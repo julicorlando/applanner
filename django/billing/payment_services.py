@@ -149,3 +149,216 @@ def cancel_tenant_recurring_subscription(recurring):
     recurring.status=TenantRecurringSubscription.Status.CANCELLED
     recurring.save(update_fields=["status","updated_at"])
     return recurring
+
+
+def connected_tenant_gateway(tenant,provider="mercadopago"):
+    connection=TenantPaymentConnection.objects.filter(
+        tenant=tenant,
+        provider=provider,
+        status=TenantPaymentConnection.Status.CONNECTED,
+    ).order_by("-environment").first()
+    if not connection:
+        raise RuntimeError("Nenhum provedor de pagamento conectado.")
+    return connection
+
+
+def _tenant_tx_status(value):
+    from .models import TenantPaymentTransaction
+    return {
+        "approved":TenantPaymentTransaction.Status.PAID,
+        "authorized":TenantPaymentTransaction.Status.PAID,
+        "processed":TenantPaymentTransaction.Status.PAID,
+        "pending":TenantPaymentTransaction.Status.PENDING,
+        "in_process":TenantPaymentTransaction.Status.PENDING,
+        "rejected":TenantPaymentTransaction.Status.FAILED,
+        "cancelled":TenantPaymentTransaction.Status.CANCELLED,
+        "refunded":TenantPaymentTransaction.Status.REFUNDED,
+        "charged_back":TenantPaymentTransaction.Status.REFUNDED,
+    }.get(str(value or "").lower(),TenantPaymentTransaction.Status.PENDING)
+
+
+def create_tenant_pix(*,tenant,reference_type,reference_id,amount,payer_email,expiration_minutes=10):
+    from secrets import token_hex
+    from django.db import IntegrityError
+    from .models import TenantPaymentTransaction
+
+    connection=connected_tenant_gateway(tenant)
+    amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+    if amount<=0:
+        raise ValueError("Valor da cobrança inválido.")
+    if "@" not in payer_email:
+        raise ValueError("Informe um e-mail válido para o Pix.")
+
+    idempotency=(
+        "pix-"+__import__("hashlib").sha256(
+            f"{tenant.pk}|{reference_type}|{reference_id}|{amount}".encode()
+        ).hexdigest()[:64]
+    )
+    existing=TenantPaymentTransaction.objects.filter(
+        tenant=tenant,idempotency_key=idempotency
+    ).first()
+    if existing and existing.status in {
+        TenantPaymentTransaction.Status.CREATED,
+        TenantPaymentTransaction.Status.PENDING,
+        TenantPaymentTransaction.Status.PAID,
+    }:
+        return existing
+
+    external=f"{reference_type[:12].upper()}-{reference_id}-{token_hex(4).upper()}"
+    expires_at=timezone.now()+__import__("datetime").timedelta(minutes=max(1,int(expiration_minutes)))
+
+    try:
+        with transaction.atomic():
+            tx=TenantPaymentTransaction.objects.create(
+                tenant=tenant,
+                connection=connection,
+                reference_type=reference_type,
+                reference_id=reference_id,
+                external_reference=external,
+                method="pix",
+                gross_amount=amount,
+                net_amount=amount,
+                status=TenantPaymentTransaction.Status.CREATED,
+                expires_at=expires_at,
+                idempotency_key=idempotency,
+            )
+    except IntegrityError:
+        return TenantPaymentTransaction.objects.get(tenant=tenant,idempotency_key=idempotency)
+
+    try:
+        remote=tenant_provider(connection).create_pix_order(
+            amount=amount,
+            external_reference=external,
+            payer_email=payer_email,
+            expiration_hours=max(1,(max(1,int(expiration_minutes))+59)//60),
+            idempotency_key=idempotency,
+        )
+        tx.provider_transaction_id=remote["order_id"]
+        tx.status=_tenant_tx_status(remote["status"])
+        tx.pix_qr_code=remote.get("qr_code_base64") or ""
+        tx.pix_copy_paste=remote.get("qr_code") or ""
+        tx.checkout_url=remote.get("ticket_url") or ""
+        tx.save(update_fields=[
+            "provider_transaction_id","status","pix_qr_code",
+            "pix_copy_paste","checkout_url","updated_at",
+        ])
+        return tx
+    except Exception:
+        TenantPaymentTransaction.objects.filter(pk=tx.pk).update(
+            status=TenantPaymentTransaction.Status.FAILED,
+            updated_at=timezone.now(),
+        )
+        raise
+
+
+def create_tenant_card_payment(
+    *,tenant,reference_type,reference_id,amount,payer_email,card_token,
+    payment_method_id,attempt_id,installments=1,issuer_id="",
+    identification=None,notification_url=""
+):
+    import hashlib
+    from secrets import token_hex
+    from .models import TenantPaymentTransaction
+
+    connection=connected_tenant_gateway(tenant)
+    amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+    if amount<=0:
+        raise ValueError("Valor da cobrança inválido.")
+    if not card_token or not payment_method_id or not attempt_id:
+        raise ValueError("Dados tokenizados do cartão incompletos.")
+
+    idempotency="card-"+hashlib.sha256(
+        f"{tenant.pk}|{reference_type}|{reference_id}|{amount}|{attempt_id}".encode()
+    ).hexdigest()[:64]
+    existing=TenantPaymentTransaction.objects.filter(
+        tenant=tenant,idempotency_key=idempotency
+    ).first()
+    if existing:
+        return existing
+
+    external=f"{reference_type[:10].upper()}-CARD-{reference_id}-{token_hex(4).upper()}"
+    with transaction.atomic():
+        tx=TenantPaymentTransaction.objects.create(
+            tenant=tenant,
+            connection=connection,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            external_reference=external,
+            method="card",
+            gross_amount=amount,
+            net_amount=amount,
+            status=TenantPaymentTransaction.Status.CREATED,
+            idempotency_key=idempotency,
+        )
+
+    try:
+        remote=tenant_provider(connection).create_tokenized_card_payment(
+            amount=amount,
+            token=card_token,
+            payment_method_id=payment_method_id,
+            payer_email=payer_email,
+            external_reference=external,
+            installments=installments,
+            issuer_id=issuer_id,
+            identification=identification,
+            notification_url=notification_url,
+            description=f"ApPlanner {reference_type} #{reference_id}",
+            idempotency_key=idempotency,
+        )
+        tx.provider_transaction_id=remote["id"]
+        tx.status=_tenant_tx_status(remote["status"])
+        tx.fee_amount=remote["fee_amount"]
+        tx.net_amount=remote["net_received_amount"]
+        tx.save(update_fields=[
+            "provider_transaction_id","status","fee_amount","net_amount","updated_at"
+        ])
+        return tx
+    except Exception:
+        TenantPaymentTransaction.objects.filter(pk=tx.pk).update(
+            status=TenantPaymentTransaction.Status.FAILED,
+            updated_at=timezone.now(),
+        )
+        raise
+
+
+def create_tenant_recurring_subscription(
+    *,tenant,reference_type,reference_id,amount,payer_email,back_url,cycle_months=1
+):
+    import hashlib
+    from .models import TenantRecurringSubscription
+
+    connection=connected_tenant_gateway(tenant)
+    amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+    cycle_months=max(1,min(12,int(cycle_months)))
+    idempotency="recurring-"+hashlib.sha256(
+        f"{tenant.pk}|{reference_type}|{reference_id}|{amount}|{cycle_months}".encode()
+    ).hexdigest()[:64]
+    existing=TenantRecurringSubscription.objects.filter(
+        tenant=tenant,idempotency_key=idempotency
+    ).first()
+    if existing:
+        return existing
+
+    external=f"{reference_type[:12].upper()}-{reference_id}-{hashlib.sha256(idempotency.encode()).hexdigest()[:8].upper()}"
+    remote=tenant_provider(connection).create_subscription(
+        reason=f"ApPlanner — {reference_type}",
+        external_reference=external,
+        payer_email=payer_email,
+        back_url=back_url,
+        amount=amount,
+        frequency=cycle_months,
+        idempotency_key=idempotency,
+    )
+    return TenantRecurringSubscription.objects.create(
+        tenant=tenant,
+        connection=connection,
+        reference_type=reference_type,
+        reference_id=reference_id,
+        external_reference=external,
+        provider_subscription_id=remote["reference"],
+        amount=amount,
+        cycle_months=cycle_months,
+        status=TenantRecurringSubscription.Status.PENDING,
+        checkout_url=remote.get("init_point") or "",
+        idempotency_key=idempotency,
+    )
