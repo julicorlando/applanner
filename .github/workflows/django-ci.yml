@@ -66,6 +66,14 @@ jobs:
           cache-dependency-path: django/requirements.txt
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Validate Docker Compose
+        env:
+          POSTGRES_DB: applanner
+          POSTGRES_USER: applanner
+          POSTGRES_PASSWORD: applanner-ci
+          DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost
+          PUBLIC_BASE_URL: http://localhost
+        run: docker compose config --quiet
       - name: Django system check
         run: python manage.py check
       - name: Check migrations are committed
