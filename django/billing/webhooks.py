@@ -15,6 +15,7 @@ from .models import (
     Subscription,
     TenantPaymentConnection,
     TenantPaymentTransaction,
+    TenantPaymentWebhookEvent,
     TenantRecurringSubscription,
     WebhookEvent,
 )
@@ -227,8 +228,28 @@ def mercadopago_tenant_webhook(request,slug):
     if not connection or not resource_id:
         return JsonResponse({"detail":"Integração não encontrada."},status=404)
 
-    if not _verify(tenant_webhook_secret(connection),request,resource_id):
+    event_key=_event_key(request,data,resource_id)
+    payload_hash=hashlib.sha256(request.body).hexdigest()
+    valid=_verify(tenant_webhook_secret(connection),request,resource_id)
+    event,created=TenantPaymentWebhookEvent.objects.get_or_create(
+        connection=connection,
+        event_id=event_key,
+        defaults={
+            "tenant":tenant,
+            "provider":"mercadopago",
+            "payload_hash":payload_hash,
+            "signature_valid":valid,
+            "status":(
+                TenantPaymentWebhookEvent.Status.RECEIVED
+                if valid else TenantPaymentWebhookEvent.Status.FAILED
+            ),
+            "error_code":"" if valid else "invalid_signature",
+        },
+    )
+    if not valid:
         return JsonResponse({"detail":"Assinatura inválida."},status=401)
+    if not created and event.status==TenantPaymentWebhookEvent.Status.PROCESSED:
+        return JsonResponse({"ok":True,"duplicate":True})
 
     provider=tenant_provider(connection)
     kind=str(data.get("type") or "")
@@ -248,10 +269,26 @@ def mercadopago_tenant_webhook(request,slug):
             if tx:
                 tx.provider_transaction_id=resource_id
                 tx.status=_tenant_status(remote.get("status"))
-                fee=sum(Decimal(str(item.get("amount") or 0)) for item in remote.get("fee_details",[]) if isinstance(item,dict))
+                fee=sum(
+                    Decimal(str(item.get("amount") or 0))
+                    for item in remote.get("fee_details",[])
+                    if isinstance(item,dict)
+                )
                 tx.fee_amount=fee
-                tx.net_amount=Decimal(str((remote.get("transaction_details") or {}).get("net_received_amount") or (tx.gross_amount-fee)))
-                tx.save(update_fields=["provider_transaction_id","status","fee_amount","net_amount","updated_at"])
+                tx.net_amount=Decimal(str(
+                    (remote.get("transaction_details") or {}).get("net_received_amount")
+                    or (tx.gross_amount-fee)
+                ))
+                if tx.status==TenantPaymentTransaction.Status.PAID:
+                    tx.paid_at=tx.paid_at or timezone.now()
+                    tx.reconciled_at=tx.reconciled_at or timezone.now()
+                tx.save(update_fields=[
+                    "provider_transaction_id","status","fee_amount","net_amount",
+                    "paid_at","reconciled_at","updated_at",
+                ])
+            else:
+                event.status=TenantPaymentWebhookEvent.Status.IGNORED
+                event.error_code="transaction_not_found"
         elif "preapproval" in kind or "preapproval" in action or "subscription" in kind:
             remote=provider.get_subscription(resource_id)
             recurring=TenantRecurringSubscription.objects.filter(
@@ -260,11 +297,27 @@ def mercadopago_tenant_webhook(request,slug):
             if recurring:
                 recurring.status=_recurring_status(remote.get("status"))
                 recurring.save(update_fields=["status","updated_at"])
+            else:
+                event.status=TenantPaymentWebhookEvent.Status.IGNORED
+                event.error_code="subscription_not_found"
+        else:
+            event.status=TenantPaymentWebhookEvent.Status.IGNORED
+            event.error_code="unsupported_event"
+
         connection.last_sync_at=timezone.now()
         connection.last_error_code=""
         connection.save(update_fields=["last_sync_at","last_error_code","updated_at"])
+
+        if event.status==TenantPaymentWebhookEvent.Status.RECEIVED:
+            event.status=TenantPaymentWebhookEvent.Status.PROCESSED
+        event.processed_at=timezone.now()
+        event.save(update_fields=["status","processed_at","error_code"])
     except Exception as exc:
-        connection.last_error_code=exc.__class__.__name__[:120]
+        event.status=TenantPaymentWebhookEvent.Status.FAILED
+        event.error_code=exc.__class__.__name__[:80]
+        event.processed_at=timezone.now()
+        event.save(update_fields=["status","error_code","processed_at"])
+        connection.last_error_code=event.error_code
         connection.save(update_fields=["last_error_code","updated_at"])
         return JsonResponse({"detail":"Falha temporária."},status=500)
 
