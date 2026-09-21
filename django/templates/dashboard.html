@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ tenant.name }}{% endblock %}
+{% block content %}
+<div class="shell dashboard">
+  <div class="dashboard-head">
+    <div><span class="eyebrow">VISÃO DE HOJE</span><h1>{{ tenant.name }}</h1><p>{{ today_pending }} compromisso{{ today_pending|pluralize }} ainda pela frente.</p></div>
+    <div class="status-pill">{{ subscription.get_status_display|default:"Operação ativa" }}</div>
+  </div>
+  <section class="metric-grid">
+    <article><span>Agenda hoje</span><strong>{{ today_total }}</strong><small>{{ today_pending }} próximos</small></article>
+    <article><span>Clientes ativos</span><strong>{{ customers }}</strong><small>base do estabelecimento</small></article>
+    <article><span>Equipe</span><strong>{{ professionals }}</strong><small>profissionais ativos</small></article>
+    <article><span>Receita do mês</span><strong>R$ {{ revenue|floatformat:2 }}</strong><small>transações pagas</small></article>
+  </section>
+  <div class="dashboard-grid">
+    <section class="panel">
+      <div class="panel-head"><h2>Próximos atendimentos</h2></div>
+      <div class="appointment-list">
+        {% for item in next_appointments %}
+          <div class="appointment-row">
+            <time>{{ item.starts_at|date:"H:i" }}</time>
+            <div><strong>{{ item.customer.name }}</strong><span>{{ item.service.name }}{% if item.professional %} · {{ item.professional.name }}{% endif %}</span></div>
+            <em>{{ item.get_status_display }}</em>
+          </div>
+        {% empty %}<p class="empty">Nenhum atendimento para hoje.</p>{% endfor %}
+      </div>
+    </section>
+    <aside class="panel modules-panel">
+      <div class="panel-head"><h2>Módulos</h2></div>
+      {% for link in modules %}<div class="module-row"><span></span><b>{{ link.module.name }}</b></div>{% empty %}<p class="empty">Os módulos do plano aparecerão aqui.</p>{% endfor %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Master · ApPlanner{% endblock %}
+{% block content %}
+<div class="shell dashboard">
+  <div class="dashboard-head"><div><span class="eyebrow">PLATAFORMA</span><h1>Operations Center</h1><p>Visão consolidada do ApPlanner.</p></div><a class="button" href="/admin/">Administração</a></div>
+  <section class="metric-grid">
+    <article><span>Estabelecimentos</span><strong>{{ tenants_total }}</strong><small>{{ tenants_active }} ativos</small></article>
+    <article><span>Assinaturas</span><strong>{{ subscriptions_active }}</strong><small>ativas</small></article>
+    <article><span>Oportunidades</span><strong>{{ open_leads }}</strong><small>em aberto</small></article>
+    <article><span>Incidentes críticos</span><strong>{{ critical_incidents }}</strong><small>requerem atenção</small></article>
+  </section>
+</div>
+{% endblock %}

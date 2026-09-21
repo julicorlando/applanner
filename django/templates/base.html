@@ -3,14 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
   <title>{% block title %}ApPlanner{% endblock %}</title>
+  <meta name="description" content="{% block description %}Agenda, operação, pagamentos e relacionamento em uma plataforma preparada para o seu negócio.{% endblock %}">
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">ApPlanner</a>
-    <nav><a href="/admin/">Admin</a></nav>
+    <a class="brand" href="/" aria-label="ApPlanner início">
+      <span class="brand-mark">A</span><span>ApPlanner</span>
+    </a>
+    <nav class="nav">
+      {% if request.user.is_authenticated %}
+        <a href="/">Dashboard</a>
+        {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
+        <a href="/account/2fa/setup/">Segurança</a>
+        <form method="post" action="/account/logout/" class="nav-form">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form>
+      {% else %}
+        <a href="/directory/">Explorar</a>
+        <a href="#segmentos">Segmentos</a>
+        <a class="nav-cta" href="/account/login/">Entrar</a>
+      {% endif %}
+    </nav>
   </header>
-  <main class="shell">{% block content %}{% endblock %}</main>
+  <main>{% block content %}{% endblock %}</main>
+  <footer class="footer">
+    <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>
+    <span>© {% now "Y" %} ApPlanner</span>
+  </footer>
 </body>
 </html>
