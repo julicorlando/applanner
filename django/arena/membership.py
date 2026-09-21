@@ -58,11 +58,8 @@ def _ensure_monthly_finance(membership):
 
 @transaction.atomic
 def generate_membership(membership):
-    membership=(
-        Membership.objects
-        .select_for_update()
-        .select_related("tenant","customer","court","modality")
-        .get(pk=membership.pk,status=Membership.Status.ACTIVE)
+    membership=Membership.objects.select_for_update().get(
+        pk=membership.pk,status=Membership.Status.ACTIVE
     )
     today=timezone.localdate()
     from_day=max(today,membership.start_date)
