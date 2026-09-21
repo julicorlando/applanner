@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from core.models import TimeStampedModel
@@ -30,8 +31,8 @@ class ArenaSettings(models.Model):
     allow_waitlist=models.BooleanField(default=True)
     allow_games=models.BooleanField(default=True)
     dynamic_pricing_enabled=models.BooleanField(default=False)
-    dynamic_min_multiplier=models.DecimalField(max_digits=6,decimal_places=3,default=0.800)
-    dynamic_max_multiplier=models.DecimalField(max_digits=6,decimal_places=3,default=1.300)
+    dynamic_min_multiplier=models.DecimalField(max_digits=6,decimal_places=3,default=Decimal("0.800"))
+    dynamic_max_multiplier=models.DecimalField(max_digits=6,decimal_places=3,default=Decimal("1.300"))
     dynamic_last_minute_hours=models.PositiveSmallIntegerField(default=4)
     dynamic_last_minute_discount_percent=models.DecimalField(max_digits=6,decimal_places=2,default=10)
     dynamic_high_occupancy_threshold=models.DecimalField(max_digits=6,decimal_places=2,default=70)
@@ -40,7 +41,7 @@ class ArenaSettings(models.Model):
     dynamic_low_occupancy_discount_percent=models.DecimalField(max_digits=6,decimal_places=2,default=5)
     dynamic_low_demand_window_hours=models.PositiveSmallIntegerField(default=24)
     dynamic_weekend_surcharge_percent=models.DecimalField(max_digits=6,decimal_places=2,default=0)
-    dynamic_rounding_step=models.DecimalField(max_digits=8,decimal_places=2,default=0.01)
+    dynamic_rounding_step=models.DecimalField(max_digits=8,decimal_places=2,default=Decimal("0.01"))
     waitlist_email_enabled=models.BooleanField(default=True)
     waitlist_whatsapp_enabled=models.BooleanField(default=False)
     reservation_reminder_enabled=models.BooleanField(default=True)
