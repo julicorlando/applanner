@@ -8,6 +8,7 @@ TASKS=[
     ("Processar notificações","communications.tasks.process_notification_queue",1,"minutes"),
     ("Processar e-mail marketing","communications.tasks.process_marketing_deliveries",1,"minutes"),
     ("Gerar lembretes de agenda","scheduling.tasks.queue_appointment_reminders",5,"minutes"),
+    ("Gerar reservas de mensalistas Arena","arena.tasks.generate_due_memberships",6,"hours"),
 ]
 
 
