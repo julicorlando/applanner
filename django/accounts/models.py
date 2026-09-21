@@ -30,11 +30,44 @@ class User(AbstractUser):
     must_change_password=models.BooleanField(default=False)
     locale=models.CharField(max_length=10,default="pt-br")
     session_version=models.PositiveIntegerField(default=1)
+    two_factor_secret_encrypted=models.TextField(blank=True)
+    two_factor_enabled_at=models.DateTimeField(null=True,blank=True)
+    two_factor_last_step=models.BigIntegerField(default=0)
 
     USERNAME_FIELD="email"
     REQUIRED_FIELDS=[]
 
     objects=UserManager()
 
+    @property
+    def two_factor_enabled(self):
+        return bool(self.two_factor_secret_encrypted and self.two_factor_enabled_at)
+
     def __str__(self):
         return self.email
+
+
+class RecoveryCode(models.Model):
+    user=models.ForeignKey(User,on_delete=models.CASCADE,related_name="recovery_codes")
+    code_hash=models.CharField(max_length=64)
+    created_at=models.DateTimeField(auto_now_add=True)
+    used_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["user","used_at"])]
+
+
+class TrustedDevice(models.Model):
+    user=models.ForeignKey(User,on_delete=models.CASCADE,related_name="trusted_devices")
+    selector=models.CharField(max_length=64,unique=True)
+    verifier_hash=models.CharField(max_length=64)
+    label=models.CharField(max_length=180,blank=True)
+    user_agent=models.CharField(max_length=500,blank=True)
+    ip_address=models.GenericIPAddressField(null=True,blank=True)
+    session_version=models.PositiveIntegerField()
+    expires_at=models.DateTimeField(db_index=True)
+    last_used_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["user","expires_at"])]
