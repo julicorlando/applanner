@@ -27,13 +27,20 @@ def send_notification(self,notification_id):
             if html:
                 message.attach_alternative(html,"text/html")
             message.send(fail_silently=False)
+        elif notification.channel==Notification.Channel.WHATSAPP:
+            from .whatsapp import send_text
+            provider_id=send_text(
+                notification.destination,
+                notification.payload.get("text") or notification.payload.get("message") or "",
+            )
+            notification.provider_reference=provider_id
         else:
             raise RuntimeError(f"Canal ainda sem provider ativo: {notification.channel}")
 
         notification.status=Notification.Status.SENT
         notification.sent_at=timezone.now()
         notification.error_message=""
-        notification.save(update_fields=["status","sent_at","error_message"])
+        notification.save(update_fields=["status","sent_at","error_message","provider_reference"])
 
 
 @shared_task
@@ -73,12 +80,21 @@ def send_marketing_delivery(self,delivery_id):
             delivery.save(update_fields=["status","updated_at"])
             return
 
+        from django.conf import settings
+        base=settings.PUBLIC_BASE_URL.rstrip("/")
+        html=delivery.campaign.body
+        if base:
+            pixel=f'<img src="{base}/tracking/email/{delivery.tracking_token}/open.gif" width="1" height="1" alt="" />'
+            html=html+pixel
+            if delivery.campaign.card_link_url:
+                tracked=f"{base}/tracking/email/{delivery.tracking_token}/click/"
+                html=html.replace(delivery.campaign.card_link_url,tracked)
         message=EmailMultiAlternatives(
             subject=delivery.campaign.subject,
             body=delivery.campaign.body,
             to=[delivery.lead.email],
         )
-        message.attach_alternative(delivery.campaign.body,"text/html")
+        message.attach_alternative(html,"text/html")
         message.send(fail_silently=False)
 
         delivery.status=MarketingDelivery.Status.SENT

@@ -1,3 +1,5 @@
+import secrets
+import uuid
 from django.conf import settings
 from django.db import models
 from core.models import TimeStampedModel
@@ -16,6 +18,7 @@ class Notification(models.Model):
         SENT="sent","Enviada"
         FAILED="failed","Falhou"
         CANCELLED="cancelled","Cancelada"
+        SKIPPED="skipped","Ignorada"
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="notifications")
     customer=models.ForeignKey("scheduling.Customer",null=True,blank=True,on_delete=models.SET_NULL,related_name="notifications")
@@ -174,7 +177,68 @@ class MarketingDelivery(TimeStampedModel):
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.QUEUED,db_index=True)
     error_message=models.CharField(max_length=500,blank=True)
     sent_at=models.DateTimeField(null=True,blank=True)
+    opened_at=models.DateTimeField(null=True,blank=True)
+    clicked_at=models.DateTimeField(null=True,blank=True)
+    tracking_token=models.UUIDField(default=uuid.uuid4,unique=True,editable=False)
 
     class Meta:
         constraints=[models.UniqueConstraint(fields=["campaign","lead"],name="uq_marketing_delivery")]
         indexes=[models.Index(fields=["campaign","status"])]
+
+
+class WhatsAppConversation(TimeStampedModel):
+    class Status(models.TextChoices):
+        BOT="bot","Bot"
+        WAITING_HUMAN="waiting_human","Aguardando humano"
+        HUMAN="human","Humano"
+        CLOSED="closed","Fechada"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="whatsapp_conversations")
+    customer=models.ForeignKey("scheduling.Customer",null=True,blank=True,on_delete=models.SET_NULL,related_name="whatsapp_conversations")
+    wa_id=models.CharField(max_length=32)
+    contact_name=models.CharField(max_length=150,blank=True)
+    status=models.CharField(max_length=20,choices=Status.choices,default=Status.BOT,db_index=True)
+    bot_state=models.CharField(max_length=60,default="welcome")
+    assigned_to=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="whatsapp_conversations")
+    context=models.JSONField(default=dict,blank=True)
+    last_message_at=models.DateTimeField()
+    
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["tenant","wa_id"],name="uq_wa_conversation")]
+        indexes=[models.Index(fields=["tenant","status","last_message_at"],name="comm_wa_inbox_idx")]
+
+
+class WhatsAppMessage(models.Model):
+    class Direction(models.TextChoices):
+        IN="in","Entrada"
+        OUT="out","Saída"
+
+    class SenderType(models.TextChoices):
+        CUSTOMER="customer","Cliente"
+        BOT="bot","Bot"
+        USER="user","Usuário"
+        SYSTEM="system","Sistema"
+
+    class Status(models.TextChoices):
+        RECEIVED="received","Recebida"
+        QUEUED="queued","Na fila"
+        SENT="sent","Enviada"
+        DELIVERED="delivered","Entregue"
+        READ="read","Lida"
+        FAILED="failed","Falhou"
+
+    conversation=models.ForeignKey(WhatsAppConversation,on_delete=models.CASCADE,related_name="messages")
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="whatsapp_messages")
+    provider_message_id=models.CharField(max_length=190,null=True,blank=True,unique=True)
+    direction=models.CharField(max_length=4,choices=Direction.choices)
+    sender_type=models.CharField(max_length=12,choices=SenderType.choices)
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="whatsapp_messages")
+    message_type=models.CharField(max_length=30,default="text")
+    body=models.TextField(blank=True)
+    status=models.CharField(max_length=16,choices=Status.choices)
+    error_message=models.CharField(max_length=500,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+    sent_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["conversation","id"],name="comm_wa_message_idx")]

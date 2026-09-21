@@ -3,6 +3,8 @@ from django.urls import include, path
 
 from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_webhook
 from core.views import healthz, home
+from communications.views import marketing_click, marketing_open, whatsapp_webhook
+from contenthub.views import blog_post, landing, public_directory
 from scheduling.public_api import (
     CustomerAppointmentAPIView,
     PublicAvailabilityAPIView,
@@ -13,6 +15,13 @@ urlpatterns = [
     path("healthz/", healthz, name="healthz"),
     path("", home, name="home"),
     path("admin/", admin.site.urls),
+    path("account/", include("accounts.urls")),
+    path("directory/", public_directory, name="public-directory"),
+    path("blog/<slug:slug>/", blog_post, name="blog-post"),
+    path("landing/<slug:slug>/", landing, name="landing"),
+    path("tracking/email/<uuid:token>/open.gif", marketing_open, name="marketing-open"),
+    path("tracking/email/<uuid:token>/click/", marketing_click, name="marketing-click"),
+    path("webhooks/whatsapp/", whatsapp_webhook, name="whatsapp-webhook"),
     path("api/scheduling/", include("scheduling.urls")),
     path("api/public/<slug:slug>/availability/", PublicAvailabilityAPIView.as_view(), name="public-availability"),
     path("api/public/<slug:slug>/book/", PublicBookingAPIView.as_view(), name="public-booking"),
