@@ -133,7 +133,12 @@ class ArenaReservationService:
         occupied=0
         for row in Reservation.objects.filter(
             tenant=tenant,court=court,
-            status__in=[Reservation.Status.PENDING_PAYMENT,Reservation.Status.CONFIRMED],
+            status__in=[
+                Reservation.Status.PENDING_PAYMENT,
+                Reservation.Status.CONFIRMED,
+                Reservation.Status.COMPLETED,
+                Reservation.Status.NO_SHOW,
+            ],
             starts_at__lt=end_day,ends_at__gt=start_day,
         ):
             occupied+=max(0,int((min(row.ends_at,end_day)-max(row.starts_at,start_day)).total_seconds()//60))
@@ -161,7 +166,10 @@ class ArenaReservationService:
             if occupancy>=settings_obj.dynamic_high_occupancy_threshold:
                 multiplier*=Decimal("1")+(settings_obj.dynamic_high_occupancy_surcharge_percent/Decimal("100"))
                 details["high_occupancy"]=True
-            elif occupancy<=settings_obj.dynamic_low_occupancy_threshold:
+            elif (
+                occupancy<=settings_obj.dynamic_low_occupancy_threshold
+                and start-now<=timedelta(hours=settings_obj.dynamic_low_demand_window_hours)
+            ):
                 multiplier*=Decimal("1")-(settings_obj.dynamic_low_occupancy_discount_percent/Decimal("100"))
                 details["low_occupancy"]=True
 
