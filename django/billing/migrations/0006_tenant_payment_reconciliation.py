@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
                     ("failed","Falhou"),("cancelled","Cancelado"),("expired","Expirado"),
                     ("refunded","Estornado"),("partially_refunded","Estorno parcial"),
                 ],
-                db_index=True,default="created",max_length=16,
+                db_index=True,default="created",max_length=20,
             ),
         ),
         migrations.AddField(
