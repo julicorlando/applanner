@@ -177,6 +177,7 @@ class Reservation(TimeStampedModel):
     class PaymentStatus(models.TextChoices):
         NOT_REQUIRED="not_required","Não exigido"
         PENDING="pending","Pendente"
+        PARTIAL="partial","Parcial"
         PAID="paid","Pago"
         REFUNDED="refunded","Estornado"
         CANCELLED="cancelled","Cancelado"
@@ -521,6 +522,7 @@ class Tournament(TimeStampedModel):
     starts_on=models.DateField()
     ends_on=models.DateField(null=True,blank=True)
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.DRAFT,db_index=True)
+    champion_team=models.ForeignKey("TournamentTeam",null=True,blank=True,on_delete=models.SET_NULL,related_name="championships")
 
     class Meta:
         indexes=[models.Index(fields=["tenant","status","starts_on"],name="arena_tournament_status_idx")]
@@ -563,3 +565,197 @@ class TournamentMatch(TimeStampedModel):
 
     class Meta:
         indexes=[models.Index(fields=["tenant","starts_at","court","status"],name="arena_match_schedule_idx")]
+
+
+class ClassMakeup(TimeStampedModel):
+    class Status(models.TextChoices):
+        CREDIT="credit","Crédito"
+        SCHEDULED="scheduled","Agendada"
+        USED="used","Utilizada"
+        CANCELLED="cancelled","Cancelada"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_class_makeups")
+    student=models.ForeignKey(ClassStudent,on_delete=models.CASCADE,related_name="makeups")
+    original_class=models.ForeignKey(SportsClass,on_delete=models.CASCADE,related_name="makeups_origin")
+    original_date=models.DateField()
+    replacement_class=models.ForeignKey(SportsClass,null=True,blank=True,on_delete=models.SET_NULL,related_name="makeups_replacement")
+    replacement_date=models.DateField(null=True,blank=True)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.CREDIT,db_index=True)
+    notes=models.CharField(max_length=300,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="sports_makeups_created")
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","student","status","original_date"],name="arena_makeup_student_idx")]
+
+
+class ClassBillingLog(models.Model):
+    class Status(models.TextChoices):
+        GENERATED="generated","Gerada"
+        SKIPPED="skipped","Ignorada"
+        CANCELLED="cancelled","Cancelada"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_class_billing_logs")
+    student=models.ForeignKey(ClassStudent,on_delete=models.CASCADE,related_name="billing_logs")
+    competence_month=models.CharField(max_length=7)
+    amount=models.DecimalField(max_digits=12,decimal_places=2)
+    financial_transaction=models.ForeignKey("finance.FinancialTransaction",null=True,blank=True,on_delete=models.SET_NULL,related_name="sports_class_billing_logs")
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.GENERATED)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["student","competence_month"],name="uq_class_billing_month")]
+        indexes=[models.Index(fields=["tenant","competence_month","status"],name="arena_class_billing_idx")]
+
+
+class DynamicPricingAudit(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_dynamic_pricing_audits")
+    reservation=models.OneToOneField(Reservation,on_delete=models.CASCADE,related_name="dynamic_pricing_audit")
+    base_total=models.DecimalField(max_digits=12,decimal_places=2)
+    final_total=models.DecimalField(max_digits=12,decimal_places=2)
+    multiplier=models.DecimalField(max_digits=8,decimal_places=4)
+    details=models.JSONField(default=dict,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","created_at"],name="arena_dynamic_audit_idx")]
+
+
+class TournamentTeamPlayer(models.Model):
+    team=models.ForeignKey(TournamentTeam,on_delete=models.CASCADE,related_name="players")
+    customer=models.ForeignKey("scheduling.Customer",on_delete=models.PROTECT,related_name="tournament_teams")
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_tournament_players")
+    jersey_number=models.PositiveSmallIntegerField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["team","customer"],name="uq_tournament_team_player")]
+
+
+class TournamentEvent(models.Model):
+    tournament=models.ForeignKey(Tournament,on_delete=models.CASCADE,related_name="events")
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_tournament_events")
+    event_type=models.CharField(max_length=50)
+    detail=models.CharField(max_length=500,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="sports_tournament_events")
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tournament","created_at"],name="arena_tournament_event_idx")]
+
+
+class CustomerMetric(models.Model):
+    class Segment(models.TextChoices):
+        NEW="new","Novo"
+        RECURRING="recurring","Recorrente"
+        VIP="vip","VIP"
+        INACTIVE="inactive","Inativo"
+        CHURN_RISK="churn_risk","Risco de churn"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_customer_metrics")
+    customer=models.ForeignKey("scheduling.Customer",on_delete=models.CASCADE,related_name="sports_metrics")
+    last_reservation_at=models.DateTimeField(null=True,blank=True)
+    reservation_count=models.PositiveIntegerField(default=0)
+    cancellation_count=models.PositiveIntegerField(default=0)
+    no_show_count=models.PositiveIntegerField(default=0)
+    total_spent=models.DecimalField(max_digits=14,decimal_places=2,default=0)
+    average_ticket=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    favorite_court=models.ForeignKey(Court,null=True,blank=True,on_delete=models.SET_NULL,related_name="+")
+    favorite_modality=models.ForeignKey(Modality,null=True,blank=True,on_delete=models.SET_NULL,related_name="+")
+    is_membership=models.BooleanField(default=False)
+    game_count=models.PositiveIntegerField(default=0)
+    segment=models.CharField(max_length=16,choices=Segment.choices,default=Segment.NEW,db_index=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["tenant","customer"],name="uq_arena_customer_metric")]
+        indexes=[models.Index(fields=["tenant","segment","last_reservation_at"],name="arena_customer_segment_idx")]
+
+
+class AutomationLog(models.Model):
+    class Status(models.TextChoices):
+        SKIPPED="skipped","Ignorado"
+        QUEUED="queued","Na fila"
+        SENT="sent","Enviado"
+        FAILED="failed","Falhou"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_automation_logs")
+    automation_key=models.CharField(max_length=80)
+    entity_type=models.CharField(max_length=60,blank=True)
+    entity_id=models.BigIntegerField(null=True,blank=True)
+    channel=models.CharField(max_length=20,blank=True)
+    status=models.CharField(max_length=16,choices=Status.choices)
+    detail=models.CharField(max_length=500,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","automation_key","created_at"],name="arena_automation_idx")]
+
+
+class ArenaCommand(TimeStampedModel):
+    class Status(models.TextChoices):
+        OPEN="open","Aberta"
+        CLOSED="closed","Fechada"
+        CANCELLED="cancelled","Cancelada"
+
+    class PaymentStatus(models.TextChoices):
+        PENDING="pending","Pendente"
+        PAID="paid","Pago"
+        PARTIAL="partial","Parcial"
+        CANCELLED="cancelled","Cancelado"
+
+    public_id=models.CharField(max_length=32,unique=True)
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_commands")
+    reservation=models.ForeignKey(Reservation,null=True,blank=True,on_delete=models.SET_NULL,related_name="commands")
+    customer=models.ForeignKey("scheduling.Customer",null=True,blank=True,on_delete=models.SET_NULL,related_name="sports_commands")
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.OPEN,db_index=True)
+    subtotal=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    discount=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    surcharge=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    total=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    payment_method=models.CharField(max_length=40,blank=True)
+    payment_status=models.CharField(max_length=16,choices=PaymentStatus.choices,default=PaymentStatus.PENDING)
+    notes=models.CharField(max_length=500,blank=True)
+    opened_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="sports_commands_opened")
+    closed_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="sports_commands_closed")
+    opened_at=models.DateTimeField()
+    closed_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","status","opened_at"],name="arena_command_status_idx")]
+
+
+class ArenaCommandItem(models.Model):
+    command=models.ForeignKey(ArenaCommand,on_delete=models.CASCADE,related_name="items")
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_command_items")
+    product=models.ForeignKey("finance.Product",null=True,blank=True,on_delete=models.SET_NULL,related_name="sports_command_items")
+    description=models.CharField(max_length=190)
+    quantity=models.DecimalField(max_digits=12,decimal_places=3)
+    unit_price=models.DecimalField(max_digits=12,decimal_places=2)
+    cost_snapshot=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    total=models.DecimalField(max_digits=12,decimal_places=2)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["command"],name="arena_command_item_idx")]
+
+
+class ArenaCommandStockMovement(models.Model):
+    class Type(models.TextChoices):
+        COMMAND_CLOSE="command_close","Fechamento de comanda"
+        COMMAND_REVERSAL="command_reversal","Estorno de comanda"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="sports_command_stock_movements")
+    command=models.ForeignKey(ArenaCommand,on_delete=models.CASCADE,related_name="stock_movements")
+    product=models.ForeignKey("finance.Product",on_delete=models.PROTECT,related_name="sports_command_stock_movements")
+    quantity=models.DecimalField(max_digits=12,decimal_places=3)
+    balance_after=models.DecimalField(max_digits=12,decimal_places=3)
+    movement_type=models.CharField(max_length=24,choices=Type.choices)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(
+                fields=["command","product","movement_type"],
+                name="uq_arena_command_stock",
+            )
+        ]
