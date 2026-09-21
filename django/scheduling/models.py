@@ -20,7 +20,29 @@ class Professional(TimeStampedModel):
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="professionals")
     user=models.OneToOneField(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
     name=models.CharField(max_length=150)
+    public_slug=models.SlugField(max_length=120,blank=True)
+    email=models.EmailField(blank=True)
+    phone=models.CharField(max_length=32,blank=True)
+    specialty=models.CharField(max_length=150,blank=True)
+    photo=models.ImageField(upload_to="professionals/",blank=True)
+    commission_percent=models.DecimalField(max_digits=5,decimal_places=2,null=True,blank=True)
     active=models.BooleanField(default=True)
+    services=models.ManyToManyField("Service",through="ProfessionalService",related_name="professionals",blank=True)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["tenant","public_slug"],name="uq_professional_public_slug"),
+        ]
+
+
+class ProfessionalService(models.Model):
+    professional=models.ForeignKey(Professional,on_delete=models.CASCADE)
+    service=models.ForeignKey("Service",on_delete=models.CASCADE)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["professional","service"],name="uq_professional_service"),
+        ]
 
 
 class Service(TimeStampedModel):
