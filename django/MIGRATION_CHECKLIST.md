@@ -10,6 +10,7 @@
 - [x] Usuário por e-mail e compatibilidade bcrypt PHP -> Argon2
 - [x] Isolamento de tenant na API inicial
 - [x] CI com PostgreSQL/Redis, checks, migrations e testes
+- [x] CI verde com PostgreSQL real antes do port dos módulos especializados
 
 ## Em andamento
 
@@ -34,12 +35,12 @@
 
 ## Ainda a portar integralmente
 
-- [ ] RBAC completo e permissões do legado
-- [ ] Mercado Pago + PIX + webhooks
+- [x] RBAC estrutural + ETL de papéis/permissões do legado; falta aplicar guards em todas as telas especializadas
+- [x] Mercado Pago + PIX + webhooks — plataforma + tenant, assinatura HMAC, Pix, cartão tokenizado e recorrência
 - [ ] Comercial/CRM/leads/equipe/comissões comerciais
 - [ ] Arena/sports/tournaments/memberships/dynamic pricing
 - [ ] Automotivo/vehicles/jobs/estimates/commands
-- [ ] Barbearia/memberships/goals/maintenance
+- [x] Barbearia — ciclo de atendimento, comanda, fila, metas, comissão/remuneração, estoque e financeiro; memberships usam recorrência genérica
 - [ ] Saúde/prontuário
 - [ ] Loyalty/referrals/waitlist/packages
 - [ ] Blog/public directory/landings
