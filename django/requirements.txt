@@ -1,0 +1,16 @@
+Django>=5.2,<5.3
+psycopg[binary]>=3.2,<4
+gunicorn>=23,<24
+uvicorn[standard]>=0.35,<1
+celery[redis]>=5.5,<6
+django-celery-beat>=2.8,<3
+django-environ>=0.12,<1
+django-redis>=5.4,<6
+djangorestframework>=3.16,<4
+argon2-cffi>=25,<26
+bcrypt>=4.2,<5
+cryptography>=45,<47
+whitenoise>=6.9,<7
+requests>=2.32,<3
+Pillow>=11,<13
+sentry-sdk[django]>=2.35,<3
