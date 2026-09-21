@@ -1,0 +1,27 @@
+# Checklist de paridade funcional
+
+- [x] Base Django e Docker/Coolify
+- [x] Tenant/multiempresa inicial
+- [x] Usuário por e-mail e camada de compatibilidade bcrypt PHP
+- [x] Núcleo inicial de clientes/profissionais/serviços/agendamentos
+- [x] Núcleo inicial de planos/assinaturas/pagamentos
+- [ ] RBAC completo e permissões do legado
+- [ ] 2FA, recovery codes e trusted devices
+- [ ] Branding/domínios/i18n completo
+- [ ] Mercado Pago + PIX + webhooks
+- [ ] Financeiro/banking/stock/packages
+- [ ] Comercial/CRM/leads/equipe/comissões
+- [ ] Marketing/e-mail/WhatsApp
+- [ ] Arena/sports/tournaments/memberships/dynamic pricing
+- [ ] Automotivo/vehicles
+- [ ] Barbearia/memberships/goals/maintenance
+- [ ] Saúde/prontuário
+- [ ] Loyalty/referrals/waitlist
+- [ ] Blog/public directory/landings
+- [ ] Funil/UTM/Meta CAPI
+- [ ] Master/support/incidents/operations center
+- [ ] Importação de dados e ETL MySQL -> PostgreSQL
+- [ ] Conversão dos 14 crons para Celery Beat
+- [ ] Testes de regressão e segurança
+- [ ] Homologação paralela
+- [ ] Cutover e rollback
