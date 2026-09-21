@@ -77,7 +77,7 @@ class ProfessionalAvailability(TimeStampedModel):
     class Meta:
         constraints=[
             models.UniqueConstraint(fields=["professional","weekday"],name="uq_professional_availability_day"),
-            models.CheckConstraint(condition=models.Q(weekday__lte=6),name="availability_weekday_lte_6"),
+            models.CheckConstraint(condition=models.Q(weekday__gte=1,weekday__lte=7),name="availability_weekday_iso"),
             models.CheckConstraint(condition=models.Q(end_time__gt=models.F("start_time")),name="availability_end_after_start"),
         ]
 
@@ -94,7 +94,7 @@ class ProfessionalBreak(TimeStampedModel):
     class Meta:
         indexes=[models.Index(fields=["tenant","professional","weekday","active"])]
         constraints=[
-            models.CheckConstraint(condition=models.Q(weekday__lte=6),name="break_weekday_lte_6"),
+            models.CheckConstraint(condition=models.Q(weekday__gte=1,weekday__lte=7),name="break_weekday_iso"),
             models.CheckConstraint(condition=models.Q(end_time__gt=models.F("start_time")),name="break_end_after_start"),
         ]
 
