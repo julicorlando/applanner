@@ -2,6 +2,8 @@
 set -eu
 
 python manage.py migrate --noinput
+python manage.py seed_modules
+python manage.py seed_periodic_tasks
 python manage.py collectstatic --noinput
 
 exec gunicorn applanner.wsgi:application \
