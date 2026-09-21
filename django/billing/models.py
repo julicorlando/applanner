@@ -316,7 +316,9 @@ class TenantPaymentTransaction(TimeStampedModel):
         PAID="paid","Pago"
         FAILED="failed","Falhou"
         CANCELLED="cancelled","Cancelado"
+        EXPIRED="expired","Expirado"
         REFUNDED="refunded","Estornado"
+        PARTIALLY_REFUNDED="partially_refunded","Estorno parcial"
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="payment_transactions")
     connection=models.ForeignKey(TenantPaymentConnection,on_delete=models.PROTECT,related_name="transactions")
