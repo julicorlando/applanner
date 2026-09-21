@@ -41,6 +41,7 @@ def login_view(request):
             return redirect("accounts:two-factor-challenge")
 
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
+        request.session["session_version"]=user.session_version
         return redirect(request.GET.get("next") or settings.LOGIN_REDIRECT_URL)
     return render(request,"accounts/login.html")
 
@@ -78,6 +79,7 @@ def two_factor_challenge(request):
         remember=bool(request.session.pop("pre_2fa_remember",False))
         request.session.pop("pre_2fa_user_id",None)
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
+        request.session["session_version"]=user.session_version
         response=redirect(settings.LOGIN_REDIRECT_URL)
         if remember:
             token=issue_trusted_device(
@@ -122,6 +124,7 @@ def two_factor_setup(request):
                 "two_factor_secret_encrypted","two_factor_enabled_at",
                 "two_factor_last_step","session_version",
             ])
+            request.session["session_version"]=request.user.session_version
             codes=generate_recovery_codes(request.user)
             request.session.pop("two_factor_setup_secret",None)
             return render(request,"accounts/recovery_codes.html",{"codes":codes})
@@ -145,6 +148,7 @@ def two_factor_disable(request):
         "two_factor_secret_encrypted","two_factor_enabled_at",
         "two_factor_last_step","session_version",
     ])
+    request.session["session_version"]=request.user.session_version
     request.user.recovery_codes.all().delete()
     request.user.trusted_devices.all().delete()
     response=redirect("accounts:two-factor-setup")
