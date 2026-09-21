@@ -5,8 +5,12 @@ from zoneinfo import ZoneInfo
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
+from billing.models import Module, TenantModule
+from finance.models import FinancialTransaction
+from scheduling.models import Customer
 from tenants.models import Tenant
-from .models import Court, CourtHours, PriceRule, Reservation
+from .membership import generate_membership
+from .models import Court, CourtHours, Membership, MembershipReservation, PriceRule, Reservation
 from .services import ArenaReservationService
 
 
@@ -48,3 +52,53 @@ class ArenaReservationServiceTests(TestCase):
                 customer_name="Outro",customer_phone="81888888888",
                 payment_method="onsite",public_rules=False,
             )
+
+
+class ArenaMembershipTests(TestCase):
+    def setUp(self):
+        from django.utils import timezone
+        self.tenant=Tenant.objects.create(name="Arena Membership",slug="arena-membership",status=Tenant.Status.ACTIVE)
+        self.customer=Customer.objects.create(
+            tenant=self.tenant,name="Mensalista",phone="81999999999",email="mensalista@example.com"
+        )
+        self.court=Court.objects.create(
+            tenant=self.tenant,name="Quadra Mensalista",slug="quadra-mensalista",
+            minimum_minutes=60,maximum_minutes=120
+        )
+        today=timezone.localdate()
+        CourtHours.objects.create(
+            tenant=self.tenant,court=self.court,weekday=today.isoweekday(),
+            start_time=time(8,0),end_time=time(22,0)
+        )
+        PriceRule.objects.create(
+            tenant=self.tenant,court=self.court,weekday=today.isoweekday(),
+            start_time=time(8,0),end_time=time(22,0),
+            price_per_hour=Decimal("100.00"),priority=10
+        )
+        finance=Module.objects.create(slug="finance-test",name="Finance Test")
+        TenantModule.objects.create(tenant=self.tenant,module=finance,enabled=True)
+
+    def test_membership_generates_reservation_and_advances_cursor(self):
+        from django.utils import timezone
+        today=timezone.localdate()
+        membership=Membership.objects.create(
+            tenant=self.tenant,
+            customer=self.customer,
+            court=self.court,
+            name="Horário fixo",
+            frequency=Membership.Frequency.WEEKLY,
+            weekday=today.isoweekday(),
+            start_time=time(10,0),
+            duration_minutes=60,
+            monthly_amount=Decimal("200.00"),
+            start_date=today,
+            generate_days_ahead=7,
+            status=Membership.Status.ACTIVE,
+        )
+
+        result=generate_membership(membership)
+        membership.refresh_from_db()
+
+        self.assertGreaterEqual(result["generated"],1)
+        self.assertTrue(MembershipReservation.objects.filter(membership=membership).exists())
+        self.assertIsNotNone(membership.next_generation_date)
