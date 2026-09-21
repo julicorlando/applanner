@@ -280,7 +280,7 @@ class WebhookEvent(models.Model):
 
     class Meta:
         constraints=[models.UniqueConstraint(fields=["provider","event_id"],name="uq_webhook_event")]
-        indexes=[models.Index(fields=["provider","status","received_at"])]
+        indexes=[models.Index(fields=["provider","status","received_at"],name="billing_webhook_status_idx")]
 
 
 class TenantPaymentConnection(TimeStampedModel):
@@ -338,8 +338,8 @@ class TenantPaymentTransaction(TimeStampedModel):
             models.UniqueConstraint(fields=["tenant","idempotency_key"],name="uq_tenant_payment_tx_idempotency"),
         ]
         indexes=[
-            models.Index(fields=["tenant","reference_type","reference_id"]),
-            models.Index(fields=["provider_transaction_id"]),
+            models.Index(fields=["tenant","reference_type","reference_id"],name="billing_tpt_ref_idx"),
+            models.Index(fields=["provider_transaction_id"],name="billing_tpt_provider_idx"),
         ]
 
 
@@ -373,4 +373,4 @@ class TenantRecurringSubscription(TimeStampedModel):
                 name="uq_tenant_recurring_provider",
             ),
         ]
-        indexes=[models.Index(fields=["tenant","reference_type","reference_id"])]
+        indexes=[models.Index(fields=["tenant","reference_type","reference_id"],name="billing_trs_ref_idx")]
