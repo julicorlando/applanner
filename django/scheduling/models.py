@@ -20,7 +20,7 @@ class Professional(TimeStampedModel):
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="professionals")
     user=models.OneToOneField(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
     name=models.CharField(max_length=150)
-    public_slug=models.SlugField(max_length=120,blank=True)
+    public_slug=models.SlugField(max_length=120,null=True,blank=True)
     email=models.EmailField(blank=True)
     phone=models.CharField(max_length=32,blank=True)
     specialty=models.CharField(max_length=150,blank=True)
