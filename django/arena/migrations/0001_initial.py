@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
@@ -38,8 +39,8 @@ class Migration(migrations.Migration):
                 ("allow_waitlist",models.BooleanField(default=True)),
                 ("allow_games",models.BooleanField(default=True)),
                 ("dynamic_pricing_enabled",models.BooleanField(default=False)),
-                ("dynamic_min_multiplier",models.DecimalField(decimal_places=3,default=0.8,max_digits=6)),
-                ("dynamic_max_multiplier",models.DecimalField(decimal_places=3,default=1.3,max_digits=6)),
+                ("dynamic_min_multiplier",models.DecimalField(decimal_places=3,default=Decimal("0.800"),max_digits=6)),
+                ("dynamic_max_multiplier",models.DecimalField(decimal_places=3,default=Decimal("1.300"),max_digits=6)),
                 ("dynamic_last_minute_hours",models.PositiveSmallIntegerField(default=4)),
                 ("dynamic_last_minute_discount_percent",models.DecimalField(decimal_places=2,default=10,max_digits=6)),
                 ("dynamic_high_occupancy_threshold",models.DecimalField(decimal_places=2,default=70,max_digits=6)),
@@ -48,7 +49,7 @@ class Migration(migrations.Migration):
                 ("dynamic_low_occupancy_discount_percent",models.DecimalField(decimal_places=2,default=5,max_digits=6)),
                 ("dynamic_low_demand_window_hours",models.PositiveSmallIntegerField(default=24)),
                 ("dynamic_weekend_surcharge_percent",models.DecimalField(decimal_places=2,default=0,max_digits=6)),
-                ("dynamic_rounding_step",models.DecimalField(decimal_places=2,default=0.01,max_digits=8)),
+                ("dynamic_rounding_step",models.DecimalField(decimal_places=2,default=Decimal("0.01"),max_digits=8)),
                 ("waitlist_email_enabled",models.BooleanField(default=True)),
                 ("waitlist_whatsapp_enabled",models.BooleanField(default=False)),
                 ("reservation_reminder_enabled",models.BooleanField(default=True)),
