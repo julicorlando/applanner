@@ -231,3 +231,146 @@ class TenantModuleAddon(TimeStampedModel):
 
     class Meta:
         constraints=[models.UniqueConstraint(fields=["tenant","module"],name="uq_tenant_module_addon")]
+
+
+class PaymentGateway(TimeStampedModel):
+    class Environment(models.TextChoices):
+        SANDBOX="sandbox","Sandbox"
+        PRODUCTION="production","Produção"
+
+    class TestStatus(models.TextChoices):
+        NOT_VALIDATED="not_validated","Não validado"
+        VALIDATED="validated","Validado"
+        FAILED="failed","Falhou"
+
+    provider=models.CharField(max_length=60,default="mercadopago")
+    environment=models.CharField(max_length=16,choices=Environment.choices)
+    public_key=models.CharField(max_length=190,blank=True)
+    access_token_encrypted=models.TextField()
+    webhook_secret_encrypted=models.TextField()
+    webhook_url=models.URLField(max_length=500)
+    active=models.BooleanField(default=False)
+    last_tested_at=models.DateTimeField(null=True,blank=True)
+    last_test_status=models.CharField(max_length=20,choices=TestStatus.choices,default=TestStatus.NOT_VALIDATED)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["provider","environment"],name="uq_payment_gateway_env"),
+        ]
+
+
+class WebhookEvent(models.Model):
+    class Status(models.TextChoices):
+        RECEIVED="received","Recebido"
+        PROCESSED="processed","Processado"
+        REJECTED="rejected","Rejeitado"
+        FAILED="failed","Falhou"
+
+    provider=models.CharField(max_length=60)
+    event_id=models.CharField(max_length=190)
+    resource_type=models.CharField(max_length=60,blank=True)
+    resource_id=models.CharField(max_length=190,blank=True)
+    signature_valid=models.BooleanField(default=False)
+    payload_hash=models.CharField(max_length=64)
+    payload=models.JSONField(default=dict,blank=True)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.RECEIVED,db_index=True)
+    error_message=models.CharField(max_length=500,blank=True)
+    received_at=models.DateTimeField(auto_now_add=True)
+    processed_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["provider","event_id"],name="uq_webhook_event")]
+        indexes=[models.Index(fields=["provider","status","received_at"])]
+
+
+class TenantPaymentConnection(TimeStampedModel):
+    class Status(models.TextChoices):
+        CONNECTED="connected","Conectado"
+        ERROR="error","Erro"
+        DISABLED="disabled","Desabilitado"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="payment_connections")
+    provider=models.CharField(max_length=60,default="mercadopago")
+    display_name=models.CharField(max_length=120,default="Mercado Pago")
+    environment=models.CharField(max_length=16,choices=PaymentGateway.Environment.choices)
+    credentials_encrypted=models.TextField(blank=True)
+    metadata=models.JSONField(default=dict,blank=True)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.CONNECTED,db_index=True)
+    last_tested_at=models.DateTimeField(null=True,blank=True)
+    last_sync_at=models.DateTimeField(null=True,blank=True)
+    last_error_code=models.CharField(max_length=120,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="payment_connections_created")
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["tenant","provider","environment"],name="uq_tenant_payment_connection"),
+        ]
+
+
+class TenantPaymentTransaction(TimeStampedModel):
+    class Status(models.TextChoices):
+        CREATED="created","Criado"
+        PENDING="pending","Pendente"
+        PAID="paid","Pago"
+        FAILED="failed","Falhou"
+        CANCELLED="cancelled","Cancelado"
+        REFUNDED="refunded","Estornado"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="payment_transactions")
+    connection=models.ForeignKey(TenantPaymentConnection,on_delete=models.PROTECT,related_name="transactions")
+    reference_type=models.CharField(max_length=40)
+    reference_id=models.BigIntegerField()
+    external_reference=models.CharField(max_length=190)
+    provider_transaction_id=models.CharField(max_length=190,blank=True)
+    method=models.CharField(max_length=40)
+    gross_amount=models.DecimalField(max_digits=12,decimal_places=2)
+    fee_amount=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    net_amount=models.DecimalField(max_digits=12,decimal_places=2)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.CREATED,db_index=True)
+    expires_at=models.DateTimeField(null=True,blank=True)
+    idempotency_key=models.CharField(max_length=100)
+    pix_qr_code=models.TextField(blank=True)
+    pix_copy_paste=models.TextField(blank=True)
+    checkout_url=models.URLField(max_length=1000,blank=True)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["tenant","idempotency_key"],name="uq_tenant_payment_tx_idempotency"),
+        ]
+        indexes=[
+            models.Index(fields=["tenant","reference_type","reference_id"]),
+            models.Index(fields=["provider_transaction_id"]),
+        ]
+
+
+class TenantRecurringSubscription(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING="pending","Pendente"
+        AUTHORIZED="authorized","Autorizada"
+        PAUSED="paused","Pausada"
+        CANCELLED="cancelled","Cancelada"
+        ERROR="error","Erro"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="recurring_subscriptions")
+    connection=models.ForeignKey(TenantPaymentConnection,on_delete=models.PROTECT,related_name="recurring_subscriptions")
+    reference_type=models.CharField(max_length=40)
+    reference_id=models.BigIntegerField()
+    external_reference=models.CharField(max_length=190)
+    provider_subscription_id=models.CharField(max_length=190,blank=True)
+    amount=models.DecimalField(max_digits=12,decimal_places=2)
+    cycle_months=models.PositiveSmallIntegerField(default=1)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING,db_index=True)
+    checkout_url=models.URLField(max_length=1000,blank=True)
+    idempotency_key=models.CharField(max_length=100)
+    last_payment_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["tenant","idempotency_key"],name="uq_tenant_recurring_idempotency"),
+            models.UniqueConstraint(
+                fields=["connection","provider_subscription_id"],
+                condition=~models.Q(provider_subscription_id=""),
+                name="uq_tenant_recurring_provider",
+            ),
+        ]
+        indexes=[models.Index(fields=["tenant","reference_type","reference_id"])]
