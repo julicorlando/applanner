@@ -68,8 +68,8 @@ jobs:
         run: pip install -r requirements.txt
       - name: Generate candidate migrations
         run: |
-          python manage.py makemigrations auto engagement commercial communications healthcare legal operations growth contenthub --noinput
-          for f in auto/migrations/[0-9]*.py engagement/migrations/[0-9]*.py commercial/migrations/[0-9]*.py communications/migrations/[0-9]*.py healthcare/migrations/[0-9]*.py legal/migrations/[0-9]*.py operations/migrations/[0-9]*.py growth/migrations/[0-9]*.py contenthub/migrations/[0-9]*.py; do
+          python manage.py makemigrations auto engagement commercial communications healthcare legal operations growth contenthub finance --noinput
+          for f in auto/migrations/[0-9]*.py engagement/migrations/[0-9]*.py commercial/migrations/[0-9]*.py communications/migrations/[0-9]*.py healthcare/migrations/[0-9]*.py legal/migrations/[0-9]*.py operations/migrations/[0-9]*.py growth/migrations/[0-9]*.py contenthub/migrations/[0-9]*.py finance/migrations/[0-9]*.py; do
             if [ -f "$f" ]; then
               echo "__FILE__:$f"
               cat "$f"

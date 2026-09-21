@@ -52,3 +52,22 @@ def send_meta_conversion(self,event_id,user_data=None):
     if not response.ok:
         raise RuntimeError(f"Meta CAPI HTTP {response.status_code}")
     return "sent"
+
+
+@shared_task
+def process_meta_conversion_queue(limit=100):
+    ids=list(
+        AcquisitionEvent.objects
+        .filter(marketing_consent=True)
+        .exclude(event_id__in=MetaConversionLog.objects.filter(
+            status__in=[
+                MetaConversionLog.Status.SENT,
+                MetaConversionLog.Status.SKIPPED,
+            ]
+        ).values("event_id"))
+        .order_by("created_at")
+        .values_list("event_id",flat=True)[:limit]
+    )
+    for event_id in ids:
+        send_meta_conversion.delay(str(event_id))
+    return len(ids)

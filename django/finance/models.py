@@ -196,3 +196,81 @@ class ProfessionalCommission(TimeStampedModel):
             ),
         ]
         indexes=[models.Index(fields=["tenant","professional","status","created_at"])]
+
+
+class PlatformFinanceCategory(TimeStampedModel):
+    class Type(models.TextChoices):
+        INCOME="income","Receita"
+        EXPENSE="expense","Despesa"
+        BOTH="both","Ambos"
+
+    name=models.CharField(max_length=120,unique=True)
+    type=models.CharField(max_length=12,choices=Type.choices,default=Type.BOTH)
+    active=models.BooleanField(default=True)
+
+
+class PlatformFinancialTransaction(TimeStampedModel):
+    class Type(models.TextChoices):
+        INCOME="income","Receita"
+        EXPENSE="expense","Despesa"
+    class Status(models.TextChoices):
+        PENDING="pending","Pendente"
+        PAID="paid","Pago"
+        CANCELLED="cancelled","Cancelado"
+
+    category=models.ForeignKey(PlatformFinanceCategory,null=True,blank=True,on_delete=models.SET_NULL,related_name="transactions")
+    type=models.CharField(max_length=12,choices=Type.choices)
+    description=models.CharField(max_length=190)
+    amount=models.DecimalField(max_digits=12,decimal_places=2)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING,db_index=True)
+    due_at=models.DateField(null=True,blank=True)
+    paid_at=models.DateTimeField(null=True,blank=True)
+    notes=models.CharField(max_length=500,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="platform_finance_transactions")
+
+    class Meta:
+        indexes=[models.Index(fields=["type","status","due_at"],name="platform_finance_status_idx")]
+
+
+class PlatformBankAccount(TimeStampedModel):
+    class AccountType(models.TextChoices):
+        CHECKING="checking","Corrente"
+        SAVINGS="savings","Poupança"
+        PAYMENT="payment","Pagamento"
+        BUSINESS="business","Empresarial"
+    class PersonType(models.TextChoices):
+        INDIVIDUAL="individual","Pessoa física"
+        COMPANY="company","Pessoa jurídica"
+    class Status(models.TextChoices):
+        ACTIVE="active","Ativa"
+        INACTIVE="inactive","Inativa"
+
+    bank_name=models.CharField(max_length=120)
+    bank_code=models.CharField(max_length=10)
+    ispb=models.CharField(max_length=20,blank=True)
+    account_type=models.CharField(max_length=16,choices=AccountType.choices)
+    agency_encrypted=models.TextField()
+    agency_digit=models.CharField(max_length=3,blank=True)
+    account_encrypted=models.TextField()
+    account_digit=models.CharField(max_length=3,blank=True)
+    holder_name=models.CharField(max_length=150)
+    holder_document_encrypted=models.TextField()
+    person_type=models.CharField(max_length=16,choices=PersonType.choices)
+    pix_key_encrypted=models.TextField(blank=True)
+    pix_key_type=models.CharField(max_length=12,blank=True)
+    currency=models.CharField(max_length=3,default="BRL")
+    notes_encrypted=models.TextField(blank=True)
+    is_default=models.BooleanField(default=False)
+    status=models.CharField(max_length=12,choices=Status.choices,default=Status.ACTIVE,db_index=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="platform_bank_accounts")
+    deleted_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["status","is_default"],name="platform_bank_status_idx")]
+        constraints=[
+            models.UniqueConstraint(
+                fields=["is_default"],
+                condition=models.Q(is_default=True,status="active",deleted_at__isnull=True),
+                name="uq_platform_default_bank",
+            )
+        ]
