@@ -36,6 +36,7 @@ class Service(TimeStampedModel):
 
 class Professional(TimeStampedModel):
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="professionals")
+    unit=models.ForeignKey("tenants.Unit",null=True,blank=True,on_delete=models.SET_NULL,related_name="professionals")
     user=models.OneToOneField(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
     name=models.CharField(max_length=150)
     public_slug=models.SlugField(max_length=120,null=True,blank=True)
