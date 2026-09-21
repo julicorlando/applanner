@@ -38,7 +38,7 @@
 - [x] RBAC estrutural + ETL de papéis/permissões do legado; falta aplicar guards em todas as telas especializadas
 - [x] Mercado Pago + PIX + webhooks — plataforma + tenant, assinatura HMAC, Pix, cartão tokenizado e recorrência
 - [ ] Comercial/CRM/leads/equipe/comissões comerciais
-- [ ] Arena/sports/tournaments/memberships/dynamic pricing
+- [ ] Arena/Sports — núcleo de quadras, horários, preços, bloqueios, reservas, financeiro e dynamic pricing portado; faltam mensalistas, rachas, escolinha, torneios, comandas, waitlist e CRM
 - [ ] Automotivo/vehicles/jobs/estimates/commands
 - [x] Barbearia — ciclo de atendimento, comanda, fila, metas, comissão/remuneração, estoque e financeiro; memberships usam recorrência genérica
 - [ ] Saúde/prontuário
