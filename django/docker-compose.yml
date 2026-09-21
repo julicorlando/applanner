@@ -2,7 +2,6 @@ services:
   web:
     build: .
     restart: unless-stopped
-    env_file: .env
     depends_on:
       db:
         condition: service_healthy
@@ -16,30 +15,36 @@ services:
   worker:
     build: .
     restart: unless-stopped
-    env_file: .env
     entrypoint: []
     command: celery -A applanner worker -l INFO --concurrency=2
-    depends_on: [db, redis]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   beat:
     build: .
     restart: unless-stopped
-    env_file: .env
     entrypoint: []
     command: celery -A applanner beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    depends_on: [db, redis]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: applanner
-      POSTGRES_USER: applanner
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-applanner}
+      POSTGRES_USER: ${POSTGRES_USER:-applanner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL","pg_isready -U applanner -d applanner"]
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-applanner} -d ${POSTGRES_DB:-applanner}"]
       interval: 10s
       timeout: 5s
       retries: 10
