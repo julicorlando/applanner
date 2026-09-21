@@ -71,3 +71,51 @@ class TrustedDevice(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["user","expires_at"])]
+
+
+class Capability(models.Model):
+    slug=models.CharField(max_length=120,unique=True)
+    name=models.CharField(max_length=150)
+
+    def __str__(self):
+        return self.name
+
+
+class PlatformRole(models.Model):
+    slug=models.CharField(max_length=60,unique=True)
+    name=models.CharField(max_length=100)
+    capabilities=models.ManyToManyField(Capability,through="RoleCapability",related_name="roles",blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class RoleCapability(models.Model):
+    role=models.ForeignKey(PlatformRole,on_delete=models.CASCADE,related_name="capability_links")
+    capability=models.ForeignKey(Capability,on_delete=models.CASCADE,related_name="role_links")
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["role","capability"],name="uq_role_capability")]
+
+
+class UserRole(models.Model):
+    user=models.ForeignKey(User,on_delete=models.CASCADE,related_name="role_links")
+    role=models.ForeignKey(PlatformRole,on_delete=models.CASCADE,related_name="user_links")
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["user","role"],name="uq_user_platform_role")]
+
+
+class LoginHistory(models.Model):
+    user=models.ForeignKey(User,null=True,blank=True,on_delete=models.SET_NULL,related_name="login_history")
+    email=models.EmailField()
+    successful=models.BooleanField()
+    ip_address=models.GenericIPAddressField(null=True,blank=True)
+    user_agent=models.CharField(max_length=500,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["user","created_at"]),
+            models.Index(fields=["email","created_at"]),
+        ]
