@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import timezone as dt_timezone
 from decimal import Decimal
@@ -99,10 +100,11 @@ class Command(BaseCommand):
             return cur.fetchall()
 
     def _restore_times(self,model,pk,row):
+        field_names={field.name for field in model._meta.fields}
         values={}
-        if row.get("created_at"):
+        if "created_at" in field_names and row.get("created_at"):
             values["created_at"]=aware(row["created_at"])
-        if row.get("updated_at"):
+        if "updated_at" in field_names and row.get("updated_at"):
             values["updated_at"]=aware(row["updated_at"])
         if values:
             model.objects.filter(pk=pk).update(**values)
@@ -178,9 +180,9 @@ class Command(BaseCommand):
                     "two_factor_enabled_at":aware(row.get("two_factor_enabled_at")),
                     "two_factor_last_step":int(row.get("two_factor_last_step") or 0),
                     "last_login":aware(row.get("last_login_at")),
+                    "date_joined":aware(row.get("created_at")) or timezone.now(),
                 },
             )
-            self._restore_times(User,user.pk,row)
 
         self.stdout.write(f"users: {len(rows)} | 2FA recriptografado: {migrated_2fa}")
 
@@ -265,7 +267,11 @@ class Command(BaseCommand):
                     "slug":row["slug"],
                     "monthly_price":Decimal(str(row.get("monthly_price") or 0)),
                     "active":bool(row.get("active",1)),
-                    "features":row.get("features_json") or {},
+                    "features":(
+                        json.loads(row["features_json"])
+                        if isinstance(row.get("features_json"),str) and row.get("features_json")
+                        else (row.get("features_json") or {})
+                    ),
                 },
             )
             self._restore_times(Plan,obj.pk,row)
