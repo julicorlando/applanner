@@ -13,7 +13,7 @@ CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 INSTALLED_APPS = [
     "django.contrib.admin","django.contrib.auth","django.contrib.contenttypes",
     "django.contrib.sessions","django.contrib.messages","django.contrib.staticfiles",
-    "rest_framework","django_celery_beat","core","tenants","accounts","scheduling","billing",
+    "rest_framework","django_celery_beat","core","tenants","accounts","scheduling","billing","finance",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
