@@ -75,7 +75,7 @@ class ArenaMembershipTests(TestCase):
             start_time=time(8,0),end_time=time(22,0),
             price_per_hour=Decimal("100.00"),priority=10
         )
-        finance=Module.objects.create(slug="finance-test",name="Finance Test")
+        finance=Module.objects.create(slug="finance",name="Financeiro")
         TenantModule.objects.create(tenant=self.tenant,module=finance,enabled=True)
 
     def test_membership_generates_reservation_and_advances_cursor(self):
@@ -102,3 +102,21 @@ class ArenaMembershipTests(TestCase):
         self.assertGreaterEqual(result["generated"],1)
         self.assertTrue(MembershipReservation.objects.filter(membership=membership).exists())
         self.assertIsNotNone(membership.next_generation_date)
+        self.assertEqual(
+            FinancialTransaction.objects.filter(
+                tenant=self.tenant,
+                source_type="arena_membership",
+                source_id=membership.pk,
+            ).count(),
+            1,
+        )
+
+        generate_membership(membership)
+        self.assertEqual(
+            FinancialTransaction.objects.filter(
+                tenant=self.tenant,
+                source_type="arena_membership",
+                source_id=membership.pk,
+            ).count(),
+            1,
+        )
