@@ -16,7 +16,7 @@ INSTALLED_APPS = [
     "django.contrib.admin","django.contrib.auth","django.contrib.contenttypes",
     "django.contrib.sessions","django.contrib.messages","django.contrib.staticfiles",
     "rest_framework","django_celery_beat","core","tenants","accounts","scheduling","billing",
-    "finance","communications","barber","arena","engagement","auto",
+    "finance","communications","barber","arena","engagement","auto","commercial",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

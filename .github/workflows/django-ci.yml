@@ -68,8 +68,8 @@ jobs:
         run: pip install -r requirements.txt
       - name: Generate candidate migrations
         run: |
-          python manage.py makemigrations auto engagement --noinput
-          for f in auto/migrations/[0-9]*.py engagement/migrations/[0-9]*.py; do
+          python manage.py makemigrations auto engagement commercial --noinput
+          for f in auto/migrations/[0-9]*.py engagement/migrations/[0-9]*.py commercial/migrations/[0-9]*.py; do
             if [ -f "$f" ]; then
               echo "__FILE__:$f"
               cat "$f"
