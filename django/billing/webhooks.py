@@ -49,8 +49,10 @@ def _tenant_status(value):
         "in_process":TenantPaymentTransaction.Status.PENDING,
         "rejected":TenantPaymentTransaction.Status.FAILED,
         "cancelled":TenantPaymentTransaction.Status.CANCELLED,
+        "expired":TenantPaymentTransaction.Status.EXPIRED,
         "refunded":TenantPaymentTransaction.Status.REFUNDED,
         "charged_back":TenantPaymentTransaction.Status.REFUNDED,
+        "partially_refunded":TenantPaymentTransaction.Status.PARTIALLY_REFUNDED,
     }.get(str(value or "").lower(),TenantPaymentTransaction.Status.PENDING)
 
 
@@ -281,11 +283,13 @@ def mercadopago_tenant_webhook(request,slug):
                 ))
                 if tx.status==TenantPaymentTransaction.Status.PAID:
                     tx.paid_at=tx.paid_at or timezone.now()
-                    tx.reconciled_at=tx.reconciled_at or timezone.now()
                 tx.save(update_fields=[
                     "provider_transaction_id","status","fee_amount","net_amount",
-                    "paid_at","reconciled_at","updated_at",
+                    "paid_at","updated_at",
                 ])
+                if tx.reference_type in {"reservation","game_player"}:
+                    from arena.payments import reconcile_tenant_transaction
+                    reconcile_tenant_transaction(tx)
             else:
                 event.status=TenantPaymentWebhookEvent.Status.IGNORED
                 event.error_code="transaction_not_found"
