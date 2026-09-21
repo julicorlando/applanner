@@ -193,12 +193,7 @@ def register_payment(*,command,user,method,amount):
 
 @transaction.atomic
 def close_command(*,command,user):
-    command=(
-        BarberCommand.objects
-        .select_for_update()
-        .select_related("appointment","professional","tip_professional","tenant")
-        .get(pk=command.pk)
-    )
+    command=BarberCommand.objects.select_for_update().get(pk=command.pk)
     if command.status==BarberCommand.Status.CLOSED:
         return command
     if command.status!=BarberCommand.Status.OPEN:
