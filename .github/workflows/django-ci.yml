@@ -59,29 +59,32 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: django/requirements.txt
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
+      - name: Generate candidate migrations
+        run: |
+          python manage.py makemigrations auto engagement --noinput
+          for f in auto/migrations/[0-9]*.py engagement/migrations/[0-9]*.py; do
+            if [ -f "$f" ]; then
+              echo "__FILE__:$f"
+              cat "$f"
+              echo "__END_FILE__"
+            fi
+          done
       - name: Django system check
         run: python manage.py check
-
       - name: Check migrations are committed
         run: python manage.py makemigrations --check --dry-run
-
       - name: Apply migrations
         run: python manage.py migrate --noinput
-
       - name: Seed platform data
         run: |
           python manage.py seed_modules
           python manage.py seed_periodic_tasks
-
       - name: Run tests
         run: python manage.py test

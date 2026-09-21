@@ -15,7 +15,8 @@ CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 INSTALLED_APPS = [
     "django.contrib.admin","django.contrib.auth","django.contrib.contenttypes",
     "django.contrib.sessions","django.contrib.messages","django.contrib.staticfiles",
-    "rest_framework","django_celery_beat","core","tenants","accounts","scheduling","billing","finance","communications","barber","arena",
+    "rest_framework","django_celery_beat","core","tenants","accounts","scheduling","billing",
+    "finance","communications","barber","arena","engagement","auto",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -108,6 +109,13 @@ EMAIL_HOST_USER=env("EMAIL_HOST_USER",default="")
 EMAIL_HOST_PASSWORD=env("EMAIL_HOST_PASSWORD",default="")
 EMAIL_USE_TLS=env.bool("EMAIL_USE_TLS",default=True)
 DEFAULT_FROM_EMAIL=env("DEFAULT_FROM_EMAIL",default="contato@applanner.com.br")
+
+WHATSAPP_GRAPH_BASE_URL=env("WHATSAPP_GRAPH_BASE_URL",default="https://graph.facebook.com/v23.0")
+WHATSAPP_ACCESS_TOKEN=env("WHATSAPP_ACCESS_TOKEN",default="")
+WHATSAPP_PHONE_NUMBER_ID=env("WHATSAPP_PHONE_NUMBER_ID",default="")
+WHATSAPP_VERIFY_TOKEN=env("WHATSAPP_VERIFY_TOKEN",default="")
+META_PIXEL_ID=env("META_PIXEL_ID",default="")
+META_CONVERSION_ACCESS_TOKEN=env("META_CONVERSION_ACCESS_TOKEN",default="")
 
 SENTRY_DSN=env("SENTRY_DSN",default="")
 if SENTRY_DSN:
