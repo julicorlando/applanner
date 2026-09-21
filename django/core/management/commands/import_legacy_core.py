@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import User
+from accounts.models import Capability, PlatformRole, RoleCapability, User, UserRole
 from accounts.security import encrypt_secret
 from billing.models import Payment, Plan, Subscription
 from core.legacy_crypto import decrypt_php_aes_gcm
@@ -62,6 +62,7 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 self._tenants(conn)
+                self._rbac(conn)
                 self._users(conn,skip_2fa=options["skip_2fa"])
                 self._customers(conn)
                 self._professionals(conn)
@@ -108,6 +109,39 @@ class Command(BaseCommand):
             values["updated_at"]=aware(row["updated_at"])
         if values:
             model.objects.filter(pk=pk).update(**values)
+
+    def _rbac(self,conn):
+        if "roles" not in self.columns or "permissions" not in self.columns:
+            self.stdout.write("rbac: tabelas legadas não encontradas; ignorando.")
+            return
+
+        roles=self._rows(conn,"SELECT id,slug,name FROM roles ORDER BY id")
+        for row in roles:
+            PlatformRole.objects.update_or_create(
+                id=row["id"],
+                defaults={"slug":row["slug"],"name":row["name"]},
+            )
+
+        permissions=self._rows(conn,"SELECT id,slug,name FROM permissions ORDER BY id")
+        for row in permissions:
+            Capability.objects.update_or_create(
+                id=row["id"],
+                defaults={"slug":row["slug"],"name":row["name"]},
+            )
+
+        RoleCapability.objects.all().delete()
+        if "role_permissions" in self.columns:
+            links=self._rows(conn,"SELECT role_id,permission_id FROM role_permissions")
+            RoleCapability.objects.bulk_create([
+                RoleCapability(role_id=row["role_id"],capability_id=row["permission_id"])
+                for row in links
+            ],ignore_conflicts=True)
+        else:
+            links=[]
+
+        self.stdout.write(
+            f"rbac: {len(roles)} papéis | {len(permissions)} permissões | {len(links)} vínculos"
+        )
 
     def _tenants(self,conn):
         rows=self._rows(conn,"SELECT * FROM tenants ORDER BY id")
@@ -183,6 +217,17 @@ class Command(BaseCommand):
                     "date_joined":aware(row.get("created_at")) or timezone.now(),
                 },
             )
+
+            UserRole.objects.filter(user=user).delete()
+            role_ids=self._rows(
+                conn,
+                "SELECT role_id FROM user_roles WHERE user_id=%s",
+                (row["id"],),
+            ) if "user_roles" in self.columns else []
+            UserRole.objects.bulk_create([
+                UserRole(user=user,role_id=role_row["role_id"])
+                for role_row in role_ids
+            ],ignore_conflicts=True)
 
         self.stdout.write(f"users: {len(rows)} | 2FA recriptografado: {migrated_2fa}")
 
