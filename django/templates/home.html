@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}ApPlanner{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <span class="eyebrow">AGENDA • GESTÃO • AUTOMAÇÃO</span>
+    <h1>Seu negócio organizado em um só lugar.</h1>
+    <p>Base Django multiempresa para agenda, clientes, equipe, pagamentos e automações.</p>
+    <div class="actions">
+      <a class="button primary" href="/admin/">Acessar painel</a>
+      <a class="button" href="/healthz/">Status</a>
+    </div>
+  </div>
+  <aside class="card">
+    <strong>ApPlanner Next</strong>
+    <p>Arquitetura preparada para PostgreSQL, Redis, Celery e deploy no Coolify.</p>
+  </aside>
+</section>
+{% endblock %}
