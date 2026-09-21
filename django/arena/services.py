@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from .models import (
     ArenaSettings, Court, CourtBlock, CourtHours, PriceRule,
-    Reservation, ReservationFinance, ReservationHistory, SportsSettings,
+    Reservation, ReservationFinance, ReservationHistory, SportsSettings, WaitlistEntry,
 )
 
 
@@ -27,7 +27,10 @@ class ArenaReservationService:
         obj,_=ArenaSettings.objects.get_or_create(tenant=tenant)
         return obj
 
-    def is_available(self,tenant,court,start,end,exclude_reservation_id=None,public_rules=True):
+    def is_available(
+        self,tenant,court,start,end,exclude_reservation_id=None,
+        exclude_waitlist_id=None,public_rules=True
+    ):
         tz=ZoneInfo(tenant.timezone or "America/Recife")
         start=start.astimezone(tz)
         end=end.astimezone(tz)
@@ -59,9 +62,12 @@ class ArenaReservationService:
         if not inside:
             return False
 
+        busy_start=start-timedelta(minutes=court.interval_minutes)
+        busy_end=end+timedelta(minutes=court.interval_minutes)
+
         if CourtBlock.objects.filter(
             tenant=tenant,court=court,status=CourtBlock.Status.ACTIVE,
-            starts_at__lt=end,ends_at__gt=start,
+            starts_at__lt=busy_end,ends_at__gt=busy_start,
         ).exists():
             return False
 
@@ -72,11 +78,76 @@ class ArenaReservationService:
                 Reservation.Status.CONFIRMED,
                 Reservation.Status.COMPLETED,
             ],
-            starts_at__lt=end,ends_at__gt=start,
+            starts_at__lt=busy_end,ends_at__gt=busy_start,
         )
         if exclude_reservation_id:
             conflicts=conflicts.exclude(pk=exclude_reservation_id)
-        return not conflicts.exists()
+        if conflicts.exists():
+            return False
+
+        holds=WaitlistEntry.objects.filter(
+            tenant=tenant,
+            court=court,
+            status=WaitlistEntry.Status.OFFERED,
+            offer_expires_at__gt=timezone.now(),
+            offered_starts_at__isnull=False,
+            offered_starts_at__lt=busy_end,
+        )
+        if exclude_waitlist_id:
+            holds=holds.exclude(pk=exclude_waitlist_id)
+        for hold in holds:
+            hold_end=hold.offered_starts_at+timedelta(minutes=hold.duration_minutes)
+            if hold_end>busy_start:
+                return False
+        return True
+
+    def slots(
+        self,tenant,court,day,duration_minutes,modality=None,
+        exclude_reservation_id=None,exclude_waitlist_id=None,public_rules=True
+    ):
+        duration_minutes=max(
+            court.minimum_minutes,
+            min(court.maximum_minutes,int(duration_minutes)),
+        )
+        if modality and not court.modalities.filter(pk=modality.pk,active=True).exists():
+            return []
+
+        settings_obj=self.sports_settings(tenant)
+        tz=ZoneInfo(tenant.timezone or "America/Recife")
+        step=max(5,settings_obj.default_slot_minutes)
+        output=[]
+        hours=CourtHours.objects.filter(
+            tenant=tenant,court=court,weekday=day.isoweekday(),active=True
+        ).order_by("start_time")
+
+        for row in hours:
+            cursor=datetime.combine(day,row.start_time,tzinfo=tz)
+            limit=datetime.combine(day,row.end_time,tzinfo=tz)
+            while cursor+timedelta(minutes=duration_minutes)<=limit:
+                end=cursor+timedelta(minutes=duration_minutes)
+                if self.is_available(
+                    tenant,court,cursor,end,
+                    exclude_reservation_id=exclude_reservation_id,
+                    exclude_waitlist_id=exclude_waitlist_id,
+                    public_rules=public_rules,
+                ):
+                    try:
+                        quote=self.quote(tenant,court,cursor,end,modality)
+                    except ValidationError:
+                        quote=None
+                    if quote:
+                        output.append({
+                            "value":cursor.isoformat(),
+                            "label":cursor.strftime("%H:%M"),
+                            "ends_at":end.isoformat(),
+                            "total":quote["total"],
+                            "price_per_hour":quote["rule"].price_per_hour,
+                            "base_total":quote["base_total"],
+                            "pricing_multiplier":quote["multiplier"],
+                            "pricing_adjustments":quote["details"],
+                        })
+                cursor+=timedelta(minutes=step)
+        return output
 
     def _matching_price_rule(self,tenant,court,start,end,modality=None):
         duration=int((end-start).total_seconds()//60)
