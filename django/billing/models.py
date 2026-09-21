@@ -142,7 +142,9 @@ class Payment(TimeStampedModel):
         PENDING="pending","Pendente"
         PAID="paid","Pago"
         FAILED="failed","Falhou"
+        EXPIRED="expired","Expirado"
         REFUNDED="refunded","Estornado"
+        PARTIALLY_REFUNDED="partially_refunded","Estorno parcial"
         CANCELLED="cancelled","Cancelado"
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="payments")
@@ -328,6 +330,8 @@ class TenantPaymentTransaction(TimeStampedModel):
     net_amount=models.DecimalField(max_digits=12,decimal_places=2)
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.CREATED,db_index=True)
     expires_at=models.DateTimeField(null=True,blank=True)
+    paid_at=models.DateTimeField(null=True,blank=True)
+    reconciled_at=models.DateTimeField(null=True,blank=True)
     idempotency_key=models.CharField(max_length=100)
     pix_qr_code=models.TextField(blank=True)
     pix_copy_paste=models.TextField(blank=True)
@@ -336,6 +340,7 @@ class TenantPaymentTransaction(TimeStampedModel):
     class Meta:
         constraints=[
             models.UniqueConstraint(fields=["tenant","idempotency_key"],name="uq_tenant_payment_tx_idempotency"),
+            models.UniqueConstraint(fields=["connection","external_reference"],name="uq_tenant_payment_external"),
         ]
         indexes=[
             models.Index(fields=["tenant","reference_type","reference_id"],name="billing_tpt_ref_idx"),
@@ -374,3 +379,28 @@ class TenantRecurringSubscription(TimeStampedModel):
             ),
         ]
         indexes=[models.Index(fields=["tenant","reference_type","reference_id"],name="billing_trs_ref_idx")]
+
+
+class TenantPaymentWebhookEvent(models.Model):
+    class Status(models.TextChoices):
+        RECEIVED="received","Recebido"
+        PROCESSED="processed","Processado"
+        IGNORED="ignored","Ignorado"
+        FAILED="failed","Falhou"
+
+    connection=models.ForeignKey(TenantPaymentConnection,on_delete=models.CASCADE,related_name="webhook_events")
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="payment_webhook_events")
+    provider=models.CharField(max_length=40)
+    event_id=models.CharField(max_length=190)
+    payload_hash=models.CharField(max_length=64)
+    signature_valid=models.BooleanField(default=False)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.RECEIVED,db_index=True)
+    error_code=models.CharField(max_length=80,blank=True)
+    received_at=models.DateTimeField(auto_now_add=True)
+    processed_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["connection","event_id"],name="uq_tenant_webhook_event"),
+        ]
+        indexes=[models.Index(fields=["tenant","received_at"],name="billing_tenant_webhook_idx")]
