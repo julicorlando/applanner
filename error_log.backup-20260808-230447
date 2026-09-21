@@ -1,0 +1,276 @@
+[08-Aug-2026 15:01:38 America/Recife] PHP Warning:  Undefined array key "module_ids" in /home/appnannerbr/public_html/app/Views/master/plans.php on line 4
+[08-Aug-2026 15:01:44 America/Recife] PHP Warning:  Undefined array key "module_ids" in /home/appnannerbr/public_html/app/Views/master/plans.php on line 4
+[08-Aug-2026 15:01:50 America/Recife] PHP Warning:  Undefined array key "module_ids" in /home/appnannerbr/public_html/app/Views/master/plans.php on line 4
+[08-Aug-2026 15:02:34 America/Recife] PHP Warning:  Undefined array key "module_ids" in /home/appnannerbr/public_html/app/Views/master/plans.php on line 4
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:09:35 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:10:30 America/Recife] PHP Warning:  Undefined array key "module_ids" in /home/appnannerbr/public_html/app/Views/master/plans.php on line 4
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:03 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 15:47:12 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 15:56:24 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:00:45 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:01:16 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:06:17 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 5
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 9
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 10
+[08-Aug-2026 16:06:21 America/Recife] PHP Warning:  Trying to access array offset on value of type bool in /home/appnannerbr/public_html/app/Views/billing/modules.php on line 11
+[08-Aug-2026 16:06:39 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:08:30 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:08:37 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:09:16 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:09:20 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 16:09:32 America/Recife] [ApPlanner MercadoPago] tenant=1 error=Mercado Pago HTTP 400: Invalid value for transaction amount, only two decimals are allowed
+[08-Aug-2026 22:41:31 America/Recife] [ApPlanner MasterUser] 01000 SQLSTATE[01000]: Warning: 1265 Data truncated for column 'status' at row 1
+[08-Aug-2026 22:41:31 America/Recife] PHP Warning:  Undefined variable $errorId in /home/appnannerbr/public_html/app/Views/errors/500.php on line 4
+[08-Aug-2026 22:41:31 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/errors/500.php on line 4
+[08-Aug-2026 22:44:02 America/Recife] [ApPlanner MasterUser] 01000 SQLSTATE[01000]: Warning: 1265 Data truncated for column 'status' at row 1
+[08-Aug-2026 22:44:02 America/Recife] PHP Warning:  Undefined variable $errorId in /home/appnannerbr/public_html/app/Views/errors/500.php on line 4
+[08-Aug-2026 22:44:02 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/errors/500.php on line 4
+[08-Aug-2026 22:47:20 America/Recife] [ApPlanner MasterUser] 01000 SQLSTATE[01000]: Warning: 1265 Data truncated for column 'status' at row 1
+[08-Aug-2026 22:47:20 America/Recife] PHP Warning:  Undefined variable $errorId in /home/appnannerbr/public_html/app/Views/errors/500.php on line 4
+[08-Aug-2026 22:47:20 America/Recife] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in /home/appnannerbr/public_html/app/Views/errors/500.php on line 4

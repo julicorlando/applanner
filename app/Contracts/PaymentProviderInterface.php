@@ -1,0 +1,2 @@
+<?php
+namespace App\Contracts;interface PaymentProviderInterface{public function createCustomer(array $customer):string;public function createSubscription(array $subscription):array;public function createPayment(array $payment):array;public function cancelSubscription(string $reference):void;public function getPayment(string $reference):array;public function handleWebhook(array $headers,string $payload):array;}

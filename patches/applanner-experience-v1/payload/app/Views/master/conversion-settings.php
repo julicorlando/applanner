@@ -1,0 +1,16 @@
+<?php $e=fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');?>
+<div class="section-heading"><div><div class="eyebrow">Crescimento</div><h1>Aquisição e conversão</h1><p class="text-secondary mb-0">Controle a mensagem da página inicial e mensure campanhas do Instagram.</p></div><a class="btn btn-light" href="/?utm_source=instagram&utm_medium=paid_social" target="_blank" rel="noopener">Visualizar campanha</a></div>
+<?php if($success):?><div class="alert alert-success"><?=$e($success)?></div><?php endif;?>
+<form method="post" action="/master/conversion-settings" class="master-work-card"><?=\App\Core\CSRF::field()?>
+ <div class="row g-3">
+  <div class="col-12"><label class="form-label">Título principal</label><input class="form-control" name="hero_title" maxlength="120" value="<?=$e($settings['growth.hero_title'])?>" placeholder="Seu cliente agenda. Sua equipe executa. Você enxerga o negócio."></div>
+  <div class="col-12"><label class="form-label">Texto de apoio</label><textarea class="form-control" name="hero_subtitle" maxlength="320" rows="3" placeholder="Explique o benefício em uma frase clara."><?=$e($settings['growth.hero_subtitle'])?></textarea></div>
+  <div class="col-md-6"><label class="form-label">Texto do botão</label><input class="form-control" name="cta_label" maxlength="50" value="<?=$e($settings['growth.cta_label'])?>" placeholder="Começar teste grátis"></div>
+  <div class="col-md-6"><label class="form-label">WhatsApp comercial</label><input class="form-control" name="whatsapp" inputmode="numeric" value="<?=$e($settings['growth.whatsapp'])?>" placeholder="5581999999999"></div>
+  <div class="col-md-6"><label class="form-label">Instagram</label><input class="form-control" name="instagram" value="<?=$e($settings['growth.instagram'])?>" placeholder="@applanner"></div>
+  <div class="col-md-6"><label class="form-label">Campanha UTM padrão</label><input class="form-control" name="default_utm_campaign" value="<?=$e($settings['growth.default_utm_campaign'])?>" placeholder="captacao_agendamento"></div>
+  <div class="col-md-6"><label class="form-label">ID do Pixel da Meta</label><input class="form-control" name="meta_pixel_id" inputmode="numeric" value="<?=$e($settings['growth.meta_pixel_id'])?>"><div class="form-text">Somente o ID numérico. A ativação respeita consentimento e não expõe token.</div></div>
+ </div>
+ <div class="public-preview-note mt-4"><strong>Campanhas recomendadas:</strong> use <code>utm_source=instagram</code>, <code>utm_medium=paid_social</code> e uma campanha diferente para cada público. O cadastro preserva a origem para análise.</div>
+ <button class="btn btn-primary btn-lg mt-4">Salvar configurações</button>
+</form>

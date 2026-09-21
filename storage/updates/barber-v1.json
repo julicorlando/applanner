@@ -1,0 +1,9 @@
+{
+    "patch": "PATCH_APPLANNER_BARBER_V1_COMPLETO",
+    "installed_at": "2026-08-18T19:25:25+00:00",
+    "backup_dir": "/home/appnannerbr/public_html/storage/update-backups/barber-v1-20260818-192524",
+    "migrations": [
+        "039_modules_merged_subscription.sql",
+        "040_applanner_barber_v1.sql"
+    ]
+}

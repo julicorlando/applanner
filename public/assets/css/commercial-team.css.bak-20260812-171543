@@ -1,0 +1,6 @@
+.app-sidebar{overflow:hidden}
+.app-sidebar .brand,.app-sidebar .sidebar-label,.app-sidebar .sidebar-footer{flex:0 0 auto}
+.app-sidebar .sidebar-nav{min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:5px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.24) transparent}
+.app-sidebar .sidebar-nav::-webkit-scrollbar{width:6px}
+.app-sidebar .sidebar-nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.24);border-radius:999px}
+.app-sidebar .sidebar-nav::-webkit-scrollbar-track{background:transparent}

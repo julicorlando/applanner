@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS subscription_exemptions(
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ tenant_id BIGINT UNSIGNED NOT NULL,
+ subscription_id BIGINT UNSIGNED NULL,
+ exemption_type ENUM('temporary','permanent') NOT NULL DEFAULT 'temporary',
+ starts_at DATETIME NOT NULL,
+ ends_at DATETIME NULL,
+ reason VARCHAR(500) NOT NULL,
+ status ENUM('active','revoked','expired') NOT NULL DEFAULT 'active',
+ granted_by BIGINT UNSIGNED NULL,
+ revoked_by BIGINT UNSIGNED NULL,
+ revoked_at DATETIME NULL,
+ created_at DATETIME NOT NULL,
+ updated_at DATETIME NOT NULL,
+ INDEX idx_exemption_tenant(tenant_id,status,starts_at,ends_at),
+ CONSTRAINT fk_exemption_tenant FOREIGN KEY(tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+ CONSTRAINT fk_exemption_subscription FOREIGN KEY(subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL,
+ CONSTRAINT fk_exemption_granted FOREIGN KEY(granted_by) REFERENCES users(id) ON DELETE SET NULL,
+ CONSTRAINT fk_exemption_revoked FOREIGN KEY(revoked_by) REFERENCES users(id) ON DELETE SET NULL
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

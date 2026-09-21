@@ -1,0 +1,26 @@
+/* Identidade do menu Master */
+.platform-shell .app-sidebar>.brand{min-height:48px}
+.platform-shell .app-sidebar>.brand .brand-mark{width:46px;height:46px;flex:0 0 46px;font-size:0;background:transparent url('/public/assets/img/applanner-logo.svg') center/contain no-repeat}
+.platform-shell .app-sidebar>.brand .brand-copy strong{font-size:17px;letter-spacing:-.02em;color:#fff}
+
+/* Planos: quantidade livre, cartões uniformes e última linha centralizada */
+.plans-responsive-grid{--plan-gap:18px;display:flex;flex-wrap:wrap;justify-content:center;align-items:stretch;gap:var(--plan-gap);width:100%}
+.plans-responsive-grid .plan-grid-item{display:flex;min-width:0;flex:0 1 calc(25% - 14px)}
+.plans-responsive-grid[data-plan-count="1"] .plan-grid-item{flex-basis:min(100%,420px)}
+.plans-responsive-grid[data-plan-count="2"] .plan-grid-item{flex-basis:calc(50% - 9px)}
+.plans-responsive-grid[data-plan-count="3"] .plan-grid-item{flex-basis:calc(33.333% - 12px)}
+.plans-responsive-grid .pricing-card{display:flex;flex-direction:column;width:100%;min-width:0;padding:clamp(20px,2.2vw,28px)}
+.plans-responsive-grid .plan-badge-slot{display:flex;align-items:center;min-height:29px}
+.plans-responsive-grid .pricing-card h3{margin:12px 0 8px}
+.plans-responsive-grid .plan-card-heading{min-width:0}
+.plans-responsive-grid .plan-description{min-height:0;margin-bottom:0;line-height:1.55}
+.plans-responsive-grid .plan-price-block{margin-top:22px}
+.plans-responsive-grid .price{display:flex;align-items:baseline;gap:4px;white-space:nowrap;font-size:clamp(31px,3vw,40px)}
+.plans-responsive-grid .price small{flex:0 0 auto;margin:0}
+.plans-responsive-grid .plan-limits{min-height:58px;align-content:flex-start}
+.plans-responsive-grid .plan-feature-list{flex:1;min-height:0;margin:22px 0;padding-left:21px}
+.plans-responsive-grid .plan-feature-list li{margin-bottom:8px;line-height:1.4}
+.plans-responsive-grid .plan-cta{margin-top:auto}
+@media(max-width:1199.98px){.plans-responsive-grid .plan-grid-item{flex-basis:calc(33.333% - 12px)}.plans-responsive-grid[data-plan-count="1"] .plan-grid-item{flex-basis:min(100%,420px)}.plans-responsive-grid[data-plan-count="2"] .plan-grid-item{flex-basis:calc(50% - 9px)}}
+@media(max-width:991.98px){.plans-responsive-grid .plan-grid-item{flex-basis:calc(50% - 9px)}.plans-responsive-grid[data-plan-count="1"] .plan-grid-item{flex-basis:min(100%,420px)}.plans-responsive-grid .pricing-card.featured{transform:none}}
+@media(max-width:575.98px){.plans-responsive-grid{--plan-gap:14px}.plans-responsive-grid .plan-grid-item{flex-basis:100%;width:100%}.plans-responsive-grid .plan-limits{min-height:0}.plans-responsive-grid .plan-feature-list{margin-top:18px}.plans-responsive-grid .plan-badge-slot{min-height:25px}}

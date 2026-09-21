@@ -1,0 +1,13 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\{Authorization,TenantContext,View};
+use App\Services\{BehaviorEngine,ModuleService};
+
+final class IntelligenceController
+{
+    public function index():void
+    {
+        ModuleService::require('behavior');Authorization::require('dashboard.view');$items=(new BehaviorEngine())->opportunities(TenantContext::id(),30);View::render('intelligence/index',['title'=>'Inteligência de retorno','items'=>$items]);
+    }
+}

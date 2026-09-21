@@ -1,0 +1,28 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+RewriteEngine On
+RewriteBase /
+
+RewriteCond %{THE_REQUEST} \s/+index\.php(?:[?\s]) [NC]
+RewriteRule ^index\.php$ / [R=301,L,NE]
+
+RewriteCond %{THE_REQUEST} \s/+install/index\.php(?:[?\s]) [NC]
+RewriteRule ^install/index\.php$ /install/ [R=301,L,NE]
+
+RewriteCond %{THE_REQUEST} \s/+[^\s?]*\.php(?:[?\s]) [NC]
+RewriteRule ^ - [F,L]
+
+RewriteRule (^|/)(\.env|\.git|app|config|cron|database|storage|tests)(/|$) - [F,L,NC]
+RewriteRule \.(sql|log|ini|bak|dist|md|lock)$ - [F,L,NC]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
+
+# php -- BEGIN cPanel-generated handler, do not edit
+# Set the “ea-php82” package as the default “PHP” programming language.
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php82 .php .php8 .phtml
+</IfModule>
+# php -- END cPanel-generated handler, do not edit

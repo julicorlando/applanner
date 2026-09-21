@@ -1,0 +1,21 @@
+<?php
+namespace App\Services;
+use App\Core\Database;
+final class SportsAvailabilityService
+{
+ public function slots(int $tenant,int $court,int $modality,string $date,int $duration):array
+ {
+  $pdo=Database::connection();$day=\DateTimeImmutable::createFromFormat('!Y-m-d',$date);if(!$day)return[];$weekday=(int)$day->format('N');$q=$pdo->prepare('SELECT * FROM sports_courts WHERE id=:c AND tenant_id=:t AND active=1');$q->execute(['c'=>$court,'t'=>$tenant]);$c=$q->fetch();if(!$c)return[];$duration=max((int)$c['minimum_minutes'],min((int)$c['maximum_minutes'],$duration));
+  $q=$pdo->prepare('SELECT 1 FROM sports_court_modalities WHERE court_id=:c AND modality_id=:m');$q->execute(['c'=>$court,'m'=>$modality]);if(!$q->fetchColumn())return[];$q=$pdo->prepare('SELECT start_time,end_time FROM sports_court_hours WHERE court_id=:c AND tenant_id=:t AND weekday=:d AND active=1 ORDER BY start_time');$q->execute(['c'=>$court,'t'=>$tenant,'d'=>$weekday]);$hours=$q->fetchAll();$settings=$pdo->prepare('SELECT default_slot_minutes,minimum_notice_minutes,maximum_days_ahead FROM sports_settings WHERE tenant_id=:t');$settings->execute(['t'=>$tenant]);$s=$settings->fetch()?:['default_slot_minutes'=>60,'minimum_notice_minutes'=>60,'maximum_days_ahead'=>90];$now=new \DateTimeImmutable();if($day<$now->setTime(0,0)||$day>$now->modify('+'.(int)$s['maximum_days_ahead'].' days')->setTime(23,59))return[];$step=max(5,(int)$s['default_slot_minutes']);$out=[];
+  foreach($hours as $h){$cursor=new \DateTimeImmutable($date.' '.$h['start_time']);$limit=new \DateTimeImmutable($date.' '.$h['end_time']);while($cursor->modify('+'.$duration.' minutes')<=$limit){$end=$cursor->modify('+'.$duration.' minutes');if($cursor>=$now->modify('+'.(int)$s['minimum_notice_minutes'].' minutes')&&$this->free($tenant,$court,$cursor,$end,(int)$c['interval_minutes'])){$quote=$this->quote($tenant,$court,$modality,$cursor,$duration);if($quote!==null)$out[]=['value'=>$cursor->format('Y-m-d H:i:s'),'label'=>$cursor->format('H:i'),'ends_at'=>$end->format('Y-m-d H:i:s'),'total'=>$quote['total'],'formatted'=>'R$ '.number_format($quote['total'],2,',','.'),'price_per_hour'=>$quote['price_per_hour']];}$cursor=$cursor->modify('+'.$step.' minutes');}}
+  return$out;
+ }
+ public function quote(int $tenant,int $court,int $modality,\DateTimeImmutable $start,int $duration):?array
+ {
+  $q=Database::connection()->prepare("SELECT price_per_hour FROM sports_price_rules WHERE tenant_id=:t AND court_id=:c AND active=1 AND (modality_id IS NULL OR modality_id=:m) AND (weekday IS NULL OR weekday=:d) AND (start_time IS NULL OR start_time<=:time1) AND (end_time IS NULL OR end_time>:time2) ORDER BY (modality_id IS NOT NULL) DESC,(weekday IS NOT NULL) DESC,(start_time IS NOT NULL) DESC,priority DESC,id DESC LIMIT 1");$q->execute(['t'=>$tenant,'c'=>$court,'m'=>$modality,'d'=>(int)$start->format('N'),'time1'=>$start->format('H:i:s'),'time2'=>$start->format('H:i:s')]);$price=$q->fetchColumn();if($price===false)return null;$hour=round((float)$price,2);return['price_per_hour'=>$hour,'total'=>round($hour*$duration/60,2)];
+ }
+ public function free(int $tenant,int $court,\DateTimeImmutable $start,\DateTimeImmutable $end,int $buffer=0):bool
+ {
+  $from=$start->modify('-'.$buffer.' minutes')->format('Y-m-d H:i:s');$to=$end->modify('+'.$buffer.' minutes')->format('Y-m-d H:i:s');$pdo=Database::connection();$q=$pdo->prepare("SELECT 1 FROM sports_reservations WHERE tenant_id=:t AND court_id=:c AND status IN('pending_payment','confirmed') AND starts_at<:ends AND ends_at>:starts LIMIT 1");$q->execute(['t'=>$tenant,'c'=>$court,'ends'=>$to,'starts'=>$from]);if($q->fetchColumn())return false;$q=$pdo->prepare("SELECT 1 FROM sports_court_blocks WHERE tenant_id=:t AND court_id=:c AND status='active' AND starts_at<:ends AND ends_at>:starts LIMIT 1");$q->execute(['t'=>$tenant,'c'=>$court,'ends'=>$to,'starts'=>$from]);return!$q->fetchColumn();
+ }
+}

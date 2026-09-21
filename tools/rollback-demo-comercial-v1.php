@@ -1,0 +1,4 @@
+<?php
+declare(strict_types=1);
+if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
+$root=dirname(__DIR__);$backup=(string)($argv[1]??'');if($backup===''){fwrite(STDERR,"Uso: php tools/rollback-demo-comercial-v1.php /caminho/do/backup\n");exit(1);}if(!is_dir($backup)){fwrite(STDERR,"Backup não encontrado.\n");exit(1);}$manifest=$backup.'/BACKUP_MANIFEST.txt';if(!is_file($manifest)){fwrite(STDERR,"Manifesto não encontrado.\n");exit(1);}foreach(file($manifest,FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) as $rel){$src=$backup.'/'.$rel;$dst=$root.'/'.$rel;if(is_file($src)){if(!is_dir(dirname($dst)))mkdir(dirname($dst),0775,true);copy($src,$dst);echo '[OK] '.$rel.PHP_EOL;}}echo "Arquivos restaurados. A empresa demonstração e seus dados NÃO são apagados pelo rollback para evitar exclusão destrutiva.\n";

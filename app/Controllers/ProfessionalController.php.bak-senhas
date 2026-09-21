@@ -1,0 +1,158 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\{Auth,Authorization,CSRF,Database,TenantContext,View,Audit,HttpException};
+use App\Services\ModuleService;
+
+final class ProfessionalController
+{
+    public function index():void
+    {
+        Authorization::require('professionals.manage');
+        $t=TenantContext::id();$pdo=Database::connection();$multiunit=ModuleService::has('multiunit',$t);
+        $q=$pdo->prepare('SELECT p.*,u.status user_status,un.name unit_name FROM professionals p LEFT JOIN users u ON u.id=p.user_id LEFT JOIN units un ON un.id=p.unit_id AND un.tenant_id=p.tenant_id WHERE p.tenant_id=:t ORDER BY p.active DESC,p.name');
+        $q->execute(['t'=>$t]);
+        $tenant=$pdo->prepare('SELECT public_slug,public_short_code FROM tenants WHERE id=:t');$tenant->execute(['t'=>$t]);
+        $units=[];if($multiunit){$uq=$pdo->prepare('SELECT id,name FROM units WHERE tenant_id=:t AND active=1 ORDER BY name');$uq->execute(['t'=>$t]);$units=$uq->fetchAll();}
+        View::render('professionals/index',['title'=>'Profissionais','professionals'=>$q->fetchAll(),'tenant'=>$tenant->fetch(),'multiunitEnabled'=>$multiunit,'units'=>$units]);
+    }
+
+    public function store():void
+    {
+        Authorization::require('professionals.manage');CSRF::enforce();
+        $t=TenantContext::id();$name=trim((string)($_POST['name']??''));$email=mb_strtolower(trim((string)($_POST['email']??'')));
+        if(strlen($name)<2){http_response_code(422);exit('Nome inválido.');}
+        if($email!==''&&!filter_var($email,FILTER_VALIDATE_EMAIL)){http_response_code(422);exit('E-mail inválido.');}
+        $pdo=Database::connection();$limit=ModuleService::limit('professionals',$t,null);if($limit!==null){$cnt=$pdo->prepare('SELECT COUNT(*) FROM professionals WHERE tenant_id=:t AND active=1');$cnt->execute(['t'=>$t]);if((int)$cnt->fetchColumn()>=$limit)HttpException::abort(422,'Seu plano permite até '.$limit.' profissional(is). Migre para um plano superior para cadastrar outro.');}$slug=$this->uniqueSlug($pdo,$t,$name);$unitId=$this->unitId($pdo,$t,$_POST['unit_id']??null);
+        $pdo->beginTransaction();
+        try{
+            $pdo->prepare('INSERT INTO professionals(tenant_id,unit_id,name,public_slug,email,phone,specialty,commission_percent,active,created_at,updated_at)VALUES(:t,:unit,:n,:s,:e,:p,:sp,:c,1,NOW(),NOW())')
+                ->execute(['t'=>$t,'unit'=>$unitId,'n'=>$name,'s'=>$slug,'e'=>$email?:null,'p'=>trim((string)($_POST['phone']??'')),'sp'=>trim((string)($_POST['specialty']??'')),'c'=>$this->commission($_POST['commission_percent']??null)]);
+            $id=(int)$pdo->lastInsertId();
+            $this->syncServices($pdo,$id,$t,$_POST['service_ids']??[]);
+            if(isset($_POST['create_access'])){
+                if(!$email)throw new \DomainException('Informe um e-mail válido para criar o acesso do profissional.');
+                $exists=$pdo->prepare('SELECT 1 FROM users WHERE email=:e');$exists->execute(['e'=>$email]);if($exists->fetchColumn())throw new \DomainException('Já existe usuário com este e-mail.');
+                $token=bin2hex(random_bytes(32));
+                $pdo->prepare("INSERT INTO users(tenant_id,name,email,password_hash,status,created_at,updated_at)VALUES(:t,:n,:e,:h,'pending',NOW(),NOW())")
+                    ->execute(['t'=>$t,'n'=>$name,'e'=>$email,'h'=>password_hash(bin2hex(random_bytes(32)),PASSWORD_DEFAULT)]);
+                $u=(int)$pdo->lastInsertId();$r=(int)$pdo->query("SELECT id FROM roles WHERE slug='professional'")->fetchColumn();
+                $pdo->prepare('INSERT INTO user_roles(user_id,role_id)VALUES(:u,:r)')->execute(['u'=>$u,'r'=>$r]);
+                $pdo->prepare('UPDATE professionals SET user_id=:u WHERE id=:id AND tenant_id=:t')->execute(['u'=>$u,'id'=>$id,'t'=>$t]);
+                $pdo->prepare('INSERT INTO password_reset_tokens(user_id,token_hash,expires_at,created_at)VALUES(:u,:h,DATE_ADD(NOW(),INTERVAL 24 HOUR),NOW())')->execute(['u'=>$u,'h'=>hash('sha256',$token)]);
+                $this->queueAccessEmail($pdo,$t,$u,$email,$token);
+            }
+            $pdo->commit();Audit::log('PROFESSIONAL_CREATED','professionals',$id);
+        }catch(\Throwable $e){if($pdo->inTransaction())$pdo->rollBack();http_response_code(422);exit($e->getMessage());}
+        header('Location: /professionals/'.$id.'/edit');exit;
+    }
+
+    public function edit(string $id):void
+    {
+        Authorization::require('professionals.manage');$t=TenantContext::id();$pid=(int)$id;$pdo=Database::connection();
+        $q=$pdo->prepare('SELECT p.*,u.status user_status FROM professionals p LEFT JOIN users u ON u.id=p.user_id WHERE p.id=:id AND p.tenant_id=:t');$q->execute(['id'=>$pid,'t'=>$t]);$professional=$q->fetch();if(!$professional)HttpException::abort(404,'Profissional não encontrado.');
+        $s=$pdo->prepare('SELECT id,name FROM services WHERE tenant_id=:t AND active=1 ORDER BY name');$s->execute(['t'=>$t]);
+        $a=$pdo->prepare('SELECT service_id FROM professional_services WHERE professional_id=:p');$a->execute(['p'=>$pid]);
+        $av=$pdo->prepare('SELECT * FROM professional_availability WHERE tenant_id=:t AND professional_id=:p ORDER BY weekday');$av->execute(['t'=>$t,'p'=>$pid]);
+        $tenant=$pdo->prepare('SELECT public_slug FROM tenants WHERE id=:t');$tenant->execute(['t'=>$t]);$multiunit=ModuleService::has('multiunit',$t);$units=[];if($multiunit){$uq=$pdo->prepare('SELECT id,name FROM units WHERE tenant_id=:t AND active=1 ORDER BY name');$uq->execute(['t'=>$t]);$units=$uq->fetchAll();}
+        View::render('professionals/edit',['title'=>'Editar profissional','professional'=>$professional,'services'=>$s->fetchAll(),'assigned'=>array_map('intval',$a->fetchAll(\PDO::FETCH_COLUMN)),'availability'=>$av->fetchAll(),'tenant'=>$tenant->fetch(),'multiunitEnabled'=>$multiunit,'units'=>$units]);
+    }
+
+    public function update(string $id):void
+    {
+        Authorization::require('professionals.manage');CSRF::enforce();$t=TenantContext::id();$pid=(int)$id;$pdo=Database::connection();
+        $q=$pdo->prepare('SELECT * FROM professionals WHERE id=:id AND tenant_id=:t');$q->execute(['id'=>$pid,'t'=>$t]);$old=$q->fetch();if(!$old)HttpException::abort(404,'Profissional não encontrado.');
+        $name=trim((string)($_POST['name']??''));$email=mb_strtolower(trim((string)($_POST['email']??'')));$active=isset($_POST['active'])?1:0;
+        if(strlen($name)<2||($email!==''&&!filter_var($email,FILTER_VALIDATE_EMAIL))){http_response_code(422);exit('Dados inválidos.');}$unitId=$this->unitId($pdo,$t,$_POST['unit_id']??null);
+        $pdo->beginTransaction();try{
+            $pdo->prepare('UPDATE professionals SET unit_id=:unit,name=:n,email=:e,phone=:p,specialty=:s,commission_percent=:c,active=:a,updated_at=NOW() WHERE id=:id AND tenant_id=:t')
+                ->execute(['unit'=>$unitId,'n'=>$name,'e'=>$email?:null,'p'=>trim((string)($_POST['phone']??'')),'s'=>trim((string)($_POST['specialty']??'')),'c'=>$this->commission($_POST['commission_percent']??null),'a'=>$active,'id'=>$pid,'t'=>$t]);
+            if(!empty($old['user_id'])){
+                if($email==='')throw new \DomainException('Profissional com acesso precisa manter um e-mail.');
+                $dup=$pdo->prepare('SELECT 1 FROM users WHERE email=:e AND id<>:id');$dup->execute(['e'=>$email,'id'=>$old['user_id']]);if($dup->fetchColumn())throw new \DomainException('Este e-mail já pertence a outro usuário.');
+                $pdo->prepare("UPDATE users SET name=:n,email=:e,status=:status,session_version=session_version+IF(:status2='active',0,1),updated_at=NOW() WHERE id=:u AND tenant_id=:t")
+                    ->execute(['n'=>$name,'e'=>$email,'status'=>$active?'active':'inactive','status2'=>$active?'active':'inactive','u'=>$old['user_id'],'t'=>$t]);
+            }
+            $this->syncServices($pdo,$pid,$t,$_POST['service_ids']??[]);
+            $pdo->commit();Audit::log('PROFESSIONAL_UPDATED','professionals',$pid,$old,['name'=>$name,'active'=>$active]);
+        }catch(\Throwable $e){if($pdo->inTransaction())$pdo->rollBack();http_response_code(422);exit($e->getMessage());}
+        header('Location: /professionals/'.$pid.'/edit');exit;
+    }
+
+    public function delete(string $id):void
+    {
+        Authorization::require('professionals.manage');CSRF::enforce();$t=TenantContext::id();$pid=(int)$id;$pdo=Database::connection();
+        $q=$pdo->prepare('SELECT user_id,name FROM professionals WHERE id=:id AND tenant_id=:t');$q->execute(['id'=>$pid,'t'=>$t]);$p=$q->fetch();if(!$p)HttpException::abort(404,'Profissional não encontrado.');
+        $pdo->beginTransaction();try{
+            $pdo->prepare('UPDATE professionals SET active=0,updated_at=NOW() WHERE id=:id AND tenant_id=:t')->execute(['id'=>$pid,'t'=>$t]);
+            if($p['user_id'])$pdo->prepare("UPDATE users SET status='inactive',session_version=session_version+1,updated_at=NOW() WHERE id=:u AND tenant_id=:t")->execute(['u'=>$p['user_id'],'t'=>$t]);
+            $pdo->commit();Audit::log('PROFESSIONAL_DEACTIVATED','professionals',$pid,null,['name'=>$p['name']]);
+        }catch(\Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        header('Location: /professionals');exit;
+    }
+
+    public function saveAvailability(string $id):void
+    {
+        Authorization::require('professionals.manage');CSRF::enforce();$t=TenantContext::id();$pid=(int)$id;
+        $this->assertProfessional($t,$pid);$this->persistAvailability($t,$pid,$_POST);header('Location: /professionals/'.$pid.'/edit');exit;
+    }
+
+    public function myAvailability():void
+    {
+        Authorization::require('professional.availability');$t=TenantContext::id();$pid=$this->ownProfessionalId($t);$pdo=Database::connection();
+        $q=$pdo->prepare('SELECT * FROM professional_availability WHERE tenant_id=:t AND professional_id=:p ORDER BY weekday');$q->execute(['t'=>$t,'p'=>$pid]);
+        View::render('professionals/availability',['title'=>'Minha disponibilidade','availability'=>$q->fetchAll()]);
+    }
+
+    public function saveMyAvailability():void
+    {
+        Authorization::require('professional.availability');CSRF::enforce();$t=TenantContext::id();$pid=$this->ownProfessionalId($t);$this->persistAvailability($t,$pid,$_POST);header('Location: /professional/availability');exit;
+    }
+
+    public function performance():void
+    {
+        Authorization::require('professional.performance');$t=TenantContext::id();$pid=$this->ownProfessionalId($t);$pdo=Database::connection();
+        $q=$pdo->prepare("SELECT COUNT(*) qty,COALESCE(SUM(COALESCE(a.service_price_snapshot,s.price)),0) revenue FROM appointments a JOIN services s ON s.id=a.service_id WHERE a.tenant_id=:t AND a.professional_id=:p AND a.status='completed' AND a.starts_at>=DATE_FORMAT(CURDATE(),'%Y-%m-01')");$q->execute(['t'=>$t,'p'=>$pid]);$services=$q->fetch();
+        $q=$pdo->prepare("SELECT COUNT(*) qty,COALESCE(SUM(total),0) revenue FROM sales WHERE tenant_id=:t AND professional_id=:p AND status='completed' AND created_at>=DATE_FORMAT(CURDATE(),'%Y-%m-01')");$q->execute(['t'=>$t,'p'=>$pid]);$sales=$q->fetch();
+        $q=$pdo->prepare('SELECT commission_percent FROM professionals WHERE id=:p AND tenant_id=:t');$q->execute(['p'=>$pid,'t'=>$t]);$commission=(float)$q->fetchColumn();
+        View::render('professionals/performance',['title'=>'Meu desempenho','services'=>$services,'sales'=>$sales,'commission'=>$commission]);
+    }
+
+    private function persistAvailability(int $tenantId,int $professionalId,array $input):void
+    {
+        $pdo=Database::connection();$pdo->beginTransaction();try{
+            for($day=1;$day<=7;$day++){
+                $enabled=isset($input['day_'.$day]);$start=trim((string)($input['start_'.$day]??''));$end=trim((string)($input['end_'.$day]??''));
+                if($enabled&&(!preg_match('/^\d{2}:\d{2}$/',$start)||!preg_match('/^\d{2}:\d{2}$/',$end)||$start>=$end))throw new \DomainException('Revise os horários informados.');
+                if($enabled){
+                    $pdo->prepare("INSERT INTO professional_availability(tenant_id,professional_id,weekday,start_time,end_time,active,created_at,updated_at)VALUES(:t,:p,:d,:s,:e,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE start_time=VALUES(start_time),end_time=VALUES(end_time),active=1,updated_at=NOW()")
+                        ->execute(['t'=>$tenantId,'p'=>$professionalId,'d'=>$day,'s'=>$start.':00','e'=>$end.':00']);
+                }else{
+                    $pdo->prepare('UPDATE professional_availability SET active=0,updated_at=NOW() WHERE tenant_id=:t AND professional_id=:p AND weekday=:d')->execute(['t'=>$tenantId,'p'=>$professionalId,'d'=>$day]);
+                }
+            }
+            $pdo->commit();Audit::log('PROFESSIONAL_AVAILABILITY_UPDATED','professionals',$professionalId);
+        }catch(\Throwable $e){if($pdo->inTransaction())$pdo->rollBack();http_response_code(422);exit($e->getMessage());}
+    }
+
+    private function syncServices(\PDO $pdo,int $professionalId,int $tenantId,array $ids):void
+    {
+        $pdo->prepare('DELETE FROM professional_services WHERE professional_id=:p')->execute(['p'=>$professionalId]);
+        $ids=array_values(array_unique(array_filter(array_map('intval',(array)$ids))));
+        if(!$ids)return;
+        $check=$pdo->prepare('SELECT id FROM services WHERE id=:id AND tenant_id=:t AND active=1');$ins=$pdo->prepare('INSERT IGNORE INTO professional_services(professional_id,service_id)VALUES(:p,:s)');
+        foreach($ids as $sid){$check->execute(['id'=>$sid,'t'=>$tenantId]);if($check->fetchColumn())$ins->execute(['p'=>$professionalId,'s'=>$sid]);}
+    }
+
+    private function queueAccessEmail(\PDO $pdo,int $tenantId,int $userId,string $email,string $token):void
+    {
+        $app=require __DIR__.'/../../config/app.php';$payload=\App\Core\Encryption::encrypt(['to'=>$email,'template'=>'password_reset','url'=>rtrim($app['url'],'/').'/reset-password?token='.$token]);
+        $pdo->prepare("INSERT INTO jobs(tenant_id,type,payload_encrypted,status,attempts,available_at,created_at,updated_at)VALUES(:t,'mail.send',:p,'queued',0,NOW(),NOW(),NOW())")->execute(['t'=>$tenantId,'p'=>$payload]);
+    }
+
+    private function assertProfessional(int $tenantId,int $id):void{$q=Database::connection()->prepare('SELECT 1 FROM professionals WHERE id=:id AND tenant_id=:t');$q->execute(['id'=>$id,'t'=>$tenantId]);if(!$q->fetchColumn())HttpException::abort(404,'Profissional não encontrado.');}
+    private function ownProfessionalId(int $tenantId):int{$q=Database::connection()->prepare('SELECT id FROM professionals WHERE tenant_id=:t AND user_id=:u AND active=1 LIMIT 1');$q->execute(['t'=>$tenantId,'u'=>Auth::user()['id']]);$id=$q->fetchColumn();if(!$id)HttpException::abort(403,'Seu usuário não está vinculado a um profissional ativo.');return (int)$id;}
+    private function unitId(\PDO $pdo,int $tenantId,mixed $value):?int{if(!ModuleService::has('multiunit',$tenantId))return null;$id=filter_var($value,FILTER_VALIDATE_INT);if(!$id)return null;$q=$pdo->prepare('SELECT id FROM units WHERE id=:id AND tenant_id=:t AND active=1');$q->execute(['id'=>$id,'t'=>$tenantId]);return $q->fetchColumn()?(int)$id:null;}
+    private function commission(mixed $v):?float{$n=filter_var($v,FILTER_VALIDATE_FLOAT);if($n===false||$n<0||$n>100)return null;return (float)$n;}
+    private function uniqueSlug(\PDO $pdo,int $tenantId,string $name):string{$v=iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$name)?:$name;$base=trim(preg_replace('/[^a-z0-9]+/','-',strtolower($v)),'-')?:'profissional';$slug=$base;$i=2;$q=$pdo->prepare('SELECT 1 FROM professionals WHERE tenant_id=:t AND public_slug=:s');while(true){$q->execute(['t'=>$tenantId,'s'=>$slug]);if(!$q->fetchColumn())return $slug;$slug=$base.'-'.$i++;}}
+}

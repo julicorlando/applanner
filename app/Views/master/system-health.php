@@ -1,0 +1,4 @@
+<div class="d-flex justify-content-between align-items-center mb-4"><div><h1 class="h3 mb-1">Saúde do sistema</h1><p class="text-secondary mb-0">Verificações executadas em tempo real.</p></div><span class="badge text-bg-secondary">Versão <?=htmlspecialchars(($appVersion??'4.0.0 RC'),ENT_QUOTES,'UTF-8')?></span></div>
+<div class="row g-3"><?php foreach($checks as $name=>$check): $color=['ok'=>'success','warning'=>'warning','error'=>'danger'][$check[0]]; ?>
+<div class="col-sm-6 col-lg-4"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="d-flex justify-content-between"><strong><?= htmlspecialchars($name,ENT_QUOTES,'UTF-8') ?></strong><span class="badge text-bg-<?= $color ?>"><?= strtoupper($check[0]) ?></span></div><div class="text-secondary mt-2"><?= htmlspecialchars($check[1],ENT_QUOTES,'UTF-8') ?></div></div></div></div>
+<?php endforeach; ?></div>

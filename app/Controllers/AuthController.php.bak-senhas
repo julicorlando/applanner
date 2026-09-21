@@ -1,0 +1,184 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\Auth;
+use App\Core\CSRF;
+use App\Core\RateLimiter;
+use App\Core\View;
+use App\Core\Database;
+use App\Core\Encryption;
+use App\Core\SecurityLogger;
+use App\Core\Totp;
+use App\Core\Audit;
+
+final class AuthController
+{
+    public function showLogin(): void
+    {
+        if (Auth::check()) {
+            header('Location: '.((Auth::user()['role']??'')==='commercial'?'/comercial':'/dashboard'));
+            exit;
+        }
+        View::render('auth/login', ['title' => 'Entrar', 'error' => $_SESSION['flash_error'] ?? null]);
+        unset($_SESSION['flash_error']);
+    }
+
+    public function showProfessionalLogin(): void
+    {
+        if (Auth::check()) {
+            header('Location: /dashboard');
+            exit;
+        }
+        View::render('auth/professional-login', [
+            'title' => 'Acesso do profissional',
+            'error' => $_SESSION['flash_error'] ?? (isset($_GET['denied']) ? 'Este acesso é exclusivo para profissionais cadastrados pelo estabelecimento.' : null),
+            'publicLayout' => true,
+        ]);
+        unset($_SESSION['flash_error']);
+    }
+
+    public function professionalLogin(): void
+    {
+        CSRF::enforce();
+        $email=mb_strtolower(trim((string)($_POST['email']??'')));
+        $password=(string)($_POST['password']??'');
+        $ip=$_SERVER['REMOTE_ADDR']??'unknown';
+        $key=$ip.'|'.$email;
+        $fail=function(string $message) use ($email):void {
+            $_SESSION['flash_error']=$message;
+            header('Location: /profissional/login');
+            exit;
+        };
+        if(!RateLimiter::hit('professional-login-ip|'.$ip,30,900)||!RateLimiter::hit('professional-login-account|'.$key,8,900)){
+            SecurityLogger::log('professional_login.rate_limited',['email_hash'=>hash('sha256',$email)]);
+            $fail('Muitas tentativas. Tente novamente em alguns minutos.');
+        }
+        if(!filter_var($email,FILTER_VALIDATE_EMAIL)||$password==='')$fail('Credenciais inválidas.');
+        if(!Auth::attempt($email,$password))$fail('E-mail ou senha inválidos.');
+        $candidate=Auth::twoFactorPending()?Auth::pendingUser():Auth::user();
+        if(($candidate['role']??'')!=='professional'){
+            SecurityLogger::log('professional_login.role_denied',['email_hash'=>hash('sha256',$email)]);
+            Auth::logout();
+            header('Location: /profissional/login?denied=1');
+            exit;
+        }
+        RateLimiter::clear('professional-login-account|'.$key);
+        if(Auth::twoFactorPending()){
+            $_SESSION['_login_return_to']='/dashboard';
+            header('Location: /two-factor-challenge');
+            exit;
+        }
+        header('Location: '.((Auth::user()['role']??'')==='commercial'?'/comercial':'/dashboard'));
+        exit;
+    }
+
+    public function login(): void
+    {
+        CSRF::enforce();
+
+        $email = mb_strtolower(trim((string)($_POST['email'] ?? '')));
+        $password = (string)($_POST['password'] ?? '');
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $key = $ip . '|' . $email;
+
+        if (!RateLimiter::hit('login-ip|' . $ip, 30, 900) || !RateLimiter::hit('login-account|' . $key, 8, 900)) {
+            SecurityLogger::log('login.rate_limited', ['email_hash'=>hash('sha256',$email)]);
+            $_SESSION['flash_error'] = 'Muitas tentativas. Tente novamente em alguns minutos.';
+            header('Location: /login');
+            exit;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
+            $_SESSION['flash_error'] = 'Credenciais inválidas.';
+            header('Location: /login');
+            exit;
+        }
+
+        if (!Auth::attempt($email, $password)) {
+            $attempt=(int)($_SESSION['_login_failures']??0)+1; $_SESSION['_login_failures']=$attempt;
+            usleep(min(1500000,150000*$attempt)+random_int(20000,120000));
+            $_SESSION['flash_error'] = 'E-mail ou senha inválidos.';
+            header('Location: /login');
+            exit;
+        }
+
+        if(Auth::twoFactorPending()){$_SESSION['_login_return_to']=(Auth::pendingUser()['role']??'')==='commercial'?'/comercial':'/dashboard';header('Location: /two-factor-challenge');exit;}
+
+        RateLimiter::clear('login-account|' . $key);
+        unset($_SESSION['_login_failures']);
+        header('Location: '.((Auth::user()['role']??'')==='commercial'?'/comercial':'/dashboard'));
+        exit;
+    }
+
+    public function logout(): void
+    {
+        CSRF::enforce();
+        Auth::logout();
+        header('Location: /login');
+        exit;
+    }
+
+    public function showForgotPassword(): void
+    {
+        View::render('auth/forgot-password',['title'=>'Recuperar senha','message'=>$_SESSION['flash_message']??null]); unset($_SESSION['flash_message']);
+    }
+
+    public function requestPasswordReset(): void
+    {
+        CSRF::enforce(); $email=mb_strtolower(trim((string)($_POST['email']??''))); $ip=$_SERVER['REMOTE_ADDR']??'unknown';
+        if(!RateLimiter::hit('reset|'.$ip,5,3600)) { SecurityLogger::log('password_reset.rate_limited'); }
+        elseif(filter_var($email,FILTER_VALIDATE_EMAIL)) {
+            $pdo=Database::connection(); $stmt=$pdo->prepare("SELECT id,tenant_id FROM users WHERE email=:email AND status='active' LIMIT 1"); $stmt->execute(['email'=>$email]); $user=$stmt->fetch();
+            if($user){ $token=bin2hex(random_bytes(32)); $pdo->beginTransaction(); try {
+                $pdo->prepare("DELETE FROM password_reset_tokens WHERE user_id=:uid OR expires_at<NOW() OR used_at IS NOT NULL")->execute(['uid'=>$user['id']]);
+                $pdo->prepare("INSERT INTO password_reset_tokens (user_id,token_hash,expires_at,created_at) VALUES (:uid,:hash,DATE_ADD(NOW(),INTERVAL 30 MINUTE),NOW())")->execute(['uid'=>$user['id'],'hash'=>hash('sha256',$token)]);
+                $app=require __DIR__.'/../../config/app.php'; $payload=Encryption::encrypt(['to'=>$email,'template'=>'password_reset','url'=>rtrim($app['url'],'/').'/reset-password?token='.$token]);
+                $pdo->prepare("INSERT INTO jobs (tenant_id,type,payload_encrypted,status,attempts,available_at,created_at,updated_at) VALUES (:tenant,'mail.send',:payload,'queued',0,NOW(),NOW(),NOW())")->execute(['tenant'=>$user['tenant_id'],'payload'=>$payload]); $pdo->commit();
+            } catch(\Throwable $e){if($pdo->inTransaction())$pdo->rollBack(); throw $e;} }
+        }
+        $_SESSION['flash_message']='Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação.'; header('Location: /forgot-password'); exit;
+    }
+
+    public function showResetPassword(): void
+    {
+        View::render('auth/reset-password',['title'=>'Redefinir senha','token'=>(string)($_GET['token']??''),'error'=>$_SESSION['flash_error']??null]); unset($_SESSION['flash_error']);
+    }
+
+    public function resetPassword(): void
+    {
+        CSRF::enforce(); $token=(string)($_POST['token']??''); $password=(string)($_POST['password']??''); $confirm=(string)($_POST['password_confirmation']??'');
+        $valid=strlen($password)>=12&&preg_match('/[A-Z]/',$password)&&preg_match('/[a-z]/',$password)&&preg_match('/\d/',$password)&&preg_match('/[^A-Za-z0-9]/',$password)&&hash_equals($password,$confirm);
+        $pdo=Database::connection(); $stmt=$pdo->prepare("SELECT id,user_id FROM password_reset_tokens WHERE token_hash=:hash AND used_at IS NULL AND expires_at>NOW() LIMIT 1 FOR UPDATE");
+        $pdo->beginTransaction(); try { $stmt->execute(['hash'=>hash('sha256',$token)]); $reset=$stmt->fetch(); if(!$valid||!$reset) throw new \DomainException('Link inválido ou senha fora da política.');
+            $pdo->prepare("UPDATE users SET password_hash=:hash,status=IF(status='pending','active',status),session_version=session_version+1,updated_at=NOW() WHERE id=:id")->execute(['hash'=>password_hash($password,PASSWORD_DEFAULT),'id'=>$reset['user_id']]);
+            $pdo->prepare("UPDATE password_reset_tokens SET used_at=NOW() WHERE id=:id")->execute(['id'=>$reset['id']]); $pdo->commit(); SecurityLogger::log('password_reset.completed',['user_id'=>(int)$reset['user_id']]);
+        } catch(\DomainException $e){if($pdo->inTransaction())$pdo->rollBack(); $_SESSION['flash_error']=$e->getMessage(); header('Location: /reset-password?token='.rawurlencode($token)); exit;}
+        header('Location: /login'); exit;
+    }
+
+    public function showTwoFactorChallenge(): void { if(!Auth::twoFactorPending()){header('Location: /login');exit;} View::render('auth/two-factor-challenge',['title'=>'Verificação em duas etapas','error'=>$_SESSION['flash_error']??null]);unset($_SESSION['flash_error']); }
+    public function verifyTwoFactorChallenge(): void
+    {
+        CSRF::enforce(); if(!Auth::twoFactorPending()){header('Location: /login');exit;} $pending=Auth::pendingUser(); $code=strtoupper(trim((string)($_POST['code']??''))); $pdo=Database::connection();
+        $stmt=$pdo->prepare('SELECT two_factor_secret,two_factor_last_step FROM users WHERE id=:id AND status=\'active\'');$stmt->execute(['id'=>$pending['id']]);$factor=$stmt->fetch();$encrypted=$factor['two_factor_secret']??null;$valid=false;$acceptedStep=null;
+        if($encrypted){$secret=Encryption::decrypt($encrypted)['secret']??'';$acceptedStep=Totp::verifyStep($secret,$code);$valid=$acceptedStep!==null&&$acceptedStep>(int)($factor['two_factor_last_step']??0);}
+        if(!$valid){$hash=hash('sha256',$code);$stmt=$pdo->prepare('SELECT id FROM two_factor_recovery_codes WHERE user_id=:uid AND code_hash=:hash AND used_at IS NULL LIMIT 1');$stmt->execute(['uid'=>$pending['id'],'hash'=>$hash]);$rid=$stmt->fetchColumn();if($rid){$pdo->prepare('UPDATE two_factor_recovery_codes SET used_at=NOW() WHERE id=:id')->execute(['id'=>$rid]);$valid=true;}}
+        if(!$valid){SecurityLogger::log('2fa.invalid',['user_id'=>$pending['id']]);$_SESSION['flash_error']='Código inválido.';header('Location: /two-factor-challenge');exit;}
+        if($acceptedStep!==null)$pdo->prepare('UPDATE users SET two_factor_last_step=:step WHERE id=:id AND (two_factor_last_step IS NULL OR two_factor_last_step<:step2)')->execute(['step'=>$acceptedStep,'step2'=>$acceptedStep,'id'=>$pending['id']]);$return=(string)($_SESSION['_login_return_to']??((($pending['role']??'')==='commercial')?'/comercial':'/dashboard'));unset($_SESSION['_login_return_to']);Auth::completeTwoFactor();header('Location: '.$return);exit;
+    }
+    public function security(): void { Auth::requireLogin(); $stmt=Database::connection()->prepare('SELECT email_verified_at,two_factor_enabled_at FROM users WHERE id=:id');$stmt->execute(['id'=>Auth::user()['id']]);View::render('auth/security',['title'=>'Segurança','security'=>$stmt->fetch(),'setup_secret'=>$_SESSION['_2fa_setup']??null,'recovery_codes'=>$_SESSION['recovery_codes']??null,'message'=>$_SESSION['flash_message']??null]);unset($_SESSION['recovery_codes'],$_SESSION['flash_message']); }
+    public function startTwoFactor(): void { Auth::requireLogin();CSRF::enforce();$_SESSION['_2fa_setup']=Totp::secret();header('Location: /security');exit; }
+    public function confirmTwoFactor(): void
+    {
+        Auth::requireLogin();CSRF::enforce();$secret=$_SESSION['_2fa_setup']??'';$code=(string)($_POST['code']??'');if(!$secret||!Totp::verify($secret,$code)){$_SESSION['flash_message']='Código inválido. Confira o horário do dispositivo.';header('Location: /security');exit;}
+        $pdo=Database::connection();$pdo->beginTransaction();try{$pdo->prepare('UPDATE users SET two_factor_secret=:secret,two_factor_enabled_at=NOW(),updated_at=NOW() WHERE id=:id')->execute(['secret'=>Encryption::encrypt(['secret'=>$secret]),'id'=>Auth::user()['id']]);$pdo->prepare('DELETE FROM two_factor_recovery_codes WHERE user_id=:id')->execute(['id'=>Auth::user()['id']]);$codes=[];for($i=0;$i<8;$i++){$raw=strtoupper(bin2hex(random_bytes(5)));$codes[]=$raw;$pdo->prepare('INSERT INTO two_factor_recovery_codes(user_id,code_hash,created_at) VALUES(:uid,:hash,NOW())')->execute(['uid'=>Auth::user()['id'],'hash'=>hash('sha256',$raw)]);} $pdo->commit();unset($_SESSION['_2fa_setup']);$_SESSION['recovery_codes']=$codes;Audit::log('auth.2fa_enabled','users',(int)Auth::user()['id']);}catch(\Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}header('Location: /security');exit;
+    }
+    public function sendVerification(): void
+    {
+        Auth::requireLogin();CSRF::enforce();$pdo=Database::connection();$token=bin2hex(random_bytes(32));$pdo->prepare('DELETE FROM email_verification_tokens WHERE user_id=:id')->execute(['id'=>Auth::user()['id']]);$pdo->prepare('INSERT INTO email_verification_tokens(user_id,token_hash,expires_at,created_at) VALUES(:uid,:hash,DATE_ADD(NOW(),INTERVAL 24 HOUR),NOW())')->execute(['uid'=>Auth::user()['id'],'hash'=>hash('sha256',$token)]);$app=require __DIR__.'/../../config/app.php';$payload=Encryption::encrypt(['to'=>Auth::user()['email'],'template'=>'email_verification','url'=>rtrim($app['url'],'/').'/verify-email?token='.$token]);$pdo->prepare("INSERT INTO jobs(tenant_id,type,payload_encrypted,status,attempts,available_at,created_at,updated_at)VALUES(:tenant,'mail.send',:payload,'queued',0,NOW(),NOW(),NOW())")->execute(['tenant'=>Auth::user()['tenant_id'],'payload'=>$payload]);$_SESSION['flash_message']='Confirmação adicionada à fila de envio.';header('Location: /security');exit;
+    }
+    public function verifyEmail(): void
+    {
+        $token=(string)($_GET['token']??'');$pdo=Database::connection();$pdo->beginTransaction();$stmt=$pdo->prepare('SELECT id,user_id FROM email_verification_tokens WHERE token_hash=:hash AND used_at IS NULL AND expires_at>NOW() LIMIT 1 FOR UPDATE');$stmt->execute(['hash'=>hash('sha256',$token)]);$row=$stmt->fetch();if(!$row){$pdo->rollBack();http_response_code(422);exit('Link inválido ou expirado.');}$pdo->prepare('UPDATE users SET email_verified_at=NOW(),updated_at=NOW() WHERE id=:id')->execute(['id'=>$row['user_id']]);$pdo->prepare('UPDATE email_verification_tokens SET used_at=NOW() WHERE id=:id')->execute(['id'=>$row['id']]);$pdo->commit();if(Auth::check())$_SESSION['user']['email_verified']=true;header('Location: /security');exit;
+    }
+}

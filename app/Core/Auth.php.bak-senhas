@@ -1,0 +1,170 @@
+<?php
+namespace App\Core;
+
+final class Auth
+{
+    public static function attempt(string $email, string $password): bool
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare(
+            "SELECT u.*, r.slug AS role_slug,
+                    GROUP_CONCAT(DISTINCT p.slug ORDER BY p.slug SEPARATOR ',') AS permission_slugs
+             FROM users u
+             LEFT JOIN user_roles ur ON ur.user_id = u.id
+             LEFT JOIN roles r ON r.id = ur.role_id
+             LEFT JOIN role_permissions rp ON rp.role_id = r.id
+             LEFT JOIN permissions p ON p.id = rp.permission_id
+             WHERE u.email = :email AND u.status = 'active'
+             GROUP BY u.id, r.slug
+             LIMIT 1"
+        );
+        $stmt->execute(['email' => mb_strtolower(trim($email))]);
+        $user = $stmt->fetch();
+
+        if (!$user || !password_verify($password, $user['password_hash'])) {
+            self::recordLogin($user ? (int)$user['id'] : null, $email, false);
+            return false;
+        }
+
+        $sessionUser = self::toSessionUser($user);
+        if(!empty($user['two_factor_secret'])) {
+            session_regenerate_id(true);
+            $_SESSION['_2fa_pending']=$sessionUser;
+            self::recordLogin((int)$user['id'],$email,true);
+            return true;
+        }
+
+        session_regenerate_id(true);
+        $_SESSION['user'] = $sessionUser;
+        $pdo->prepare("UPDATE users SET last_login_at = NOW() WHERE id = :id")->execute(['id' => $user['id']]);
+        Audit::log('auth.login', 'users', (int)$user['id'], null, ['email' => $user['email']]);
+        self::recordLogin((int)$user['id'], $email, true);
+        return true;
+    }
+
+    private static function toSessionUser(array $user): array
+    {
+        return [
+            'id'=>(int)$user['id'],
+            'tenant_id'=>$user['tenant_id']!==null?(int)$user['tenant_id']:null,
+            'name'=>$user['name'],
+            'email'=>$user['email'],
+            'role'=>$user['role_slug']?:'user',
+            'permissions'=>$user['permission_slugs']?explode(',',$user['permission_slugs']):[],
+            'last_activity'=>time(),
+            'authenticated_at'=>time(),
+            'session_version'=>(int)$user['session_version'],
+            'email_verified'=>$user['email_verified_at']!==null,
+        ];
+    }
+
+    public static function sessionUserById(int $id): ?array
+    {
+        $stmt=Database::connection()->prepare(
+            "SELECT u.*,r.slug role_slug,GROUP_CONCAT(DISTINCT p.slug ORDER BY p.slug SEPARATOR ',') permission_slugs
+             FROM users u
+             LEFT JOIN user_roles ur ON ur.user_id=u.id
+             LEFT JOIN roles r ON r.id=ur.role_id
+             LEFT JOIN role_permissions rp ON rp.role_id=r.id
+             LEFT JOIN permissions p ON p.id=rp.permission_id
+             WHERE u.id=:id AND u.status='active'
+             GROUP BY u.id,r.slug LIMIT 1"
+        );
+        $stmt->execute(['id'=>$id]);
+        $row=$stmt->fetch();
+        return $row?self::toSessionUser($row):null;
+    }
+
+    public static function twoFactorPending(): bool { return !empty($_SESSION['_2fa_pending']['id']); }
+    public static function pendingUser(): ?array { return $_SESSION['_2fa_pending'] ?? null; }
+    public static function completeTwoFactor(): void { session_regenerate_id(true); $_SESSION['user']=$_SESSION['_2fa_pending']; unset($_SESSION['_2fa_pending']); Audit::log('auth.2fa','users',(int)$_SESSION['user']['id']); }
+    public static function check(): bool { return !empty($_SESSION['user']['id']); }
+    public static function user(): ?array { return $_SESSION['user'] ?? null; }
+    public static function isPlatformStaff(): bool { $u=self::user(); return (bool)$u && empty($u['tenant_id']) && (in_array($u['role']??'',['master','support'],true)||self::commercialSupportEnabled()); }
+    public static function commercialSupportEnabled():bool
+    {
+        $u=self::user();if(!$u||($u['role']??'')!=='commercial'||!empty($u['tenant_id']))return false;try{$q=Database::connection()->prepare('SELECT support_enabled FROM commercial_profiles WHERE user_id=:u AND active=1');$q->execute(['u'=>$u['id']]);return (bool)$q->fetchColumn();}catch(\Throwable){return false;}
+    }
+    public static function isSupportImpersonating(): bool { return !empty($_SESSION['_support_impersonation']['actor_id']); }
+    public static function supportMeta(): ?array { return $_SESSION['_support_impersonation'] ?? null; }
+
+    public static function beginSupportAccess(int $targetUserId,int $ticketId,int $accessSessionId): void
+    {
+        if(!self::isPlatformStaff() || self::isSupportImpersonating())HttpException::abort(403,'Acesso assistido não autorizado.');
+        $actor=self::user();
+        $target=self::sessionUserById($targetUserId);
+        if(!$target || empty($target['tenant_id']))HttpException::abort(404,'Usuário do cliente indisponível para suporte.');
+        $_SESSION['_support_impersonation']=[
+            'actor_id'=>(int)$actor['id'],
+            'actor_role'=>$actor['role'],
+            'ticket_id'=>$ticketId,
+            'access_session_id'=>$accessSessionId,
+            'tenant_id'=>(int)$target['tenant_id'],
+            'started_at'=>date('c'),
+        ];
+        $_SESSION['_support_actor']=$actor;
+        $_SESSION['user']=$target;
+        session_regenerate_id(true);
+    }
+
+    public static function endSupportAccess(): ?array
+    {
+        if(!self::isSupportImpersonating())return null;
+        $meta=$_SESSION['_support_impersonation'];
+        $actorId=(int)($meta['actor_id']??0);
+        $actor=$actorId?self::sessionUserById($actorId):null;
+        unset($_SESSION['_support_impersonation'],$_SESSION['_support_actor'],$_SESSION['access_mode']);
+        if(!$actor){self::logout();return $meta;}
+        $_SESSION['user']=$actor;
+        session_regenerate_id(true);
+        return $meta;
+    }
+
+    public static function requireLogin(): void
+    {
+        $security=require __DIR__.'/../../config/security.php';
+        if (self::check() && (time() - (int)($_SESSION['user']['last_activity'] ?? 0) > (int)$security['session_idle_seconds'] || time() - (int)($_SESSION['user']['authenticated_at'] ?? 0) > (int)$security['session_absolute_seconds'])) {
+            self::logout();
+        }
+        if (!self::check()) { header('Location: /login'); exit; }
+        $_SESSION['user']['last_activity'] = time();
+        header('Cache-Control: no-store, private');header('Pragma: no-cache');
+        $stmt=Database::connection()->prepare("SELECT session_version,status FROM users WHERE id=:id");
+        $stmt->execute(['id'=>(int)self::user()['id']]); $fresh=$stmt->fetch();
+        if(!$fresh || $fresh['status']!=='active' || (int)$fresh['session_version']!==(int)self::user()['session_version']) { self::logout(); header('Location: /login'); exit; }
+        SubscriptionAccess::enforce();
+    }
+
+    private static function recordLogin(?int $userId, string $email, bool $successful): void
+    {
+        try {
+            $stmt = Database::connection()->prepare("INSERT INTO login_history (user_id,email,successful,ip_address,user_agent,created_at) VALUES (:uid,:email,:ok,:ip,:ua,NOW())");
+            $stmt->execute(['uid'=>$userId,'email'=>mb_strtolower(trim($email)),'ok'=>$successful ? 1 : 0,'ip'=>$_SERVER['REMOTE_ADDR'] ?? null,'ua'=>substr($_SERVER['HTTP_USER_AGENT'] ?? '',0,500)]);
+        } catch (\Throwable $e) {}
+        try {
+            $tenant=null;if($userId){$q=Database::connection()->prepare('SELECT tenant_id FROM users WHERE id=:id');$q->execute(['id'=>$userId]);$tenant=$q->fetchColumn()?:null;}
+            $q=Database::connection()->prepare('INSERT INTO login_audit(tenant_id,user_id,email_attempted,event_type,result,ip_address,user_agent,failure_reason_code,created_at)VALUES(:t,:u,:e,:event,:result,:ip,:ua,:reason,NOW())');
+            $q->execute(['t'=>$tenant,'u'=>$userId,'e'=>mb_strtolower(trim($email)),'event'=>$successful?'LOGIN_SUCCESS':'LOGIN_FAILED','result'=>$successful?'success':'failure','ip'=>$_SERVER['REMOTE_ADDR']??null,'ua'=>substr($_SERVER['HTTP_USER_AGENT']??'',0,500),'reason'=>$successful?null:'INVALID_CREDENTIALS']);
+        } catch (\Throwable $e) {}
+    }
+
+    public static function requireRole(string ...$roles): void
+    {
+        self::requireLogin();
+        if (!in_array(self::user()['role'] ?? '', $roles, true)) {
+            SecurityLogger::log('role.denied', ['required'=>$roles]);
+            HttpException::abort(403, 'Você não possui permissão para acessar esta área.');
+        }
+    }
+
+    public static function logout(): void
+    {
+        if (self::check()) Audit::log('auth.logout', 'users', (int)self::user()['id']);
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params['path'], '', $params['secure'], $params['httponly']);
+        }
+        session_destroy();
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "patch": "PATCH_APPLANNER_AUTO_V1_COMPLETO",
+    "installed_at": "2026-08-18T20:00:00+00:00",
+    "backup_dir": "/home/appnannerbr/public_html/storage/update-backups/auto-v1-20260818-195958",
+    "migrations": [
+        "039_modules_merged_subscription.sql",
+        "040_applanner_barber_v1.sql",
+        "041_applanner_auto_v1.sql"
+    ]
+}

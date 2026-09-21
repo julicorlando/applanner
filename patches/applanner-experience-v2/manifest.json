@@ -1,0 +1,12 @@
+{
+  "name":"ApPlanner Experience V2","version":"2.0.0","requires":"ApPlanner RC1 / migration 043","migrations":["044_applanner_experience_i18n_growth.sql","045_applanner_growth_i18n_automation.sql"],
+  "files":[
+    "index.php","app/Core/bootstrap.php","app/Core/I18n.php","app/Core/Security.php",
+    "app/Lang/pt_BR.php","app/Lang/pt_PT.php","app/Lang/en.php","app/Lang/es.php",
+    "app/Controllers/BrandController.php","app/Controllers/CommercialController.php","app/Controllers/MasterController.php","app/Controllers/GrowthController.php","app/Controllers/WebhookController.php",
+    "app/Services/GrowthService.php","app/Services/MetaConversionService.php","app/Services/ProductEvent.php","app/Services/PublicTranslationService.php",
+    "app/Views/layout.php","app/Views/master/index.php","app/Views/master/conversion-settings.php","app/Views/master/growth-funnel.php","app/Views/settings/branding.php","app/Views/commercial/landing.php","app/Views/public/show.php","app/Views/public/sports.php",
+    "public/assets/css/experience-v1.css","public/assets/css/experience-v2.css","public/assets/js/app.js","public/assets/js/i18n-selector.js","public/assets/js/growth-tracking.js","public/assets/js/branding-editor.js","public/assets/js/public-section-order.js",
+    "database/migrations/044_applanner_experience_i18n_growth.sql","database/migrations/045_applanner_growth_i18n_automation.sql","cron/run.php","cron/worker.php","cron/health_alerts.php","cron/growth.php","tools/applanner-cron-health.php","tools/install-experience-crons.php","tests/experience_v1_static.php","tests/experience_v2_static.php"
+  ]
+}

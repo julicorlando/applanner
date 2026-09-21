@@ -1,0 +1,9 @@
+APPLANNER RC1 GO
+release=RC1-PRODUCTION-READINESS-V1.1
+migration=043_applanner_rc1_production_readiness.sql
+payload_files=16
+requires_migrations=037,038,039,040,041,042
+safe_job_repair=example.com,example.com.br only
+commercial_go_command=php tools/rc1-go-live.php --commercial --external
+backup_key_compat=config/app.php + getenv(APP_KEY) legacy
+restore_fallback=same-db temporary prefixed tables when CREATE DATABASE denied

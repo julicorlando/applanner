@@ -1,0 +1,1 @@
+<section class="final-cta"><span class="public-kicker">Preferência atualizada</span><h1>Descadastro confirmado</h1><p>Este endereço não receberá novas campanhas de marketing do ApPlanner. E-mails essenciais de uma conta ativa, quando aplicáveis, não são afetados.</p><a class="btn btn-primary" href="/">Voltar ao ApPlanner</a></section>

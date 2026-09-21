@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS billing_support_requests (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tenant_id BIGINT UNSIGNED NOT NULL,
+  user_id BIGINT UNSIGNED NOT NULL,
+  ticket_id BIGINT UNSIGNED NOT NULL,
+  request_type ENUM('account_deletion','invoice') NOT NULL,
+  status ENUM('pending','approved','completed','rejected','cancelled') NOT NULL DEFAULT 'pending',
+  reference_period VARCHAR(20) NULL,
+  deadline_at DATETIME NULL,
+  attachment_message_id BIGINT UNSIGNED NULL,
+  reviewed_by BIGINT UNSIGNED NULL,
+  reviewed_at DATETIME NULL,
+  completed_at DATETIME NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  INDEX idx_bsr_tenant_type(tenant_id,request_type,status),
+  UNIQUE KEY uq_bsr_ticket(ticket_id),
+  CONSTRAINT fk_bsr_tenant FOREIGN KEY(tenant_id) REFERENCES tenants(id),
+  CONSTRAINT fk_bsr_user FOREIGN KEY(user_id) REFERENCES users(id),
+  CONSTRAINT fk_bsr_ticket FOREIGN KEY(ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_bsr_message FOREIGN KEY(attachment_message_id) REFERENCES support_messages(id) ON DELETE SET NULL,
+  CONSTRAINT fk_bsr_reviewer FOREIGN KEY(reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,0 +1,15 @@
+<?php
+declare(strict_types=1);
+$root=dirname(__DIR__);$errors=[];$ok=[];
+$check=static function(bool $cond,string $msg)use(&$errors,&$ok):void{if($cond){$ok[]=$msg;echo "[OK] {$msg}\n";}else{$errors[]=$msg;echo "[ERRO] {$msg}\n";}};
+$required=[
+'app/Controllers/BarberOperationsController.php','app/Services/CommissionService.php','app/Services/BarberMaintenanceService.php','app/Services/BarberMembershipPaymentService.php','app/Services/BarberRecurringReconciliationService.php','app/Views/barber/commands.php','app/Views/barber/command.php','app/Views/barber/queue.php','app/Views/barber/goals.php','app/Views/barber/team.php','cron/barber.php','database/migrations/040_applanner_barber_v1.sql'
+];foreach($required as $rel)$check(is_file($root.'/'.$rel),'Arquivo presente: '.$rel);
+$index=(string)@file_get_contents($root.'/index.php');foreach(['/barber/commands','/barber/queue','/barber/goals','/barber/team/{id}','/memberships/{id}/automatic','/webhooks/payments/mercadopago/{tenant}'] as $route)$check(str_contains($index,$route),'Rota presente: '.$route);
+$migration=(string)@file_get_contents($root.'/database/migrations/040_applanner_barber_v1.sql');foreach(['barber_commands','barber_queue_entries','professional_service_commissions','professional_compensation_models','professional_goals','tenant_recurring_subscriptions'] as $table)$check(str_contains($migration,$table),'Schema Barber contém '.$table);$check(!preg_match('/\b(DROP\s+(?:DATABASE|TABLE)|TRUNCATE\s+TABLE)\b/i',$migration),'Migration Barber sem DROP/TRUNCATE');
+$appointments=(string)@file_get_contents($root.'/app/Controllers/AppointmentController.php');$check(str_contains($appointments,'checked_in_at')&&str_contains($appointments,'service_started_at'),'Check-in e início de atendimento integrados à agenda');
+$commands=(string)@file_get_contents($root.'/app/Controllers/BarberOperationsController.php');foreach(['PackageService::consumeForAppointment','CommissionService::tip','product_stock_movements','financial_transactions','LoyaltyService::earn'] as $needle)$check(str_contains($commands,$needle),'Fechamento integrado: '.$needle);
+$commission=(string)@file_get_contents($root.'/app/Services/CommissionService.php');$check(str_contains($commission,'professional_service_commissions')&&str_contains($commission,'professional_compensation_models'),'Comissão por serviço e modelo de trabalho ativos');
+$webhook=(string)@file_get_contents($root.'/app/Controllers/TenantPaymentWebhookController.php');$check(str_contains($webhook,'subscription_authorized_payment')&&str_contains($webhook,'BarberMembershipPaymentService'),'Webhook recorrente diferencia pagamento autorizado');
+$cron=(string)@file_get_contents($root.'/cron/barber.php');$check(str_contains($cron,'BarberRecurringReconciliationService')&&str_contains($cron,'BarberMaintenanceService'),'Cron Barbearia cobre recorrência e aluguel de cadeira');
+if($errors){echo "\nbarber v1 smoke: FALHOU (".count($errors).")\n";exit(1);}echo "\nbarber v1 smoke: OK (".count($ok)." verificações)\n";

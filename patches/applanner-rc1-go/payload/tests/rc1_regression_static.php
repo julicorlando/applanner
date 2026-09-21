@@ -1,0 +1,33 @@
+<?php
+declare(strict_types=1);
+$root=dirname(__DIR__);
+$checks=[];$add=function(string $n,bool $ok)use(&$checks){$checks[]=['name'=>$n,'ok'=>$ok];if(!$ok)fwrite(STDERR,"FAIL: {$n}\n");};
+$m=(string)@file_get_contents($root.'/database/migrations/043_applanner_rc1_production_readiness.sql');
+$w=(string)@file_get_contents($root.'/cron/worker.php');
+$b=(string)@file_get_contents($root.'/app/Views/billing/modules.php');
+$g=(string)@file_get_contents($root.'/tools/rc1-go-live.php');
+$a=(string)@file_get_contents($root.'/tools/rc1-acceptance.php');
+$bs=(string)@file_get_contents($root.'/app/Services/BackupService.php');
+foreach(['arena','barber','auto'] as $c){$x=(string)@file_get_contents($root.'/cron/'.$c.'.php');$add("cron lock {$c}",str_contains($x,"CronLock::acquire('{$c}')"));}
+$add('migration 043 skipped enum',str_contains($m,"'skipped'"));
+$add('migration 043 notifications skipped',str_contains($m,"ALTER TABLE notifications")&&str_contains($m,"'cancelled','skipped'"));
+$add('migration 043 jobs.last_error',str_contains($m,'last_error'));
+$add('worker uses CronLock',str_contains($w,"CronLock::acquire('worker')"));
+$add('worker records last_error',str_contains($w,'last_error=:error'));
+$add('worker recovers stale locks',str_contains($w,"locked_at<DATE_SUB(NOW(),INTERVAL 15 MINUTE)"));
+$add('billing filters invalid module rows',str_contains($b,'array_filter(is_array($modules??null)?$modules:[], \'is_array\')'));
+$add('billing auth user defensive',str_contains($b,'$currentRole'));
+$add('cron installer exists',is_file($root.'/tools/install-rc1-crons.php'));
+$add('go-live exists',is_file($root.'/tools/rc1-go-live.php'));
+$add('backup restore verifier exists',is_file($root.'/tools/rc1-verify-backup.php'));
+$add('backup APP_KEY config fallback',str_contains($bs,'config/app.php')&&str_contains($bs,'keyCandidates'));
+$add('backup decrypt legacy compatibility',str_contains($bs,"hash('sha256',\$env,true)"));
+$add('backup restore cPanel fallback',str_contains($bs,'testRestoreWithPrefixedTables')&&str_contains($bs,'sem permissão CREATE DATABASE')); 
+$add('go-live requires production gateway',str_contains($g,"environment='production'")&&str_contains($g,'GO COMERCIAL'));
+$add('go-live requires paid payment',str_contains($g,"payments WHERE status='paid'"));
+$add('go-live requires platform webhook evidence',str_contains($g,'webhook_events'));
+$add('go-live requires tenant payment evidence',str_contains($g,'tenant_payment_transactions')&&str_contains($g,'tenant_payment_webhook_events'));
+$add('acceptance cannot auto-pass backup',!str_contains($a,"'backup_restore'"));
+$bad=array_filter($checks,fn($c)=>!$c['ok']);
+if($bad)exit(1);
+echo 'rc1 regression static: OK ('.count($checks)." verificações)\n";

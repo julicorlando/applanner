@@ -1,0 +1,213 @@
+<?php
+declare(strict_types=1);
+
+use App\Core\Database;
+use App\Services\BehaviorEngine;
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
+require dirname(__DIR__).'/app/Core/bootstrap.php';
+
+const DEMO_SLUG = 'studio-aurora-demonstracao';
+const DEMO_OWNER_EMAIL = 'gestor.demo@example.com';
+
+$action = strtolower((string)($argv[1] ?? 'status'));
+$pdo = Database::connection();
+
+function tableExists(PDO $pdo, string $table): bool
+{
+    try { $pdo->query('SELECT 1 FROM `'.$table.'` LIMIT 1'); return true; }
+    catch (Throwable) { return false; }
+}
+
+function columns(PDO $pdo, string $table): array
+{
+    static $cache = [];
+    if (isset($cache[$table])) return $cache[$table];
+    $rows = $pdo->query('SHOW COLUMNS FROM `'.$table.'`')->fetchAll();
+    return $cache[$table] = array_column($rows, 'Field');
+}
+
+function insertRow(PDO $pdo, string $table, array $data): int
+{
+    $allowed = array_flip(columns($pdo, $table));
+    $data = array_intersect_key($data, $allowed);
+    if (!$data) throw new RuntimeException('Nenhum campo compatível para '.$table.'.');
+    $fields = array_keys($data);
+    $sql = 'INSERT INTO `'.$table.'` (`'.implode('`,`', $fields).'`) VALUES (:'.implode(',:', $fields).')';
+    $pdo->prepare($sql)->execute($data);
+    return (int)$pdo->lastInsertId();
+}
+
+function demoTenant(PDO $pdo): array|false
+{
+    $q = $pdo->prepare('SELECT * FROM tenants WHERE slug=:slug LIMIT 1');
+    $q->execute(['slug'=>DEMO_SLUG]);
+    return $q->fetch();
+}
+
+function passwordValue(): string
+{
+    return 'Demo!'.random_int(100000, 999999).bin2hex(random_bytes(2));
+}
+
+function roleId(PDO $pdo, string $slug): int
+{
+    $q=$pdo->prepare('SELECT id FROM roles WHERE slug=:slug LIMIT 1');$q->execute(['slug'=>$slug]);
+    $id=(int)$q->fetchColumn();if(!$id)throw new RuntimeException('Perfil obrigatório não encontrado: '.$slug);
+    return $id;
+}
+
+function createUser(PDO $pdo, int $tenantId, string $name, string $email, string $role, string $password): int
+{
+    $id=insertRow($pdo,'users',['tenant_id'=>$tenantId,'name'=>$name,'email'=>$email,'password_hash'=>password_hash($password,PASSWORD_DEFAULT),'must_change_password'=>0,'password_changed_at'=>date('Y-m-d H:i:s'),'status'=>'active','email_verified_at'=>date('Y-m-d H:i:s'),'session_version'=>1,'created_at'=>date('Y-m-d H:i:s'),'updated_at'=>date('Y-m-d H:i:s')]);
+    $pdo->prepare('INSERT INTO user_roles(user_id,role_id) VALUES(:u,:r)')->execute(['u'=>$id,'r'=>roleId($pdo,$role)]);
+    return $id;
+}
+
+function installDemo(PDO $pdo): array
+{
+    if (demoTenant($pdo)) throw new RuntimeException('A empresa demonstração já existe. Use "status" para consultar.');
+    foreach (['units','professional_availability','professional_services','behavior_profiles','behavior_service_profiles'] as $required) {
+        if (!tableExists($pdo,$required)) throw new RuntimeException('Estrutura incompleta: execute as migrações; tabela ausente: '.$required);
+    }
+    $plan=(int)$pdo->query("SELECT id FROM plans WHERE active=1 ORDER BY monthly_price DESC,id DESC LIMIT 1")->fetchColumn();
+    if(!$plan)throw new RuntimeException('Crie ao menos um plano ativo antes de instalar a demonstração.');
+    $credentials=[];$pdo->beginTransaction();
+    try {
+        $now=date('Y-m-d H:i:s');
+        $tenant=insertRow($pdo,'tenants',[
+            'name'=>'Studio Aurora — Demonstração','slug'=>DEMO_SLUG,'public_slug'=>'studio-aurora-demo','public_short_code'=>'AURORADEMO',
+            'email'=>DEMO_OWNER_EMAIL,'phone'=>'81900001000','description'=>'Empresa demonstrativa do ApPlanner: agenda online, profissionais, serviços, fidelidade e relacionamento inteligente.','category'=>'salao',
+            'status'=>'active','primary_color'=>'#7c3aed','menu_color'=>'#24103f','menu_text_color'=>'#ffffff','background_color'=>'#f7f5ff','text_color'=>'#24103f','font_family'=>'Inter','font_size'=>15,
+            'public_enabled'=>1,'public_booking_enabled'=>1,'onboarding_step'=>9,
+            'accepted_payment_methods'=>json_encode(['Pix','Cartão de crédito','Cartão de débito','Dinheiro'],JSON_UNESCAPED_UNICODE),
+            'public_sections'=>json_encode(['professionals'=>true,'services'=>true,'reviews'=>true,'products'=>true,'packages'=>true,'loyalty'=>true],JSON_UNESCAPED_UNICODE),
+            'created_at'=>$now,'updated_at'=>$now
+        ]);
+        $ownerPassword=passwordValue();
+        $owner=createUser($pdo,$tenant,'Gestora Demonstração',DEMO_OWNER_EMAIL,'owner',$ownerPassword);
+        $credentials[]=['perfil'=>'Empresa','email'=>DEMO_OWNER_EMAIL,'senha'=>$ownerPassword];
+        insertRow($pdo,'subscriptions',['tenant_id'=>$tenant,'plan_id'=>$plan,'status'=>'active','started_at'=>date('Y-m-d H:i:s',strtotime('-60 days')),'next_billing_at'=>date('Y-m-d H:i:s',strtotime('+30 days')),'created_at'=>$now,'updated_at'=>$now]);
+        $unit=insertRow($pdo,'units',['tenant_id'=>$tenant,'name'=>'Unidade Centro','address'=>'Rua da Aurora','address_number'=>'100','address_complement'=>'Loja modelo','district'=>'Centro','city'=>'Recife','state'=>'PE','postal_code'=>'50050000','phone'=>'8130001000','whatsapp'=>'81900001000','email'=>'contato.demo@example.com','instagram'=>'@studioaurorademo','website'=>'https://applanner.com.br','amenities'=>json_encode(['Wi-Fi','Acessibilidade','Ar-condicionado','Estacionamento'],JSON_UNESCAPED_UNICODE),'payment_methods'=>json_encode(['Pix','Crédito','Débito','Dinheiro'],JSON_UNESCAPED_UNICODE),'public_notes'=>'Ambiente demonstrativo. Nenhum atendimento é real.','is_primary'=>1,'active'=>1,'created_at'=>$now,'updated_at'=>$now]);
+        if(tableExists($pdo,'tenant_onboarding')) insertRow($pdo,'tenant_onboarding',['tenant_id'=>$tenant,'company_done'=>1,'branding_done'=>1,'unit_done'=>1,'professional_done'=>1,'service_done'=>1,'schedule_done'=>1,'payment_done'=>1,'public_page_done'=>1,'completed_at'=>$now,'updated_at'=>$now]);
+        if(tableExists($pdo,'tenant_modules')) {
+            $mods=$pdo->query('SELECT id FROM modules WHERE active=1')->fetchAll(PDO::FETCH_COLUMN);
+            $st=$pdo->prepare('INSERT INTO tenant_modules(tenant_id,module_id,enabled) VALUES(:t,:m,1) ON DUPLICATE KEY UPDATE enabled=1');
+            foreach($mods as $m)$st->execute(['t'=>$tenant,'m'=>$m]);
+        }
+        $serviceData=[
+            ['Corte feminino',60,89.90],['Corte masculino',40,49.90],['Barba completa',30,39.90],['Escova e finalização',45,69.90],['Design de sobrancelhas',30,35.00],['Hidratação premium',50,79.90]
+        ];$services=[];
+        foreach($serviceData as [$name,$duration,$price])$services[]=insertRow($pdo,'services',['tenant_id'=>$tenant,'name'=>$name,'description'=>'Serviço demonstrativo para apresentação do fluxo completo.','duration_minutes'=>$duration,'price'=>$price,'active'=>1,'created_at'=>$now,'updated_at'=>$now]);
+        $professionalData=[
+            ['Ana Souza','Cabeleireira e colorista','ana.demo@example.com',12.5,[0,3,5]],
+            ['Bruno Lima','Barbeiro','bruno.demo@example.com',15.0,[1,2]],
+            ['Camila Rocha','Esteticista','camila.demo@example.com',10.0,[4,5]],
+        ];$professionals=[];
+        foreach($professionalData as [$name,$specialty,$email,$commission,$serviceIndexes]){
+            $pass=passwordValue();$user=createUser($pdo,$tenant,$name,$email,'professional',$pass);
+            $pid=insertRow($pdo,'professionals',['tenant_id'=>$tenant,'unit_id'=>$unit,'user_id'=>$user,'name'=>$name,'public_slug'=>strtolower(str_replace(' ','-',iconv('UTF-8','ASCII//TRANSLIT',$name))),'email'=>$email,'phone'=>'8190000'.str_pad((string)(count($professionals)+101),4,'0',STR_PAD_LEFT),'specialty'=>$specialty,'commission_percent'=>$commission,'active'=>1,'created_at'=>$now,'updated_at'=>$now]);
+            $professionals[]=$pid;$credentials[]=['perfil'=>'Profissional — '.$name,'email'=>$email,'senha'=>$pass];
+            foreach($serviceIndexes as $index)$pdo->prepare('INSERT INTO professional_services(professional_id,service_id)VALUES(:p,:s)')->execute(['p'=>$pid,'s'=>$services[$index]]);
+            for($day=1;$day<=6;$day++)insertRow($pdo,'professional_availability',['tenant_id'=>$tenant,'professional_id'=>$pid,'weekday'=>$day,'start_time'=>$day===6?'09:00:00':'09:00:00','end_time'=>$day===6?'14:00:00':'18:00:00','active'=>1,'created_at'=>$now,'updated_at'=>$now]);
+        }
+        $customerData=[
+            ['Mariana Alves',28,-39,0],['João Martins',15,-22,1],['Fernanda Costa',30,-28,0],['Carlos Oliveira',30,-93,1],['Paula Ribeiro',21,-18,2],['Renata Melo',45,-44,0],['Diego Santos',20,-20,1],['Larissa Nunes',35,-70,2]
+        ];$customers=[];
+        foreach($customerData as $i=>[$name,$interval,$lastOffset,$profIndex]){
+            // DateTimeImmutable evita diferenças de interpretação do strtotime()
+            // entre as versões do PHP usadas pelos provedores cPanel.
+            $birthDate=(new DateTimeImmutable('today'))->modify('-'.(28+$i).' years');
+            if($i!==2)$birthDate=$birthDate->modify('-'.($i+10).' days');
+            $birth=$birthDate->format('Y-m-d');
+            $cid=insertRow($pdo,'customers',['tenant_id'=>$tenant,'name'=>$name,'phone'=>'8191000'.str_pad((string)($i+1),4,'0',STR_PAD_LEFT),'email'=>'cliente'.($i+1).'.demo@example.com','birth_date'=>$birth,'consent_marketing'=>1,'status'=>'active','created_at'=>date('Y-m-d H:i:s',strtotime('-1 year')),'updated_at'=>$now]);
+            $customers[]=$cid;
+            for($visit=4;$visit>=0;$visit--){
+                $offset=$lastOffset-($interval*$visit);$start=date('Y-m-d 10:00:00',strtotime($offset.' days'));$duration=$serviceData[$profIndex===1?1:($profIndex===2?4:0)][1];
+                insertRow($pdo,'appointments',['tenant_id'=>$tenant,'customer_id'=>$cid,'professional_id'=>$professionals[$profIndex],'service_id'=>$services[$profIndex===1?1:($profIndex===2?4:0)],'service_price_snapshot'=>$serviceData[$profIndex===1?1:($profIndex===2?4:0)][2],'starts_at'=>$start,'ends_at'=>date('Y-m-d H:i:s',strtotime($start.' +'.$duration.' minutes')),'status'=>'completed','source'=>$visit%2?'public':'internal','notes'=>'Histórico demonstrativo para inteligência de comportamento.','created_by'=>$owner,'created_at'=>$start,'updated_at'=>$start]);
+            }
+        }
+        foreach([[0,0,0,'confirmed','tomorrow 10:00'],[2,2,4,'confirmed','tomorrow 14:00'],[4,1,1,'pending','+2 days 11:00']] as [$ci,$pi,$si,$status,$when]){
+            $start=date('Y-m-d H:i:s',strtotime($when));$duration=$serviceData[$si][1];
+            insertRow($pdo,'appointments',['tenant_id'=>$tenant,'customer_id'=>$customers[$ci],'professional_id'=>$professionals[$pi],'service_id'=>$services[$si],'service_price_snapshot'=>$serviceData[$si][2],'starts_at'=>$start,'ends_at'=>date('Y-m-d H:i:s',strtotime($start.' +'.$duration.' minutes')),'status'=>$status,'source'=>'public','notes'=>'Agendamento futuro demonstrativo.','created_by'=>$owner,'created_at'=>$now,'updated_at'=>$now]);
+        }
+        if(tableExists($pdo,'products')){
+            $products=[];foreach([['Shampoo Premium','SH-DEMO-01',32.90,18],['Óleo finalizador','OL-DEMO-02',44.90,9],['Pomada modeladora','PO-DEMO-03',39.90,4]] as [$name,$sku,$price,$stock])$products[]=insertRow($pdo,'products',['tenant_id'=>$tenant,'unit_id'=>$unit,'name'=>$name,'sku'=>$sku,'category'=>'Cuidados','cost_price'=>round($price*.48,2),'sale_price'=>$price,'stock'=>$stock,'minimum_stock'=>5,'unit'=>'un','active'=>1,'created_at'=>$now,'updated_at'=>$now]);
+            if(tableExists($pdo,'sales')){$sale=insertRow($pdo,'sales',['tenant_id'=>$tenant,'unit_id'=>$unit,'professional_id'=>$professionals[0],'customer_id'=>$customers[0],'user_id'=>$owner,'subtotal'=>77.80,'discount'=>0,'total'=>77.80,'payment_method'=>'pix','status'=>'completed','created_at'=>date('Y-m-d H:i:s',strtotime('-2 days'))]);if(tableExists($pdo,'sale_items')){insertRow($pdo,'sale_items',['sale_id'=>$sale,'product_id'=>$products[0],'quantity'=>1,'unit_price'=>32.90,'discount'=>0,'total'=>32.90,'cost_snapshot'=>15.79]);insertRow($pdo,'sale_items',['sale_id'=>$sale,'product_id'=>$products[1],'quantity'=>1,'unit_price'=>44.90,'discount'=>0,'total'=>44.90,'cost_snapshot'=>21.55]);}}
+        }
+        if(tableExists($pdo,'public_reviews'))foreach([['Mariana Alves',5,'Atendimento pontual e experiência excelente.'],['João Martins',5,'Agendamento simples e equipe muito atenciosa.'],['Paula Ribeiro',4,'Gostei muito do atendimento e do lembrete.']] as [$name,$rating,$comment])insertRow($pdo,'public_reviews',['tenant_id'=>$tenant,'customer_name'=>$name,'rating'=>$rating,'comment'=>$comment,'active'=>1,'created_at'=>date('Y-m-d H:i:s',strtotime('-'.random_int(2,30).' days'))]);
+        $pdo->commit();
+        foreach($customers as $customerId)(new BehaviorEngine())->recalculateCustomer($tenant,$customerId);
+        return ['tenant_id'=>$tenant,'credentials'=>$credentials,'public_url'=>'/a/studio-aurora-demo'];
+    } catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+}
+
+function enrichDemo(PDO $pdo): array
+{
+    $tenant=demoTenant($pdo);
+    if(!$tenant)throw new RuntimeException('Instale primeiro a empresa demonstração com o comando install.');
+    $tenantId=(int)$tenant['id'];
+    $ownerQ=$pdo->prepare("SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE u.tenant_id=:t AND r.slug='owner' ORDER BY u.id LIMIT 1");
+    $ownerQ->execute(['t'=>$tenantId]);$ownerId=(int)$ownerQ->fetchColumn();
+    if(!$ownerId)throw new RuntimeException('Gestor da empresa demonstração não encontrado.');
+    $optionsQ=$pdo->prepare('SELECT p.id professional_id,s.id service_id,s.name,s.duration_minutes,s.price FROM professional_services ps JOIN professionals p ON p.id=ps.professional_id AND p.tenant_id=:t AND p.active=1 JOIN services s ON s.id=ps.service_id AND s.tenant_id=p.tenant_id AND s.active=1 ORDER BY p.id,s.id');
+    $optionsQ->execute(['t'=>$tenantId]);$options=$optionsQ->fetchAll();
+    if(!$options)throw new RuntimeException('A demonstração precisa ter profissionais vinculados aos serviços.');
+    $names=['Aline Ferreira','André Carvalho','Beatriz Lima','Bianca Moura','Bruna Tavares','Caio Nascimento','Carolina Freitas','Cecília Barros','Daniel Rocha','Débora Araújo','Eduardo Mendes','Elaine Monteiro','Fábio Correia','Gabriela Ramos','Gustavo Almeida','Helena Castro','Igor Vasconcelos','Isabela Andrade','Jéssica Dantas','Leandro Gomes','Lívia Teixeira','Marcelo Farias','Márcia Cavalcanti','Natália Lopes','Pedro Henrique','Priscila Macedo','Rafael Batista','Raquel Dias','Rodrigo Pires','Sabrina Matos','Tiago Moreira','Vanessa Paiva'];
+    $newCustomers=[];$completed=0;$future=0;$other=0;$revenue=0.0;$now=(new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+    $pdo->beginTransaction();
+    try{
+        foreach($names as $i=>$name){
+            $email='carteira'.str_pad((string)($i+1),2,'0',STR_PAD_LEFT).'.demo@example.com';
+            $exists=$pdo->prepare('SELECT id FROM customers WHERE tenant_id=:t AND email=:e LIMIT 1');$exists->execute(['t'=>$tenantId,'e'=>$email]);
+            if($exists->fetchColumn())continue;
+            $birth=(new DateTimeImmutable('today'))->modify('-'.(21+($i%34)).' years')->modify('-'.(($i*11)%330).' days')->format('Y-m-d');
+            $customerId=insertRow($pdo,'customers',['tenant_id'=>$tenantId,'name'=>$name,'phone'=>'8192'.str_pad((string)($i+1),7,'0',STR_PAD_LEFT),'email'=>$email,'birth_date'=>$birth,'consent_marketing'=>$i%5===0?0:1,'status'=>'active','created_at'=>(new DateTimeImmutable('now'))->modify('-'.(180+$i*4).' days')->format('Y-m-d H:i:s'),'updated_at'=>$now]);
+            $newCustomers[]=$customerId;$visits=3+($i%6);$interval=[14,21,28,30,35,45][$i%6];$lastOffset=-((($i*7)%65)+4);$option=$options[$i%count($options)];
+            for($v=$visits-1;$v>=0;$v--){
+                $jitter=(($i+$v)%3)-1;$days=$lastOffset-($interval*$v)+$jitter;$hour=9+(($i+$v)%8);
+                $start=(new DateTimeImmutable('today'))->modify($days.' days')->setTime($hour,($i%2)*30);$end=$start->modify('+'.(int)$option['duration_minutes'].' minutes');
+                $appointmentId=insertRow($pdo,'appointments',['tenant_id'=>$tenantId,'customer_id'=>$customerId,'professional_id'=>$option['professional_id'],'service_id'=>$option['service_id'],'service_price_snapshot'=>$option['price'],'starts_at'=>$start->format('Y-m-d H:i:s'),'ends_at'=>$end->format('Y-m-d H:i:s'),'status'=>'completed','source'=>$v%3===0?'public':($v%3===1?'whatsapp':'internal'),'notes'=>'Serviço realizado — histórico ampliado da demonstração.','created_by'=>$ownerId,'created_at'=>$start->modify('-'.(2+($v%5)).' days')->format('Y-m-d H:i:s'),'updated_at'=>$end->format('Y-m-d H:i:s')]);
+                $completed++;$revenue+=(float)$option['price'];
+                if(tableExists($pdo,'financial_transactions'))insertRow($pdo,'financial_transactions',['tenant_id'=>$tenantId,'appointment_id'=>$appointmentId,'source_type'=>'appointment','source_id'=>$appointmentId,'type'=>'income','description'=>'Serviço realizado: '.$option['name'],'amount'=>$option['price'],'payment_method'=>['pix','credito','debito','dinheiro'][$appointmentId%4],'competence_at'=>$start->format('Y-m-d'),'status'=>'paid','idempotency_key'=>'demo-appointment-'.$appointmentId,'due_at'=>$start->format('Y-m-d'),'paid_at'=>$end->format('Y-m-d H:i:s'),'created_at'=>$start->format('Y-m-d H:i:s'),'updated_at'=>$end->format('Y-m-d H:i:s')]);
+            }
+            if($i%7===0){
+                $cancelStart=(new DateTimeImmutable('today'))->modify('-'.(8+$i).' days')->setTime(16,0);
+                insertRow($pdo,'appointments',['tenant_id'=>$tenantId,'customer_id'=>$customerId,'professional_id'=>$option['professional_id'],'service_id'=>$option['service_id'],'service_price_snapshot'=>$option['price'],'starts_at'=>$cancelStart->format('Y-m-d H:i:s'),'ends_at'=>$cancelStart->modify('+'.(int)$option['duration_minutes'].' minutes')->format('Y-m-d H:i:s'),'status'=>$i%14===0?'no_show':'cancelled','source'=>'public','notes'=>'Cenário demonstrativo de cancelamento ou ausência.','created_by'=>$ownerId,'created_at'=>$cancelStart->modify('-3 days')->format('Y-m-d H:i:s'),'updated_at'=>$cancelStart->format('Y-m-d H:i:s')]);$other++;
+            }
+        }
+        foreach(array_slice($newCustomers,0,12) as $i=>$customerId){
+            $option=$options[($i+2)%count($options)];$start=(new DateTimeImmutable('tomorrow'))->modify('+'.$i.' days')->setTime(9+($i%8),($i%2)*30);
+            insertRow($pdo,'appointments',['tenant_id'=>$tenantId,'customer_id'=>$customerId,'professional_id'=>$option['professional_id'],'service_id'=>$option['service_id'],'service_price_snapshot'=>$option['price'],'starts_at'=>$start->format('Y-m-d H:i:s'),'ends_at'=>$start->modify('+'.(int)$option['duration_minutes'].' minutes')->format('Y-m-d H:i:s'),'status'=>$i%3===0?'pending':'confirmed','source'=>$i%2?'professional_link':'public','notes'=>'Próximo atendimento da carteira demonstrativa.','created_by'=>$ownerId,'created_at'=>$now,'updated_at'=>$now]);$future++;
+        }
+        $pdo->commit();
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    foreach($newCustomers as $customerId)(new BehaviorEngine())->recalculateCustomer($tenantId,$customerId);
+    return ['customers'=>count($newCustomers),'completed'=>$completed,'future'=>$future,'other'=>$other,'revenue'=>round($revenue,2)];
+}
+
+try {
+    if($action==='install'){
+        $result=installDemo($pdo);
+        echo "\nEMPRESA DEMONSTRAÇÃO CRIADA\n";
+        echo "ID: {$result['tenant_id']}\nPágina pública: {$result['public_url']}\n\nACESSOS (guarde agora):\n";
+        foreach($result['credentials'] as $c)echo "{$c['perfil']} | {$c['email']} | {$c['senha']}\n";
+        echo "\nOs dados são fictícios. Troque as senhas antes de qualquer acesso externo.\n";
+    } elseif($action==='enrich'){
+        $result=enrichDemo($pdo);
+        echo "\nCARTEIRA DEMONSTRATIVA AMPLIADA\n";
+        echo "Novos clientes: {$result['customers']}\nServiços realizados: {$result['completed']}\nAgendamentos futuros: {$result['future']}\nCancelamentos/ausências: {$result['other']}\nValor histórico dos serviços: R$ ".number_format($result['revenue'],2,',','.')."\n";
+        if($result['customers']===0)echo "Nenhum dado foi duplicado: a ampliação já havia sido aplicada.\n";
+    } elseif($action==='archive'){
+        $tenant=demoTenant($pdo);if(!$tenant)throw new RuntimeException('Empresa demonstração não encontrada.');
+        $pdo->prepare("UPDATE tenants SET status='suspended',public_enabled=0,updated_at=NOW() WHERE id=:id AND slug=:slug")->execute(['id'=>$tenant['id'],'slug'=>DEMO_SLUG]);
+        $pdo->prepare("UPDATE users SET status='inactive',session_version=session_version+1,updated_at=NOW() WHERE tenant_id=:id")->execute(['id'=>$tenant['id']]);
+        echo "Empresa demonstração arquivada e acessos desativados.\n";
+    } elseif($action==='status'){
+        $tenant=demoTenant($pdo);echo $tenant ? "Instalada | ID {$tenant['id']} | status {$tenant['status']}\n" : "Não instalada.\n";
+    } else throw new RuntimeException('Ação inválida. Use: install, enrich, status ou archive.');
+} catch(Throwable $e){fwrite(STDERR,"ERRO: ".$e->getMessage()."\n");exit(1);}

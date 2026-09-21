@@ -1,0 +1,16 @@
+.public-shell,.public-shell .public-content{color:var(--text);background:var(--page)}
+.public-shell .card,.public-shell .pricing-card,.public-shell .blog-card,.public-shell .blog-featured,.public-shell .accordion-item,.public-shell .accordion-button{color:var(--text);background-color:var(--card);border-color:var(--border)}
+.public-shell p,.public-shell small,.public-shell .form-text{color:var(--muted)}
+.public-shell .form-control,.public-shell .form-select{color:var(--text);background-color:var(--card);border-color:var(--border)}
+.public-shell .form-control::placeholder,.public-shell textarea::placeholder{color:var(--muted);opacity:.9}
+.public-shell .dropdown-menu,.public-shell .list-group-item{color:var(--text);background:var(--card);border-color:var(--border)}
+.public-shell .btn-outline-primary{background:var(--card)}.public-shell .btn-outline-primary:hover{color:#fff;background:var(--primary)}
+.public-profile label,.public-profile .form-label,.public-profile .public-info-card p,.public-profile .public-waitlist p{color:var(--public-text)}
+.public-profile .public-contact-links a,.public-profile .public-tags span{color:var(--public-text);background:var(--public-soft);border:1px solid var(--public-border)}
+.public-profile .service-choice:focus-visible,.public-profile .professional-card:focus-visible,.public-profile .form-control:focus,.public-profile .form-select:focus{outline:3px solid color-mix(in srgb,var(--primary) 35%,transparent);outline-offset:2px}
+.public-profile input[type="date"],.public-profile input[type="time"]{color-scheme:light}
+[data-theme="dark"] .public-profile input[type="date"],[data-theme="dark"] .public-profile input[type="time"]{color-scheme:dark}
+[data-theme="dark"] .availability-status.available{background:#123c2a;color:#9af3bd}[data-theme="dark"] .availability-status.unavailable{background:#4a1723;color:#ffb3c0}
+@media(prefers-color-scheme:dark){html[data-theme="auto"] .public-profile input[type="date"],html[data-theme="auto"] .public-profile input[type="time"]{color-scheme:dark}html[data-theme="auto"] .availability-status.available{background:#123c2a;color:#9af3bd}html[data-theme="auto"] .availability-status.unavailable{background:#4a1723;color:#ffb3c0}html[data-theme="auto"] .alert-info{color:#b9e6ff;background:#102f45;border-color:#245571}html[data-theme="auto"] .alert-warning{color:#ffe29a;background:#3d2e0e;border-color:#6b5220}html[data-theme="auto"] .alert-danger{color:#ffc0c7;background:#431820;border-color:#71303b}html[data-theme="auto"] .alert-success{color:#a9f1c7;background:#123a28;border-color:#286044}}
+[data-theme="dark"] .alert-info{color:#b9e6ff;background:#102f45;border-color:#245571}[data-theme="dark"] .alert-warning{color:#ffe29a;background:#3d2e0e;border-color:#6b5220}[data-theme="dark"] .alert-danger{color:#ffc0c7;background:#431820;border-color:#71303b}[data-theme="dark"] .alert-success{color:#a9f1c7;background:#123a28;border-color:#286044}
+@media(max-width:767.98px){.public-shell .public-content{padding-left:16px;padding-right:16px}.public-profile .booking-form .btn{min-height:48px}.public-profile .public-contact-links a{min-height:40px;display:inline-flex;align-items:center}}

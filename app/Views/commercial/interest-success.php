@@ -1,0 +1,1 @@
+<section class="plans-hero"><span class="public-kicker">Solicitação recebida</span><h1>Obrigado pelo interesse!</h1><p>Sua oportunidade já está disponível para nossa equipe comercial. Um responsável entrará em contato com você.</p><a class="btn btn-light btn-lg" href="/">Voltar ao início</a></section>

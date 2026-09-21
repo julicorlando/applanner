@@ -1,0 +1,2 @@
+<?php
+declare(strict_types=1);require __DIR__.'/../app/Core/bootstrap.php';$pdo=App\Core\Database::connection();$enabled=(int)($pdo->query('SELECT backup_before_update FROM platform_operation_settings WHERE id=1')->fetchColumn()?:0);if(!$enabled){fwrite(STDERR,"Backup pré-atualização está desativado.\n");exit(2);}try{$r=(new App\Services\BackupService())->create('pre_update');echo 'BACKUP_OK '.$r['path'].' '.hash_file('sha256',$r['path']).PHP_EOL;}catch(Throwable $e){fwrite(STDERR,'BACKUP_FAILED '.$e->getMessage().PHP_EOL);exit(1);}

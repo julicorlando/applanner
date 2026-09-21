@@ -1,0 +1,2 @@
+<section class="legal-hero"><span class="public-kicker">Transparência e confiança</span><h1><?=htmlspecialchars($doc['title'],ENT_QUOTES,'UTF-8')?></h1><p>Versão <?=htmlspecialchars($doc['version'],ENT_QUOTES,'UTF-8')?> · publicada em <?=!empty($doc['published_at'])?date('d/m/Y',strtotime($doc['published_at'])):'—'?></p></section>
+<section class="legal-document card"><div class="card-body p-4 p-lg-5"><div class="legal-text"><?=nl2br(htmlspecialchars($content,ENT_QUOTES,'UTF-8'))?></div></div></section>

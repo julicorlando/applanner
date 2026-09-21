@@ -1,0 +1,1 @@
+<div class="text-center py-5"><h1>404</h1><p class="text-secondary">Página não encontrada.</p><a href="/dashboard" class="btn btn-primary">Voltar</a></div>

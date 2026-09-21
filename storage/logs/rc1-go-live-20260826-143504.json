@@ -1,0 +1,724 @@
+{
+    "verdict": "GO TÉCNICO",
+    "commercial": false,
+    "external": true,
+    "checks": [
+        {
+            "area": "Ambiente",
+            "name": "PHP 8.2+",
+            "ok": true,
+            "details": "8.2.31",
+            "level": "blocker"
+        },
+        {
+            "area": "Ambiente",
+            "name": "Produção sem debug",
+            "ok": true,
+            "details": "env=production debug=off",
+            "level": "blocker"
+        },
+        {
+            "area": "Ambiente",
+            "name": "Timezone da aplicação",
+            "ok": true,
+            "details": "America/Recife",
+            "level": "warning"
+        },
+        {
+            "area": "Ambiente",
+            "name": "HTTPS configurado",
+            "ok": true,
+            "details": "https://applanner.com.br",
+            "level": "blocker"
+        },
+        {
+            "area": "Migrations",
+            "name": "037_applanner_arena_v1.sql",
+            "ok": true,
+            "details": "aplicada",
+            "level": "blocker"
+        },
+        {
+            "area": "Migrations",
+            "name": "038_applanner_arena_v2_complete.sql",
+            "ok": true,
+            "details": "aplicada",
+            "level": "blocker"
+        },
+        {
+            "area": "Migrations",
+            "name": "039_modules_merged_subscription.sql",
+            "ok": true,
+            "details": "aplicada",
+            "level": "blocker"
+        },
+        {
+            "area": "Migrations",
+            "name": "040_applanner_barber_v1.sql",
+            "ok": true,
+            "details": "aplicada",
+            "level": "blocker"
+        },
+        {
+            "area": "Migrations",
+            "name": "041_applanner_auto_v1.sql",
+            "ok": true,
+            "details": "aplicada",
+            "level": "blocker"
+        },
+        {
+            "area": "Migrations",
+            "name": "042_two_factor_trusted_devices.sql",
+            "ok": true,
+            "details": "aplicada",
+            "level": "blocker"
+        },
+        {
+            "area": "Migrations",
+            "name": "043_applanner_rc1_production_readiness.sql",
+            "ok": true,
+            "details": "aplicada",
+            "level": "blocker"
+        },
+        {
+            "area": "Fila",
+            "name": "campaign_recipients aceita skipped",
+            "ok": true,
+            "details": "enum('queued','sent','delivered','clicked','converted','failed','opted_out','skipped')",
+            "level": "blocker"
+        },
+        {
+            "area": "Fila",
+            "name": "notifications aceita skipped",
+            "ok": true,
+            "details": "enum('queued','sent','failed','cancelled','skipped')",
+            "level": "blocker"
+        },
+        {
+            "area": "Fila",
+            "name": "jobs.last_error disponível",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Fila",
+            "name": "Sem novas falhas de jobs após RC1",
+            "ok": true,
+            "details": "0 falha(s) pós-RC1 | corte=2026-08-26 13:23:43",
+            "level": "blocker"
+        },
+        {
+            "area": "Fila",
+            "name": "Falhas históricas preservadas",
+            "ok": true,
+            "details": "0 falha(s) anterior(es) ao RC1; mantidas para auditoria",
+            "level": "warning"
+        },
+        {
+            "area": "Fila",
+            "name": "Sem jobs travados",
+            "ok": true,
+            "details": "0 job(s) travado(s)",
+            "level": "blocker"
+        },
+        {
+            "area": "Cron",
+            "name": "arena.php cadastrado",
+            "ok": true,
+            "details": "presente no crontab",
+            "level": "blocker"
+        },
+        {
+            "area": "Cron",
+            "name": "barber.php cadastrado",
+            "ok": true,
+            "details": "presente no crontab",
+            "level": "blocker"
+        },
+        {
+            "area": "Cron",
+            "name": "auto.php cadastrado",
+            "ok": true,
+            "details": "presente no crontab",
+            "level": "blocker"
+        },
+        {
+            "area": "Cron",
+            "name": "Arquivo cron/worker.php",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Cron",
+            "name": "Arquivo cron/arena.php",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Cron",
+            "name": "Arquivo cron/barber.php",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Cron",
+            "name": "Arquivo cron/auto.php",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Cron",
+            "name": "CronLock disponível",
+            "ok": true,
+            "details": "proteção contra sobreposição",
+            "level": "blocker"
+        },
+        {
+            "area": "Arena",
+            "name": "Tabela sports_courts",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Arena",
+            "name": "Tabela sports_reservations",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Arena",
+            "name": "Tabela sports_commands",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Barber",
+            "name": "Tabela barber_commands",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Barber",
+            "name": "Tabela barber_queue_entries",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Barber",
+            "name": "Tabela professional_service_commissions",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Auto",
+            "name": "Tabela auto_service_bays",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Auto",
+            "name": "Tabela auto_jobs",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Auto",
+            "name": "Tabela auto_commands",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Auto",
+            "name": "Tabela customer_vehicles",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "2FA",
+            "name": "Tabela two_factor_trusted_devices",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Módulos",
+            "name": "Tabela module_requests",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Módulos",
+            "name": "Tabela subscription_module_adjustments",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Módulos",
+            "name": "Tabela tenant_module_addons",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Backup",
+            "name": "Backup recente íntegro",
+            "ok": true,
+            "details": "backup=1 arquivo=ok checksum=ok",
+            "level": "blocker"
+        },
+        {
+            "area": "Backup",
+            "name": "Restauração isolada aprovada",
+            "ok": true,
+            "details": "há verificação restore/passed",
+            "level": "blocker"
+        },
+        {
+            "area": "Segurança",
+            "name": "CSRF disponível",
+            "ok": true,
+            "details": "app/Core/CSRF.php",
+            "level": "blocker"
+        },
+        {
+            "area": "Segurança",
+            "name": "2FA confiável disponível",
+            "ok": true,
+            "details": "tabela + core",
+            "level": "blocker"
+        },
+        {
+            "area": "Segurança",
+            "name": "session_version disponível",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Segurança",
+            "name": "2FA trusted-device exercitado",
+            "ok": true,
+            "details": "1 dispositivo(s) válido(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Mercado Pago PRODUÇÃO ativo/validado",
+            "ok": true,
+            "details": "ambiente=production status=validated active=1",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Webhook secret de produção configurado",
+            "ok": true,
+            "details": "configurado",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Assinatura com referência de provider",
+            "ok": false,
+            "details": "0 assinatura(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Pagamento end-to-end já confirmado",
+            "ok": false,
+            "details": "0 pagamento(s) pago(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Webhook da plataforma já processado",
+            "ok": false,
+            "details": "0 evento(s) registrado(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Módulo incorporado já exercitado",
+            "ok": false,
+            "details": "0 ajuste(s) aplicado(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Pagamentos do estabelecimento",
+            "name": "Mercado Pago conectado em ao menos um tenant",
+            "ok": false,
+            "details": "0 conexão(ões)",
+            "level": "warning"
+        },
+        {
+            "area": "Pagamentos do estabelecimento",
+            "name": "Pagamento de cliente final já conciliado",
+            "ok": false,
+            "details": "0 transação(ões) paga(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Pagamentos do estabelecimento",
+            "name": "Webhook de tenant validado/processado",
+            "ok": false,
+            "details": "0 evento(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Conectividade externa Mercado Pago produção",
+            "ok": true,
+            "details": "API de produção respondeu /users/me",
+            "level": "warning"
+        },
+        {
+            "area": "Pagamentos do estabelecimento",
+            "name": "Conectividade externa de tenant",
+            "ok": false,
+            "details": "nenhuma conexão testada",
+            "level": "warning"
+        },
+        {
+            "area": "Demo",
+            "name": "Flag is_demo disponível",
+            "ok": true,
+            "details": "presente",
+            "level": "blocker"
+        },
+        {
+            "area": "Homologação",
+            "name": "Sem tenants de demonstração",
+            "ok": true,
+            "details": "0 tenant(s) demo instalado(s)",
+            "level": "blocker"
+        },
+        {
+            "area": "Homologação",
+            "name": "Sem billing de demonstração",
+            "ok": true,
+            "details": "0 registro(s) de billing em tenant demo",
+            "level": "warning"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/route_integrity_static.php",
+            "ok": true,
+            "details": "PASS route integrity: 420 rotas apontam para métodos existentes.",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/security_static.php",
+            "ok": true,
+            "details": "OK: isolamento, CSRF, disponibilidade e concorrência presentes.",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/auth_security_static.php",
+            "ok": true,
+            "details": "OK: reset usa token hash, expiração, uso único, anti-enumeração e revogação de sessões.",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/commercial_security_static.php",
+            "ok": true,
+            "details": "OK: signup atômico, preço server-side e webhook idempotente presentes.",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/subscription_access_test.php",
+            "ok": true,
+            "details": "OK: conta bloqueada mantém login, libera cobrança e bloqueia módulos/API.",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/arena_v2_smoke.php",
+            "ok": true,
+            "details": "[OK] Migration 037/038 | [OK] Schema Arena V2 | [OK] Reserva sem profissional | [OK] Rotas críticas | [OK] Preço dinâmico, torneios e cartão presentes | ARENA V2 SMOKE: OK",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/barber_v1_smoke.php",
+            "ok": true,
+            "details": "[OK] Arquivo presente: app/Controllers/BarberOperationsController.php | [OK] Arquivo presente: app/Services/CommissionService.php | [OK] Arquivo presente: app/Services/BarberMaintenanceService.php | [OK] Arquivo presente: app/Services/BarberMembershipPaymentService.php | [OK] Arquivo presente: app/Services/BarberRecurringReconciliationService.php | [OK] Arquivo presente: app/Views/barber/commands.php | [OK] Arquivo presente: app/Views/barber/command.php | [OK] Arquivo presente: app/Views/barber/",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/barber_recurring_provider_unit.php",
+            "ok": true,
+            "details": "barber recurring provider unit: OK",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/auto_v1_smoke.php",
+            "ok": true,
+            "details": "[OK] Arquivo presente: app/Controllers/AutoOperationsController.php | [OK] Arquivo presente: app/Controllers/PublicAutoController.php | [OK] Arquivo presente: app/Controllers/VehicleController.php | [OK] Arquivo presente: app/Services/AutoTenantService.php | [OK] Arquivo presente: app/Services/AutoAvailabilityService.php | [OK] Arquivo presente: app/Views/auto/dashboard.php | [OK] Arquivo presente: app/Views/auto/bays.php | [OK] Arquivo presente: app/Views/auto/jobs.php | [OK] Arquivo presente: ",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/module_subscription_merge_smoke.php",
+            "ok": true,
+            "details": "module subscription merge smoke: OK",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/mercadopago_subscription_update_unit.php",
+            "ok": true,
+            "details": "mercadopago subscription update unit: OK",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/mercadopago_card_provider_unit.php",
+            "ok": true,
+            "details": "MERCADO PAGO CARD UNIT: OK",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/two_factor_trusted_device_static.php",
+            "ok": true,
+            "details": "[OK] Login consulta dispositivo confiável antes de exigir 2FA | [OK] Prazo padrão de confiança é 30 dias | [OK] Cookie confiável é HttpOnly e SameSite=Lax | [OK] Token do dispositivo é persistido somente como hash | [OK] Dispositivo confiável é vinculado à versão de sessão | [OK] Challenge pode registrar o dispositivo após 2FA válido | [OK] Alterações sensíveis revogam dispositivos confiáveis | [OK] Tela informa a confiança por 30 dias | [OK] Tela Segurança lista dispositivos confiáveis | [OK] R",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/no_demo_smoke.php",
+            "ok": true,
+            "details": "Tenant real: RF Films | demos=0 | failed_jobs=0 | backups=1 | restore_passed=1 | no demo smoke: OK",
+            "level": "blocker"
+        },
+        {
+            "area": "Testes",
+            "name": "tests/rc1_regression_static.php",
+            "ok": true,
+            "details": "rc1 regression static: OK (30 verificações)",
+            "level": "blocker"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite tenant_idor",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite billing_e2e",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite billing_module",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite agenda",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite barber",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite arena_concurrency",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite arena_payment",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite auto",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite two_factor",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite lgpd",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        }
+    ],
+    "blockers": [],
+    "warnings": [
+        {
+            "area": "Billing",
+            "name": "Assinatura com referência de provider",
+            "ok": false,
+            "details": "0 assinatura(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Pagamento end-to-end já confirmado",
+            "ok": false,
+            "details": "0 pagamento(s) pago(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Webhook da plataforma já processado",
+            "ok": false,
+            "details": "0 evento(s) registrado(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Billing",
+            "name": "Módulo incorporado já exercitado",
+            "ok": false,
+            "details": "0 ajuste(s) aplicado(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Pagamentos do estabelecimento",
+            "name": "Mercado Pago conectado em ao menos um tenant",
+            "ok": false,
+            "details": "0 conexão(ões)",
+            "level": "warning"
+        },
+        {
+            "area": "Pagamentos do estabelecimento",
+            "name": "Pagamento de cliente final já conciliado",
+            "ok": false,
+            "details": "0 transação(ões) paga(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Pagamentos do estabelecimento",
+            "name": "Webhook de tenant validado/processado",
+            "ok": false,
+            "details": "0 evento(s)",
+            "level": "warning"
+        },
+        {
+            "area": "Pagamentos do estabelecimento",
+            "name": "Conectividade externa de tenant",
+            "ok": false,
+            "details": "nenhuma conexão testada",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite tenant_idor",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite billing_e2e",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite billing_module",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite agenda",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite barber",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite arena_concurrency",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite arena_payment",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite auto",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite two_factor",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        },
+        {
+            "area": "Homologação",
+            "name": "Aceite lgpd",
+            "ok": false,
+            "details": "pendente",
+            "level": "warning"
+        }
+    ]
+}

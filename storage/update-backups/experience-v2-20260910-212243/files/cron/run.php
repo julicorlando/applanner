@@ -1,0 +1,11 @@
+<?php
+declare(strict_types=1);
+if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
+$root=dirname(__DIR__);$key=preg_replace('/[^a-z0-9_]/','',(string)($argv[1]??''));
+$allowed=['worker','appointment_reminders','automation_dispatch','memberships','subscription_notifications','privacy_retention','backup','incident_monitor','arena','barber','auto'];
+if(!in_array($key,$allowed,true)){fwrite(STDERR,"Uso: php cron/run.php <".implode('|',$allowed).">\n");exit(64);}
+require $root.'/app/Core/bootstrap.php';$pdo=\App\Core\Database::connection();$start=microtime(true);$started=date('Y-m-d H:i:s');$host=gethostname()?:'unknown';$id=0;
+try{$pdo->prepare("INSERT INTO cron_heartbeats(cron_key,started_at,status,host_name,created_at)VALUES(:k,:s,'running',:h,NOW())")->execute(['k'=>$key,'s'=>$started,'h'=>$host]);$id=(int)$pdo->lastInsertId();
+ register_shutdown_function(static function()use($pdo,$id,$start):void{if(!$id)return;try{$q=$pdo->prepare('SELECT status FROM cron_heartbeats WHERE id=:id');$q->execute(['id'=>$id]);if($q->fetchColumn()==='running'){$fatal=error_get_last();$failed=$fatal&&in_array($fatal['type'],[E_ERROR,E_PARSE,E_CORE_ERROR,E_COMPILE_ERROR],true);$pdo->prepare("UPDATE cron_heartbeats SET finished_at=NOW(),status=:s,duration_ms=:d,details=:x WHERE id=:id")->execute(['s'=>$failed?'failed':'ok','d'=>(int)round((microtime(true)-$start)*1000),'x'=>$failed?mb_substr((string)$fatal['message'],0,500):'Finalizado pelo processo do cron.','id'=>$id]);}}catch(Throwable){}});
+ ob_start();$argv=[$root.'/cron/'.$key.'.php'];require $root.'/cron/'.$key.'.php';$output=trim((string)ob_get_clean());$duration=(int)round((microtime(true)-$start)*1000);$pdo->prepare("UPDATE cron_heartbeats SET finished_at=NOW(),status='ok',duration_ms=:d,details=:x WHERE id=:id")->execute(['d'=>$duration,'x'=>mb_substr($output,0,500),'id'=>$id]);echo $output."\n";exit(0);
+}catch(Throwable $e){if(ob_get_level())ob_end_clean();$duration=(int)round((microtime(true)-$start)*1000);if($id)$pdo->prepare("UPDATE cron_heartbeats SET finished_at=NOW(),status='failed',duration_ms=:d,details=:x WHERE id=:id")->execute(['d'=>$duration,'x'=>mb_substr($e->getMessage(),0,500),'id'=>$id]);fwrite(STDERR,"[FALHA] {$key}: {$e->getMessage()}\n");exit(1);}
