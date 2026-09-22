@@ -1,3 +1,4 @@
+from accounts.permissions import require_any_capability
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -23,6 +24,7 @@ class DomainForm(forms.Form):
 
 @login_required
 def domains(request):
+    require_any_capability(request.user,"engagement.manage")
     tenant=_tenant(request)
     form=DomainForm(request.POST or None)
     if request.method=="POST":
@@ -111,6 +113,7 @@ class PointsForm(forms.Form):
 
 @login_required
 def packages(request):
+    require_any_capability(request.user,"engagement.manage")
     tenant=_tenant(request)
     buy=PurchaseForm(tenant=tenant,prefix="buy")
     membership=MembershipForm(tenant=tenant,recurring=True,prefix="membership")
@@ -152,6 +155,7 @@ def packages(request):
 
 @login_required
 def loyalty(request):
+    require_any_capability(request.user,"engagement.manage")
     tenant=_tenant(request)
     settings_obj,_=TenantLoyaltySettings.objects.get_or_create(tenant=tenant)
     points_form=PointsForm(tenant=tenant)
@@ -196,6 +200,7 @@ def loyalty(request):
 
 @login_required
 def waitlist(request):
+    require_any_capability(request.user,"engagement.manage")
     tenant=_tenant(request)
     if request.method=="POST":
         entry=get_object_or_404(WaitlistEntry,pk=request.POST.get("entry"),tenant=tenant)
