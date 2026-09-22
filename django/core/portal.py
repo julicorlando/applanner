@@ -12,12 +12,14 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from accounts.permissions import has_capability,require_any_capability
 from arena.services import ArenaReservationService
 from healthcare.services import create_record, read_record
 
 
 PORTAL_MODULES = {
     "agenda": {
+        "capability":"agenda.manage",
         "title": "Agenda",
         "description": "Clientes, equipe, serviços e agendamentos.",
         "resources": {
@@ -53,6 +55,7 @@ PORTAL_MODULES = {
         },
     },
     "financeiro": {
+        "capability":"finance.manage",
         "title": "Financeiro & Estoque",
         "description": "Receitas, despesas, produtos e estoque.",
         "resources": {
@@ -104,6 +107,7 @@ PORTAL_MODULES = {
         },
     },
     "barbearia": {
+        "capability":"barber.manage",
         "title": "Barbearia & Salão",
         "description": "Fila e comandas do atendimento.",
         "resources": {
@@ -142,6 +146,7 @@ PORTAL_MODULES = {
         },
     },
     "arena": {
+        "capability":"arena.manage",
         "title": "Arena & Quadras",
         "description": "Quadras, reservas, mensalistas, turmas e torneios.",
         "resources": {
@@ -221,6 +226,7 @@ PORTAL_MODULES = {
         },
     },
     "auto": {
+        "capability":"auto.manage",
         "title": "Automotivo",
         "description": "Veículos, boxes e ordens de serviço.",
         "resources": {
@@ -258,6 +264,7 @@ PORTAL_MODULES = {
         },
     },
     "relacionamento": {
+        "capability":"engagement.manage",
         "title": "Relacionamento",
         "description": "Pacotes, recorrência, fidelidade e lista de espera.",
         "resources": {
@@ -315,6 +322,7 @@ PORTAL_MODULES = {
         },
     },
     "saude": {
+        "capability":"healthcare.manage",
         "title": "Saúde",
         "description": "Prontuário clínico criptografado.",
         "resources": {
@@ -331,6 +339,7 @@ PORTAL_MODULES = {
         },
     },
     "suporte": {
+        "capability":"support.manage",
         "title": "Suporte",
         "description": "Chamados e acompanhamento.",
         "resources": {
@@ -375,6 +384,12 @@ def _require_tenant(request):
     if request.user.is_superuser:
         return None
     raise PermissionDenied("Seu usuário não está vinculado a uma empresa.")
+
+
+def _require_module_access(user,module):
+    capability=module.get("capability")
+    if capability:
+        require_any_capability(user,capability)
 
 
 def _resource(module_slug, resource_slug):
@@ -553,6 +568,9 @@ def home(request):
 
     modules=[]
     for slug,module in PORTAL_MODULES.items():
+        capability=module.get("capability")
+        if capability and not has_capability(request.user,capability):
+            continue
         resources=[]
         for resource_slug,resource in module["resources"].items():
             resources.append({"slug":resource_slug,"title":resource["title"]})
@@ -573,6 +591,9 @@ def select_tenant(request, tenant_id):
 
 @login_required
 def resource_list(request,module_slug,resource_slug):
+    module_for_access=PORTAL_MODULES.get(module_slug)
+    if not module_for_access: raise Http404
+    _require_module_access(request.user,module_for_access)
     module,resource,model=_resource(module_slug,resource_slug)
     if resource.get("custom_list")=="arena_games":
         return redirect("arena-games")
@@ -618,6 +639,9 @@ def resource_list(request,module_slug,resource_slug):
 
 @login_required
 def resource_create(request,module_slug,resource_slug):
+    module_for_access=PORTAL_MODULES.get(module_slug)
+    if not module_for_access: raise Http404
+    _require_module_access(request.user,module_for_access)
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")
@@ -685,6 +709,9 @@ def resource_create(request,module_slug,resource_slug):
 
 @login_required
 def resource_edit(request,module_slug,resource_slug,pk):
+    module_for_access=PORTAL_MODULES.get(module_slug)
+    if not module_for_access: raise Http404
+    _require_module_access(request.user,module_for_access)
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")
@@ -713,6 +740,9 @@ def resource_edit(request,module_slug,resource_slug,pk):
 
 @login_required
 def resource_detail(request,module_slug,resource_slug,pk):
+    module_for_access=PORTAL_MODULES.get(module_slug)
+    if not module_for_access: raise Http404
+    _require_module_access(request.user,module_for_access)
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")
