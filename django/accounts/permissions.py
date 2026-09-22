@@ -6,6 +6,18 @@ from rest_framework.permissions import BasePermission
 from .models import Capability,RoleCapability,UserRole
 
 
+LEGACY_ROLE_CAPABILITIES={
+    "master":{"*"},
+    "support":{"support.manage"},
+    "owner":{"*tenant"},
+    "manager":{"*tenant"},
+    "reception":{"agenda.manage","engagement.manage","support.manage","arena.manage","auto.manage"},
+    "finance":{"finance.manage"},
+    "professional":{"agenda.manage","barber.manage","auto.manage","healthcare.manage","support.manage"},
+    "commercial":{"commercial.manage"},
+}
+
+
 def user_capabilities(user):
     if not user or not user.is_authenticated:
         return set()
@@ -20,7 +32,15 @@ def user_capabilities(user):
 
 def has_capability(user,slug):
     caps=user_capabilities(user)
-    return "*" in caps or slug in caps
+    if "*" in caps or slug in caps:
+        return True
+    role=(getattr(user,"role","") or "").lower()
+    fallback=LEGACY_ROLE_CAPABILITIES.get(role,set())
+    if "*" in fallback:
+        return True
+    if "*tenant" in fallback and getattr(user,"tenant_id",None):
+        return True
+    return slug in fallback
 
 
 def require_capability(slug):
