@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -6,7 +7,7 @@
   <meta name="theme-color" content="#0b1020">
   <title>{% block title %}ApPlanner{% endblock %}</title>
   <meta name="description" content="{% block description %}Agenda, operação, pagamentos e relacionamento em uma plataforma preparada para o seu negócio.{% endblock %}">
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body>
   <header class="topbar">
