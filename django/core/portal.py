@@ -458,6 +458,8 @@ def _headers(model, columns):
 
 @login_required
 def home(request):
+    if request.user.is_superuser and request.GET.get("trocar")=="1":
+        request.session.pop("portal_tenant_id",None)
     tenant=_require_tenant(request)
     if tenant is None:
         Tenant=apps.get_model("tenants","Tenant")
