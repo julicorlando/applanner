@@ -165,3 +165,23 @@ class CronAlertLog(models.Model):
     message=models.CharField(max_length=500)
     error_message=models.CharField(max_length=500,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
+
+
+class DataImportJob(models.Model):
+    class Status(models.TextChoices):
+        PROCESSING="processing","Processando"
+        COMPLETED="completed","Concluído"
+        FAILED="failed","Falhou"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="data_import_jobs")
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="data_import_jobs")
+    source=models.CharField(max_length=40,default="appbarber")
+    original_name=models.CharField(max_length=255)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PROCESSING,db_index=True)
+    summary=models.JSONField(default=dict,blank=True)
+    error_message=models.CharField(max_length=500,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+    completed_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","-created_at"],name="ops_import_tenant_idx")]
