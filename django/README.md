@@ -12,15 +12,19 @@ Replatform do ApPlanner para Python/Django, mantendo o PHP legado como referênc
 - Gunicorn
 - Docker Compose / Coolify
 
-## Desenvolvimento
+## Desenvolvimento local
 
-```bash
+No Windows/PowerShell:
+
+```powershell
 cd django
-cp .env.example .env
-docker compose up --build
+Copy-Item env.local.example .env
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 ```
 
-A aplicação web fica na porta interna 8000 e expõe `/healthz/` para healthcheck.
+O arquivo `.env` é ignorado pelo Git. Troque os dois placeholders de segredo antes de iniciar.
+
+A aplicação fica em `http://127.0.0.1:8000/` e usa PostgreSQL/Redis dentro do Docker. O Compose local monta o código-fonte em `/app`, aplica migrations/seeds e inicia o servidor de desenvolvimento do Django.
 
 ## Coolify
 
