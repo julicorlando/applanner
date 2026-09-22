@@ -85,6 +85,7 @@ jobs:
       - name: Seed platform data
         run: |
           python manage.py seed_modules
+          python manage.py seed_rbac
           python manage.py seed_periodic_tasks
       - name: Run tests
         run: python manage.py test
