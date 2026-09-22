@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Planos — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="section-head"><span class="eyebrow">PLANOS</span><h1>Escolha a estrutura certa para o seu negócio.</h1><p>Os recursos e preços abaixo vêm diretamente do catálogo administrado no Master.</p></div>
+  <div class="pricing-grid">
+    {% for card in cards %}
+    <article class="pricing-card {% if card.plan.featured %}featured{% endif %}">
+      {% if card.plan.featured %}<span class="status-pill">Mais escolhido</span>{% endif %}
+      <h2>{{ card.plan.name }}</h2>
+      <p>{{ card.plan.description|default:"Agenda e gestão em uma plataforma modular." }}</p>
+      <div class="price-line"><small>R$</small><strong>{{ card.plan.monthly_price }}</strong><span>/mês</span></div>
+      {% if card.plan.trial_days %}<div class="trial-highlight">{{ card.plan.trial_days }} dias de teste{% if card.plan.trial_without_card %} sem cartão{% endif %}</div>{% endif %}
+      <ul class="sales-feature-list">
+        {% for item in card.plan.features.included_features %}<li>{{ item }}</li>{% endfor %}
+        {% for module in card.modules %}<li>{{ module.name }}</li>{% endfor %}
+      </ul>
+      <a class="button primary" href="{% url 'billing-signup' %}?plan={{ card.plan.pk }}">Escolher {{ card.plan.name }}</a>
+    </article>
+    {% empty %}<div class="panel"><p>Nenhum plano público disponível.</p></div>{% endfor %}
+  </div>
+</section>
+{% endblock %}
