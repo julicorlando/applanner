@@ -89,7 +89,7 @@ class PublicSignupTests(TestCase):
         response=self.client.get("/planos/")
         self.assertEqual(response.status_code,200)
         self.assertContains(response,"Inicial")
-        self.assertContains(response,"49.90")
+        self.assertContains(response,"49,90")
 
     def test_signup_creates_tenant_owner_unit_and_subscription(self):
         response=self.client.post("/cadastro/",{
