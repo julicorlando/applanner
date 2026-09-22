@@ -24,7 +24,8 @@
         <form method="post" action="/account/logout/" class="nav-form">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form>
       {% else %}
         <a href="/directory/">Explorar</a>
-        <a href="#segmentos">Segmentos</a>
+        <a href="/planos/">Planos</a>
+        <a href="/#segmentos">Segmentos</a>
         <a class="nav-cta" href="/account/login/">Entrar</a>
       {% endif %}
     </nav>
