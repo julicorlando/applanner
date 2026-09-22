@@ -5,6 +5,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied,ValidationError
 from django.shortcuts import get_object_or_404,redirect,render
+
+from accounts.permissions import require_any_capability
 from django.urls import reverse
 
 from finance.models import Product
@@ -109,6 +111,7 @@ class PaymentForm(forms.Form):
 
 @login_required
 def job_detail(request,pk):
+    require_any_capability(request.user,"auto.manage")
     tenant=_tenant(request)
     job=get_object_or_404(
         Job.objects.select_related("appointment__customer","appointment__service","vehicle","bay","assigned_professional"),
@@ -153,6 +156,7 @@ def job_detail(request,pk):
 
 @login_required
 def job_action(request,pk):
+    require_any_capability(request.user,"auto.manage")
     if request.method!="POST":
         raise PermissionDenied
     tenant=_tenant(request)
@@ -217,6 +221,7 @@ def job_action(request,pk):
 
 @login_required
 def command_action(request,pk):
+    require_any_capability(request.user,"auto.manage")
     if request.method!="POST":
         raise PermissionDenied
     tenant=_tenant(request)
