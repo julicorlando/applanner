@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ resource.title }} — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+<div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">PLATAFORMA</span><h1>{{ resource.title }}</h1></div>{% if resource.create != False %}<a class="button primary" href="{% url 'master-resource-create' slug %}">Novo cadastro</a>{% endif %}</div>
+<form class="portal-search"><input name="q" value="{{ q }}" placeholder="Pesquisar"><button class="button">Buscar</button></form>
+<div class="table-card"><table class="portal-table"><thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th></th></tr></thead><tbody>{% for row in rows %}<tr>{% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}<td class="table-actions">{% if resource.edit != False %}<a href="{% url 'master-resource-edit' slug row.obj.pk %}">Editar</a>{% endif %}</td></tr>{% empty %}<tr><td colspan="99" class="empty-table">Nenhum registro.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}

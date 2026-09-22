@@ -17,6 +17,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("account/", include("accounts.urls")),
     path("app/", include("core.portal_urls")),
+    path("commercial/", include("commercial.urls")),
+    path("master/", include("core.master_urls")),
     path("directory/", public_directory, name="public-directory"),
     path("blog/<slug:slug>/", blog_post, name="blog-post"),
     path("landing/<slug:slug>/", landing, name="landing"),
