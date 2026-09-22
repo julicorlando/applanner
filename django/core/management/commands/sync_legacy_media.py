@@ -1,57 +1,32 @@
-import hashlib
-import shutil
+import hashlib, os, shutil
 from pathlib import Path
-
 from django.conf import settings
-from django.core.management.base import BaseCommand,CommandError
-
-
-def _sha256(path):
-    h=hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda:handle.read(1024*1024),b""):
-            h.update(chunk)
-    return h.hexdigest()
-
+from django.core.management.base import BaseCommand, CommandError
 
 class Command(BaseCommand):
-    help="Sincroniza arquivos de mídia do legado para MEDIA_ROOT preservando caminhos."
-
+    help="Copia mídia do PHP para MEDIA_ROOT e verifica SHA-256."
     def add_arguments(self,parser):
-        parser.add_argument("--source",required=True)
+        parser.add_argument("--source",default=os.getenv("LEGACY_MEDIA_ROOT",""))
         parser.add_argument("--dry-run",action="store_true")
         parser.add_argument("--overwrite",action="store_true")
-        parser.add_argument("--verify",action="store_true")
-
     def handle(self,*args,**options):
-        source=Path(options["source"]).expanduser().resolve()
-        target=Path(settings.MEDIA_ROOT).resolve()
-        if not source.is_dir():
-            raise CommandError("Origem não encontrada: "+str(source))
-        target.mkdir(parents=True,exist_ok=True)
-        copied=skipped=verified=0
+        source=Path(options["source"]).expanduser()
+        if not source.is_dir(): raise CommandError("Informe --source ou LEGACY_MEDIA_ROOT válido.")
+        target=Path(settings.MEDIA_ROOT); copied=verified=skipped=0
         for src in source.rglob("*"):
-            if not src.is_file():
-                continue
-            rel=src.relative_to(source)
-            dst=target/rel
+            if not src.is_file(): continue
+            rel=src.relative_to(source); dst=target/rel
             if dst.exists() and not options["overwrite"]:
-                if options["verify"] and src.stat().st_size==dst.stat().st_size and _sha256(src)==_sha256(dst):
-                    verified+=1
-                skipped+=1
+                if self._sha(src)==self._sha(dst): verified+=1
+                else: skipped+=1; self.stderr.write(f"divergente: {rel}")
                 continue
-            if options["dry_run"]:
-                self.stdout.write("copiar: "+str(rel))
-                copied+=1
-                continue
-            dst.parent.mkdir(parents=True,exist_ok=True)
-            shutil.copy2(src,dst)
+            if options["dry_run"]: copied+=1; self.stdout.write(f"copiar: {rel}"); continue
+            dst.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(src,dst)
+            if self._sha(src)!=self._sha(dst): raise CommandError(f"Checksum falhou: {rel}")
             copied+=1
-            if options["verify"]:
-                if src.stat().st_size!=dst.stat().st_size or _sha256(src)!=_sha256(dst):
-                    raise CommandError("Checksum divergente após cópia: "+str(rel))
-                verified+=1
-        self.stdout.write(self.style.SUCCESS(
-            "Mídia: "+str(copied)+" copiado(s), "+str(skipped)+
-            " ignorado(s), "+str(verified)+" verificado(s)."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"Mídia: {copied} copiadas, {verified} verificadas, {skipped} divergentes."))
+    def _sha(self,path):
+        h=hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda:fh.read(1024*1024),b""): h.update(chunk)
+        return h.hexdigest()
