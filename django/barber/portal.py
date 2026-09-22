@@ -6,6 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied,ValidationError
 from django.shortcuts import get_object_or_404,redirect,render
 
+from accounts.permissions import require_any_capability
+
 from finance.models import Product
 from scheduling.models import Appointment,Customer,Professional,Service
 from .models import BarberCommand
@@ -80,6 +82,7 @@ class PaymentForm(forms.Form):
 
 @login_required
 def command_create(request):
+    require_any_capability(request.user,"barber.manage")
     tenant=_tenant(request)
     form=OpenCommandForm(request.POST or None,tenant=tenant)
     if request.method=="POST" and form.is_valid():
@@ -94,6 +97,7 @@ def command_create(request):
 
 @login_required
 def command_detail(request,pk):
+    require_any_capability(request.user,"barber.manage")
     tenant=_tenant(request)
     command=get_object_or_404(
         BarberCommand.objects.select_related("customer","professional","appointment").prefetch_related("items","payments"),
@@ -111,6 +115,7 @@ def command_detail(request,pk):
 
 @login_required
 def command_action(request,pk):
+    require_any_capability(request.user,"barber.manage")
     if request.method!="POST":
         raise PermissionDenied
     tenant=_tenant(request)
