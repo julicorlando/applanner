@@ -71,6 +71,26 @@ PORTAL_MODULES = {
                 "columns": ["name","sku","sale_price","stock","minimum_stock","active"],
                 "order": "name",
             },
+            "pdv": {
+                "model": "finance.Sale",
+                "title": "PDV / Vendas",
+                "fields": [],
+                "columns": ["id","customer","total","payment_method","status","created_at"],
+                "order": "-created_at",
+                "create": False,
+                "edit": False,
+                "custom_list": "finance_pos",
+            },
+            "caixa": {
+                "model": "finance.CashSession",
+                "title": "Caixa",
+                "fields": [],
+                "columns": ["unit","opening_amount","status","opened_at","closed_at"],
+                "order": "-opened_at",
+                "create": False,
+                "edit": False,
+                "custom_list": "finance_cash",
+            },
             "comissoes": {
                 "model": "finance.ProfessionalCommission",
                 "title": "Comissões",
@@ -79,6 +99,7 @@ PORTAL_MODULES = {
                 "order": "-created_at",
                 "create": False,
                 "edit": False,
+                "custom_list": "finance_commissions",
             },
         },
     },
@@ -543,6 +564,12 @@ def resource_list(request,module_slug,resource_slug):
         return redirect("arena-games")
     if resource.get("custom_list")=="arena_commands":
         return redirect("arena-commands")
+    if resource.get("custom_list")=="finance_pos":
+        return redirect("finance-pos")
+    if resource.get("custom_list")=="finance_cash":
+        return redirect("finance-cash")
+    if resource.get("custom_list")=="finance_commissions":
+        return redirect("finance-commissions")
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")

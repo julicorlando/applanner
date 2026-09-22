@@ -178,3 +178,71 @@ def cancel_sale(*,sale,user,reason):
     sale.cancelled_at=timezone.now()
     sale.save(update_fields=["status","cancel_reason","cancelled_by","cancelled_at"])
     return sale
+
+
+@transaction.atomic
+def open_cash_session(*,tenant,user,opening_amount=0,unit=None,notes=""):
+    from .models import CashSession
+    if CashSession.objects.filter(tenant=tenant,unit=unit,status=CashSession.Status.OPEN).exists():
+        raise ValidationError("Já existe um caixa aberto para esta unidade.")
+    return CashSession.objects.create(
+        tenant=tenant,unit=unit,opened_by=user,opening_amount=_money(opening_amount),
+        opened_at=timezone.now(),notes=notes[:500],
+    )
+
+
+@transaction.atomic
+def close_cash_session(*,session,user,closing_amount,notes=""):
+    from django.db.models import Sum
+    from .models import CashSession
+    session=CashSession.objects.select_for_update().get(pk=session.pk)
+    if session.status!=CashSession.Status.OPEN:
+        raise ValidationError("Caixa já está fechado.")
+    cash_methods=["cash","dinheiro"]
+    income=FinancialTransaction.objects.filter(
+        tenant=session.tenant,status=FinancialTransaction.Status.PAID,
+        type=FinancialTransaction.Type.INCOME,paid_at__gte=session.opened_at,
+        payment_method__in=cash_methods,
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    expense=FinancialTransaction.objects.filter(
+        tenant=session.tenant,status=FinancialTransaction.Status.PAID,
+        type=FinancialTransaction.Type.EXPENSE,paid_at__gte=session.opened_at,
+        payment_method__in=cash_methods,
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    expected=_money(session.opening_amount+income-expense)
+    closing=_money(closing_amount)
+    session.closing_amount=closing
+    session.expected_amount=expected
+    session.difference_amount=_money(closing-expected)
+    session.closed_by=user
+    session.closed_at=timezone.now()
+    session.status=CashSession.Status.CLOSED
+    if notes:
+        session.notes=(session.notes+"\n"+notes).strip()[:500]
+    session.save()
+    return session
+
+
+@transaction.atomic
+def pay_commission(*,commission,user):
+    commission=ProfessionalCommission.objects.select_for_update().get(pk=commission.pk)
+    if commission.status!=ProfessionalCommission.Status.PENDING:
+        raise ValidationError("Comissão não está pendente.")
+    commission.status=ProfessionalCommission.Status.PAID
+    commission.paid_at=timezone.now()
+    commission.paid_by=user
+    commission.save(update_fields=["status","paid_at","paid_by","updated_at"])
+    FinancialTransaction.objects.get_or_create(
+        tenant=commission.tenant,
+        idempotency_key=f"commission:{commission.pk}",
+        defaults={
+            "source_type":"professional_commission","source_id":commission.pk,
+            "type":FinancialTransaction.Type.EXPENSE,
+            "description":f"Comissão · {commission.professional.name}",
+            "amount":commission.commission_amount,
+            "status":FinancialTransaction.Status.PAID,
+            "competence_at":timezone.localdate(),
+            "paid_at":timezone.now(),
+        },
+    )
+    return commission
