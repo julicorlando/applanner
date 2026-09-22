@@ -1,3 +1,4 @@
+from datetime import timedelta
 import hashlib
 import os
 import subprocess
@@ -44,7 +45,7 @@ def create_database_backup():
         status=Backup.Status.RUNNING,
         destination="local-volume",
         started_at=now,
-        expires_at=now+timezone.timedelta(days=ops.backup_retention_days),
+        expires_at=now+timedelta(days=ops.backup_retention_days),
     )
     path=_backup_dir()/f"applanner-{now:%Y%m%d-%H%M%S}-{backup.pk}.dump"
     cfg=_connection_args()
