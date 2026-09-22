@@ -294,6 +294,16 @@ PORTAL_MODULES = {
                 "edit": False,
                 "custom_list": "engagement_loyalty",
             },
+            "dominios": {
+                "model": "engagement.TenantDomain",
+                "title": "Domínios personalizados",
+                "fields": [],
+                "columns": ["domain","status","verified_at"],
+                "order": "-created_at",
+                "create": False,
+                "edit": False,
+                "custom_list": "engagement_domains",
+            },
             "espera": {
                 "model": "engagement.WaitlistEntry",
                 "title": "Lista de espera",
@@ -331,6 +341,7 @@ PORTAL_MODULES = {
                 "columns": ["protocol","subject","category","priority","status","created_at"],
                 "order": "-created_at",
                 "special": "support_ticket",
+                "detail": "support_ticket",
             },
         },
     },
@@ -579,6 +590,8 @@ def resource_list(request,module_slug,resource_slug):
         return redirect("engagement-loyalty")
     if resource.get("custom_list")=="engagement_waitlist":
         return redirect("engagement-waitlist")
+    if resource.get("custom_list")=="engagement_domains":
+        return redirect("engagement-domains")
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")

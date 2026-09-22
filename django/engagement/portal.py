@@ -1,3 +1,49 @@
+from django import forms
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied,ValidationError
+from django.shortcuts import get_object_or_404,redirect,render
+
+from tenants.models import Tenant
+from .domains import create_tenant_domain,verify_tenant_domain
+from .models import TenantDomain
+
+
+def _tenant(request):
+    if request.user.tenant_id:return request.user.tenant
+    if request.user.is_superuser:
+        tid=request.session.get("portal_tenant_id")
+        if tid:return Tenant.objects.filter(pk=tid).first()
+    raise PermissionDenied("Selecione uma empresa.")
+
+
+class DomainForm(forms.Form):
+    domain=forms.CharField(max_length=190,label="Domínio")
+
+
+@login_required
+def domains(request):
+    tenant=_tenant(request)
+    form=DomainForm(request.POST or None)
+    if request.method=="POST":
+        action=request.POST.get("action")
+        try:
+            if action=="create" and form.is_valid():
+                create_tenant_domain(tenant=tenant,domain=form.cleaned_data["domain"])
+                messages.success(request,"Domínio adicionado. Configure o TXT mostrado abaixo.")
+            elif action=="verify":
+                row=get_object_or_404(TenantDomain,pk=request.POST.get("domain_id"),tenant=tenant)
+                if verify_tenant_domain(row):
+                    messages.success(request,"Domínio verificado com sucesso.")
+                else:
+                    messages.error(request,"TXT de verificação ainda não foi encontrado.")
+        except ValidationError as exc: messages.error(request,str(exc))
+        return redirect("engagement-domains")
+    return render(request,"engagement/domains.html",{
+        "form":form,"rows":TenantDomain.objects.filter(tenant=tenant).order_by("-created_at"),
+    })
+
+
 from decimal import Decimal
 
 from django import forms

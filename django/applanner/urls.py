@@ -23,6 +23,7 @@ urlpatterns = [
     path("app/arena/", include("arena.urls")),
     path("app/financeiro/", include("finance.urls")),
     path("app/relacionamento/", include("engagement.urls")),
+    path("app/suporte/", include("operations.urls")),
     path("commercial/", include("commercial.urls")),
     path("master/", include("core.master_urls")),
     path("directory/", public_directory, name="public-directory"),
