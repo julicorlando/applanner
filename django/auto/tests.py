@@ -9,8 +9,8 @@ from finance.models import FinancialTransaction,Product
 from scheduling.models import Appointment,Customer,Professional,Service
 from tenants.models import Tenant
 
-from .models import AutoCommand,AutoCommandItem,AutoCommandPayment,Job,Vehicle
-from .services import close_command
+from .models import AutoCommand,AutoCommandItem,AutoCommandPayment,Estimate,Job,JobStep,ServiceStep,Vehicle
+from .services import add_estimate_item,close_command,create_estimate,respond_estimate,send_estimate,update_job_step
 
 
 class AutoCommandTests(TestCase):
@@ -61,3 +61,64 @@ class AutoCommandTests(TestCase):
         self.assertTrue(FinancialTransaction.objects.filter(
             tenant=tenant,source_type="auto_command",source_id=command.pk,status="paid"
         ).exists())
+
+
+class AutoEstimateAndStepsTests(TestCase):
+    def setUp(self):
+        self.tenant=Tenant.objects.create(
+            name="Auto Flow",slug="auto-flow",status=Tenant.Status.ACTIVE
+        )
+        self.user=User.objects.create_user(
+            email="flow@example.com",password="StrongPassword!123",
+            tenant=self.tenant,role="manager"
+        )
+        self.customer=Customer.objects.create(tenant=self.tenant,name="Cliente")
+        self.professional=Professional.objects.create(tenant=self.tenant,name="Técnico")
+        self.service=Service.objects.create(
+            tenant=self.tenant,name="Polimento",duration_minutes=60,price=Decimal("150")
+        )
+        now=timezone.now()
+        self.appointment=Appointment.objects.create(
+            tenant=self.tenant,customer=self.customer,professional=self.professional,
+            service=self.service,starts_at=now,ends_at=now+timedelta(hours=1),
+            status=Appointment.Status.CONFIRMED,created_by=self.user,
+        )
+        self.vehicle=Vehicle.objects.create(
+            tenant=self.tenant,customer=self.customer,plate="XYZ1A23",model="SUV"
+        )
+        self.job=Job.objects.create(
+            tenant=self.tenant,appointment=self.appointment,vehicle=self.vehicle
+        )
+
+    def test_public_estimate_approval_creates_command_item(self):
+        estimate,token=create_estimate(job=self.job,user=self.user)
+        add_estimate_item(
+            estimate=estimate,service=self.service,quantity=1,unit_price=Decimal("150")
+        )
+        send_estimate(estimate=estimate)
+        respond_estimate(token=token,approved=True,customer_note="Aprovado")
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status,Estimate.Status.APPROVED)
+        self.assertTrue(
+            AutoCommandItem.objects.filter(
+                command__job=self.job,approved_estimate=estimate
+            ).exists()
+        )
+
+    def test_job_step_flow(self):
+        template=ServiceStep.objects.create(
+            tenant=self.tenant,service=self.service,name="Polir",sort_order=1
+        )
+        step=JobStep.objects.create(
+            tenant=self.tenant,job=self.job,service_step=template,name="Polir"
+        )
+        update_job_step(
+            step=step,status=JobStep.Status.IN_PROGRESS,professional=self.professional
+        )
+        step.refresh_from_db()
+        self.assertIsNotNone(step.started_at)
+        update_job_step(
+            step=step,status=JobStep.Status.COMPLETED,professional=self.professional
+        )
+        step.refresh_from_db()
+        self.assertIsNotNone(step.completed_at)
