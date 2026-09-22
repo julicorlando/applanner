@@ -3,18 +3,18 @@ from functools import wraps
 from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission
 
-from .models import Capability,RoleCapability,UserRole
+from .models import Capability
 
 
 LEGACY_ROLE_CAPABILITIES={
     "master":{"*"},
+    "owner":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
+    "manager":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
+    "reception":{"agenda.manage","engagement.manage","support.manage","barber.manage","arena.manage","auto.manage"},
+    "professional":{"agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","support.manage"},
+    "commercial":{"commercial.manage","support.manage"},
     "support":{"support.manage"},
-    "owner":{"*tenant"},
-    "manager":{"*tenant"},
-    "reception":{"agenda.manage","engagement.manage","support.manage","arena.manage","auto.manage"},
-    "finance":{"finance.manage"},
-    "professional":{"agenda.manage","barber.manage","auto.manage","healthcare.manage","support.manage"},
-    "commercial":{"commercial.manage"},
+    "user":{"agenda.manage","support.manage"},
 }
 
 
@@ -23,24 +23,18 @@ def user_capabilities(user):
         return set()
     if user.is_superuser:
         return {"*"}
-    return set(
+    linked=set(
         Capability.objects.filter(
             role_links__role__user_links__user=user
         ).values_list("slug",flat=True).distinct()
     )
+    linked.update(LEGACY_ROLE_CAPABILITIES.get(getattr(user,"role",""),set()))
+    return linked
 
 
 def has_capability(user,slug):
     caps=user_capabilities(user)
-    if "*" in caps or slug in caps:
-        return True
-    role=(getattr(user,"role","") or "").lower()
-    fallback=LEGACY_ROLE_CAPABILITIES.get(role,set())
-    if "*" in fallback:
-        return True
-    if "*tenant" in fallback and getattr(user,"tenant_id",None):
-        return True
-    return slug in fallback
+    return "*" in caps or slug in caps
 
 
 def require_capability(slug):
