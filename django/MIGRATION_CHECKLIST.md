@@ -57,15 +57,17 @@
 - [x] Recriptografia AES-256-GCM PHP -> Fernet Django
 - [x] Celery Beat para jobs principais e especializados
 - [ ] Validar ETL especializado contra clone real do MySQL legado
-- [ ] Migrar/copy de uploads e mídia do legado
-- [ ] Validar contagens/checksums por tabela antes do cutover
+- [x] Ferramenta de cópia/verificação SHA-256 de mídia disponível (`sync_legacy_media`)
+- [ ] Executar cópia dos uploads/mídia reais do legado
+- [x] Ferramenta de auditoria automatizada de contagens/IDs disponível (`audit_legacy_parity`)
+- [ ] Executar auditoria contra o clone real do MySQL antes do cutover
 
 ## Paridade ainda necessária antes de substituir o PHP
 
-- [ ] Portal Comercial completo (fila de leads, proposta, aprovação/aceite e comissões)
-- [ ] Portal Master completo (tenants, planos, financeiro plataforma, suporte, incidentes, backups e homologação)
+- [x] Portal Comercial completo (fila de leads, proposta, aprovação/aceite e comissões)
+- [x] Portal Master completo (tenants, planos, módulos, billing, comercial, financeiro plataforma, suporte, incidentes, backups, crons e homologação)
 - [x] Arena: UI de jogos/rachas, jogadores, attendance/makeup, chaveamento de torneio e fechamento de comanda
-- [x] Auto: UI de inspeção/fotos/materiais e fechamento de comanda; orçamento público/etapas ainda exige revisão final
+- [x] Auto: UI de inspeção/fotos/materiais, orçamento público, etapas, termo de entrega e fechamento de comanda
 - [x] Barbearia: UI de itens/pagamentos/fechamento de comanda, metas e remuneração
 - [x] Financeiro: UI de venda/POS, caixa e baixa/pagamento de comissões
 - [x] Pacotes: compra, consumo de crédito e billing recorrente pela UI
@@ -73,7 +75,7 @@
 - [x] Custom domain: roteamento por Host + validação TXT/ativação do domínio
 - [x] Legal/LGPD: aceite obrigatório e telas de consentimento/documentos
 - [x] Backup real: pg_dump, checksum, verificação e restauração em banco separado
-- [ ] Aplicar RBAC granular em todas as telas do portal
+- [x] Aplicar RBAC granular em todas as telas do portal
 - [ ] Ampliar testes de regressão das operações especializadas
 - [ ] Homologação paralela PHP x Django com dados reais
 - [ ] Cutover/rollback documentado e executado
