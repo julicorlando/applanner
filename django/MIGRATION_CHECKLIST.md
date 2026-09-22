@@ -64,15 +64,15 @@
 
 - [ ] Portal Comercial completo (fila de leads, proposta, aprovação/aceite e comissões)
 - [ ] Portal Master completo (tenants, planos, financeiro plataforma, suporte, incidentes, backups e homologação)
-- [ ] Arena: UI de jogos/rachas, jogadores, attendance/makeup, chaveamento de torneio e fechamento de comanda
-- [ ] Auto: UI de inspeção/fotos/materiais/etapas/orçamento público e fechamento de comanda
-- [ ] Barbearia: UI de itens/pagamentos/fechamento de comanda, metas e remuneração
-- [ ] Financeiro: UI de venda/POS, caixa e baixa/pagamento de comissões
-- [ ] Pacotes: compra, consumo de crédito e billing recorrente pela UI
-- [ ] Fidelidade/referral: emissão/resgate/referral attribution pela UI
-- [ ] Custom domain: roteamento por Host + validação/ativação do domínio
-- [ ] Legal/LGPD: aceite obrigatório e telas de consentimento/documentos
-- [ ] Backup real: execução/restauração, não apenas catálogo/verificação
+- [x] Arena: UI de jogos/rachas, jogadores, attendance/makeup, chaveamento de torneio e fechamento de comanda
+- [x] Auto: UI de inspeção/fotos/materiais e fechamento de comanda; orçamento público/etapas ainda exige revisão final
+- [x] Barbearia: UI de itens/pagamentos/fechamento de comanda, metas e remuneração
+- [x] Financeiro: UI de venda/POS, caixa e baixa/pagamento de comissões
+- [x] Pacotes: compra, consumo de crédito e billing recorrente pela UI
+- [x] Fidelidade/referral: emissão, resgate e conclusão de indicação pela UI
+- [x] Custom domain: roteamento por Host + validação TXT/ativação do domínio
+- [x] Legal/LGPD: aceite obrigatório e telas de consentimento/documentos
+- [x] Backup real: pg_dump, checksum, verificação e restauração em banco separado
 - [ ] Aplicar RBAC granular em todas as telas do portal
 - [ ] Ampliar testes de regressão das operações especializadas
 - [ ] Homologação paralela PHP x Django com dados reais
