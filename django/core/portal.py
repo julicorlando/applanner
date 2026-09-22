@@ -17,6 +17,17 @@ from arena.services import ArenaReservationService
 from healthcare.services import create_record, read_record
 
 
+MODULE_CAPABILITIES = {
+    "agenda":"agenda.manage",
+    "financeiro":"finance.manage",
+    "barbearia":"barber.manage",
+    "arena":"arena.manage",
+    "auto":"auto.manage",
+    "relacionamento":"engagement.manage",
+    "saude":"healthcare.manage",
+    "suporte":"support.manage",
+}
+
 PORTAL_MODULES = {
     "agenda": {
         "capability":"agenda.manage",
@@ -605,6 +616,7 @@ def select_tenant(request, tenant_id):
 
 @login_required
 def resource_list(request,module_slug,resource_slug):
+    require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access)
@@ -653,6 +665,7 @@ def resource_list(request,module_slug,resource_slug):
 
 @login_required
 def resource_create(request,module_slug,resource_slug):
+    require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access)
@@ -723,6 +736,7 @@ def resource_create(request,module_slug,resource_slug):
 
 @login_required
 def resource_edit(request,module_slug,resource_slug,pk):
+    require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access)
@@ -754,6 +768,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
 
 @login_required
 def resource_detail(request,module_slug,resource_slug,pk):
+    require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access)
