@@ -436,3 +436,37 @@ class CRMEvent(TimeStampedModel):
     class Meta:
         constraints=[models.UniqueConstraint(fields=["tenant","vehicle","event_type","due_at"],name="uq_auto_crm_event")]
         indexes=[models.Index(fields=["tenant","status","due_at"],name="auto_crm_due_idx")]
+
+
+class VehiclePackageLink(models.Model):
+    customer_package=models.OneToOneField(
+        "engagement.CustomerPackage",primary_key=True,on_delete=models.CASCADE,
+        related_name="vehicle_link",
+    )
+    tenant=models.ForeignKey(
+        "tenants.Tenant",on_delete=models.CASCADE,related_name="auto_vehicle_package_links"
+    )
+    vehicle=models.ForeignKey(
+        Vehicle,on_delete=models.CASCADE,related_name="package_links"
+    )
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","vehicle"],name="auto_pkg_vehicle_idx")]
+
+
+class MembershipVehicleLink(models.Model):
+    membership=models.OneToOneField(
+        "engagement.CustomerMembership",primary_key=True,on_delete=models.CASCADE,
+        related_name="vehicle_link",
+    )
+    tenant=models.ForeignKey(
+        "tenants.Tenant",on_delete=models.CASCADE,related_name="auto_membership_vehicle_links"
+    )
+    vehicle=models.ForeignKey(
+        Vehicle,on_delete=models.CASCADE,related_name="membership_links"
+    )
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","vehicle"],name="auto_member_vehicle_idx")]

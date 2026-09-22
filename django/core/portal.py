@@ -261,6 +261,20 @@ PORTAL_MODULES = {
                 "create": False,
                 "edit": False,
             },
+            "pacotes-veiculos": {
+                "model": "auto.VehiclePackageLink",
+                "title": "Pacotes vinculados a veículos",
+                "fields": ["customer_package","vehicle"],
+                "columns": ["customer_package","vehicle","created_at"],
+                "order": "-created_at",
+            },
+            "mensalidades-veiculos": {
+                "model": "auto.MembershipVehicleLink",
+                "title": "Mensalidades vinculadas a veículos",
+                "fields": ["membership","vehicle"],
+                "columns": ["membership","vehicle","created_at"],
+                "order": "-created_at",
+            },
         },
     },
     "relacionamento": {

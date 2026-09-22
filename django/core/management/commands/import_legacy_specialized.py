@@ -71,6 +71,8 @@ SPECS=[
     {"table":"auto_service_materials","model":"auto.ServiceMaterial","keys":["service_id","product_id"]},
     {"table":"auto_service_steps","model":"auto.ServiceStep"},
     {"table":"auto_job_steps","model":"auto.JobStep"},
+    {"table":"auto_vehicle_package_links","model":"auto.VehiclePackageLink","keys":["customer_package_id"]},
+    {"table":"auto_membership_vehicle_links","model":"auto.MembershipVehicleLink","keys":["membership_id"]},
     {"table":"auto_vehicle_maintenance","model":"auto.VehicleMaintenance"},
     {"table":"auto_delivery_terms","model":"auto.DeliveryTerm","keys":["job_id"]},
     {"table":"auto_crm_events","model":"auto.CRMEvent"},
