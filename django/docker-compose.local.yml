@@ -11,6 +11,7 @@ services:
       - >
         python manage.py migrate --noinput &&
         python manage.py seed_modules &&
+        python manage.py seed_rbac &&
         python manage.py seed_periodic_tasks &&
         python manage.py runserver 0.0.0.0:8000
 
