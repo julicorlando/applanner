@@ -4,6 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied,ValidationError
 from django.shortcuts import get_object_or_404,redirect,render
 
+from accounts.permissions import require_any_capability
+
 from finance.models import Product
 from scheduling.models import Customer
 from tenants.models import Tenant
@@ -75,6 +77,7 @@ class ProductForm(forms.Form):
 
 @login_required
 def games(request):
+    require_any_capability(request.user,"arena.manage")
     tenant=_tenant(request)
     form=GameForm(request.POST or None,tenant=tenant)
     if request.method=="POST" and form.is_valid():
@@ -88,6 +91,7 @@ def games(request):
 
 @login_required
 def game_detail(request,pk):
+    require_any_capability(request.user,"arena.manage")
     tenant=_tenant(request)
     game=get_object_or_404(Game.objects.prefetch_related("players"),pk=pk,tenant=tenant)
     form=PlayerForm(request.POST or None,tenant=tenant)
@@ -102,6 +106,7 @@ def game_detail(request,pk):
 
 @login_required
 def class_detail(request,pk):
+    require_any_capability(request.user,"arena.manage")
     tenant=_tenant(request)
     sports_class=get_object_or_404(SportsClass.objects.prefetch_related("students__customer"),pk=pk,tenant=tenant)
     if request.method=="POST":
@@ -119,6 +124,7 @@ def class_detail(request,pk):
 
 @login_required
 def tournament_detail(request,pk):
+    require_any_capability(request.user,"arena.manage")
     tenant=_tenant(request)
     tournament=get_object_or_404(Tournament.objects.prefetch_related("teams","matches__home_team","matches__away_team"),pk=pk,tenant=tenant)
     if request.method=="POST":
@@ -138,6 +144,7 @@ def tournament_detail(request,pk):
 
 @login_required
 def commands(request):
+    require_any_capability(request.user,"arena.manage")
     tenant=_tenant(request)
     form=CommandForm(request.POST or None,tenant=tenant)
     if request.method=="POST" and form.is_valid():
@@ -151,6 +158,7 @@ def commands(request):
 
 @login_required
 def command_detail(request,pk):
+    require_any_capability(request.user,"arena.manage")
     tenant=_tenant(request)
     command=get_object_or_404(ArenaCommand.objects.prefetch_related("items"),pk=pk,tenant=tenant)
     if request.method=="POST":
