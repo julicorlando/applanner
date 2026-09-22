@@ -100,8 +100,23 @@ PORTAL_MODULES = {
                 "fields": [],
                 "columns": ["customer","professional","status","total_amount","opened_at"],
                 "order": "-opened_at",
-                "create": False,
+                "custom_create": "barber_command",
                 "edit": False,
+                "detail": "barber_command",
+            },
+            "metas": {
+                "model": "barber.ProfessionalGoal",
+                "title": "Metas profissionais",
+                "fields": ["professional","year","month","revenue_target","services_target","products_target","ticket_target"],
+                "columns": ["professional","year","month","revenue_target","services_target","ticket_target"],
+                "order": "-year,-month",
+            },
+            "remuneracao": {
+                "model": "barber.ProfessionalCompensationModel",
+                "title": "Remuneração",
+                "fields": ["professional","model","monthly_rent","daily_rent","rent_due_day","service_commission_percent","notes"],
+                "columns": ["professional","model","monthly_rent","daily_rent","service_commission_percent"],
+                "order": "professional__name",
             },
         },
     },
@@ -520,6 +535,8 @@ def resource_create(request,module_slug,resource_slug):
     module,resource,model=_resource(module_slug,resource_slug)
     custom=resource.get("custom_create")
 
+    if custom=="barber_command":
+        return redirect("barber-command-create")
     if custom=="arena_reservation":
         form=ArenaReservationForm(request.POST or None,tenant=tenant)
         if request.method=="POST" and form.is_valid():
@@ -612,6 +629,8 @@ def resource_detail(request,module_slug,resource_slug,pk):
         return redirect("portal-home")
     module,resource,model=_resource(module_slug,resource_slug)
     obj=get_object_or_404(_tenant_queryset(model,tenant),pk=pk)
+    if resource.get("detail")=="barber_command":
+        return redirect("barber-command-detail",pk=obj.pk)
     if resource.get("detail")=="medical_record":
         content=read_record(entry=obj,user=request.user,ip=request.META.get("REMOTE_ADDR",""))
         return render(request,"portal/medical_record.html",{
