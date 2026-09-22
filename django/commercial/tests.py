@@ -32,3 +32,37 @@ class CommercialFlowTests(TestCase):
         acceptance=accept_proposal(proposal=proposal,ip="127.0.0.1",user_agent="tests")
         self.assertEqual(len(acceptance.document_hash),64)
         self.assertEqual(acceptance.proposal_snapshot["final_price"],"90.00")
+
+
+class CommercialPortalTests(TestCase):
+    def setUp(self):
+        self.sales=User.objects.create_user(
+            email="sales-portal@example.com",password="StrongPassword!123",role="commercial"
+        )
+        CommercialProfile.objects.create(
+            user=self.sales,commission_percent=Decimal("8"),max_discount_percent=Decimal("5")
+        )
+        self.plan=Plan.objects.create(
+            name="Plano Portal",slug="portal-plan",monthly_price=Decimal("100")
+        )
+        self.client.force_login(self.sales)
+
+    def test_proposal_captures_plan_snapshot(self):
+        from billing.models import Module,PlanModule
+        module=Module.objects.create(slug="finance-test",name="Financeiro teste",active=True)
+        PlanModule.objects.create(plan=self.plan,module=module,enabled=True)
+        response=self.client.post("/commercial/propostas/nova/",{
+            "plan":self.plan.pk,
+            "title":"Oferta",
+            "customer_name":"Cliente",
+            "customer_email":"cliente@example.com",
+            "discount_percent":"2",
+            "final_price":"98",
+            "notes":"Teste",
+            "expires_at":"",
+        })
+        self.assertEqual(response.status_code,302)
+        proposal=Proposal.objects.get(title="Oferta")
+        self.assertEqual(proposal.base_plan,self.plan)
+        self.assertIn("Financeiro teste",proposal.modules)
+        self.assertEqual(response.url,f"/commercial/propostas/{proposal.pk}/")
