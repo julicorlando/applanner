@@ -275,6 +275,7 @@ PORTAL_MODULES = {
                 "columns": ["customer","package","status","purchase_amount","expires_at"],
                 "order": "-purchased_at",
                 "special": "customer_package",
+                "custom_list": "engagement_packages",
             },
             "recorrencias": {
                 "model": "engagement.CustomerMembership",
@@ -291,6 +292,7 @@ PORTAL_MODULES = {
                 "order": "-points",
                 "create": False,
                 "edit": False,
+                "custom_list": "engagement_loyalty",
             },
             "espera": {
                 "model": "engagement.WaitlistEntry",
@@ -298,6 +300,7 @@ PORTAL_MODULES = {
                 "fields": ["customer","service","professional","preferred_date","period","status","notes"],
                 "columns": ["customer","service","professional","preferred_date","period","status"],
                 "order": "preferred_date,created_at",
+                "custom_list": "engagement_waitlist",
             },
         },
     },
@@ -570,6 +573,12 @@ def resource_list(request,module_slug,resource_slug):
         return redirect("finance-cash")
     if resource.get("custom_list")=="finance_commissions":
         return redirect("finance-commissions")
+    if resource.get("custom_list")=="engagement_packages":
+        return redirect("engagement-packages")
+    if resource.get("custom_list")=="engagement_loyalty":
+        return redirect("engagement-loyalty")
+    if resource.get("custom_list")=="engagement_waitlist":
+        return redirect("engagement-waitlist")
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")

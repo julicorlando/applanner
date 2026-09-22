@@ -301,6 +301,21 @@ def mercadopago_tenant_webhook(request,slug):
             if recurring:
                 recurring.status=_recurring_status(remote.get("status"))
                 recurring.save(update_fields=["status","updated_at"])
+                if recurring.reference_type=="customer_membership":
+                    from engagement.models import CustomerMembership
+                    membership=CustomerMembership.objects.filter(
+                        pk=recurring.reference_id,tenant=tenant
+                    ).first()
+                    if membership:
+                        mapped={
+                            TenantRecurringSubscription.Status.AUTHORIZED:CustomerMembership.Status.ACTIVE,
+                            TenantRecurringSubscription.Status.PAUSED:CustomerMembership.Status.PAUSED,
+                            TenantRecurringSubscription.Status.CANCELLED:CustomerMembership.Status.CANCELLED,
+                        }.get(recurring.status)
+                        if mapped:
+                            membership.status=mapped
+                            membership.provider_subscription_id=recurring.provider_subscription_id
+                            membership.save(update_fields=["status","provider_subscription_id","updated_at"])
             else:
                 event.status=TenantPaymentWebhookEvent.Status.IGNORED
                 event.error_code="subscription_not_found"

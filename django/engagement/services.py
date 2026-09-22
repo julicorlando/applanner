@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal, ROUND_DOWN
 
 from django.core.exceptions import ValidationError
@@ -83,3 +84,95 @@ def issue_reward(*,tenant,customer,user=None):
         tenant=tenant,customer=customer,points_spent=settings_obj.reward_points,
         reward_value=settings_obj.reward_value,issued_at=timezone.now(),
     )
+
+
+@transaction.atomic
+def purchase_package(*,tenant,customer,package,amount=None,external_reference=""):
+    if package.tenant_id!=tenant.id or not package.active:
+        raise ValidationError("Pacote indisponível.")
+    purchased=timezone.now()
+    return CustomerPackage.objects.create(
+        tenant=tenant,customer=customer,package=package,purchased_at=purchased,
+        expires_at=purchased+timedelta(days=package.validity_days) if package.validity_days else None,
+        status=CustomerPackage.Status.ACTIVE,
+        purchase_amount=Decimal(str(amount if amount is not None else package.price)),
+        external_reference=external_reference[:190],
+    )
+
+
+@transaction.atomic
+def create_membership(*,tenant,customer,package,cycle,amount=None,start_date=None,payer_email="",back_url="",online_payment=False):
+    from .models import CustomerMembership
+    if package.tenant_id!=tenant.id or not package.active or not package.recurring:
+        raise ValidationError("Pacote recorrente indisponível.")
+    if cycle not in {value for value,_ in CustomerMembership.Cycle.choices}:
+        raise ValidationError("Ciclo inválido.")
+    start=start_date or timezone.localdate()
+    next_due=start+timedelta(days=90 if cycle==CustomerMembership.Cycle.QUARTERLY else 30)
+    membership=CustomerMembership.objects.create(
+        tenant=tenant,customer=customer,package=package,cycle=cycle,
+        recurring_amount=Decimal(str(amount if amount is not None else package.price)),
+        status=CustomerMembership.Status.ACTIVE,started_at=start,next_due_at=next_due,
+    )
+    if online_payment:
+        if not payer_email or not back_url:
+            raise ValidationError("E-mail e URL de retorno são obrigatórios para recorrência online.")
+        from billing.payment_services import create_tenant_recurring_subscription
+        recurring=create_tenant_recurring_subscription(
+            tenant=tenant,reference_type="customer_membership",reference_id=membership.pk,
+            amount=membership.recurring_amount,payer_email=payer_email,back_url=back_url,
+            cycle_months=3 if cycle==CustomerMembership.Cycle.QUARTERLY else 1,
+        )
+        membership.provider_subscription_id=recurring.provider_subscription_id
+        membership.save(update_fields=["provider_subscription_id","updated_at"])
+        membership.checkout_url=recurring.checkout_url
+    return membership
+
+
+@transaction.atomic
+def complete_referral(*,referral,user=None):
+    from .models import LoyaltyReferral
+    referral=LoyaltyReferral.objects.select_for_update().select_related("tenant","referrer").get(pk=referral.pk)
+    if referral.status==LoyaltyReferral.Status.COMPLETED:
+        return referral
+    if referral.status!=LoyaltyReferral.Status.PENDING:
+        raise ValidationError("Indicação não está pendente.")
+    referral.status=LoyaltyReferral.Status.COMPLETED
+    referral.completed_at=timezone.now()
+    referral.save(update_fields=["status","completed_at","updated_at"])
+    if referral.reward_points>0:
+        account,_=LoyaltyAccount.objects.select_for_update().get_or_create(
+            tenant=referral.tenant,customer=referral.referrer,defaults={"points":0}
+        )
+        LoyaltyTransaction.objects.create(
+            tenant=referral.tenant,customer=referral.referrer,type=LoyaltyTransaction.Type.EARN,
+            points=referral.reward_points,source_type="referral",source_id=referral.pk,
+            note="Bonificação por indicação",user=user,
+        )
+        account.points+=referral.reward_points
+        account.save(update_fields=["points","updated_at"])
+    return referral
+
+
+@transaction.atomic
+def redeem_reward(*,reward,user=None):
+    reward=LoyaltyReward.objects.select_for_update().get(pk=reward.pk)
+    if reward.status!=LoyaltyReward.Status.AVAILABLE:
+        raise ValidationError("Recompensa não está disponível.")
+    reward.status=LoyaltyReward.Status.REDEEMED
+    reward.redeemed_at=timezone.now()
+    reward.redeemed_by=user
+    reward.save(update_fields=["status","redeemed_at","redeemed_by"])
+    return reward
+
+
+@transaction.atomic
+def match_waitlist(*,entry,user=None):
+    from .models import WaitlistEntry
+    entry=WaitlistEntry.objects.select_for_update().get(pk=entry.pk)
+    if entry.status!=WaitlistEntry.Status.WAITING:
+        raise ValidationError("Entrada não está aguardando.")
+    entry.status=WaitlistEntry.Status.MATCHED
+    entry.last_notified_at=timezone.now()
+    entry.save(update_fields=["status","last_notified_at","updated_at"])
+    return entry
