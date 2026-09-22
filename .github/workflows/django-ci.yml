@@ -76,6 +76,8 @@ jobs:
         run: docker compose config --quiet
       - name: Django system check
         run: python manage.py check
+      - name: Collect static files
+        run: python manage.py collectstatic --noinput
       - name: Check migrations are committed
         run: python manage.py makemigrations --check --dry-run
       - name: Apply migrations
