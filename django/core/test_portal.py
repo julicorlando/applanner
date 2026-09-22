@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import timedelta
 
 from django.test import TestCase
@@ -61,7 +62,7 @@ class PortalAppointmentTests(TestCase):
         self.assertEqual(response.status_code,302)
         appointment=Appointment.objects.get()
         self.assertEqual(int((appointment.ends_at-appointment.starts_at).total_seconds()/60),45)
-        self.assertEqual(appointment.service_price_snapshot,self.service.price)
+        self.assertEqual(appointment.service_price_snapshot,Decimal("50.00"))
         self.assertEqual(appointment.created_by,self.user)
 
 

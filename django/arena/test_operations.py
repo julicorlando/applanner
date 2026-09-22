@@ -13,7 +13,7 @@ class ArenaOperationsTests(TestCase):
         self.tenant=Tenant.objects.create(name="Arena",slug="arena-ops")
         self.user=User.objects.create_user(email="arena@example.com",password="StrongPassword123!",tenant=self.tenant)
         self.court=Court.objects.create(tenant=self.tenant,name="Quadra 1",slug="q1",minimum_minutes=30,maximum_minutes=180,interval_minutes=0)
-        self.modality=Modality.objects.create(tenant=self.tenant,name="Futebol",slug="futebol")
+        self.modality=Modality.objects.create(tenant=self.tenant,name="Futebol")
 
     def test_game_split_rebalances(self):
         start=timezone.now()+timedelta(days=1)
