@@ -14,7 +14,7 @@ class PortalTenantIsolationTests(TestCase):
     def setUp(self):
         self.tenant=Tenant.objects.create(name="Tenant A",slug="tenant-a",status=Tenant.Status.ACTIVE)
         self.other=Tenant.objects.create(name="Tenant B",slug="tenant-b",status=Tenant.Status.ACTIVE)
-        self.user=User.objects.create_user(email="user@example.test",password="StrongPassword123!",tenant=self.tenant)
+        self.user=User.objects.create_user(email="user@example.test",password="StrongPassword123!",tenant=self.tenant,role="manager")
         self.client.force_login(self.user)
 
     def test_portal_home_works_for_tenant_user(self):
@@ -39,7 +39,7 @@ class PortalTenantIsolationTests(TestCase):
 class PortalAppointmentTests(TestCase):
     def setUp(self):
         self.tenant=Tenant.objects.create(name="Agenda",slug="agenda",status=Tenant.Status.ACTIVE)
-        self.user=User.objects.create_user(email="agenda@example.test",password="StrongPassword123!",tenant=self.tenant)
+        self.user=User.objects.create_user(email="agenda@example.test",password="StrongPassword123!",tenant=self.tenant,role="manager")
         self.customer=Customer.objects.create(tenant=self.tenant,name="Cliente")
         self.service=Service.objects.create(tenant=self.tenant,name="Corte",duration_minutes=45,price="50.00")
         self.professional=Professional.objects.create(tenant=self.tenant,name="Profissional")
