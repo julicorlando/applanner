@@ -128,3 +128,50 @@ def resource_form(request,slug,pk=None):
         except ValidationError as exc:
             form.add_error(None,exc)
     return render(request,"master/form.html",{"slug":slug,"resource":config,"form":form,"title":("Editar" if obj else "Novo")+" — "+config["title"]})
+
+
+@login_required
+def operational_action(request,action,pk=None):
+    _guard(request.user)
+    if request.method!="POST":
+        raise PermissionDenied
+    from operations.backup import create_database_backup,verify_database_backup
+    from operations.models import Backup,OperationalIncident
+    from operations.services import run_homologation
+
+    try:
+        if action=="backup-create":
+            backup=create_database_backup()
+            messages.success(request,f"Backup #{backup.pk} concluído.")
+            return redirect("master-resource-list",slug="backups")
+        if action=="backup-verify":
+            backup=get_object_or_404(Backup,pk=pk)
+            verification=verify_database_backup(backup=backup,user=request.user)
+            if verification.status=="passed":
+                messages.success(request,"Integridade do backup confirmada.")
+            else:
+                messages.error(request,"Falha na verificação do backup.")
+            return redirect("master-resource-list",slug="backups")
+        if action=="homologation-run":
+            run=run_homologation(user=request.user)
+            messages.success(request,f"Homologação executada: {run.get_status_display()} · {run.score}.")
+            return redirect("master-resource-list",slug="homologacao")
+        if action in {"incident-ack","incident-resolve"}:
+            incident=get_object_or_404(OperationalIncident,pk=pk)
+            now=timezone.now()
+            if action=="incident-ack":
+                incident.status=OperationalIncident.Status.ACKNOWLEDGED
+                incident.acknowledged_by=request.user
+                incident.acknowledged_at=now
+                incident.save(update_fields=["status","acknowledged_by","acknowledged_at","updated_at"])
+                messages.success(request,"Incidente reconhecido.")
+            else:
+                incident.status=OperationalIncident.Status.RESOLVED
+                incident.resolved_by=request.user
+                incident.resolved_at=now
+                incident.save(update_fields=["status","resolved_by","resolved_at","updated_at"])
+                messages.success(request,"Incidente resolvido.")
+            return redirect("master-resource-list",slug="incidentes")
+    except Exception as exc:
+        messages.error(request,f"Falha operacional: {str(exc)[:240]}")
+    return redirect("master-home")
