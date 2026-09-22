@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Selecionar empresa — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">HOMOLOGAÇÃO</span><h1>Selecionar empresa</h1><p>Como superusuário, escolha qual tenant deseja operar.</p></div></div>
+  <div class="tenant-picker">
+    {% for item in tenants %}
+      <a href="{% url 'portal-select-tenant' item.pk %}"><strong>{{ item.name }}</strong><span>{{ item.slug }} · {{ item.get_status_display }}</span></a>
+    {% empty %}
+      <div class="panel"><p class="empty">Nenhuma empresa cadastrada. Rode o comando de demo ou cadastre um tenant no Admin.</p></div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

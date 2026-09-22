@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'portal-resource-list' module_slug resource_slug %}">← {{ resource.title }}</a><span class="eyebrow">{{ module.title }}</span><h1>{{ title }}</h1></div></div>
+  <form method="post" enctype="multipart/form-data" class="portal-form panel">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}
+      <div class="form-field {% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="form-actions"><button class="button primary" type="submit">Salvar</button><a class="button ghost" href="{% url 'portal-resource-list' module_slug resource_slug %}">Cancelar</a></div>
+  </form>
+</section>
+{% endblock %}

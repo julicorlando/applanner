@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Operação — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div><span class="eyebrow">ÁREA OPERACIONAL</span><h1>{{ tenant.name }}</h1><p>Escolha um módulo para gerenciar a operação.</p></div>
+    {% if request.user.is_superuser %}<a class="button ghost" href="{% url 'portal-home' %}?trocar=1">Empresa atual</a>{% endif %}
+  </div>
+  <div class="portal-module-grid">
+    {% for item in modules %}
+      <article class="portal-module-card">
+        <span class="portal-module-kicker">{{ forloop.counter|stringformat:"02d" }}</span>
+        <h2>{{ item.title }}</h2>
+        <p>{{ item.description }}</p>
+        <div class="portal-resource-links">
+          {% for resource in item.resources %}
+            <a href="{% url 'portal-resource-list' item.slug resource.slug %}">{{ resource.title }} <span>→</span></a>
+          {% endfor %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
