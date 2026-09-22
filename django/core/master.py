@@ -8,10 +8,56 @@ from django.forms import modelform_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from billing.models import Module, Plan, PlanModule
+
+
+class PlanMasterForm(forms.ModelForm):
+    professionals_limit=forms.IntegerField(min_value=1,required=False,label="Limite de profissionais")
+    units_limit=forms.IntegerField(min_value=1,required=False,label="Limite de unidades")
+    included_features=forms.CharField(
+        required=False,label="Funcionalidades comerciais",
+        widget=forms.Textarea(attrs={"rows":8,"placeholder":"Uma funcionalidade por linha"}),
+    )
+
+    class Meta:
+        model=Plan
+        fields=[
+            "name","slug","description","monthly_price","quarterly_price","semiannual_price",
+            "annual_price","trial_days","trial_without_card","active","public_visible",
+            "is_custom","featured","sort_order",
+        ]
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        features=(getattr(self.instance,"features",None) or {}) if self.instance else {}
+        self.fields["professionals_limit"].initial=features.get("professionals")
+        self.fields["units_limit"].initial=features.get("units")
+        self.fields["included_features"].initial="\n".join(features.get("included_features") or [])
+
+    def save(self,commit=True):
+        obj=super().save(commit=False)
+        features=dict(obj.features or {})
+        if self.cleaned_data.get("professionals_limit"):
+            features["professionals"]=self.cleaned_data["professionals_limit"]
+        if self.cleaned_data.get("units_limit"):
+            features["units"]=self.cleaned_data["units_limit"]
+        features["included_features"]=[
+            line.strip() for line in (self.cleaned_data.get("included_features") or "").splitlines()
+            if line.strip()
+        ][:30]
+        obj.features=features
+        if commit:
+            obj.save()
+        return obj
+
 
 MASTER_RESOURCES={
     "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","created_at"],"order":"-created_at"},
     "planos":{"model":"billing.Plan","title":"Planos","fields":["name","slug","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","public_visible","is_custom","featured","sort_order"],"columns":["name","monthly_price","trial_days","active","public_visible","is_custom","featured"],"order":"sort_order,name","special":"plan"},
+    "modulos":{"model":"billing.Module","title":"Módulos","fields":["name","slug","description","addon_monthly_price","addon_sellable","sort_order","active"],"columns":["name","slug","addon_monthly_price","addon_sellable","active"],"order":"sort_order,name"},
+    "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":["tenant","module","quoted_monthly_price","status","tenant_note","master_note"],"columns":["tenant","module","quoted_monthly_price","status","created_at"],"order":"-created_at"},
+    "equipe-comercial":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","active"],"columns":["user","commission_percent","max_discount_percent","active"],"order":"user__email"},
+    "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":["commercial_user","tenant","base_amount","commission_percent","commission_amount","status","hold_until"],"columns":["commercial_user","tenant","commission_amount","status","created_at"],"order":"-created_at"},
     "assinaturas":{"model":"billing.Subscription","title":"Assinaturas","fields":["tenant","plan","billing_cycle","contracted_price","status","started_at","trial_ends_at","next_billing_at","provider_customer_id","provider_subscription_id"],"columns":["tenant","plan","billing_cycle","status","next_billing_at"],"order":"-started_at"},
     "financeiro":{"model":"finance.PlatformFinancialTransaction","title":"Financeiro da plataforma","fields":["category","type","description","amount","status","due_at","paid_at","notes"],"columns":["type","description","amount","status","due_at"],"order":"-created_at","special":"platform_finance"},
     "suporte":{"model":"operations.SupportTicket","title":"Suporte","fields":["tenant","user","category","subject","description","priority","status","assigned_to"],"columns":["protocol","tenant","subject","priority","status","assigned_to"],"order":"-created_at","create":False},
@@ -109,7 +155,7 @@ def resource_form(request,slug,pk=None):
     if pk is None and not config.get("create",True): raise PermissionDenied
     if pk is not None and not config.get("edit",True): raise PermissionDenied
     obj=get_object_or_404(model,pk=pk) if pk else None
-    Form=modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"]))
+    Form=PlanMasterForm if config.get("special")=="plan" else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"]))
     form=Form(request.POST or None,instance=obj)
     for name,field in form.fields.items():
         mf=_field(model,name)
@@ -177,3 +223,21 @@ def operational_action(request,action,pk=None):
     except Exception as exc:
         messages.error(request,f"Falha operacional: {str(exc)[:240]}")
     return redirect("master-home")
+
+
+@login_required
+def plan_modules(request,pk):
+    _guard(request.user)
+    plan=get_object_or_404(Plan,pk=pk)
+    modules=list(Module.objects.order_by("sort_order","name"))
+    current={row.module_id:row.enabled for row in plan.module_links.all()}
+    if request.method=="POST":
+        selected={int(value) for value in request.POST.getlist("modules") if value.isdigit()}
+        for module in modules:
+            PlanModule.objects.update_or_create(
+                plan=plan,module=module,defaults={"enabled":module.pk in selected}
+            )
+        messages.success(request,"Módulos do plano atualizados.")
+        return redirect("master-plan-modules",pk=plan.pk)
+    rows=[{"module":module,"enabled":bool(current.get(module.pk,False))} for module in modules]
+    return render(request,"master/plan_modules.html",{"plan":plan,"rows":rows})
