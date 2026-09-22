@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from accounts.models import Capability, PlatformRole, RoleCapability, User, UserRole
 from accounts.security import encrypt_secret
-from billing.models import Payment, Plan, Subscription
+from billing.models import Module, Payment, Plan, PlanModule, Subscription, TenantModule
 from core.legacy_crypto import decrypt_php_aes_gcm
 from scheduling.models import Appointment, Customer, Professional, Service
 from tenants.models import Tenant
@@ -41,6 +41,7 @@ class Command(BaseCommand):
     def add_arguments(self,parser):
         parser.add_argument("--dry-run",action="store_true")
         parser.add_argument("--skip-2fa",action="store_true")
+        parser.add_argument("--catalog-only",action="store_true",help="Importa somente módulos, planos e vínculos comerciais.")
 
     def handle(self,*args,**options):
         cfg={
@@ -61,16 +62,25 @@ class Command(BaseCommand):
 
         try:
             with transaction.atomic():
-                self._tenants(conn)
-                self._rbac(conn)
-                self._users(conn,skip_2fa=options["skip_2fa"])
-                self._customers(conn)
-                self._professionals(conn)
-                self._services(conn)
-                self._appointments(conn)
-                self._plans(conn)
-                self._subscriptions(conn)
-                self._payments(conn)
+                if options["catalog_only"]:
+                    self._modules(conn)
+                    self._plans(conn)
+                    self._plan_modules(conn)
+                    self._tenant_modules(conn)
+                else:
+                    self._tenants(conn)
+                    self._rbac(conn)
+                    self._users(conn,skip_2fa=options["skip_2fa"])
+                    self._customers(conn)
+                    self._professionals(conn)
+                    self._services(conn)
+                    self._appointments(conn)
+                    self._modules(conn)
+                    self._plans(conn)
+                    self._plan_modules(conn)
+                    self._tenant_modules(conn)
+                    self._subscriptions(conn)
+                    self._payments(conn)
 
                 if options["dry_run"]:
                     transaction.set_rollback(True)
@@ -302,25 +312,119 @@ class Command(BaseCommand):
             self._restore_times(Appointment,obj.pk,row)
         self.stdout.write(f"appointments: {len(rows)}")
 
+    def _modules(self,conn):
+        if "modules" not in self.columns:
+            self.stdout.write("modules: tabela legada ausente; ignorando.")
+            return
+        rows=self._rows(conn,"SELECT * FROM modules ORDER BY id")
+        for row in rows:
+            defaults={
+                "slug":row["slug"],
+                "name":row["name"],
+                "description":row.get("description") or "",
+                "active":bool(row.get("active",1)),
+            }
+            if self._has("modules","addon_monthly_price"):
+                defaults["addon_monthly_price"]=(
+                    Decimal(str(row["addon_monthly_price"]))
+                    if row.get("addon_monthly_price") is not None else None
+                )
+            if self._has("modules","addon_sellable"):
+                defaults["addon_sellable"]=bool(row.get("addon_sellable"))
+            if self._has("modules","sort_order"):
+                defaults["sort_order"]=int(row.get("sort_order") or 0)
+            Module.objects.update_or_create(id=row["id"],defaults=defaults)
+        self.stdout.write(f"modules: {len(rows)}")
+
+    def _json_value(self,value):
+        if isinstance(value,str):
+            if not value.strip():
+                return {}
+            try:
+                parsed=json.loads(value)
+                return parsed if isinstance(parsed,dict) else {"legacy":parsed}
+            except json.JSONDecodeError:
+                return {"legacy":value}
+        return value if isinstance(value,dict) else {}
+
     def _plans(self,conn):
         rows=self._rows(conn,"SELECT * FROM plans ORDER BY id")
         for row in rows:
-            obj,_=Plan.objects.update_or_create(
-                id=row["id"],
-                defaults={
-                    "name":row["name"],
-                    "slug":row["slug"],
-                    "monthly_price":Decimal(str(row.get("monthly_price") or 0)),
-                    "active":bool(row.get("active",1)),
-                    "features":(
-                        json.loads(row["features_json"])
-                        if isinstance(row.get("features_json"),str) and row.get("features_json")
-                        else (row.get("features_json") or {})
-                    ),
-                },
-            )
+            defaults={
+                "name":row["name"],
+                "slug":row["slug"],
+                "description":row.get("description") or "",
+                "monthly_price":Decimal(str(row.get("monthly_price") or 0)),
+                "active":bool(row.get("active",1)),
+                "features":self._json_value(row.get("features_json")),
+            }
+            for source,target in (
+                ("quarterly_price","quarterly_price"),
+                ("semiannual_price","semiannual_price"),
+                ("annual_price","annual_price"),
+            ):
+                if self._has("plans",source):
+                    defaults[target]=(
+                        Decimal(str(row[source])) if row.get(source) is not None else None
+                    )
+            if self._has("plans","trial_days"):
+                defaults["trial_days"]=int(row.get("trial_days") or 0)
+            if self._has("plans","trial_without_card"):
+                defaults["trial_without_card"]=bool(row.get("trial_without_card"))
+            if self._has("plans","featured"):
+                defaults["featured"]=bool(row.get("featured"))
+            if self._has("plans","sort_order"):
+                defaults["sort_order"]=int(row.get("sort_order") or 0)
+            if self._has("plans","public_visible"):
+                defaults["public_visible"]=bool(row.get("public_visible"))
+            if self._has("plans","is_custom"):
+                defaults["is_custom"]=bool(row.get("is_custom"))
+            if self._has("plans","created_by_user_id"):
+                creator_id=row.get("created_by_user_id")
+                defaults["created_by_id"]=creator_id if creator_id and User.objects.filter(pk=creator_id).exists() else None
+
+            obj,_=Plan.objects.update_or_create(id=row["id"],defaults=defaults)
             self._restore_times(Plan,obj.pk,row)
         self.stdout.write(f"plans: {len(rows)}")
+
+    def _plan_modules(self,conn):
+        if "plan_modules" not in self.columns:
+            self.stdout.write("plan_modules: tabela legada ausente; ignorando.")
+            return
+        rows=self._rows(conn,"SELECT plan_id,module_id,enabled FROM plan_modules ORDER BY plan_id,module_id")
+        valid=[]
+        for row in rows:
+            if Plan.objects.filter(pk=row["plan_id"]).exists() and Module.objects.filter(pk=row["module_id"]).exists():
+                PlanModule.objects.update_or_create(
+                    plan_id=row["plan_id"],module_id=row["module_id"],
+                    defaults={"enabled":bool(row.get("enabled",1))},
+                )
+                valid.append((row["plan_id"],row["module_id"]))
+        legacy_plan_ids={plan_id for plan_id,_ in valid}
+        if legacy_plan_ids:
+            keep=set(valid)
+            for link in PlanModule.objects.filter(plan_id__in=legacy_plan_ids):
+                if (link.plan_id,link.module_id) not in keep:
+                    link.delete()
+        self.stdout.write(f"plan_modules: {len(valid)}")
+
+    def _tenant_modules(self,conn):
+        if "tenant_modules" not in self.columns:
+            self.stdout.write("tenant_modules: tabela legada ausente; ignorando.")
+            return
+        rows=self._rows(conn,"SELECT tenant_id,module_id,enabled FROM tenant_modules ORDER BY tenant_id,module_id")
+        count=0
+        for row in rows:
+            if not Tenant.objects.filter(pk=row["tenant_id"]).exists():
+                continue
+            if not Module.objects.filter(pk=row["module_id"]).exists():
+                continue
+            TenantModule.objects.update_or_create(
+                tenant_id=row["tenant_id"],module_id=row["module_id"],
+                defaults={"enabled":bool(row.get("enabled",1))},
+            )
+            count+=1
+        self.stdout.write(f"tenant_modules: {count}")
 
     def _subscriptions(self,conn):
         rows=self._rows(conn,"SELECT * FROM subscriptions ORDER BY id")

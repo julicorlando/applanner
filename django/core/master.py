@@ -11,7 +11,7 @@ from django.utils import timezone
 
 MASTER_RESOURCES={
     "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","created_at"],"order":"-created_at"},
-    "planos":{"model":"billing.Plan","title":"Planos","fields":["name","slug","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","featured","sort_order"],"columns":["name","monthly_price","trial_days","active","featured"],"order":"sort_order,name"},
+    "planos":{"model":"billing.Plan","title":"Planos","fields":["name","slug","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","public_visible","is_custom","featured","sort_order"],"columns":["name","monthly_price","trial_days","active","public_visible","is_custom","featured"],"order":"sort_order,name","special":"plan"},
     "assinaturas":{"model":"billing.Subscription","title":"Assinaturas","fields":["tenant","plan","billing_cycle","contracted_price","status","started_at","trial_ends_at","next_billing_at","provider_customer_id","provider_subscription_id"],"columns":["tenant","plan","billing_cycle","status","next_billing_at"],"order":"-started_at"},
     "financeiro":{"model":"finance.PlatformFinancialTransaction","title":"Financeiro da plataforma","fields":["category","type","description","amount","status","due_at","paid_at","notes"],"columns":["type","description","amount","status","due_at"],"order":"-created_at","special":"platform_finance"},
     "suporte":{"model":"operations.SupportTicket","title":"Suporte","fields":["tenant","user","category","subject","description","priority","status","assigned_to"],"columns":["protocol","tenant","subject","priority","status","assigned_to"],"order":"-created_at","create":False},
@@ -118,6 +118,8 @@ def resource_form(request,slug,pk=None):
     if request.method=="POST" and form.is_valid():
         row=form.save(commit=False)
         if config.get("special")=="platform_finance" and not row.created_by_id:
+            row.created_by=request.user
+        if config.get("special")=="plan" and row.is_custom and not row.created_by_id:
             row.created_by=request.user
         try:
             row.full_clean()

@@ -45,3 +45,15 @@ Esta branch é de migração/homologação e ainda não substitui a produção P
 ## Segurança
 
 Não reutilize nenhuma credencial encontrada no histórico do repositório. Credenciais expostas devem ser rotacionadas antes de qualquer cutover.
+
+
+## Sincronizar catálogo do PHP legado
+
+Para copiar somente módulos, planos, preços, ciclos e vínculos plano→módulo do MySQL legado:
+
+```bash
+python manage.py import_legacy_core --catalog-only --dry-run
+python manage.py import_legacy_core --catalog-only
+```
+
+Configure antes as variáveis `LEGACY_MYSQL_HOST`, `LEGACY_MYSQL_PORT`, `LEGACY_MYSQL_DATABASE`, `LEGACY_MYSQL_USER` e `LEGACY_MYSQL_PASSWORD`. O modo `--catalog-only` não importa clientes ou agendamentos.
