@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_webhook
-from core.views import healthz, home
+from core.views import healthz, home, tenant_public
 from communications.views import marketing_click, marketing_open, whatsapp_webhook
 from contenthub.views import blog_post, landing, public_directory
 from scheduling.public_api import (
@@ -20,6 +20,7 @@ urlpatterns = [
     path("commercial/", include("commercial.urls")),
     path("master/", include("core.master_urls")),
     path("directory/", public_directory, name="public-directory"),
+    path("p/<slug:slug>/", tenant_public, name="tenant-public"),
     path("blog/<slug:slug>/", blog_post, name="blog-post"),
     path("landing/<slug:slug>/", landing, name="landing"),
     path("tracking/email/<uuid:token>/open.gif", marketing_open, name="marketing-open"),

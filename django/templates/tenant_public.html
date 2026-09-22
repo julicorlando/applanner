@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ tenant.public_seo_title|default:tenant.name }}{% endblock %}
+{% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
+{% block content %}
+<section class="tenant-hero" style="--tenant-accent:{{ tenant.public_accent_color|default:tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}">
+  <div class="shell">
+    {% if tenant.public_announcement %}<div class="tenant-announcement">{{ tenant.public_announcement }}</div>{% endif %}
+    <span class="eyebrow">{{ tenant.category|default:"AGENDE ONLINE" }}</span>
+    <h1>{{ tenant.public_headline|default:tenant.name }}</h1>
+    <p>{{ tenant.public_subheadline|default:tenant.description }}</p>
+    <div class="actions"><a class="button primary" href="#servicos">{{ tenant.public_cta_label|default:"Ver serviços" }}</a></div>
+  </div>
+</section>
+<section class="shell section" id="servicos">
+  <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2></div>
+  <div class="segment-grid">{% for service in services %}<article><span>{{ service.duration_minutes }} min</span><h3>{{ service.name }}</h3><p>{{ service.description }}</p><strong>R$ {{ service.price }}</strong></article>{% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}</div>
+</section>
+{% if professionals %}<section class="shell section"><div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2></div><div class="segment-grid">{% for professional in professionals %}<article><span>{{ professional.specialty|default:"Profissional" }}</span><h3>{{ professional.name }}</h3><p>{{ professional.email }}</p></article>{% endfor %}</div></section>{% endif %}
+{% if units %}<section class="shell section"><div class="section-head"><span class="eyebrow">UNIDADES</span><h2>Onde encontrar.</h2></div><div class="segment-grid">{% for unit in units %}<article><span>{% if unit.is_primary %}Principal{% else %}Unidade{% endif %}</span><h3>{{ unit.name }}</h3><p>{{ unit.address }} {{ unit.address_number }}{% if unit.city %}<br>{{ unit.city }}/{{ unit.state }}{% endif %}</p>{% if unit.whatsapp %}<strong>{{ unit.whatsapp }}</strong>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+{% endblock %}

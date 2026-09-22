@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.db import connection
 from django.db.models import Sum
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 
 
@@ -105,9 +105,38 @@ def _platform_dashboard(request):
     })
 
 
+def tenant_public(request,slug=None):
+    from tenants.models import Tenant
+    if slug:
+        tenant=get_object_or_404(
+            Tenant,
+            status=Tenant.Status.ACTIVE,
+            public_enabled=True,
+            public_slug=slug,
+        )
+    else:
+        tenant=getattr(request,"tenant",None)
+        if not tenant or tenant.status!=Tenant.Status.ACTIVE or not tenant.public_enabled:
+            return render(request,"home.html")
+
+    services=tenant.services.filter(active=True).order_by("name")[:50]
+    professionals=tenant.professionals.filter(active=True).order_by("name")[:50]
+    units=tenant.units.filter(active=True).order_by("-is_primary","name")
+    public_slug=tenant.public_slug or tenant.slug
+    return render(request,"tenant_public.html",{
+        "tenant":tenant,
+        "services":services,
+        "professionals":professionals,
+        "units":units,
+        "public_slug":public_slug,
+    })
+
+
 def home(request):
     if request.user.is_authenticated:
         if request.user.tenant_id:
             return _tenant_dashboard(request)
         return _platform_dashboard(request)
+    if getattr(request,"tenant",None):
+        return tenant_public(request)
     return render(request,"home.html")
