@@ -19,6 +19,7 @@ urlpatterns = [
     path("legal/", include("legal.urls")),
     path("app/barbearia/", include("barber.urls")),
     path("app/auto/", include("auto.urls")),
+    path("auto/", include("auto.public_urls")),
     path("app/arena/", include("arena.urls")),
     path("app/financeiro/", include("finance.urls")),
     path("app/relacionamento/", include("engagement.urls")),
