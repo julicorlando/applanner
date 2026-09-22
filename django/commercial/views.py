@@ -124,3 +124,27 @@ def proposal_action(request,pk):
     else:
         messages.error(request,"Ação inválida.")
     return redirect("commercial-dashboard")
+
+
+def public_proposal(request,token):
+    proposal=get_object_or_404(Proposal.objects.select_related("plan"),public_token=token)
+    if proposal.expires_at and proposal.expires_at<=timezone.now() and proposal.status!=Proposal.Status.CONVERTED:
+        proposal.status=Proposal.Status.EXPIRED
+        proposal.save(update_fields=["status","updated_at"])
+    if proposal.status==Proposal.Status.SENT:
+        proposal.status=Proposal.Status.VIEWED
+        proposal.save(update_fields=["status","updated_at"])
+    error=""
+    if request.method=="POST":
+        try:
+            from .services import accept_proposal
+            accept_proposal(
+                proposal=proposal,
+                ip=request.META.get("REMOTE_ADDR") or "",
+                user_agent=request.META.get("HTTP_USER_AGENT") or "",
+            )
+            messages.success(request,"Proposta aceita com sucesso.")
+            return redirect("commercial-public-proposal",token=token)
+        except ValidationError as exc:
+            error=str(exc)
+    return render(request,"commercial/public_proposal.html",{"proposal":proposal,"error":error})

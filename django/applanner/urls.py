@@ -16,6 +16,7 @@ urlpatterns = [
     path("", home, name="home"),
     path("admin/", admin.site.urls),
     path("account/", include("accounts.urls")),
+    path("legal/", include("legal.urls")),
     path("app/", include("core.portal_urls")),
     path("app/barbearia/", include("barber.urls")),
     path("app/auto/", include("auto.urls")),
