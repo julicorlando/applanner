@@ -64,3 +64,51 @@ class MercadoPagoProviderTests(SimpleTestCase):
         self.assertEqual(payload["auto_recurring"]["frequency"],3)
         self.assertEqual(payload["auto_recurring"]["free_trial"]["frequency"],14)
         self.assertEqual(idempotency,"idem-99")
+
+
+from django.test import TestCase
+
+from accounts.models import User
+from tenants.models import Tenant,Unit
+from .models import Plan,Subscription
+
+
+class PublicSignupTests(TestCase):
+    def setUp(self):
+        self.plan=Plan.objects.create(
+            name="Inicial",
+            slug="signup-inicial",
+            monthly_price=Decimal("49.90"),
+            trial_days=14,
+            trial_without_card=True,
+            public_visible=True,
+            active=True,
+        )
+
+    def test_public_plans_page_lists_plan(self):
+        response=self.client.get("/planos/")
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,"Inicial")
+        self.assertContains(response,"49.90")
+
+    def test_signup_creates_tenant_owner_unit_and_subscription(self):
+        response=self.client.post("/cadastro/",{
+            "plan":self.plan.pk,
+            "billing_cycle":Subscription.BillingCycle.MONTHLY,
+            "business_name":"Barbearia Teste",
+            "category":"barbearia",
+            "owner_name":"Responsável",
+            "email":"owner-signup@example.com",
+            "phone":"81999999999",
+            "password":"StrongPassword!123",
+            "password_confirm":"StrongPassword!123",
+        })
+        self.assertEqual(response.status_code,302)
+        tenant=Tenant.objects.get(name="Barbearia Teste")
+        user=User.objects.get(email="owner-signup@example.com")
+        self.assertEqual(user.tenant,tenant)
+        self.assertEqual(user.role,"owner")
+        self.assertTrue(Unit.objects.filter(tenant=tenant,is_primary=True).exists())
+        subscription=Subscription.objects.get(tenant=tenant)
+        self.assertEqual(subscription.plan,self.plan)
+        self.assertEqual(subscription.status,Subscription.Status.TRIAL)
