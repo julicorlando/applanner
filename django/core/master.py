@@ -19,6 +19,8 @@ MASTER_RESOURCES={
     "backups":{"model":"operations.Backup","title":"Backups","fields":[],"columns":["type","scope","status","destination","size_bytes","completed_at"],"order":"-started_at","create":False,"edit":False},
     "homologacao":{"model":"operations.HomologationRun","title":"Homologações","fields":[],"columns":["status","score","executed_by","created_at"],"order":"-created_at","create":False,"edit":False},
     "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","version","title","content","status","published_at"],"columns":["type","version","title","status","published_at"],"order":"-published_at,-created_at"},
+    "usuarios":{"model":"accounts.User","title":"Usuários","fields":["tenant","email","role","is_active","is_staff"],"columns":["email","tenant","role","is_active","is_staff"],"order":"email"},
+    "papeis-usuarios":{"model":"accounts.UserRole","title":"Papéis dos usuários","fields":["user","role"],"columns":["user","role"],"order":"user__email"},
 }
 
 

@@ -27,6 +27,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "accounts.middleware.SessionVersionMiddleware",
+    "accounts.route_middleware.CapabilityRouteMiddleware",
     "core.middleware.TenantContextMiddleware",
     "legal.middleware.LegalAcceptanceMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
