@@ -65,6 +65,13 @@ MASTER_RESOURCES={
     "backups":{"model":"operations.Backup","title":"Backups","fields":[],"columns":["type","scope","status","destination","size_bytes","completed_at"],"order":"-started_at","create":False,"edit":False},
     "homologacao":{"model":"operations.HomologationRun","title":"Homologações","fields":[],"columns":["status","score","executed_by","created_at"],"order":"-created_at","create":False,"edit":False},
     "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","version","title","content","status","published_at"],"columns":["type","version","title","status","published_at"],"order":"-published_at,-created_at"},
+    "comerciais":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","active"],"columns":["user","commission_percent","max_discount_percent","active"],"order":"user__email"},
+    "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":[],"columns":["commercial_user","tenant","base_amount","commission_amount","status","paid_at"],"order":"-created_at","create":False,"edit":False},
+    "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
+    "propostas":{"model":"commercial.Proposal","title":"Propostas comerciais","fields":[],"columns":["title","customer_name","commercial_user","final_price","status","approval_status"],"order":"-created_at","create":False,"edit":False},
+    "operacao":{"model":"operations.PlatformOperationSettings","title":"Configuração operacional","fields":["backup_retention_days","backup_include_uploads","backup_encrypt","backup_before_update","lead_retention_days","critical_alert_email","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"columns":["backup_retention_days","backup_include_uploads","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"order":"id","special":"operation_settings"},
+    "crons":{"model":"operations.CronHeartbeat","title":"Saúde dos jobs","fields":[],"columns":["cron_key","status","started_at","finished_at","duration_ms","host_name"],"order":"-started_at","create":False,"edit":False},
+    "imports":{"model":"operations.DataImportJob","title":"Implantações de bases","fields":[],"columns":["tenant","source","original_name","status","created_at","completed_at"],"order":"-created_at","create":False,"edit":False},
     "usuarios":{"model":"accounts.User","title":"Usuários","fields":["tenant","email","role","is_active","is_staff"],"columns":["email","tenant","role","is_active","is_staff"],"order":"email"},
     "papeis-usuarios":{"model":"accounts.UserRole","title":"Papéis dos usuários","fields":["user","role"],"columns":["user","role"],"order":"user__email"},
 }
@@ -167,6 +174,8 @@ def resource_form(request,slug,pk=None):
             row.created_by=request.user
         if config.get("special")=="plan" and row.is_custom and not row.created_by_id:
             row.created_by=request.user
+        if config.get("special")=="operation_settings":
+            row.updated_by=request.user
         try:
             row.full_clean()
             row.save()
