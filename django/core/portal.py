@@ -155,12 +155,47 @@ PORTAL_MODULES = {
                 "columns": ["name","teacher_name","court","weekday","start_time","status"],
                 "order": "name",
             },
+            "jogos": {
+                "model": "arena.Game",
+                "title": "Jogos / Rachas",
+                "fields": [],
+                "columns": ["name","court","starts_at","max_players","status"],
+                "order": "-starts_at",
+                "create": False,
+                "edit": False,
+                "custom_list": "arena_games",
+            },
+            "alunos": {
+                "model": "arena.ClassStudent",
+                "title": "Alunos de turmas",
+                "fields": ["sports_class","customer","responsible_name","responsible_phone","monthly_amount_override","billing_day","status","joined_at"],
+                "columns": ["customer","sports_class","status","joined_at"],
+                "order": "-joined_at",
+            },
+            "reposicoes": {
+                "model": "arena.ClassMakeup",
+                "title": "Reposições",
+                "fields": ["student","original_class","original_date","replacement_class","replacement_date","status","notes"],
+                "columns": ["student","original_class","original_date","replacement_class","replacement_date","status"],
+                "order": "-original_date",
+            },
             "torneios": {
                 "model": "arena.Tournament",
                 "title": "Torneios",
                 "fields": ["modality","name","category","format","registration_amount","starts_on","ends_on","status"],
                 "columns": ["name","category","format","starts_on","status"],
                 "order": "-starts_on",
+                "detail": "arena_tournament",
+            },
+            "comandas": {
+                "model": "arena.ArenaCommand",
+                "title": "Comandas Arena",
+                "fields": [],
+                "columns": ["public_id","customer","status","total","payment_status","opened_at"],
+                "order": "-opened_at",
+                "create": False,
+                "edit": False,
+                "custom_list": "arena_commands",
             },
         },
     },
@@ -503,10 +538,14 @@ def select_tenant(request, tenant_id):
 
 @login_required
 def resource_list(request,module_slug,resource_slug):
+    module,resource,model=_resource(module_slug,resource_slug)
+    if resource.get("custom_list")=="arena_games":
+        return redirect("arena-games")
+    if resource.get("custom_list")=="arena_commands":
+        return redirect("arena-commands")
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")
-    module,resource,model=_resource(module_slug,resource_slug)
     qs=_tenant_queryset(model,tenant)
     q=(request.GET.get("q") or "").strip()
     if q:
@@ -634,6 +673,10 @@ def resource_detail(request,module_slug,resource_slug,pk):
         return redirect("barber-command-detail",pk=obj.pk)
     if resource.get("detail")=="auto_job":
         return redirect("auto-job-detail",pk=obj.pk)
+    if resource.get("detail")=="arena_tournament":
+        return redirect("arena-tournament-detail",pk=obj.pk)
+    if resource.get("detail")=="arena_class":
+        return redirect("arena-class-detail",pk=obj.pk)
     if resource.get("detail")=="medical_record":
         content=read_record(entry=obj,user=request.user,ip=request.META.get("REMOTE_ADDR",""))
         return render(request,"portal/medical_record.html",{
