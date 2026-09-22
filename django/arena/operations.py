@@ -171,7 +171,7 @@ def _advance_winner(match,winner):
 
 @transaction.atomic
 def record_match_result(*,match,home_score,away_score):
-    match=TournamentMatch.objects.select_for_update().select_related("home_team","away_team","tournament").get(pk=match.pk)
+    match=TournamentMatch.objects.select_for_update().select_related("tournament").get(pk=match.pk)
     if not match.home_team_id or not match.away_team_id:
         raise ValidationError("Partida ainda não possui as duas equipes.")
     home_score=int(home_score); away_score=int(away_score)
