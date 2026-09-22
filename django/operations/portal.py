@@ -1,3 +1,4 @@
+from accounts.permissions import require_any_capability
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -25,6 +26,7 @@ class MessageForm(forms.ModelForm):
 
 @login_required
 def ticket_detail(request,pk):
+    require_any_capability(request.user,"support.manage")
     tenant=_tenant(request)
     ticket=get_object_or_404(
         SupportTicket.objects.select_related("assigned_to","user").prefetch_related("messages__user"),
