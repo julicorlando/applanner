@@ -27,6 +27,7 @@ x-app-environment: &app-environment
   META_CONVERSION_ACCESS_TOKEN: ${META_CONVERSION_ACCESS_TOKEN:-}
   META_GRAPH_BASE_URL: ${META_GRAPH_BASE_URL:-}
   SENTRY_DSN: ${SENTRY_DSN:-}
+  BACKUP_DIR: ${BACKUP_DIR:-/app/media/backups}
 
 services:
   web:

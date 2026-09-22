@@ -50,3 +50,11 @@ def platform_health_check():
     heartbeat.details="; ".join(errors)[:500]
     heartbeat.save(update_fields=["finished_at","duration_ms","status","details"])
     return heartbeat.status
+
+
+@shared_task
+def scheduled_database_backup():
+    from .backup import create_database_backup,expire_old_backups
+    backup=create_database_backup()
+    expire_old_backups()
+    return backup.pk

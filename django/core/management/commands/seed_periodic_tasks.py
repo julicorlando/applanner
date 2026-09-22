@@ -19,6 +19,7 @@ TASKS=[
     ("Health check operacional","operations.tasks.platform_health_check",5,"minutes"),
     ("Processar conversões Meta","growth.tasks.process_meta_conversion_queue",1,"minutes"),
     ("Atualizar métricas Arena","arena.tasks.refresh_arena_customer_metrics",12,"hours"),
+    ("Backup diário do PostgreSQL","operations.tasks.scheduled_database_backup",24,"hours"),
 ]
 
 
