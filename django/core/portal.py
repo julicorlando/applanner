@@ -188,6 +188,7 @@ PORTAL_MODULES = {
                 "fields": ["appointment","vehicle","bay","assigned_professional","status","odometer_in","fuel_level","keys_received","expected_ready_at","internal_notes","public_notes"],
                 "columns": ["appointment","vehicle","bay","assigned_professional","status","expected_ready_at"],
                 "order": "-created_at",
+                "detail": "auto_job",
             },
             "orcamentos": {
                 "model": "auto.Estimate",
@@ -631,6 +632,8 @@ def resource_detail(request,module_slug,resource_slug,pk):
     obj=get_object_or_404(_tenant_queryset(model,tenant),pk=pk)
     if resource.get("detail")=="barber_command":
         return redirect("barber-command-detail",pk=obj.pk)
+    if resource.get("detail")=="auto_job":
+        return redirect("auto-job-detail",pk=obj.pk)
     if resource.get("detail")=="medical_record":
         content=read_record(entry=obj,user=request.user,ip=request.META.get("REMOTE_ADDR",""))
         return render(request,"portal/medical_record.html",{

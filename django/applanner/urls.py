@@ -18,6 +18,7 @@ urlpatterns = [
     path("account/", include("accounts.urls")),
     path("app/", include("core.portal_urls")),
     path("app/barbearia/", include("barber.urls")),
+    path("app/auto/", include("auto.urls")),
     path("commercial/", include("commercial.urls")),
     path("master/", include("core.master_urls")),
     path("directory/", public_directory, name="public-directory"),

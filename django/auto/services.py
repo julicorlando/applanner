@@ -150,3 +150,77 @@ def close_command(*,command,user):
         profile.warranty_until=timezone.localdate()+timedelta(days=technical.warranty_days)
     profile.save()
     return command
+
+
+@transaction.atomic
+def open_command(*,job,user):
+    job=Job.objects.select_for_update().select_related("appointment__customer","vehicle").get(pk=job.pk)
+    existing=AutoCommand.objects.filter(job=job).first()
+    if existing:
+        return existing
+    return AutoCommand.objects.create(
+        tenant=job.tenant,job=job,appointment=job.appointment,
+        customer=job.appointment.customer,vehicle=job.vehicle,
+        opened_by=user,opened_at=timezone.now(),
+    )
+
+
+@transaction.atomic
+def add_service_item(*,command,service,professional=None,quantity=1,unit_price=None,discount=0):
+    command=AutoCommand.objects.select_for_update().get(pk=command.pk)
+    if command.status!=AutoCommand.Status.OPEN:
+        raise ValidationError("Comanda não está aberta.")
+    if service.tenant_id!=command.tenant_id:
+        raise ValidationError("Serviço pertence a outro tenant.")
+    quantity=Decimal(str(quantity))
+    price=Decimal(str(service.price if unit_price in (None,"") else unit_price))
+    discount=Decimal(str(discount or 0))
+    total=(quantity*price-discount).quantize(Decimal("0.01"))
+    if quantity<=0 or total<0:
+        raise ValidationError("Valores inválidos.")
+    item=AutoCommandItem.objects.create(
+        command=command,tenant=command.tenant,item_type=AutoCommandItem.Type.SERVICE,
+        service=service,professional=professional,description=service.name,
+        quantity=quantity,unit_price=price,discount_amount=discount,total_amount=total,
+        is_primary_service=not command.items.filter(item_type=AutoCommandItem.Type.SERVICE).exists(),
+    )
+    recalculate_command(command)
+    return item
+
+
+@transaction.atomic
+def add_product_item(*,command,product,professional=None,quantity=1,unit_price=None,discount=0):
+    command=AutoCommand.objects.select_for_update().get(pk=command.pk)
+    if command.status!=AutoCommand.Status.OPEN:
+        raise ValidationError("Comanda não está aberta.")
+    if product.tenant_id!=command.tenant_id:
+        raise ValidationError("Produto pertence a outro tenant.")
+    quantity=Decimal(str(quantity))
+    price=Decimal(str(product.sale_price if unit_price in (None,"") else unit_price))
+    discount=Decimal(str(discount or 0))
+    total=(quantity*price-discount).quantize(Decimal("0.01"))
+    if quantity<=0 or total<0:
+        raise ValidationError("Valores inválidos.")
+    item=AutoCommandItem.objects.create(
+        command=command,tenant=command.tenant,item_type=AutoCommandItem.Type.PRODUCT,
+        product=product,professional=professional,description=product.name,
+        quantity=quantity,unit_price=price,discount_amount=discount,total_amount=total,
+        cost_snapshot=product.cost_price,
+    )
+    recalculate_command(command)
+    return item
+
+
+@transaction.atomic
+def register_payment(*,command,user,payment_method,amount,provider="",provider_reference=""):
+    command=AutoCommand.objects.select_for_update().get(pk=command.pk)
+    if command.status!=AutoCommand.Status.OPEN:
+        raise ValidationError("Comanda não está aberta.")
+    amount=Decimal(str(amount))
+    if amount<=0:
+        raise ValidationError("Valor inválido.")
+    return AutoCommandPayment.objects.create(
+        command=command,tenant=command.tenant,payment_method=payment_method[:20],
+        amount=amount,provider=provider[:50],provider_reference=provider_reference[:190],
+        received_by=user,received_at=timezone.now(),
+    )
