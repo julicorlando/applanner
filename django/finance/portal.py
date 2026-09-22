@@ -6,6 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied,ValidationError
 from django.shortcuts import get_object_or_404,redirect,render
 
+from accounts.permissions import require_any_capability
+
 from scheduling.models import Customer,Professional
 from tenants.models import Tenant,Unit
 from .models import CashSession,Product,ProfessionalCommission,Sale
@@ -51,6 +53,7 @@ class CashOpenForm(forms.Form):
 
 @login_required
 def pos(request):
+    require_any_capability(request.user,"finance.manage")
     tenant=_tenant(request)
     form=SaleForm(request.POST or None,tenant=tenant)
     if request.method=="POST" and form.is_valid():
@@ -75,6 +78,7 @@ def pos(request):
 
 @login_required
 def sale_cancel(request,pk):
+    require_any_capability(request.user,"finance.manage")
     if request.method!="POST": raise PermissionDenied
     tenant=_tenant(request)
     sale=get_object_or_404(Sale,pk=pk,tenant=tenant)
@@ -87,6 +91,7 @@ def sale_cancel(request,pk):
 
 @login_required
 def cash(request):
+    require_any_capability(request.user,"finance.manage")
     tenant=_tenant(request)
     open_session=CashSession.objects.filter(tenant=tenant,status=CashSession.Status.OPEN).select_related("unit","opened_by").first()
     form=CashOpenForm(request.POST or None,tenant=tenant)
@@ -109,6 +114,7 @@ def cash(request):
 
 @login_required
 def commissions(request):
+    require_any_capability(request.user,"finance.manage")
     tenant=_tenant(request)
     if request.method=="POST":
         row=get_object_or_404(ProfessionalCommission,pk=request.POST.get("commission"),tenant=tenant)
