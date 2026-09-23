@@ -67,6 +67,7 @@ class TrustedDevice(models.Model):
     session_version=models.PositiveIntegerField()
     expires_at=models.DateTimeField(db_index=True)
     last_used_at=models.DateTimeField(null=True,blank=True)
+    revoked_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -119,3 +120,57 @@ class LoginHistory(models.Model):
             models.Index(fields=["user","created_at"]),
             models.Index(fields=["email","created_at"]),
         ]
+
+
+class LoginAudit(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,related_name="login_audit")
+    user=models.ForeignKey(User,null=True,blank=True,on_delete=models.SET_NULL,related_name="login_audit")
+    email_attempted=models.EmailField()
+    event_type=models.CharField(max_length=40)
+    result=models.CharField(max_length=20)
+    ip_address=models.GenericIPAddressField(null=True,blank=True)
+    user_agent=models.CharField(max_length=500,blank=True)
+    device_info=models.CharField(max_length=255,blank=True)
+    failure_reason_code=models.CharField(max_length=60,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["created_at","result"],name="accounts_login_audit_idx"),
+            models.Index(fields=["email_attempted","created_at"],name="accounts_login_email_idx"),
+        ]
+
+
+class SecurityEvent(models.Model):
+    class Severity(models.TextChoices):
+        LOW="low","Baixa"
+        MEDIUM="medium","Média"
+        HIGH="high","Alta"
+        CRITICAL="critical","Crítica"
+
+    tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,related_name="security_events")
+    user=models.ForeignKey(User,null=True,blank=True,on_delete=models.SET_NULL,related_name="security_events")
+    event_type=models.CharField(max_length=80,db_index=True)
+    severity=models.CharField(max_length=12,choices=Severity.choices)
+    ip_address=models.GenericIPAddressField(null=True,blank=True)
+    user_agent=models.CharField(max_length=500,blank=True)
+    metadata=models.JSONField(default=dict,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","created_at"],name="accounts_security_tenant_idx")]
+
+
+class UserBlock(models.Model):
+    user=models.ForeignKey(User,on_delete=models.CASCADE,related_name="blocks")
+    tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,related_name="user_blocks")
+    reason_code=models.CharField(max_length=40)
+    reason_text=models.CharField(max_length=500,blank=True)
+    blocked_by=models.ForeignKey(User,null=True,blank=True,on_delete=models.SET_NULL,related_name="user_blocks_created")
+    blocked_at=models.DateTimeField()
+    expires_at=models.DateTimeField(null=True,blank=True)
+    unblocked_by=models.ForeignKey(User,null=True,blank=True,on_delete=models.SET_NULL,related_name="user_blocks_removed")
+    unblocked_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["user","unblocked_at"],name="accounts_user_block_idx")]
