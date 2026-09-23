@@ -9,6 +9,7 @@ class CommercialProfile(TimeStampedModel):
     commission_percent=models.DecimalField(max_digits=5,decimal_places=2,default=0)
     max_discount_percent=models.DecimalField(max_digits=5,decimal_places=2,default=0)
     active=models.BooleanField(default=True)
+    support_enabled=models.BooleanField(default=False)
 
 
 class Lead(TimeStampedModel):
