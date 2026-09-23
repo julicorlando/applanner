@@ -30,6 +30,8 @@ class User(AbstractUser):
     must_change_password=models.BooleanField(default=False)
     locale=models.CharField(max_length=10,default="pt-br")
     session_version=models.PositiveIntegerField(default=1)
+    email_verified_at=models.DateTimeField(null=True,blank=True)
+    password_changed_at=models.DateTimeField(null=True,blank=True)
     two_factor_secret_encrypted=models.TextField(blank=True)
     two_factor_enabled_at=models.DateTimeField(null=True,blank=True)
     two_factor_last_step=models.BigIntegerField(default=0)
@@ -174,3 +176,25 @@ class UserBlock(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["user","unblocked_at"],name="accounts_user_block_idx")]
+
+
+class EmailVerificationToken(models.Model):
+    user=models.ForeignKey(User,on_delete=models.CASCADE,related_name="email_verification_tokens")
+    token_hash=models.CharField(max_length=64,unique=True)
+    expires_at=models.DateTimeField(db_index=True)
+    used_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["user","expires_at"])]
+
+
+class PasswordResetToken(models.Model):
+    user=models.ForeignKey(User,on_delete=models.CASCADE,related_name="password_reset_tokens")
+    token_hash=models.CharField(max_length=64,unique=True)
+    expires_at=models.DateTimeField(db_index=True)
+    used_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["user","expires_at"])]
