@@ -55,3 +55,13 @@ def expire_packages_and_waitlist():
         preferred_date__lt=timezone.localdate(),
     ).update(status=WaitlistEntry.Status.EXPIRED,updated_at=now)
     return {"packages":expired,"waitlist":wait}
+
+
+@shared_task
+def refresh_behavior_intelligence():
+    from tenants.models import Tenant
+    from .behavior import refresh_behavior_for_tenant
+    total=0
+    for tenant in Tenant.objects.filter(status__in=["trial","active"]):
+        total+=refresh_behavior_for_tenant(tenant)
+    return total
