@@ -147,6 +147,7 @@ class Appointment(TimeStampedModel):
     class Status(models.TextChoices):
         PENDING="pending","Pendente"
         CONFIRMED="confirmed","Confirmado"
+        WAITING="waiting","Aguardando"
         IN_PROGRESS="in_progress","Em atendimento"
         COMPLETED="completed","Concluído"
         CANCELLED="cancelled","Cancelado"
