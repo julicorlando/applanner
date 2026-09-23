@@ -47,3 +47,68 @@ class AvailabilityServiceTests(TestCase):
             self.tenant,self.service.pk,self.professional.pk,monday,public_rules=False
         )
         self.assertFalse(any(slot["label"]=="08:00" for slot in slots))
+
+
+class PublicBookingFlowTests(TestCase):
+    def setUp(self):
+        from django.utils import timezone
+        self.tenant=Tenant.objects.create(
+            name="Public Demo",slug="public-demo",public_slug="public-demo",
+            public_enabled=True,public_booking_enabled=True,status=Tenant.Status.ACTIVE,
+        )
+        self.service=Service.objects.create(
+            tenant=self.tenant,name="Atendimento",duration_minutes=30,price=60
+        )
+        self.professionals=[]
+        tomorrow=timezone.localdate()+__import__("datetime").timedelta(days=1)
+        self.day=tomorrow
+        for idx in range(2):
+            professional=Professional.objects.create(
+                tenant=self.tenant,name=f"Profissional {idx+1}",public_slug=f"prof-{idx+1}"
+            )
+            professional.services.add(self.service)
+            ProfessionalAvailability.objects.create(
+                tenant=self.tenant,professional=professional,weekday=tomorrow.isoweekday(),
+                start_time=time(8,0),end_time=time(18,0),
+            )
+            self.professionals.append(professional)
+
+    def test_availability_can_choose_any_professional(self):
+        response=self.client.get(
+            f"/api/public/{self.tenant.public_slug}/availability/",
+            {"service_id":self.service.pk,"date":self.day.isoformat()},
+        )
+        self.assertEqual(response.status_code,200)
+        payload=response.json()
+        self.assertTrue(payload["auto_professional"])
+        self.assertTrue(payload["slots"])
+        self.assertIn("professional_id",payload["slots"][0])
+
+    def test_booking_without_professional_auto_assigns_and_returns_management_url(self):
+        availability=self.client.get(
+            f"/api/public/{self.tenant.public_slug}/availability/",
+            {"service_id":self.service.pk,"date":self.day.isoformat()},
+        ).json()
+        start=availability["slots"][0]["value"]
+        response=self.client.post(
+            f"/api/public/{self.tenant.public_slug}/book/",
+            {
+                "service_id":self.service.pk,"starts_at":start,
+                "name":"Cliente Teste","phone":"81999999999",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code,201)
+        payload=response.json()
+        self.assertTrue(payload["professional"]["id"])
+        self.assertIn("/agendamento/",payload["manage_url"])
+        appointment=Appointment.objects.get(pk=payload["id"])
+        self.assertIsNotNone(appointment.professional_id)
+
+    def test_professional_public_page_exists(self):
+        response=self.client.get(
+            f"/p/{self.tenant.public_slug}/profissional/{self.professionals[0].public_slug}/"
+        )
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,self.professionals[0].name)
+        self.assertContains(response,"Agendamento online")
