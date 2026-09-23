@@ -72,6 +72,8 @@ class Subscription(TimeStampedModel):
     plan=models.ForeignKey(Plan,on_delete=models.PROTECT)
     billing_cycle=models.CharField(max_length=16,choices=BillingCycle.choices,default=BillingCycle.MONTHLY)
     contracted_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    base_contracted_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    addon_contracted_price=models.DecimalField(max_digits=10,decimal_places=2,default=0)
     status=models.CharField(max_length=20,choices=Status.choices,default=Status.TRIAL,db_index=True)
     started_at=models.DateTimeField()
     trial_started_at=models.DateTimeField(null=True,blank=True)
@@ -100,6 +102,8 @@ class CheckoutSession(TimeStampedModel):
     subtotal=models.DecimalField(max_digits=10,decimal_places=2)
     discount=models.DecimalField(max_digits=10,decimal_places=2,default=0)
     total=models.DecimalField(max_digits=10,decimal_places=2)
+    base_total=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    addon_total=models.DecimalField(max_digits=10,decimal_places=2,default=0)
     coupon_code=models.CharField(max_length=60,blank=True)
     status=models.CharField(max_length=24,choices=Status.choices,default=Status.STARTED,db_index=True)
     idempotency_key=models.CharField(max_length=64,unique=True)
@@ -223,11 +227,16 @@ class TenantModuleAddon(TimeStampedModel):
         PAST_DUE="past_due","Em atraso"
         CANCELLED="cancelled","Cancelado"
 
+    class BillingMode(models.TextChoices):
+        SEPARATE="separate","Separada"
+        MERGED="merged_subscription","Incorporada à assinatura"
+
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="module_addons")
     module=models.ForeignKey(Module,on_delete=models.PROTECT,related_name="addons")
     module_request=models.ForeignKey(ModuleRequest,null=True,blank=True,on_delete=models.SET_NULL,related_name="addons")
     monthly_price=models.DecimalField(max_digits=10,decimal_places=2)
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING,db_index=True)
+    billing_mode=models.CharField(max_length=24,choices=BillingMode.choices,default=BillingMode.SEPARATE)
     provider=models.CharField(max_length=40,blank=True)
     provider_reference=models.CharField(max_length=190,blank=True)
     started_at=models.DateTimeField(null=True,blank=True)
@@ -409,3 +418,105 @@ class TenantPaymentWebhookEvent(models.Model):
             models.UniqueConstraint(fields=["connection","event_id"],name="uq_tenant_webhook_event"),
         ]
         indexes=[models.Index(fields=["tenant","received_at"],name="billing_tenant_webhook_idx")]
+
+
+class SubscriptionExemption(TimeStampedModel):
+    class Type(models.TextChoices):
+        TEMPORARY="temporary","Temporária"
+        PERMANENT="permanent","Permanente"
+    class Status(models.TextChoices):
+        ACTIVE="active","Ativa"
+        REVOKED="revoked","Revogada"
+        EXPIRED="expired","Expirada"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="subscription_exemptions")
+    subscription=models.ForeignKey(Subscription,null=True,blank=True,on_delete=models.SET_NULL,related_name="exemptions")
+    exemption_type=models.CharField(max_length=12,choices=Type.choices,default=Type.TEMPORARY)
+    starts_at=models.DateTimeField()
+    ends_at=models.DateTimeField(null=True,blank=True)
+    reason=models.CharField(max_length=500)
+    status=models.CharField(max_length=12,choices=Status.choices,default=Status.ACTIVE,db_index=True)
+    granted_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="subscription_exemptions_granted")
+    revoked_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="subscription_exemptions_revoked")
+    revoked_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","status","starts_at","ends_at"],name="billing_exempt_tenant_idx")]
+
+
+class SubscriptionModuleAdjustment(TimeStampedModel):
+    class Action(models.TextChoices):
+        ADD="add","Adicionar"
+        REMOVE="remove","Remover"
+        CONSOLIDATE="consolidate","Consolidar"
+    class Status(models.TextChoices):
+        PENDING="pending","Pendente"
+        APPLIED="applied","Aplicado"
+        FAILED="failed","Falhou"
+        SYNC_REQUIRED="sync_required","Sincronização necessária"
+
+    public_id=models.CharField(max_length=32,unique=True)
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="subscription_module_adjustments")
+    subscription=models.ForeignKey(Subscription,on_delete=models.CASCADE,related_name="module_adjustments")
+    module_request=models.ForeignKey(ModuleRequest,null=True,blank=True,on_delete=models.SET_NULL,related_name="adjustments")
+    module_addon=models.ForeignKey(TenantModuleAddon,null=True,blank=True,on_delete=models.SET_NULL,related_name="adjustments")
+    action=models.CharField(max_length=16,choices=Action.choices)
+    previous_amount=models.DecimalField(max_digits=10,decimal_places=2)
+    new_amount=models.DecimalField(max_digits=10,decimal_places=2)
+    addon_monthly_price=models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    provider=models.CharField(max_length=40,blank=True)
+    provider_reference=models.CharField(max_length=190,blank=True)
+    idempotency_key=models.CharField(max_length=64,unique=True)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING,db_index=True)
+    error_code=models.CharField(max_length=120,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="subscription_module_adjustments_created")
+    applied_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["tenant","status","created_at"],name="billing_modadj_tenant_idx"),
+            models.Index(fields=["subscription","created_at"],name="billing_modadj_sub_idx"),
+        ]
+
+
+class SubscriptionNoticeLog(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="subscription_notices")
+    subscription=models.ForeignKey(Subscription,on_delete=models.CASCADE,related_name="notice_logs")
+    notice_key=models.CharField(max_length=40)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["subscription","notice_key"],name="uq_subscription_notice")]
+        indexes=[models.Index(fields=["tenant","created_at"],name="billing_notice_tenant_idx")]
+
+
+class ProviderEvent(models.Model):
+    provider=models.CharField(max_length=40)
+    event_id=models.CharField(max_length=190)
+    event_type=models.CharField(max_length=100,blank=True)
+    payload_hash=models.CharField(max_length=64)
+    status=models.CharField(max_length=16,default="received",db_index=True)
+    error_message=models.CharField(max_length=500,blank=True)
+    received_at=models.DateTimeField()
+    processed_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["provider","event_id"],name="uq_provider_event")]
+        indexes=[models.Index(fields=["provider","status","received_at"],name="billing_provider_evt_idx")]
+
+
+class PixCharge(TimeStampedModel):
+    public_id=models.CharField(max_length=32,unique=True)
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="pix_charges")
+    subscription=models.ForeignKey(Subscription,on_delete=models.CASCADE,related_name="pix_charges")
+    checkout_session=models.ForeignKey(CheckoutSession,on_delete=models.CASCADE,related_name="pix_charges")
+    payment=models.ForeignKey(Payment,on_delete=models.CASCADE,related_name="pix_charges")
+    provider_order_id=models.CharField(max_length=190)
+    provider_payment_id=models.CharField(max_length=190,blank=True)
+    amount=models.DecimalField(max_digits=10,decimal_places=2)
+    qr_code=models.TextField(blank=True)
+    qr_code_base64=models.TextField(blank=True)
+    ticket_url=models.URLField(max_length=1000,blank=True)
+    status=models.CharField(max_length=16,default="pending",db_index=True)
+    expires_at=models.DateTimeField()
+    paid_at=models.DateTimeField(null=True,blank=True)
