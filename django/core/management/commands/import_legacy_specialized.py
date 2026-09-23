@@ -99,7 +99,7 @@ SPECS=[
     {"table":"customer_vehicles","model":"auto.Vehicle","rename":{"brand":"make"}},
     {"table":"auto_settings","model":"auto.AutoSettings","keys":["tenant_id"]},
     {"table":"auto_vehicle_profiles","model":"auto.VehicleProfile","keys":["vehicle_id"]},
-    {"table":"auto_service_bays","model":"auto.ServiceBay","rename":{"bay_type":"type"}},
+    {"table":"auto_service_bays","model":"auto.ServiceBay"},
     {"table":"auto_bay_hours","model":"auto.BayHours"},
     {"table":"auto_bay_services","model":"auto.BayService","keys":["bay_id","service_id"]},
     {"table":"auto_jobs","model":"auto.Job"},
