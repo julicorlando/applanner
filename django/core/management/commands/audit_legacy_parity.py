@@ -1,55 +1,175 @@
-import hashlib, os
+import hashlib
+import os
+
 import pymysql
 from django.apps import apps
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand,CommandError
+
 from core.management.commands.import_legacy_specialized import SPECS
 
-CORE=[("tenants","tenants.Tenant"),("users","accounts.User"),("customers","scheduling.Customer"),
-("professionals","scheduling.Professional"),("services","scheduling.Service"),
-("appointments","scheduling.Appointment"),("modules","billing.Module"),("plans","billing.Plan"),
-("subscriptions","billing.Subscription"),("payments","billing.Payment")]
+
+DIRECT=[
+    ("tenants","tenants.Tenant"),
+    ("units","tenants.Unit"),
+    ("users","accounts.User"),
+    ("roles","accounts.PlatformRole"),
+    ("permissions","accounts.Capability"),
+    ("role_permissions","accounts.RoleCapability"),
+    ("user_roles","accounts.UserRole"),
+    ("customers","scheduling.Customer"),
+    ("professionals","scheduling.Professional"),
+    ("services","scheduling.Service"),
+    ("appointments","scheduling.Appointment"),
+    ("modules","billing.Module"),
+    ("plans","billing.Plan"),
+    ("plan_modules","billing.PlanModule"),
+    ("tenant_modules","billing.TenantModule"),
+    ("subscriptions","billing.Subscription"),
+    ("payments","billing.Payment"),
+    ("customer_package_usage","engagement.CustomerPackageUsage"),
+    ("settings","operations.PlatformSetting"),
+    ("payment_gateways","billing.PaymentGateway"),
+    ("tenant_payment_connections","billing.TenantPaymentConnection"),
+    ("platform_bank_accounts","finance.PlatformBankAccount"),
+    ("medical_record_entries","healthcare.MedicalRecordEntry"),
+]
+
+TRANSFORMED={
+    "sports_price_rule_extensions":"campos incorporados em arena.PriceRule",
+    "terms_acceptances":"normalizado em legal.LegalAcceptance",
+}
+
+IGNORED={
+    "migrations":"histórico de migrations do PHP; substituído pelas migrations Django",
+    "jobs":"fila de execução do runtime PHP; Celery assume essa função",
+    "jobs_failed_archive":"histórico técnico da fila PHP; não é dado operacional",
+    "email_verification_tokens":"token efêmero de autenticação; não deve atravessar o cutover",
+    "password_reset_tokens":"token efêmero de autenticação; não deve atravessar o cutover",
+}
+
 
 class Command(BaseCommand):
-    help="Compara contagens e IDs entre MySQL legado e PostgreSQL."
+    help="Compara o MySQL legado com PostgreSQL e valida cobertura de todas as tabelas."
+
     def add_arguments(self,parser):
         parser.add_argument("--strict",action="store_true")
         parser.add_argument("--only",default="")
+
     def handle(self,*args,**options):
-        cfg={"host":os.getenv("LEGACY_MYSQL_HOST"),"port":int(os.getenv("LEGACY_MYSQL_PORT","3306")),
-             "database":os.getenv("LEGACY_MYSQL_DATABASE"),"user":os.getenv("LEGACY_MYSQL_USER"),
-             "password":os.getenv("LEGACY_MYSQL_PASSWORD"),"charset":"utf8mb4","cursorclass":pymysql.cursors.DictCursor}
-        missing=[k for k in ("host","database","user","password") if not cfg[k]]
-        if missing: raise CommandError("Variáveis legadas ausentes: "+", ".join(missing))
+        cfg={
+            "host":os.getenv("LEGACY_MYSQL_HOST"),
+            "port":int(os.getenv("LEGACY_MYSQL_PORT","3306")),
+            "database":os.getenv("LEGACY_MYSQL_DATABASE"),
+            "user":os.getenv("LEGACY_MYSQL_USER"),
+            "password":os.getenv("LEGACY_MYSQL_PASSWORD"),
+            "charset":"utf8mb4",
+            "cursorclass":pymysql.cursors.DictCursor,
+        }
+        missing=[key for key in ("host","database","user","password") if not cfg[key]]
+        if missing:
+            raise CommandError("Variáveis legadas ausentes: "+", ".join(missing))
+
         selected={x.strip() for x in options["only"].split(",") if x.strip()}
-        specs=CORE+[(s["table"],s["model"]) for s in SPECS]
-        seen=set(); failures=[]; conn=pymysql.connect(**cfg)
+        spec_pairs=[(spec["table"],spec["model"]) for spec in SPECS]
+        pairs=DIRECT+spec_pairs
+        seen=set()
+        failures=[]
+        conn=pymysql.connect(**cfg)
         try:
-            for table,label in specs:
-                if table in seen or (selected and table not in selected): continue
+            legacy_tables=self._legacy_tables(conn,cfg["database"])
+            covered={table for table,_ in pairs}|set(TRANSFORMED)|set(IGNORED)
+            uncovered=sorted(legacy_tables-covered)
+            if uncovered:
+                failures.append("cobertura:"+",".join(uncovered))
+                self.stderr.write(self.style.ERROR(
+                    "Tabelas sem estratégia de migração: "+", ".join(uncovered)
+                ))
+
+            for table,label in pairs:
+                if table in seen or (selected and table not in selected):
+                    continue
                 seen.add(table)
-                with conn.cursor() as cur:
-                    cur.execute("SELECT COUNT(*) n FROM information_schema.TABLES WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s",(cfg["database"],table))
-                    if not cur.fetchone()["n"]:
-                        self.stdout.write(f"{table}: ausente no legado; ignorando"); continue
-                    cur.execute(f"SELECT COUNT(*) n FROM `{table}`"); legacy=int(cur.fetchone()["n"])
-                    cur.execute("SELECT COUNT(*) n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s AND COLUMN_NAME='id'",(cfg["database"],table))
-                    has_id=bool(cur.fetchone()["n"]); legacy_hash=None
-                    if has_id:
-                        cur.execute(f"SELECT id FROM `{table}` ORDER BY id")
-                        legacy_hash=self._hash([r["id"] for r in cur.fetchall()])
-                model=apps.get_model(label); target=model.objects.count(); target_hash=None
-                if model._meta.pk.get_internal_type() in {"AutoField","BigAutoField","IntegerField","BigIntegerField","PositiveIntegerField","PositiveBigIntegerField","SmallIntegerField"}:
-                    target_hash=self._hash(model.objects.order_by("pk").values_list("pk",flat=True))
-                ok=legacy==target and (legacy_hash is None or target_hash is None or legacy_hash==target_hash)
-                self.stdout.write(f"{table}: legado={legacy} django={target} {'OK' if ok else 'DIVERGENTE'}")
-                if not ok: failures.append(table)
-        finally: conn.close()
+                if table not in legacy_tables:
+                    self.stdout.write(f"{table}: ausente no legado; ignorando")
+                    continue
+                legacy_count,legacy_hash=self._legacy_count_hash(conn,table,cfg["database"])
+                model=apps.get_model(label)
+                target_count=model.objects.count()
+                target_hash=None
+                if self._integer_pk(model):
+                    target_hash=self._hash(
+                        model.objects.order_by("pk").values_list("pk",flat=True)
+                    )
+                ids_match=legacy_hash is None or target_hash is None or legacy_hash==target_hash
+                ok=legacy_count==target_count and ids_match
+                extra=""
+                if legacy_hash is not None and target_hash is not None:
+                    extra=f" ids={'OK' if ids_match else 'DIVERGENTES'}"
+                self.stdout.write(
+                    f"{table}: legado={legacy_count} django={target_count} "
+                    f"{'OK' if ok else 'DIVERGENTE'}{extra}"
+                )
+                if not ok:
+                    failures.append(table)
+
+            for table,note in TRANSFORMED.items():
+                if table in legacy_tables and (not selected or table in selected):
+                    count=self._legacy_count(conn,table)
+                    self.stdout.write(
+                        self.style.WARNING(f"{table}: {count} registros · TRANSFORMADO · {note}")
+                    )
+            for table,note in IGNORED.items():
+                if table in legacy_tables and (not selected or table in selected):
+                    count=self._legacy_count(conn,table)
+                    self.stdout.write(f"{table}: {count} registros · IGNORADO INTENCIONALMENTE · {note}")
+        finally:
+            conn.close()
+
         if failures:
-            msg="Divergências: "+", ".join(failures)
-            if options["strict"]: raise CommandError(msg)
-            self.stderr.write(self.style.WARNING(msg))
-        else: self.stdout.write(self.style.SUCCESS("Paridade de contagens/IDs aprovada."))
+            message="Divergências encontradas: "+", ".join(failures)
+            if options["strict"]:
+                raise CommandError(message)
+            self.stderr.write(self.style.WARNING(message))
+        else:
+            self.stdout.write(self.style.SUCCESS(
+                "Paridade aprovada: cobertura integral das tabelas de negócio e nenhuma divergência direta."
+            ))
+
+    def _legacy_tables(self,conn,database):
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=%s",
+                (database,),
+            )
+            return {row["TABLE_NAME"] for row in cur.fetchall()}
+
+    def _legacy_count(self,conn,table):
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) n FROM `{table}`")
+            return int(cur.fetchone()["n"])
+
+    def _legacy_count_hash(self,conn,table,database):
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) n FROM `{table}`")
+            count=int(cur.fetchone()["n"])
+            cur.execute(
+                "SELECT COUNT(*) n FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s AND COLUMN_NAME='id'",
+                (database,table),
+            )
+            if not cur.fetchone()["n"]:
+                return count,None
+            cur.execute(f"SELECT id FROM `{table}` ORDER BY id")
+            return count,self._hash([row["id"] for row in cur.fetchall()])
+
+    def _integer_pk(self,model):
+        return model._meta.pk.get_internal_type() in {
+            "AutoField","BigAutoField","IntegerField","BigIntegerField",
+            "PositiveIntegerField","PositiveBigIntegerField","SmallIntegerField",
+        }
+
     def _hash(self,values):
-        h=hashlib.sha256()
-        for value in values: h.update((str(value)+"\n").encode())
-        return h.hexdigest()
+        digest=hashlib.sha256()
+        for value in values:
+            digest.update((str(value)+"\n").encode())
+        return digest.hexdigest()
