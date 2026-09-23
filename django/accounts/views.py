@@ -5,9 +5,11 @@ from urllib.parse import quote
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.db.models import Q
@@ -305,3 +307,37 @@ def verify_email(request,token):
     row.user.save(update_fields=["email_verified_at"])
     messages.success(request,"E-mail verificado com sucesso.")
     return redirect("accounts:login")
+
+
+@login_required
+@never_cache
+def change_password(request):
+    if request.method=="POST":
+        current=request.POST.get("current_password") or ""
+        password=request.POST.get("password") or ""
+        confirmation=request.POST.get("password_confirmation") or ""
+        if not request.user.check_password(current):
+            messages.error(request,"Senha atual inválida.")
+        elif password!=confirmation:
+            messages.error(request,"As novas senhas não conferem.")
+        else:
+            try:
+                validate_password(password,user=request.user)
+            except ValidationError as exc:
+                for item in exc.messages:
+                    messages.error(request,item)
+            else:
+                request.user.set_password(password)
+                request.user.password_changed_at=timezone.now()
+                request.user.must_change_password=False
+                request.user.session_version+=1
+                request.user.save(update_fields=[
+                    "password","password_changed_at","must_change_password","session_version",
+                ])
+                request.session["session_version"]=request.user.session_version
+                request.user.trusted_devices.all().delete()
+                messages.success(request,"Senha atualizada com sucesso.")
+                return redirect(settings.LOGIN_REDIRECT_URL)
+    return render(request,"accounts/change_password.html",{
+        "required":request.user.must_change_password,
+    })
