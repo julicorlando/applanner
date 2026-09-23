@@ -4,7 +4,7 @@ from django.urls import include, path
 from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_webhook
 from core.views import healthz, home, professional_public, tenant_public
 from communications.views import marketing_click, marketing_open, whatsapp_webhook
-from contenthub.views import blog_post, landing, public_directory
+from contenthub.views import blog_post, landing, public_directory, public_directory_page
 from scheduling.public_views import appointment_page
 from scheduling.public_api import (
     CustomerAppointmentAPIView,
@@ -31,6 +31,7 @@ urlpatterns = [
     path("commercial/", include("commercial.urls")),
     path("master/", include("core.master_urls")),
     path("directory/", public_directory, name="public-directory"),
+    path("estabelecimentos/", public_directory_page, name="public-directory-page"),
     path("p/<slug:slug>/profissional/<slug:professional_slug>/", professional_public, name="professional-public"),
     path("p/<slug:slug>/", tenant_public, name="tenant-public"),
     path("agendamento/<str:token>/", appointment_page, name="public-appointment-page"),
