@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Inteligência de retorno — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">RELACIONAMENTO</span><h1>Inteligência de retorno</h1><p>Previsões calculadas a partir do histórico real de atendimentos concluídos.</p></div>
+    <form method="post">{% csrf_token %}<button class="button primary">Recalcular agora</button></form>
+  </div>
+  <div class="metric-grid">
+    <article><span>Perfis analisados</span><strong>{{ total }}</strong></article>
+    <article><span>Retorno vencido</span><strong>{{ overdue }}</strong></article>
+    <article><span>Próximos 14 dias</span><strong>{{ upcoming }}</strong></article>
+    <article><span>Alta confiança</span><strong>{{ high_confidence }}</strong></article>
+  </div>
+  <div class="table-card">
+    <table class="portal-table">
+      <thead><tr><th>Cliente</th><th>Última visita</th><th>Próximo retorno</th><th>Intervalo médio</th><th>Visitas</th><th>Confiança</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr><td>{{ row.customer }}</td><td>{{ row.last_visit_at|date:"d/m/Y" }}</td><td>{{ row.next_expected_date|date:"d/m/Y"|default:"—" }}</td><td>{{ row.avg_interval_days|default:"—" }} dias</td><td>{{ row.visits_count }}</td><td>{{ row.confidence_score }}%</td></tr>
+      {% empty %}<tr><td colspan="6" class="empty-table">Conclua atendimentos para gerar previsões de retorno.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
