@@ -195,6 +195,8 @@ def operational_action(request,action,pk=None):
     from operations.backup import create_database_backup,verify_database_backup
     from operations.models import Backup,OperationalIncident
     from operations.services import run_homologation
+    from billing.models import ModuleRequest
+    from billing.module_services import activate_module_request,review_module_request
 
     try:
         if action=="backup-create":
@@ -209,6 +211,19 @@ def operational_action(request,action,pk=None):
             else:
                 messages.error(request,"Falha na verificação do backup.")
             return redirect("master-resource-list",slug="backups")
+        if action in {"module-request-approve","module-request-reject"}:
+            row=get_object_or_404(ModuleRequest,pk=pk)
+            approved=action=="module-request-approve"
+            review_module_request(
+                module_request=row,user=request.user,approved=approved,
+                note=request.POST.get("note",""),
+            )
+            if approved:
+                activate_module_request(module_request=row,user=request.user)
+                messages.success(request,"Módulo aprovado, ativado e incorporado à assinatura.")
+            else:
+                messages.success(request,"Solicitação de módulo rejeitada.")
+            return redirect("master-resource-list",slug="solicitacoes-modulos")
         if action=="homologation-run":
             run=run_homologation(user=request.user)
             messages.success(request,f"Homologação executada: {run.get_status_display()} · {run.score}.")
