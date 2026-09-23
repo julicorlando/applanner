@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import Capability, PlatformRole, RoleCapability, User, UserRole
+from accounts.models import Capability, EmailVerificationToken, PasswordResetToken, PlatformRole, RoleCapability, User, UserRole
 from accounts.security import encrypt_secret
 from billing.models import Module, Payment, Plan, PlanModule, Subscription, TenantModule
 from core.legacy_crypto import decrypt_php_aes_gcm
@@ -72,6 +72,7 @@ class Command(BaseCommand):
                     self._units(conn)
                     self._rbac(conn)
                     self._users(conn,skip_2fa=options["skip_2fa"])
+                    self._identity_tokens(conn)
                     self._customers(conn)
                     self._professionals(conn)
                     self._services(conn)
@@ -195,6 +196,7 @@ class Command(BaseCommand):
                 "onboarding_step":int(row.get("onboarding_step") or 1),
                 "status":row.get("status") or "trial",
                 "deleted_at":aware(row.get("deleted_at")),
+                "is_demo":bool(row.get("is_demo",0)),
             }
             obj,_=Tenant.objects.update_or_create(id=row["id"],defaults=defaults)
             self._restore_times(Tenant,obj.pk,row)
@@ -289,6 +291,9 @@ class Command(BaseCommand):
                     "is_staff":pick_role(row.get("role_slugs")) in {"master","support"},
                     "must_change_password":bool(row.get("must_change_password")),
                     "session_version":int(row.get("session_version") or 1),
+                    "locale":(row.get("locale") or "pt_BR").replace("_","-").lower(),
+                    "email_verified_at":aware(row.get("email_verified_at")),
+                    "password_changed_at":aware(row.get("password_changed_at")),
                     "two_factor_secret_encrypted":encrypted,
                     "two_factor_enabled_at":aware(row.get("two_factor_enabled_at")),
                     "two_factor_last_step":int(row.get("two_factor_last_step") or 0),
@@ -309,6 +314,28 @@ class Command(BaseCommand):
             ],ignore_conflicts=True)
 
         self.stdout.write(f"users: {len(rows)} | 2FA recriptografado: {migrated_2fa}")
+
+    def _identity_tokens(self,conn):
+        for table,Model in (
+            ("email_verification_tokens",EmailVerificationToken),
+            ("password_reset_tokens",PasswordResetToken),
+        ):
+            if table not in self.columns:
+                self.stdout.write(f"{table}: tabela legada ausente; ignorando.")
+                continue
+            rows=self._rows(conn,f"SELECT * FROM {table} ORDER BY id")
+            for row in rows:
+                obj,_=Model.objects.update_or_create(
+                    id=row["id"],
+                    defaults={
+                        "user_id":row["user_id"],
+                        "token_hash":row["token_hash"],
+                        "expires_at":aware(row["expires_at"]),
+                        "used_at":aware(row.get("used_at")),
+                    },
+                )
+                Model.objects.filter(pk=obj.pk).update(created_at=aware(row["created_at"]))
+            self.stdout.write(f"{table}: {len(rows)}")
 
     def _customers(self,conn):
         rows=self._rows(conn,"SELECT * FROM customers ORDER BY id")
