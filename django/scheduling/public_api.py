@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework import permissions, status, throttling
 from rest_framework.response import Response
@@ -11,7 +12,9 @@ from rest_framework.views import APIView
 
 from tenants.models import Tenant
 from .availability import AvailabilityService
-from .models import Appointment, Customer, Professional, Service
+from .models import (
+    Appointment, AppointmentRescheduleHistory, Customer, Professional, Service,
+)
 
 
 class PublicBookingThrottle(throttling.AnonRateThrottle):
@@ -27,6 +30,24 @@ def _tenant(slug):
     ).first()
 
 
+def _parse_start(tenant,value):
+    tz=ZoneInfo(tenant.timezone or "America/Recife")
+    start=datetime.fromisoformat(str(value))
+    if start.tzinfo is None:
+        return start.replace(tzinfo=tz)
+    return start.astimezone(tz)
+
+
+def _candidate_professionals(tenant,service):
+    service_linked=Professional.objects.filter(
+        tenant=tenant,active=True,services=service
+    )
+    unrestricted=Professional.objects.filter(
+        tenant=tenant,active=True,services__isnull=True
+    )
+    return (service_linked|unrestricted).distinct().order_by("name","pk")
+
+
 class PublicAvailabilityAPIView(APIView):
     permission_classes=[permissions.AllowAny]
     throttle_classes=[PublicBookingThrottle]
@@ -37,22 +58,61 @@ class PublicAvailabilityAPIView(APIView):
             return Response({"detail":"Página não encontrada."},status=status.HTTP_404_NOT_FOUND)
         try:
             service_id=int(request.query_params["service_id"])
-            professional_id=int(request.query_params["professional_id"])
             day=date.fromisoformat(request.query_params["date"])
         except (KeyError,TypeError,ValueError):
             return Response(
-                {"detail":"Informe service_id, professional_id e date=YYYY-MM-DD."},
+                {"detail":"Informe service_id e date=YYYY-MM-DD."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        service=Service.objects.filter(pk=service_id,tenant=tenant,active=True).first()
+        if not service:
+            return Response({"detail":"Serviço não encontrado."},status=status.HTTP_404_NOT_FOUND)
 
-        slots=AvailabilityService().slots(
-            tenant=tenant,
-            service_id=service_id,
-            professional_id=professional_id,
-            day=day,
-            public_rules=True,
-        )
-        return Response({"date":day.isoformat(),"slots":slots})
+        raw_professional=(request.query_params.get("professional_id") or "").strip()
+        availability=AvailabilityService()
+        if raw_professional:
+            try:
+                professional_id=int(raw_professional)
+            except ValueError:
+                return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
+            professional=Professional.objects.filter(
+                pk=professional_id,tenant=tenant,active=True
+            ).first()
+            if not professional or not availability.professional_offers(
+                tenant,professional.pk,service.pk
+            ):
+                return Response({"detail":"Profissional não oferece esse serviço."},status=status.HTTP_400_BAD_REQUEST)
+            slots=availability.slots(
+                tenant=tenant,service_id=service.pk,professional_id=professional.pk,
+                day=day,public_rules=True,
+            )
+            for slot in slots:
+                slot["professional_id"]=professional.pk
+                slot["professional_name"]=professional.name
+            return Response({
+                "date":day.isoformat(),"auto_professional":False,
+                "professional":{"id":professional.pk,"name":professional.name},
+                "slots":slots,
+            })
+
+        combined={}
+        for professional in _candidate_professionals(tenant,service):
+            for slot in availability.slots(
+                tenant=tenant,service_id=service.pk,professional_id=professional.pk,
+                day=day,public_rules=True,
+            ):
+                # One row per start time. The booking endpoint rechecks and chooses
+                # an available professional transactionally.
+                current=combined.get(slot["value"])
+                candidate={
+                    **slot,
+                    "professional_id":professional.pk,
+                    "professional_name":professional.name,
+                }
+                if current is None or professional.name.lower()<current["professional_name"].lower():
+                    combined[slot["value"]]=candidate
+        slots=sorted(combined.values(),key=lambda item:item["value"])
+        return Response({"date":day.isoformat(),"auto_professional":True,"slots":slots})
 
 
 class PublicBookingAPIView(APIView):
@@ -68,29 +128,45 @@ class PublicBookingAPIView(APIView):
         data=request.data
         try:
             service=Service.objects.get(pk=int(data["service_id"]),tenant=tenant,active=True)
-            professional=Professional.objects.select_for_update().get(
-                pk=int(data["professional_id"]),tenant=tenant,active=True
-            )
-            tz=ZoneInfo(tenant.timezone or "America/Recife")
-            starts_at=datetime.fromisoformat(str(data["starts_at"]))
-            if starts_at.tzinfo is None:
-                starts_at=starts_at.replace(tzinfo=tz)
-            else:
-                starts_at=starts_at.astimezone(tz)
-        except (KeyError,TypeError,ValueError,Service.DoesNotExist,Professional.DoesNotExist):
+            starts_at=_parse_start(tenant,data["starts_at"])
+        except (KeyError,TypeError,ValueError,Service.DoesNotExist):
             return Response({"detail":"Dados de agendamento inválidos."},status=status.HTTP_400_BAD_REQUEST)
 
-        if not AvailabilityService().professional_offers(tenant,professional.pk,service.pk):
-            return Response({"detail":"Profissional não oferece esse serviço."},status=status.HTTP_400_BAD_REQUEST)
-
         ends_at=starts_at+timedelta(minutes=service.duration_minutes)
-        if not AvailabilityService().is_available(
-            tenant,professional,starts_at,ends_at,public_rules=True
-        ):
-            return Response(
-                {"detail":"Este horário não está mais disponível."},
-                status=status.HTTP_409_CONFLICT,
-            )
+        availability=AvailabilityService()
+        requested_professional=(str(data.get("professional_id") or "")).strip()
+        professional=None
+        source=Appointment.Source.PUBLIC
+        if requested_professional:
+            try:
+                professional=Professional.objects.select_for_update().get(
+                    pk=int(requested_professional),tenant=tenant,active=True
+                )
+            except (ValueError,Professional.DoesNotExist):
+                return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
+            if not availability.professional_offers(tenant,professional.pk,service.pk):
+                return Response({"detail":"Profissional não oferece esse serviço."},status=status.HTTP_400_BAD_REQUEST)
+            source=Appointment.Source.PROFESSIONAL_LINK if data.get("professional_link") else Appointment.Source.PUBLIC
+            if not availability.is_available(
+                tenant,professional,starts_at,ends_at,public_rules=True
+            ):
+                return Response(
+                    {"detail":"Este horário não está mais disponível."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+        else:
+            # Lock candidates and pick the first one that remains free.
+            for candidate in _candidate_professionals(tenant,service).select_for_update():
+                if availability.is_available(
+                    tenant,candidate,starts_at,ends_at,public_rules=True
+                ):
+                    professional=candidate
+                    break
+            if not professional:
+                return Response(
+                    {"detail":"Não existe profissional disponível neste horário."},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
         name=str(data.get("name") or "").strip()
         email=str(data.get("email") or "").strip().lower()
@@ -124,24 +200,20 @@ class PublicBookingAPIView(APIView):
 
         token=secrets.token_urlsafe(32)
         appointment=Appointment.objects.create(
-            tenant=tenant,
-            customer=customer,
-            professional=professional,
-            service=service,
-            service_price_snapshot=service.price,
-            starts_at=starts_at,
-            ends_at=ends_at,
-            status=Appointment.Status.PENDING,
-            source=Appointment.Source.PUBLIC,
+            tenant=tenant,customer=customer,professional=professional,service=service,
+            service_price_snapshot=service.price,starts_at=starts_at,ends_at=ends_at,
+            status=Appointment.Status.PENDING,source=source,
             notes=str(data.get("notes") or "")[:2000],
             customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest(),
         )
+        manage_path=reverse("public-appointment-page",args=[token])
         return Response(
             {
-                "id":appointment.pk,
-                "status":appointment.status,
+                "id":appointment.pk,"status":appointment.status,
                 "starts_at":appointment.starts_at.isoformat(),
+                "professional":{"id":professional.pk,"name":professional.name},
                 "manage_token":token,
+                "manage_url":request.build_absolute_uri(manage_path),
             },
             status=status.HTTP_201_CREATED,
         )
@@ -157,18 +229,96 @@ class CustomerAppointmentAPIView(APIView):
             "tenant","customer","professional","service"
         ).filter(customer_manage_token_hash=digest).first()
 
+    def _capabilities(self,appointment):
+        schedule=AvailabilityService().settings(appointment.tenant)
+        manageable=appointment.status in [Appointment.Status.PENDING,Appointment.Status.CONFIRMED]
+        minimum=timezone.now()+timedelta(minutes=schedule.cancel_notice_minutes)
+        in_time=appointment.starts_at>=minimum
+        return {
+            "can_cancel":bool(schedule.customer_can_cancel and manageable and in_time),
+            "can_reschedule":bool(schedule.customer_can_reschedule and manageable and in_time),
+        }
+
     def get(self,request,token):
         appointment=self._appointment(token)
         if not appointment:
             return Response({"detail":"Agendamento não encontrado."},status=status.HTTP_404_NOT_FOUND)
         return Response({
-            "id":appointment.pk,
-            "status":appointment.status,
-            "starts_at":appointment.starts_at.isoformat(),
-            "ends_at":appointment.ends_at.isoformat(),
-            "service":appointment.service.name,
+            "id":appointment.pk,"status":appointment.status,
+            "starts_at":appointment.starts_at.isoformat(),"ends_at":appointment.ends_at.isoformat(),
+            "service_id":appointment.service_id,"service":appointment.service.name,
+            "professional_id":appointment.professional_id,
             "professional":appointment.professional.name if appointment.professional else None,
-            "can_cancel":appointment.status in [Appointment.Status.PENDING,Appointment.Status.CONFIRMED],
+            **self._capabilities(appointment),
+        })
+
+    @transaction.atomic
+    def patch(self,request,token):
+        appointment=Appointment.objects.select_for_update().select_related(
+            "tenant","service","professional"
+        ).filter(customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest()).first()
+        if not appointment:
+            return Response({"detail":"Agendamento não encontrado."},status=status.HTTP_404_NOT_FOUND)
+        caps=self._capabilities(appointment)
+        if not caps["can_reschedule"]:
+            return Response({"detail":"Remarcação online não está disponível para este agendamento."},status=status.HTTP_403_FORBIDDEN)
+        try:
+            starts_at=_parse_start(appointment.tenant,request.data["starts_at"])
+        except (KeyError,TypeError,ValueError):
+            return Response({"detail":"Informe starts_at válido."},status=status.HTTP_400_BAD_REQUEST)
+        ends_at=starts_at+timedelta(minutes=appointment.service.duration_minutes)
+        availability=AvailabilityService()
+        raw_prof=(str(request.data.get("professional_id") or "")).strip()
+        professional=None
+        if raw_prof:
+            try:
+                professional=Professional.objects.select_for_update().get(
+                    pk=int(raw_prof),tenant=appointment.tenant,active=True
+                )
+            except (ValueError,Professional.DoesNotExist):
+                return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
+            if not availability.professional_offers(
+                appointment.tenant,professional.pk,appointment.service_id
+            ):
+                return Response({"detail":"Profissional não oferece esse serviço."},status=status.HTTP_400_BAD_REQUEST)
+            if not availability.is_available(
+                appointment.tenant,professional,starts_at,ends_at,
+                exclude_appointment_id=appointment.pk,public_rules=True,
+            ):
+                return Response({"detail":"Horário indisponível."},status=status.HTTP_409_CONFLICT)
+        else:
+            for candidate in _candidate_professionals(
+                appointment.tenant,appointment.service
+            ).select_for_update():
+                if availability.is_available(
+                    appointment.tenant,candidate,starts_at,ends_at,
+                    exclude_appointment_id=appointment.pk,public_rules=True,
+                ):
+                    professional=candidate
+                    break
+            if not professional:
+                return Response({"detail":"Nenhum profissional disponível."},status=status.HTTP_409_CONFLICT)
+
+        old_professional=appointment.professional
+        old_start=appointment.starts_at
+        old_end=appointment.ends_at
+        appointment.professional=professional
+        appointment.starts_at=starts_at
+        appointment.ends_at=ends_at
+        appointment.save(update_fields=["professional","starts_at","ends_at","updated_at"])
+        AppointmentRescheduleHistory.objects.create(
+            tenant=appointment.tenant,appointment=appointment,
+            old_professional=old_professional,new_professional=professional,
+            old_starts_at=old_start,old_ends_at=old_end,
+            new_starts_at=starts_at,new_ends_at=ends_at,
+            reason=str(request.data.get("reason") or "Remarcação pelo cliente")[:255],
+            actor_type=AppointmentRescheduleHistory.ActorType.CUSTOMER,
+        )
+        return Response({
+            "id":appointment.pk,"status":appointment.status,
+            "starts_at":appointment.starts_at.isoformat(),"ends_at":appointment.ends_at.isoformat(),
+            "professional_id":professional.pk,"professional":professional.name,
+            **self._capabilities(appointment),
         })
 
     @transaction.atomic
@@ -178,20 +328,11 @@ class CustomerAppointmentAPIView(APIView):
         ).first()
         if not appointment:
             return Response({"detail":"Agendamento não encontrado."},status=status.HTTP_404_NOT_FOUND)
-
-        settings_obj=AvailabilityService().settings(appointment.tenant)
-        if not settings_obj.customer_can_cancel:
-            return Response({"detail":"Cancelamento online não está disponível."},status=status.HTTP_403_FORBIDDEN)
-        if appointment.status not in [Appointment.Status.PENDING,Appointment.Status.CONFIRMED]:
-            return Response({"detail":"Este agendamento não pode mais ser cancelado."},status=status.HTTP_409_CONFLICT)
-
-        minimum=timezone.now()+timedelta(minutes=settings_obj.cancel_notice_minutes)
-        if appointment.starts_at<minimum:
+        if not self._capabilities(appointment)["can_cancel"]:
             return Response(
-                {"detail":"O prazo para cancelamento online foi encerrado."},
-                status=status.HTTP_409_CONFLICT,
+                {"detail":"Cancelamento online não está disponível para este agendamento."},
+                status=status.HTTP_403_FORBIDDEN,
             )
-
         appointment.status=Appointment.Status.CANCELLED
         appointment.save(update_fields=["status","updated_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
