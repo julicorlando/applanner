@@ -35,9 +35,9 @@ def _start(tenant,value):
 
 
 def _candidates(row):
-    linked=Professional.objects.filter(tenant=row.tenant,active=True,services=row.service)
-    unrestricted=Professional.objects.filter(tenant=row.tenant,active=True,services__isnull=True)
-    return (linked|unrestricted).distinct().order_by("name","pk")
+    return Professional.objects.filter(
+        tenant=row.tenant,active=True
+    ).order_by("name","pk")
 
 
 @transaction.atomic
@@ -84,6 +84,10 @@ def appointment_page(request,token):
                     professional=candidate
             else:
                 for candidate in _candidates(row).select_for_update():
+                    if not availability.professional_offers(
+                        row.tenant,candidate.pk,row.service_id
+                    ):
+                        continue
                     if availability.is_available(
                         row.tenant,candidate,starts_at,ends_at,
                         exclude_appointment_id=row.pk,public_rules=True,
