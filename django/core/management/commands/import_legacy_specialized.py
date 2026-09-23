@@ -161,7 +161,7 @@ SPECS=[
     {"table":"campaign_recipients","model":"communications.CampaignRecipient"},
     {"table":"revenue_attributions","model":"communications.RevenueAttribution"},
     {"table":"marketing_leads","model":"communications.MarketingLead"},
-    {"table":"marketing_campaigns","model":"communications.MarketingCampaign"},
+    {"table":"marketing_campaigns","model":"communications.MarketingCampaign","rename":{"image":"image_path"}},
     {"table":"marketing_deliveries","model":"communications.MarketingDelivery"},
     {"table":"whatsapp_conversations","model":"communications.WhatsAppConversation","rename":{"context":"context_json"}},
     {"table":"whatsapp_messages","model":"communications.WhatsAppMessage"},
@@ -275,6 +275,20 @@ class Command(BaseCommand):
             cur.execute("SELECT * FROM "+table)
             return cur.fetchall()
 
+    def _legacy_media_name(self,value):
+        if not value:
+            return ""
+        raw=str(value).strip().replace("\\","/")
+        if raw.startswith(("http://","https://")):
+            from urllib.parse import urlparse
+            raw=urlparse(raw).path
+        raw=raw.lstrip("/")
+        for prefix in ("public/uploads/","uploads/","public/"):
+            if raw.startswith(prefix):
+                raw=raw[len(prefix):]
+                break
+        return raw
+
     def _normalize(self,field,value):
         if value is None:
             return None
@@ -291,6 +305,8 @@ class Command(BaseCommand):
             return bool(value)
         if isinstance(field,models.DateTimeField):
             return aware(value)
+        if isinstance(field,(models.FileField,models.ImageField)):
+            return self._legacy_media_name(value)
         if isinstance(field,models.UUIDField):
             return value or None
         return value
