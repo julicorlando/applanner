@@ -377,6 +377,210 @@ class Command(BaseCommand):
             count+=1
         return count
 
+    def _selected_table(self,table,selected):
+        return (not selected or table in selected) and table in self.tables
+
+    def _legacy_secret_value(self,value):
+        if not value:
+            return ""
+        if not self.legacy_key:
+            raise CommandError("LEGACY_APP_KEY é obrigatório para recriptografar segredos do legado.")
+        payload=decrypt_php_aes_gcm(value,self.legacy_key)
+        for key in ("value","secret","token","access_token"):
+            if key in payload and not isinstance(payload[key],(dict,list)):
+                return str(payload[key])
+        if len(payload)==1:
+            only=next(iter(payload.values()))
+            if not isinstance(only,(dict,list)):
+                return str(only)
+        return json.dumps(payload,ensure_ascii=False,separators=(",",":"))
+
+    def _legacy_secret_dict(self,value):
+        if not value:
+            return {}
+        if not self.legacy_key:
+            raise CommandError("LEGACY_APP_KEY é obrigatório para recriptografar credenciais do legado.")
+        payload=decrypt_php_aes_gcm(value,self.legacy_key)
+        raw=payload.get("value")
+        if isinstance(raw,dict):
+            return raw
+        if isinstance(raw,str):
+            try:
+                decoded=json.loads(raw)
+                if isinstance(decoded,dict):
+                    return decoded
+            except json.JSONDecodeError:
+                pass
+        return payload
+
+    def _platform_settings(self,conn,selected):
+        table="settings"
+        if not self._selected_table(table,selected):
+            return 0
+        Model=apps.get_model("operations.PlatformSetting")
+        count=0
+        for row in self._rows(conn,table):
+            value=row.get("setting_value") or ""
+            if row.get("is_secret"):
+                value=encrypt_text(self._legacy_secret_value(value))
+            obj,_=Model.objects.update_or_create(
+                id=row["id"],
+                defaults={
+                    "tenant_id":row.get("tenant_id"),
+                    "key":row["setting_key"],
+                    "value":value,
+                    "is_secret":bool(row.get("is_secret")),
+                },
+            )
+            Model.objects.filter(pk=obj.pk).update(updated_at=aware(row.get("updated_at")))
+            count+=1
+        self.stdout.write(f"settings: {count}")
+        return count
+
+    def _payment_gateways(self,conn,selected):
+        table="payment_gateways"
+        if not self._selected_table(table,selected):
+            return 0
+        Model=apps.get_model("billing.PaymentGateway")
+        settings_rows={}
+        if "settings" in self.tables:
+            for item in self._rows(conn,"settings"):
+                if not item.get("is_secret"):
+                    settings_rows[item["setting_key"]]=item.get("setting_value") or ""
+        count=0
+        for row in self._rows(conn,table):
+            access=encrypt_text(self._legacy_secret_value(row.get("access_token_encrypted")))
+            webhook_secret=encrypt_text(self._legacy_secret_value(row.get("webhook_secret_encrypted")))
+            webhook_url=settings_rows.get(
+                f"mercadopago.webhook_url.{row['environment']}",
+                "https://localhost/webhooks/mercadopago/",
+            )
+            obj,_=Model.objects.update_or_create(
+                id=row["id"],
+                defaults={
+                    "provider":row.get("provider") or "mercadopago",
+                    "environment":row.get("environment") or "sandbox",
+                    "public_key":row.get("public_key") or "",
+                    "access_token_encrypted":access,
+                    "webhook_secret_encrypted":webhook_secret,
+                    "webhook_url":webhook_url,
+                    "active":bool(row.get("active")),
+                    "last_tested_at":aware(row.get("last_tested_at")),
+                    "last_test_status":row.get("last_test_status") or "not_validated",
+                },
+            )
+            Model.objects.filter(pk=obj.pk).update(updated_at=aware(row.get("updated_at")))
+            count+=1
+        self.stdout.write(f"payment_gateways: {count}")
+        return count
+
+    def _tenant_payment_connections(self,conn,selected):
+        table="tenant_payment_connections"
+        if not self._selected_table(table,selected):
+            return 0
+        Model=apps.get_model("billing.TenantPaymentConnection")
+        count=0
+        for row in self._rows(conn,table):
+            credentials=encrypt_json(self._legacy_secret_dict(row.get("credentials_encrypted")))
+            metadata=row.get("metadata_json")
+            if isinstance(metadata,str):
+                try: metadata=json.loads(metadata) if metadata.strip() else {}
+                except json.JSONDecodeError: metadata={}
+            obj,_=Model.objects.update_or_create(
+                id=row["id"],
+                defaults={
+                    "tenant_id":row["tenant_id"],
+                    "provider":row.get("provider") or "mercadopago",
+                    "display_name":row.get("display_name") or "Mercado Pago",
+                    "environment":row.get("environment") or "sandbox",
+                    "credentials_encrypted":credentials,
+                    "metadata":metadata or {},
+                    "status":row.get("status") or "pending",
+                    "last_tested_at":aware(row.get("last_tested_at")),
+                    "last_sync_at":aware(row.get("last_sync_at")),
+                    "last_error_code":row.get("last_error_code") or "",
+                    "created_by_id":row.get("created_by"),
+                },
+            )
+            self._restore_times(Model,obj.pk,row)
+            count+=1
+        self.stdout.write(f"tenant_payment_connections: {count}")
+        return count
+
+    def _platform_bank_accounts(self,conn,selected):
+        table="platform_bank_accounts"
+        if not self._selected_table(table,selected):
+            return 0
+        Model=apps.get_model("finance.PlatformBankAccount")
+        encrypted_fields=("agency_encrypted","account_encrypted","holder_document_encrypted","pix_key_encrypted","notes_encrypted")
+        count=0
+        for row in self._rows(conn,table):
+            defaults={}
+            for field in Model._meta.concrete_fields:
+                if field.primary_key:
+                    continue
+                source=field.attname
+                if source not in row and source.endswith("_id") and field.name in row:
+                    source=field.name
+                if source not in row:
+                    continue
+                value=row.get(source)
+                if field.name in encrypted_fields:
+                    value=encrypt_text(self._legacy_secret_value(value)) if value else ""
+                defaults[field.attname]=self._normalize(field,value)
+            obj,_=Model.objects.update_or_create(id=row["id"],defaults=defaults)
+            self._restore_times(Model,obj.pk,row)
+            count+=1
+        self.stdout.write(f"platform_bank_accounts: {count}")
+        return count
+
+    def _sports_price_rule_extensions(self,conn,selected):
+        table="sports_price_rule_extensions"
+        if not self._selected_table(table,selected):
+            return 0
+        Model=apps.get_model("arena.PriceRule")
+        count=0
+        for row in self._rows(conn,table):
+            updated=Model.objects.filter(pk=row["price_rule_id"]).update(
+                rule_type=row.get("rule_type") or "standard",
+                specific_date=row.get("specific_date"),
+                valid_from=row.get("valid_from"),
+                valid_to=row.get("valid_to"),
+                minimum_duration_minutes=row.get("minimum_duration_minutes"),
+                maximum_duration_minutes=row.get("maximum_duration_minutes"),
+                label=row.get("label") or "",
+            )
+            count+=updated
+        self.stdout.write(f"sports_price_rule_extensions: {count}")
+        return count
+
+    def _terms_acceptances(self,conn,selected):
+        table="terms_acceptances"
+        if not self._selected_table(table,selected):
+            return 0
+        Document=apps.get_model("legal.LegalDocument")
+        Acceptance=apps.get_model("legal.LegalAcceptance")
+        count=0
+        for row in self._rows(conn,table):
+            document=Document.objects.filter(type="terms",version=row["terms_version"]).first()
+            if not document:
+                self.stderr.write(
+                    f"terms_acceptances #{row['id']}: documento {row['terms_version']} não encontrado; ignorando"
+                )
+                continue
+            obj,_=Acceptance.objects.update_or_create(
+                user_id=row["user_id"],document=document,
+                defaults={
+                    "tenant_id":row.get("tenant_id"),
+                    "ip_address":row.get("ip_address") or None,
+                    "user_agent":"",
+                },
+            )
+            Acceptance.objects.filter(pk=obj.pk).update(accepted_at=aware(row["accepted_at"]))
+            count+=1
+        self.stdout.write(f"terms_acceptances: {count}")
+        return count
+
     def _medical_records(self,conn,selected):
         table="medical_record_entries"
         if selected and table not in selected:
