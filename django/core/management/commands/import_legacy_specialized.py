@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand,CommandError
 from django.db import models,transaction
 from django.utils import timezone
 
-from core.crypto import encrypt_text
+from core.crypto import encrypt_json, encrypt_text
 from core.legacy_crypto import decrypt_php_aes_gcm
 
 
@@ -234,7 +234,13 @@ class Command(BaseCommand):
                     total+=imported
                     self.stdout.write(f"{spec['table']}: {imported}")
                 total+=self._customer_package_usage(conn,selected)
+                total+=self._sports_price_rule_extensions(conn,selected)
+                total+=self._terms_acceptances(conn,selected)
                 if not options["skip_sensitive"]:
+                    total+=self._platform_settings(conn,selected)
+                    total+=self._payment_gateways(conn,selected)
+                    total+=self._tenant_payment_connections(conn,selected)
+                    total+=self._platform_bank_accounts(conn,selected)
                     total+=self._medical_records(conn,selected)
                 if options["dry_run"]:
                     transaction.set_rollback(True)
