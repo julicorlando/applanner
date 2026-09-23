@@ -39,7 +39,7 @@ ROLES={
     "arena-manager":("Gestor Arena",["arena.manage","finance.manage","engagement.manage"]),
     "auto-manager":("Gestor Automotivo",["agenda.manage","auto.manage","finance.manage","engagement.manage"]),
     "healthcare":("Saúde",["agenda.manage","healthcare.manage","support.manage"]),
-    "commercial":("Comercial",["commercial.manage","communications.manage","support.manage"]),
+    "commercial":("Comercial",["commercial.manage","communications.manage"]),
     "support":("Suporte",["support.manage"]),
     "user":("Usuário",["agenda.manage","communications.manage","support.manage"]),
 }
