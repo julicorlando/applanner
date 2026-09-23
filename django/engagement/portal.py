@@ -212,3 +212,28 @@ def waitlist(request):
     return render(request,"engagement/waitlist.html",{
         "rows":WaitlistEntry.objects.filter(tenant=tenant).select_related("customer","service","professional").order_by("preferred_date","created_at")[:200]
     })
+
+
+@login_required
+def intelligence(request):
+    require_any_capability(request.user,"engagement.manage")
+    tenant=_tenant(request)
+    from django.utils import timezone
+    from .behavior import refresh_behavior_for_tenant
+    from .models import BehaviorProfile
+
+    if request.method=="POST":
+        updated=refresh_behavior_for_tenant(tenant)
+        messages.success(request,f"Inteligência atualizada: {updated} perfis recalculados.")
+        return redirect("engagement-intelligence")
+
+    today=timezone.localdate()
+    horizon=today+__import__("datetime").timedelta(days=14)
+    qs=BehaviorProfile.objects.filter(tenant=tenant).select_related("customer").order_by("next_expected_date","customer__name")
+    return render(request,"engagement/intelligence.html",{
+        "rows":qs[:300],
+        "total":qs.count(),
+        "overdue":qs.filter(next_expected_date__lt=today).count(),
+        "upcoming":qs.filter(next_expected_date__gte=today,next_expected_date__lte=horizon).count(),
+        "high_confidence":qs.filter(confidence_score__gte=70).count(),
+    })
