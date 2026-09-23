@@ -75,7 +75,7 @@ class Command(BaseCommand):
         try:
             legacy_tables=self._legacy_tables(conn,cfg["database"])
             covered={table for table,_ in pairs}|set(TRANSFORMED)|set(IGNORED)
-            uncovered=sorted(legacy_tables-covered)
+            uncovered=sorted(set(legacy_tables)-covered)
             if uncovered:
                 failures.append("cobertura:"+",".join(uncovered))
                 self.stderr.write(self.style.ERROR(
