@@ -5,16 +5,124 @@
 <section class="tenant-hero" style="--tenant-accent:{{ tenant.public_accent_color|default:tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}">
   <div class="shell">
     {% if tenant.public_announcement %}<div class="tenant-announcement">{{ tenant.public_announcement }}</div>{% endif %}
+    {% if tenant.logo %}<img src="{{ tenant.logo.url }}" alt="{{ tenant.name }}" style="max-height:72px;max-width:190px;margin-bottom:18px">{% endif %}
     <span class="eyebrow">{{ tenant.category|default:"AGENDE ONLINE" }}</span>
-    <h1>{{ tenant.public_headline|default:tenant.name }}</h1>
-    <p>{{ tenant.public_subheadline|default:tenant.description }}</p>
-    <div class="actions"><a class="button primary" href="#servicos">{{ tenant.public_cta_label|default:"Ver serviços" }}</a></div>
+    {% if selected_professional %}
+      <h1>{{ selected_professional.name }}</h1>
+      <p>{{ selected_professional.specialty|default:tenant.name }} · {{ tenant.name }}</p>
+    {% else %}
+      <h1>{{ tenant.public_headline|default:tenant.name }}</h1>
+      <p>{{ tenant.public_subheadline|default:tenant.description }}</p>
+    {% endif %}
+    <div class="actions"><a class="button primary" href="#agendar">{{ tenant.public_cta_label|default:"Agendar agora" }}</a><a class="button ghost" href="#servicos">Ver serviços</a></div>
   </div>
 </section>
+
+{% if tenant.public_booking_enabled %}
+<section class="shell section" id="agendar">
+  <div class="section-head"><span class="eyebrow">AGENDAMENTO ONLINE</span><h2>Escolha serviço, profissional e horário.</h2></div>
+  <div class="panel">
+    <form id="public-booking" class="portal-form">{% csrf_token %}
+      <div class="portal-module-grid">
+        <div class="form-field"><label>Serviço</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
+        <div class="form-field"><label>Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
+        <div class="form-field"><label>Data</label><input id="booking-date" type="date" required></div>
+        <div class="form-field"><label>Horário</label><select id="booking-slot" required><option value="">Escolha serviço e data</option></select></div>
+      </div>
+      <div class="portal-module-grid" style="margin-top:14px">
+        <div class="form-field"><label>Seu nome</label><input id="booking-name" required minlength="2"></div>
+        <div class="form-field"><label>Telefone</label><input id="booking-phone" autocomplete="tel"></div>
+        <div class="form-field"><label>E-mail</label><input id="booking-email" type="email" autocomplete="email"></div>
+        <div class="form-field"><label>Observações</label><input id="booking-notes"></div>
+      </div>
+      <div id="booking-feedback" style="margin-top:12px"></div>
+      <div class="form-actions"><button class="button primary" type="submit">Confirmar agendamento</button></div>
+    </form>
+  </div>
+</section>
+{% endif %}
+
 <section class="shell section" id="servicos">
   <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2></div>
   <div class="segment-grid">{% for service in services %}<article><span>{{ service.duration_minutes }} min</span><h3>{{ service.name }}</h3><p>{{ service.description }}</p><strong>R$ {{ service.price }}</strong></article>{% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}</div>
 </section>
-{% if professionals %}<section class="shell section"><div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2></div><div class="segment-grid">{% for professional in professionals %}<article><span>{{ professional.specialty|default:"Profissional" }}</span><h3>{{ professional.name }}</h3><p>{{ professional.email }}</p></article>{% endfor %}</div></section>{% endif %}
-{% if units %}<section class="shell section"><div class="section-head"><span class="eyebrow">UNIDADES</span><h2>Onde encontrar.</h2></div><div class="segment-grid">{% for unit in units %}<article><span>{% if unit.is_primary %}Principal{% else %}Unidade{% endif %}</span><h3>{{ unit.name }}</h3><p>{{ unit.address }} {{ unit.address_number }}{% if unit.city %}<br>{{ unit.city }}/{{ unit.state }}{% endif %}</p>{% if unit.whatsapp %}<strong>{{ unit.whatsapp }}</strong>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+
+{% if professionals and not selected_professional %}
+<section class="shell section"><div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2></div><div class="segment-grid">
+{% for professional in professionals %}<article>{% if professional.photo %}<img src="{{ professional.photo.url }}" alt="{{ professional.name }}" style="width:72px;height:72px;object-fit:cover;border-radius:50%">{% endif %}<span>{{ professional.specialty|default:"Profissional" }}</span><h3>{{ professional.name }}</h3>{% if professional.public_slug %}<a href="{% url 'professional-public' public_slug professional.public_slug %}">Ver agenda exclusiva →</a>{% endif %}</article>{% endfor %}
+</div></section>
+{% endif %}
+
+{% if products %}
+<section class="shell section"><div class="section-head"><span class="eyebrow">PRODUTOS</span><h2>Produtos disponíveis.</h2></div><div class="segment-grid">{% for product in products %}<article><span>{{ product.category|default:"Produto" }}</span><h3>{{ product.name }}</h3><p>{{ product.description }}</p><strong>R$ {{ product.sale_price }}</strong></article>{% endfor %}</div></section>
+{% endif %}
+
+{% if packages %}
+<section class="shell section"><div class="section-head"><span class="eyebrow">PACOTES</span><h2>Mais recorrência e benefícios.</h2></div><div class="segment-grid">{% for package in packages %}<article><span>{% if package.recurring %}Mensalidade{% else %}Pacote{% endif %}</span><h3>{{ package.name }}</h3><p>{{ package.description }}</p><strong>R$ {{ package.price }}</strong></article>{% endfor %}</div></section>
+{% endif %}
+
+{% if loyalty %}
+<section class="shell section"><article class="panel"><span class="eyebrow">FIDELIDADE</span><h2>Programa de fidelidade ativo</h2><p>Acumule pontos nos atendimentos e aproveite recompensas oferecidas por {{ tenant.name }}.</p></article></section>
+{% endif %}
+
+{% if reviews %}
+<section class="shell section"><div class="section-head"><span class="eyebrow">AVALIAÇÕES</span><h2>O que os clientes dizem.</h2></div><div class="segment-grid">{% for review in reviews %}<article><span>{{ review.rating }}/5 ★</span><h3>{{ review.customer_name }}</h3><p>{{ review.comment }}</p></article>{% endfor %}</div></section>
+{% endif %}
+
+{% if units %}<section class="shell section"><div class="section-head"><span class="eyebrow">UNIDADES</span><h2>Onde encontrar.</h2></div><div class="segment-grid">{% for unit in units %}<article><span>{% if unit.is_primary %}Principal{% else %}Unidade{% endif %}</span><h3>{{ unit.name }}</h3><p>{{ unit.address }} {{ unit.address_number }}{% if unit.district %}<br>{{ unit.district }}{% endif %}{% if unit.city %}<br>{{ unit.city }}/{{ unit.state }}{% endif %}</p>{% if unit.whatsapp %}<strong>{{ unit.whatsapp }}</strong>{% endif %}{% if unit.instagram %}<p>{{ unit.instagram }}</p>{% endif %}{% if unit.map_url %}<a href="{{ unit.map_url }}" target="_blank" rel="noopener">Ver localização →</a>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+
+{% if tenant.public_booking_enabled %}
+<script>
+(() => {
+  const form=document.getElementById('public-booking');
+  const service=document.getElementById('booking-service');
+  const professional=document.getElementById('booking-professional');
+  const date=document.getElementById('booking-date');
+  const slot=document.getElementById('booking-slot');
+  const feedback=document.getElementById('booking-feedback');
+  const csrf=form.querySelector('[name=csrfmiddlewaretoken]').value;
+  const today=new Date(); date.min=today.toISOString().slice(0,10);
+
+  async function loadSlots(){
+    if(!service.value || !date.value){slot.innerHTML='<option value="">Escolha serviço e data</option>';return;}
+    slot.innerHTML='<option value="">Carregando...</option>';
+    const query=new URLSearchParams({service_id:service.value,date:date.value});
+    if(professional.value)query.set('professional_id',professional.value);
+    try{
+      const response=await fetch('/api/public/{{ public_slug }}/availability/?'+query.toString());
+      const data=await response.json();
+      slot.innerHTML='<option value="">Selecione</option>';
+      (data.slots||[]).forEach(item=>{
+        const option=document.createElement('option');
+        option.value=item.value;
+        option.textContent=item.label+(professional.value?'':(' · '+(item.professional_name||'Disponível')));
+        slot.appendChild(option);
+      });
+      if(!(data.slots||[]).length)slot.innerHTML='<option value="">Sem horários disponíveis</option>';
+    }catch(e){slot.innerHTML='<option value="">Não foi possível consultar horários</option>';}
+  }
+  service.addEventListener('change',loadSlots); professional.addEventListener('change',loadSlots); date.addEventListener('change',loadSlots);
+
+  form.addEventListener('submit',async event=>{
+    event.preventDefault(); feedback.textContent='Confirmando...';
+    const payload={
+      service_id:service.value,professional_id:professional.value,starts_at:slot.value,
+      name:document.getElementById('booking-name').value,
+      phone:document.getElementById('booking-phone').value,
+      email:document.getElementById('booking-email').value,
+      notes:document.getElementById('booking-notes').value,
+      professional_link:{% if selected_professional %}true{% else %}false{% endif %}
+    };
+    if(!payload.phone && !payload.email){feedback.innerHTML='<div class="flash error">Informe telefone ou e-mail.</div>';return;}
+    const response=await fetch('/api/public/{{ public_slug }}/book/',{
+      method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf},body:JSON.stringify(payload)
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok){feedback.innerHTML='<div class="flash error">'+(data.detail||'Não foi possível agendar.')+'</div>';return;}
+    feedback.innerHTML='<div class="flash success"><strong>Agendamento solicitado!</strong><br>Profissional: '+data.professional.name+'<br><a href="'+data.manage_url+'">Abrir meu agendamento</a></div>';
+    form.querySelector('button[type=submit]').disabled=true;
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}
