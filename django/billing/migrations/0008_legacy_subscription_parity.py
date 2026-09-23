@@ -9,6 +9,14 @@ class Migration(migrations.Migration):
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
     operations=[
+        migrations.AlterField(
+            model_name="tenantpaymentconnection",
+            name="status",
+            field=models.CharField(
+                choices=[("pending","Pendente"),("connected","Conectado"),("error","Erro"),("disabled","Desabilitado")],
+                db_index=True,default="connected",max_length=16,
+            ),
+        ),
         migrations.AddField(
             model_name="subscription",name="base_contracted_price",
             field=models.DecimalField(blank=True,decimal_places=2,max_digits=10,null=True),
