@@ -106,6 +106,7 @@ def validate_trusted_device(user, token: str) -> bool:
         selector=selector,
         expires_at__gt=timezone.now(),
         session_version=user.session_version,
+        revoked_at__isnull=True,
     ).first()
     if not device:
         return False
