@@ -38,6 +38,6 @@ class Migration(migrations.Migration):
                 ("user",models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,related_name="password_reset_tokens",to=settings.AUTH_USER_MODEL)),
             ],
         ),
-        migrations.AddIndex(model_name="emailverificationtoken",index=models.Index(fields=["user","expires_at"],name="accounts_ev_user_id_529675_idx")),
-        migrations.AddIndex(model_name="passwordresettoken",index=models.Index(fields=["user","expires_at"],name="accounts_pa_user_id_a6c347_idx")),
+        migrations.AddIndex(model_name="emailverificationtoken",index=models.Index(fields=["user","expires_at"],name="accounts_em_user_id_b5ffac_idx")),
+        migrations.AddIndex(model_name="passwordresettoken",index=models.Index(fields=["user","expires_at"],name="accounts_pa_user_id_e5b29b_idx")),
     ]
