@@ -66,6 +66,7 @@ class Command(BaseCommand):
             raise CommandError("Variáveis legadas ausentes: "+", ".join(missing))
 
         selected={x.strip() for x in options["only"].split(",") if x.strip()}
+        spec_by_table={spec["table"]:spec for spec in SPECS}
         spec_pairs=[(spec["table"],spec["model"]) for spec in SPECS]
         pairs=DIRECT+spec_pairs
         seen=set()
@@ -90,6 +91,17 @@ class Command(BaseCommand):
                     continue
                 legacy_count,legacy_hash=self._legacy_count_hash(conn,table,cfg["database"])
                 model=apps.get_model(label)
+                if table in spec_by_table:
+                    unmapped=self._unmapped_columns(
+                        model=model,
+                        spec=spec_by_table[table],
+                        source_columns=legacy_tables[table],
+                    )
+                    if unmapped:
+                        failures.append(table+":colunas")
+                        self.stderr.write(self.style.ERROR(
+                            f"{table}: colunas sem destino no Django: {', '.join(unmapped)}"
+                        ))
                 target_count=model.objects.count()
                 target_hash=None
                 if self._integer_pk(model):
@@ -134,10 +146,14 @@ class Command(BaseCommand):
     def _legacy_tables(self,conn,database):
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=%s",
+                "SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA=%s ORDER BY TABLE_NAME,ORDINAL_POSITION",
                 (database,),
             )
-            return {row["TABLE_NAME"] for row in cur.fetchall()}
+            result={}
+            for row in cur.fetchall():
+                result.setdefault(row["TABLE_NAME"],set()).add(row["COLUMN_NAME"])
+            return result
 
     def _legacy_count(self,conn,table):
         with conn.cursor() as cur:
@@ -157,6 +173,18 @@ class Command(BaseCommand):
                 return count,None
             cur.execute(f"SELECT id FROM `{table}` ORDER BY id")
             return count,self._hash([row["id"] for row in cur.fetchall()])
+
+    def _unmapped_columns(self,model,spec,source_columns):
+        rename=spec.get("rename",{})
+        mapped=set()
+        for field in model._meta.concrete_fields:
+            attname=field.attname
+            source=rename.get(attname,attname)
+            if source not in source_columns and attname.endswith("_id") and field.name in source_columns:
+                source=field.name
+            if source in source_columns:
+                mapped.add(source)
+        return sorted(set(source_columns)-mapped)
 
     def _integer_pk(self,model):
         return model._meta.pk.get_internal_type() in {
