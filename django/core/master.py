@@ -72,6 +72,38 @@ MASTER_RESOURCES={
     "operacao":{"model":"operations.PlatformOperationSettings","title":"Configuração operacional","fields":["backup_retention_days","backup_include_uploads","backup_encrypt","backup_before_update","lead_retention_days","critical_alert_email","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"columns":["backup_retention_days","backup_include_uploads","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"order":"id","special":"operation_settings"},
     "crons":{"model":"operations.CronHeartbeat","title":"Saúde dos jobs","fields":[],"columns":["cron_key","status","started_at","finished_at","duration_ms","host_name"],"order":"-started_at","create":False,"edit":False},
     "imports":{"model":"operations.DataImportJob","title":"Implantações de bases","fields":[],"columns":["tenant","source","original_name","status","created_at","completed_at"],"order":"-created_at","create":False,"edit":False},
+    "isencoes-assinaturas":{"model":"billing.SubscriptionExemption","title":"Isenções de assinatura","fields":["tenant","subscription","exemption_type","starts_at","ends_at","reason","status"],"columns":["tenant","subscription","exemption_type","starts_at","ends_at","status"],"order":"-created_at","special":"subscription_exemption"},
+    "historico-assinaturas":{"model":"billing.SubscriptionHistory","title":"Histórico de assinaturas","fields":[],"columns":["tenant","subscription","from_plan","to_plan","from_status","to_status","reason","created_at"],"order":"-created_at","create":False,"edit":False},
+    "addons-modulos":{"model":"billing.TenantModuleAddon","title":"Módulos adicionais contratados","fields":[],"columns":["tenant","module","monthly_price","status","started_at","next_billing_at"],"order":"-created_at","create":False,"edit":False},
+    "ajustes-modulos":{"model":"billing.SubscriptionModuleAdjustment","title":"Ajustes de módulos na assinatura","fields":[],"columns":["tenant","subscription","action","previous_amount","new_amount","status","created_at"],"order":"-created_at","create":False,"edit":False},
+    "checkouts":{"model":"billing.CheckoutSession","title":"Checkouts","fields":[],"columns":["public_id","tenant","plan","billing_cycle","total","status","expires_at"],"order":"-created_at","create":False,"edit":False},
+    "cupons":{"model":"billing.Coupon","title":"Cupons","fields":["code","type","value","valid_from","valid_until","max_uses","active"],"columns":["code","type","value","uses_count","max_uses","active"],"order":"code"},
+    "faturas":{"model":"billing.Invoice","title":"Faturas","fields":[],"columns":["number","tenant","amount","status","due_at","paid_at"],"order":"-created_at","create":False,"edit":False},
+    "pagamentos":{"model":"billing.Payment","title":"Pagamentos","fields":[],"columns":["tenant","purpose","provider","amount","status","due_at","paid_at"],"order":"-created_at","create":False,"edit":False},
+    "pix":{"model":"billing.PixCharge","title":"Cobranças Pix","fields":[],"columns":["public_id","tenant","amount","status","expires_at","paid_at"],"order":"-created_at","create":False,"edit":False},
+    "eventos-provedor":{"model":"billing.ProviderEvent","title":"Eventos de provedores","fields":[],"columns":["provider","event_type","status","received_at","processed_at"],"order":"-received_at","create":False,"edit":False},
+    "conexoes-pagamento":{"model":"billing.TenantPaymentConnection","title":"Conexões de pagamento","fields":[],"columns":["tenant","provider","display_name","environment","status","last_tested_at","last_sync_at"],"order":"tenant__name,provider","create":False,"edit":False},
+    "transacoes-pagamento":{"model":"billing.TenantPaymentTransaction","title":"Transações dos estabelecimentos","fields":[],"columns":["tenant","reference_type","method","gross_amount","net_amount","status","paid_at"],"order":"-created_at","create":False,"edit":False},
+    "recorrencias-pagamento":{"model":"billing.TenantRecurringSubscription","title":"Recorrências de pagamento","fields":[],"columns":["tenant","reference_type","amount","cycle_months","status","last_payment_at"],"order":"-created_at","create":False,"edit":False},
+    "login-audit":{"model":"accounts.LoginAudit","title":"Auditoria de login","fields":[],"columns":["user","email","event","ip_address","created_at"],"order":"-created_at","create":False,"edit":False},
+    "eventos-seguranca":{"model":"accounts.SecurityEvent","title":"Eventos de segurança","fields":[],"columns":["tenant","user","event_type","severity","ip_address","created_at"],"order":"-created_at","create":False,"edit":False},
+    "bloqueios-usuarios":{"model":"accounts.UserBlock","title":"Bloqueios de usuários","fields":[],"columns":["user","blocked_until","reason","created_at"],"order":"-created_at","create":False,"edit":False},
+    "onboarding":{"model":"tenants.TenantOnboarding","title":"Onboarding das empresas","fields":[],"columns":["tenant","company_done","branding_done","unit_done","professional_done","service_done","schedule_done","payment_done","public_page_done","completed_at"],"order":"tenant__name","create":False,"edit":False},
+    "historico-empresas":{"model":"tenants.TenantStatusHistory","title":"Histórico das empresas","fields":[],"columns":["tenant","from_status","to_status","reason","changed_by","created_at"],"order":"-created_at","create":False,"edit":False},
+    "acessos-suporte":{"model":"operations.SupportAccessSession","title":"Acessos remotos de suporte","fields":[],"columns":["ticket","support_user","started_at","ended_at"],"order":"-started_at","create":False,"edit":False},
+    "verificacoes-backup":{"model":"operations.BackupVerification","title":"Verificações de backup","fields":[],"columns":["backup","status","verification_type","verified_at"],"order":"-verified_at","create":False,"edit":False},
+    "alertas-cron":{"model":"operations.CronAlertLog","title":"Alertas dos jobs","fields":[],"columns":["alert_key","channel","status","message","created_at"],"order":"-created_at","create":False,"edit":False},
+    "solicitacoes-billing":{"model":"operations.BillingSupportRequest","title":"Solicitações financeiras","fields":[],"columns":["tenant","request_type","status","created_at"],"order":"-created_at","create":False,"edit":False},
+    "configuracoes-plataforma":{"model":"operations.PlatformSetting","title":"Configurações da plataforma","fields":[],"columns":["tenant","key","is_secret","updated_at"],"order":"key","create":False,"edit":False},
+    "blog":{"model":"contenthub.BlogPost","title":"Blog","fields":["slug","title","excerpt","content","status","published_at"],"columns":["title","slug","status","published_at"],"order":"-published_at,-created_at"},
+    "landings":{"model":"contenthub.LandingPage","title":"Landing pages","fields":["slug","title","headline","subheadline","cta_label","cta_url","active"],"columns":["title","slug","active","updated_at"],"order":"title"},
+    "avaliacoes-publicas":{"model":"contenthub.PublicReview","title":"Avaliações públicas","fields":["tenant","customer_name","rating","comment","active"],"columns":["tenant","customer_name","rating","active","created_at"],"order":"-created_at"},
+    "marketing-contatos":{"model":"communications.MarketingLead","title":"Contatos de e-mail marketing","fields":["name","email","status","source"],"columns":["name","email","status","source","created_at"],"order":"-created_at"},
+    "marketing-campanhas":{"model":"communications.MarketingCampaign","title":"Campanhas de e-mail","fields":[],"columns":["subject","status","total_count","sent_count","failed_count","created_at"],"order":"-created_at","create":False,"edit":False},
+    "marketing-entregas":{"model":"communications.MarketingDelivery","title":"Entregas de e-mail","fields":[],"columns":["campaign","lead","status","sent_at","opened_at","clicked_at"],"order":"-created_at","create":False,"edit":False},
+    "whatsapp-conversas":{"model":"communications.WhatsAppConversation","title":"Conversas WhatsApp","fields":[],"columns":["tenant","contact_name","wa_id","status","assigned_to","last_message_at"],"order":"-last_message_at","create":False,"edit":False},
+    "aquisicao":{"model":"growth.AcquisitionEvent","title":"Eventos de aquisição","fields":[],"columns":["event_name","tenant","source","medium","campaign","value_amount","created_at"],"order":"-created_at","create":False,"edit":False},
+    "meta-conversoes":{"model":"growth.MetaConversionLog","title":"Meta Conversions API","fields":[],"columns":["event_name","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "usuarios":{"model":"accounts.User","title":"Usuários","fields":["tenant","email","role","is_active","is_staff"],"columns":["email","tenant","role","is_active","is_staff"],"order":"email"},
     "papeis-usuarios":{"model":"accounts.UserRole","title":"Papéis dos usuários","fields":["user","role"],"columns":["user","role"],"order":"user__email"},
 }
@@ -176,6 +208,8 @@ def resource_form(request,slug,pk=None):
             row.created_by=request.user
         if config.get("special")=="operation_settings":
             row.updated_by=request.user
+        if config.get("special")=="subscription_exemption" and not row.granted_by_id:
+            row.granted_by=request.user
         try:
             row.full_clean()
             row.save()
