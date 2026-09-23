@@ -11,6 +11,7 @@
       <div class="module-row"><span></span><div><strong>Valor contratado</strong><small>R$ {{ subscription.contracted_price }}</small></div></div>
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
     {% else %}<p>Nenhuma assinatura encontrada.</p>{% endif %}
+  <div class="form-actions" style="margin-top:18px"><a class="button primary" href="{% url 'billing-subscription-modules' %}">Gerenciar módulos adicionais</a></div>
   </article>
 </section>
 {% endblock %}
