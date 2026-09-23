@@ -293,6 +293,16 @@ PORTAL_MODULES = {
         "title": "Relacionamento",
         "description": "Pacotes, recorrência, fidelidade e lista de espera.",
         "resources": {
+            "inteligencia": {
+                "model": "engagement.BehaviorProfile",
+                "title": "Inteligência de retorno",
+                "fields": [],
+                "columns": ["customer","last_visit_at","next_expected_date","avg_interval_days","visits_count","confidence_score"],
+                "order": "next_expected_date,customer__name",
+                "create": False,
+                "edit": False,
+                "custom_list": "engagement_intelligence",
+            },
             "pacotes": {
                 "model": "engagement.ServicePackage",
                 "title": "Pacotes de serviços",
@@ -631,6 +641,8 @@ def resource_list(request,module_slug,resource_slug):
         return redirect("finance-cash")
     if resource.get("custom_list")=="finance_commissions":
         return redirect("finance-commissions")
+    if resource.get("custom_list")=="engagement_intelligence":
+        return redirect("engagement-intelligence")
     if resource.get("custom_list")=="engagement_packages":
         return redirect("engagement-packages")
     if resource.get("custom_list")=="engagement_loyalty":
