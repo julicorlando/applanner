@@ -12,6 +12,7 @@ TASKS=[
     ("Expirar sinais Arena","arena.tasks.expire_unpaid_reservations",5,"minutes"),
     ("Cobrar mensalidades de pacotes","engagement.tasks.bill_due_memberships",6,"hours"),
     ("Expirar pacotes e waitlist","engagement.tasks.expire_packages_and_waitlist",6,"hours"),
+    ("Atualizar inteligência de retorno","engagement.tasks.refresh_behavior_intelligence",12,"hours"),
     ("Processar CRM automotivo","auto.tasks.process_auto_crm",1,"hours"),
     ("Aplicar retenção LGPD de leads","commercial.tasks.enforce_lead_retention",24,"hours"),
     ("Expirar checkouts","billing.tasks.expire_checkouts",10,"minutes"),
