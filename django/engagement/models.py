@@ -40,6 +40,8 @@ class CustomerPackage(TimeStampedModel):
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.ACTIVE,db_index=True)
     purchase_amount=models.DecimalField(max_digits=12,decimal_places=2)
     external_reference=models.CharField(max_length=190,blank=True)
+    membership=models.ForeignKey("engagement.CustomerMembership",null=True,blank=True,on_delete=models.SET_NULL,related_name="purchased_packages")
+    financial_transaction=models.OneToOneField("finance.FinancialTransaction",null=True,blank=True,on_delete=models.SET_NULL,related_name="customer_package")
 
     class Meta:
         indexes=[models.Index(fields=["tenant","customer","status"],name="eng_pkg_customer_idx")]
