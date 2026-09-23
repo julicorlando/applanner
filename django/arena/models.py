@@ -209,6 +209,7 @@ class Reservation(TimeStampedModel):
     payment_status=models.CharField(max_length=20,choices=PaymentStatus.choices,default=PaymentStatus.NOT_REQUIRED)
     manage_token_hash=models.CharField(max_length=64,unique=True)
     recurrence_group=models.CharField(max_length=32,blank=True)
+    legacy_tournament_match_id=models.BigIntegerField(null=True,blank=True,db_index=True)
     source=models.CharField(max_length=16,choices=Source.choices,default=Source.PUBLIC)
     notes=models.CharField(max_length=1000,blank=True)
     terms_accepted_at=models.DateTimeField(null=True,blank=True)
