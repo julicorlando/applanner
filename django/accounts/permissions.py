@@ -8,11 +8,11 @@ from .models import Capability
 
 LEGACY_ROLE_CAPABILITIES={
     "master":{"*"},
-    "owner":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
+    "owner":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","communications.manage","support.manage"},
     "manager":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
-    "reception":{"agenda.manage","engagement.manage","support.manage","barber.manage","arena.manage","auto.manage"},
-    "professional":{"agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","support.manage"},
-    "commercial":{"commercial.manage","support.manage"},
+    "reception":{"agenda.manage","engagement.manage","communications.manage","support.manage","barber.manage","arena.manage","auto.manage"},
+    "professional":{"agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","communications.manage","support.manage"},
+    "commercial":{"commercial.manage","communications.manage","support.manage"},
     "finance":{"finance.manage"},
     "barber-manager":{"agenda.manage","barber.manage","finance.manage","engagement.manage"},
     "arena-manager":{"arena.manage","finance.manage","engagement.manage"},
@@ -20,7 +20,7 @@ LEGACY_ROLE_CAPABILITIES={
     "healthcare":{"agenda.manage","healthcare.manage","support.manage"},
     "tenant-admin":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
     "support":{"support.manage"},
-    "user":{"agenda.manage","support.manage"},
+    "user":{"agenda.manage","communications.manage","support.manage"},
 }
 
 
