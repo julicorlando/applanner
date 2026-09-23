@@ -12,40 +12,72 @@ $compose = @(
     "-f","docker-compose.legacy.yml"
 )
 
-Write-Host "Subindo clone MariaDB legado..."
-docker compose @compose up -d legacy-db
+function Wait-Healthy([string]$Service) {
+    Write-Host "Aguardando $Service ficar saudável..."
+    $tries = 0
+    do {
+        Start-Sleep -Seconds 2
+        $container = docker compose @compose ps -q $Service
+        $status = if ($container) {
+            docker inspect --format='{{.State.Health.Status}}' $container 2>$null
+        } else { "" }
+        $tries++
+    } until ($status -eq "healthy" -or $tries -ge 60)
+    if ($status -ne "healthy") { throw "$Service não ficou saudável." }
+}
 
-Write-Host "Aguardando MariaDB ficar saudável..."
+Write-Host "Subindo bancos isolados de homologação..."
+docker compose @compose up -d legacy-db migration-db
+Wait-Healthy "legacy-db"
+Wait-Healthy "migration-db"
+
+$legacyDb = if ($env:LEGACY_CLONE_DATABASE) { $env:LEGACY_CLONE_DATABASE } else { "appnannerbr_planner" }
+$legacyUser = if ($env:LEGACY_CLONE_USER) { $env:LEGACY_CLONE_USER } else { "legacy" }
+$legacyPass = if ($env:LEGACY_CLONE_PASSWORD) { $env:LEGACY_CLONE_PASSWORD } else { "legacy-local-2026" }
+$legacyRoot = if ($env:LEGACY_CLONE_ROOT_PASSWORD) { $env:LEGACY_CLONE_ROOT_PASSWORD } else { "legacy-root-local-2026" }
+
+$targetDb = if ($env:MIGRATION_POSTGRES_DB) { $env:MIGRATION_POSTGRES_DB } else { "applanner_migration" }
+$targetUser = if ($env:MIGRATION_POSTGRES_USER) { $env:MIGRATION_POSTGRES_USER } else { "applanner_migration" }
+
+if ($legacyDb -notmatch '^[A-Za-z0-9_]+$' -or $legacyUser -notmatch '^[A-Za-z0-9_]+$') {
+    throw "Nome de banco/usuário do clone MariaDB inválido."
+}
+if ($targetDb -notmatch '^[A-Za-z0-9_]+$' -or $targetUser -notmatch '^[A-Za-z0-9_]+$') {
+    throw "Nome de banco/usuário PostgreSQL de homologação inválido."
+}
+
+Write-Host "Recriando clone MariaDB $legacyDb..."
+$resetSql = "DROP DATABASE IF EXISTS $legacyDb; CREATE DATABASE $legacyDb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL PRIVILEGES ON $legacyDb.* TO '$legacyUser'@'%'; FLUSH PRIVILEGES;"
+docker compose @compose exec -T legacy-db mariadb "-uroot" "-p$legacyRoot" -e $resetSql
+
+Write-Host "Restaurando dump PHP/MariaDB..."
+Get-Content -Raw -Encoding UTF8 $SqlPath |
+    docker compose @compose exec -T legacy-db mariadb --default-character-set=utf8mb4 "-uroot" "-p$legacyRoot" $legacyDb
+
+Write-Host "Parando aplicação antes de recriar o PostgreSQL de homologação..."
+docker compose @compose stop web worker beat 2>$null
+
+Write-Host "Recriando PostgreSQL isolado $targetDb..."
+$terminate = "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$targetDb' AND pid <> pg_backend_pid();"
+docker compose @compose exec -T migration-db psql -U $targetUser -d postgres -v ON_ERROR_STOP=1 -c $terminate
+docker compose @compose exec -T migration-db dropdb -U $targetUser --if-exists $targetDb
+docker compose @compose exec -T migration-db createdb -U $targetUser $targetDb
+
+Write-Host "Subindo Django contra o PostgreSQL de homologação..."
+docker compose @compose up -d --force-recreate web
 $tries = 0
 do {
     Start-Sleep -Seconds 2
-    $container = docker compose @compose ps -q legacy-db
-    $status = if ($container) { docker inspect --format='{{.State.Health.Status}}' $container 2>$null } else { "" }
+    $container = docker compose @compose ps -q web
+    $state = if ($container) { docker inspect --format='{{.State.Status}}' $container 2>$null } else { "" }
     $tries++
-} until ($status -eq "healthy" -or $tries -ge 60)
-
-if ($status -ne "healthy") { throw "MariaDB legado não ficou saudável." }
-
-$db = if ($env:LEGACY_CLONE_DATABASE) { $env:LEGACY_CLONE_DATABASE } else { "appnannerbr_planner" }
-$user = if ($env:LEGACY_CLONE_USER) { $env:LEGACY_CLONE_USER } else { "legacy" }
-$pass = if ($env:LEGACY_CLONE_PASSWORD) { $env:LEGACY_CLONE_PASSWORD } else { "legacy-local-2026" }
-$rootPass = if ($env:LEGACY_CLONE_ROOT_PASSWORD) { $env:LEGACY_CLONE_ROOT_PASSWORD } else { "legacy-root-local-2026" }
-
-if ($db -notmatch '^[A-Za-z0-9_]+$' -or $user -notmatch '^[A-Za-z0-9_]+$') {
-    throw "Nome de banco/usuário do clone inválido."
+} until ($state -eq "running" -or $tries -ge 60)
+if ($state -ne "running") {
+    docker compose @compose logs web --tail=150
+    throw "Django de homologação não iniciou."
 }
 
-Write-Host "Recriando banco de homologação $db..."
-$resetSql = "DROP DATABASE IF EXISTS $db; CREATE DATABASE $db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL PRIVILEGES ON $db.* TO '$user'@'%'; FLUSH PRIVILEGES;"
-docker compose @compose exec -T legacy-db mariadb "-uroot" "-p$rootPass" -e $resetSql
-
-Write-Host "Restaurando dump em $db..."
-Get-Content -Raw -Encoding UTF8 $SqlPath | docker compose @compose exec -T legacy-db mariadb --default-character-set=utf8mb4 "-uroot" "-p$rootPass" $db
-
-Write-Host "Recriando web com conexão ao clone..."
-docker compose @compose up -d --force-recreate web
-
-Write-Host "Executando ETL em dry-run..."
+Write-Host "Executando ETL completo em dry-run..."
 docker compose @compose exec web python manage.py import_legacy_core --dry-run
 $specialArgs = @("python","manage.py","import_legacy_specialized","--dry-run")
 if (-not $env:LEGACY_APP_KEY) {
@@ -56,13 +88,28 @@ docker compose @compose exec web @specialArgs
 
 if ($Apply) {
     if (-not $env:LEGACY_APP_KEY) {
-        throw "Para aplicar a migração completa, configure LEGACY_APP_KEY com a chave do PHP antigo."
+        throw "Para aplicar a migração completa, configure LEGACY_APP_KEY localmente com a chave do PHP antigo."
     }
-    Write-Host "Aplicando ETL..."
+
+    Write-Host "Aplicando ETL no PostgreSQL isolado..."
     docker compose @compose exec web python manage.py import_legacy_core
     docker compose @compose exec web python manage.py import_legacy_specialized
-    Write-Host "Auditando paridade..."
+
+    Write-Host "Auditando tabelas, IDs e cobertura de colunas..."
     docker compose @compose exec web python manage.py audit_legacy_parity --strict
+
+    Write-Host "Aplicando RBAC adicional do Django após validar os dados legados..."
+    docker compose @compose exec web python manage.py seed_rbac
+
+    Write-Host "Subindo workers contra o banco homologado..."
+    docker compose @compose up -d --force-recreate worker beat
+
+    Write-Host ""
+    Write-Host "Migração aplicada e auditada no banco isolado."
+    Write-Host "Abra http://127.0.0.1:8000/ para homologar."
+    Write-Host "Seu PostgreSQL local original não foi apagado."
 } else {
-    Write-Host "Dry-run concluído. Rode novamente com -Apply para persistir a migração."
+    Write-Host ""
+    Write-Host "Dry-run concluído. Nenhum registro legado foi persistido."
+    Write-Host "Rode novamente com -Apply após configurar LEGACY_APP_KEY para gerar a base homologada."
 }
