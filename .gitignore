@@ -28,3 +28,6 @@ error_log*
 *.backup*
 storage/backups/
 storage/logs/
+
+# Dumps reais usados apenas em homologação local
+django/legacy-dumps/
