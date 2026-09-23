@@ -9,5 +9,6 @@
     <p><label><input type="checkbox" name="remember_device" value="1"> confiar neste dispositivo após o 2FA</label></p>
     <button type="submit">Entrar</button>
   </form>
+  <p><a href="{% url 'accounts:password-reset-request' %}">Esqueci minha senha</a></p>
 </main>
 {% endblock %}
