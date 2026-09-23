@@ -4,6 +4,7 @@ from billing.models import Module
 
 
 MODULES={
+    # Ordem deliberadamente igual aos IDs 1..17 do catálogo legado atual.
     "products":{
         "name":"Produtos, PDV e vendas",
         "description":"Cadastro de produtos, frente de caixa (PDV) e venda de produtos.",
@@ -30,6 +31,9 @@ MODULES={
         "description":"Gestão de mais de uma unidade no mesmo estabelecimento.",
         "active":True,"sort_order":0,"addon_monthly_price":"39.99","addon_sellable":True,
     },
+    "medical_records":{"name":"Prontuários","description":"Prontuário clínico.","active":False,"sort_order":60},
+    "odontology":{"name":"Odontologia","description":"Recursos de odontologia.","active":False,"sort_order":61},
+    "api":{"name":"API","description":"Acesso à API.","active":False,"sort_order":62},
     "packages":{
         "name":"Pacotes e mensalidades",
         "description":"Pacotes de serviços, créditos e mensalidades recorrentes.",
@@ -50,9 +54,6 @@ MODULES={
         "description":"Uso de domínio próprio na página pública.",
         "active":True,"sort_order":0,"addon_monthly_price":"59.99","addon_sellable":True,
     },
-    "medical_records":{"name":"Prontuários","description":"Prontuário clínico.","active":False,"sort_order":60},
-    "odontology":{"name":"Odontologia","description":"Recursos de odontologia.","active":False,"sort_order":61},
-    "api":{"name":"API","description":"Acesso à API.","active":False,"sort_order":62},
     "sports_courts":{
         "name":"Arena",
         "description":"Gestão de arenas, quadras e espaços esportivos: agenda, reservas, rachas, mensalistas, comandas, CRM e operação esportiva.",
