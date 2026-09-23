@@ -41,11 +41,7 @@ TRANSFORMED={
     "terms_acceptances":"normalizado em legal.LegalAcceptance",
 }
 
-IGNORED={
-    "migrations":"histórico de migrations do PHP; substituído pelas migrations Django",
-    "jobs":"fila de execução do runtime PHP; Celery assume essa função",
-    "jobs_failed_archive":"histórico técnico da fila PHP; não é dado operacional",
-}
+IGNORED={}
 
 
 class Command(BaseCommand):
