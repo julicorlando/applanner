@@ -11,7 +11,7 @@ from tenants.models import Tenant
 class AutoPortalTests(TestCase):
     def setUp(self):
         self.tenant=Tenant.objects.create(name="Auto",slug="auto-test")
-        self.user=User.objects.create_user(email="auto@example.com",password="StrongPassword123!",tenant=self.tenant)
+        self.user=User.objects.create_user(email="auto@example.com",password="StrongPassword123!",tenant=self.tenant,role="auto-manager")
         customer=Customer.objects.create(tenant=self.tenant,name="Cliente")
         service=Service.objects.create(tenant=self.tenant,name="Detail",duration_minutes=60,price="100.00")
         vehicle=Vehicle.objects.create(tenant=self.tenant,customer=customer,plate="ABC1D23",model="Carro")
@@ -25,3 +25,15 @@ class AutoPortalTests(TestCase):
         response=self.client.post(reverse("auto-job-action",args=[self.job.pk]),{"action":"open_command"})
         self.assertEqual(response.status_code,302)
         self.assertTrue(hasattr(Job.objects.get(pk=self.job.pk),"command"))
+
+
+    def test_regular_user_is_denied(self):
+        other=User.objects.create_user(
+            email="basic-auto@example.com",password="StrongPassword123!",
+            tenant=self.tenant,role="user",
+        )
+        self.client.force_login(other)
+        self.assertEqual(
+            self.client.get(reverse("auto-job-detail",args=[self.job.pk])).status_code,
+            403,
+        )
