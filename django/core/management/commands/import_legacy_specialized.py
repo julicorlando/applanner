@@ -123,7 +123,7 @@ SPECS=[
     {"table":"auto_crm_events","model":"auto.CRMEvent"},
 
     {"table":"sports_settings","model":"arena.SportsSettings","keys":["tenant_id"]},
-    {"table":"sports_arena_settings","model":"arena.ArenaSettings","keys":["tenant_id"]},
+    {"table":"sports_arena_settings","model":"arena.ArenaSettings","keys":["tenant_id"],"rename":{"amenities":"amenities_json"}},
     {"table":"sports_modalities","model":"arena.Modality"},
     {"table":"sports_courts","model":"arena.Court","rename":{"photo":"photo_path"}},
     {"table":"sports_court_modalities","model":"arena.CourtModality","keys":["court_id","modality_id"]},
@@ -155,7 +155,7 @@ SPECS=[
     {"table":"sports_command_items","model":"arena.ArenaCommandItem"},
     {"table":"sports_command_stock_movements","model":"arena.ArenaCommandStockMovement"},
 
-    {"table":"notifications","model":"communications.Notification"},
+    {"table":"notifications","model":"communications.Notification","rename":{"payload":"payload_json"}},
     {"table":"user_notifications","model":"communications.UserNotification"},
     {"table":"campaigns","model":"communications.CustomerCampaign"},
     {"table":"campaign_recipients","model":"communications.CampaignRecipient"},
