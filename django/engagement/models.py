@@ -227,3 +227,75 @@ class ReferralVisit(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["referrer_user","clicked_at"],name="eng_referral_owner_idx")]
+
+
+class BehaviorProfile(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="behavior_profiles")
+    customer=models.ForeignKey("scheduling.Customer",on_delete=models.CASCADE,related_name="behavior_profiles")
+    avg_interval_days=models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True)
+    median_interval_days=models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True)
+    std_deviation_days=models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True)
+    last_visit_at=models.DateTimeField(null=True,blank=True)
+    next_expected_date=models.DateField(null=True,blank=True,db_index=True)
+    confidence_score=models.PositiveSmallIntegerField(default=0)
+    visits_count=models.PositiveIntegerField(default=0)
+    intervals=models.JSONField(default=list,blank=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["tenant","customer"],name="uq_behavior_customer")]
+        indexes=[models.Index(fields=["tenant","next_expected_date"],name="behavior_next_idx")]
+
+
+class BehaviorServiceProfile(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="behavior_service_profiles")
+    customer=models.ForeignKey("scheduling.Customer",on_delete=models.CASCADE,related_name="behavior_service_profiles")
+    service=models.ForeignKey("scheduling.Service",on_delete=models.CASCADE,related_name="behavior_profiles")
+    avg_interval_days=models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True)
+    median_interval_days=models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True)
+    std_deviation_days=models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True)
+    last_visit_at=models.DateTimeField(null=True,blank=True)
+    next_expected_date=models.DateField(null=True,blank=True)
+    confidence_score=models.PositiveSmallIntegerField(default=0)
+    visits_count=models.PositiveIntegerField(default=0)
+    intervals=models.JSONField(default=list,blank=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["tenant","customer","service"],name="uq_behavior_service")]
+        indexes=[models.Index(fields=["tenant","next_expected_date","confidence_score"],name="behavior_service_next_idx")]
+
+
+class BehaviorEvent(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="behavior_events")
+    customer=models.ForeignKey("scheduling.Customer",on_delete=models.CASCADE,related_name="behavior_events")
+    event_type=models.CharField(max_length=60)
+    score=models.DecimalField(max_digits=8,decimal_places=2,null=True,blank=True)
+    payload=models.JSONField(default=dict,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","event_type","created_at"],name="behavior_event_type_idx")]
+
+
+class PlatformAutomationLog(models.Model):
+    class Channel(models.TextChoices):
+        EMAIL="email","E-mail"
+        WHATSAPP="whatsapp","WhatsApp"
+    class Status(models.TextChoices):
+        QUEUED="queued","Na fila"
+        SENT="sent","Enviado"
+        FAILED="failed","Falhou"
+        SKIPPED="skipped","Ignorado"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="automation_logs")
+    customer=models.ForeignKey("scheduling.Customer",on_delete=models.CASCADE,related_name="automation_logs")
+    event_type=models.CharField(max_length=60)
+    channel=models.CharField(max_length=16,choices=Channel.choices)
+    scheduled_for=models.DateField()
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.QUEUED)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["tenant","customer","event_type","channel","scheduled_for"],name="uq_platform_automation")]
+        indexes=[models.Index(fields=["tenant","scheduled_for","status"],name="platform_automation_idx")]
