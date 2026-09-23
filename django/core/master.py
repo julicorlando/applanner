@@ -85,18 +85,18 @@ MASTER_RESOURCES={
     "conexoes-pagamento":{"model":"billing.TenantPaymentConnection","title":"Conexões de pagamento","fields":[],"columns":["tenant","provider","display_name","environment","status","last_tested_at","last_sync_at"],"order":"tenant__name,provider","create":False,"edit":False},
     "transacoes-pagamento":{"model":"billing.TenantPaymentTransaction","title":"Transações dos estabelecimentos","fields":[],"columns":["tenant","reference_type","method","gross_amount","net_amount","status","paid_at"],"order":"-created_at","create":False,"edit":False},
     "recorrencias-pagamento":{"model":"billing.TenantRecurringSubscription","title":"Recorrências de pagamento","fields":[],"columns":["tenant","reference_type","amount","cycle_months","status","last_payment_at"],"order":"-created_at","create":False,"edit":False},
-    "login-audit":{"model":"accounts.LoginAudit","title":"Auditoria de login","fields":[],"columns":["user","email","event","ip_address","created_at"],"order":"-created_at","create":False,"edit":False},
+    "login-audit":{"model":"accounts.LoginAudit","title":"Auditoria de login","fields":[],"columns":["user","email_attempted","event_type","result","ip_address","created_at"],"order":"-created_at","create":False,"edit":False},
     "eventos-seguranca":{"model":"accounts.SecurityEvent","title":"Eventos de segurança","fields":[],"columns":["tenant","user","event_type","severity","ip_address","created_at"],"order":"-created_at","create":False,"edit":False},
-    "bloqueios-usuarios":{"model":"accounts.UserBlock","title":"Bloqueios de usuários","fields":[],"columns":["user","blocked_until","reason","created_at"],"order":"-created_at","create":False,"edit":False},
+    "bloqueios-usuarios":{"model":"accounts.UserBlock","title":"Bloqueios de usuários","fields":[],"columns":["user","reason_code","reason_text","blocked_at","expires_at","unblocked_at"],"order":"-created_at","create":False,"edit":False},
     "onboarding":{"model":"tenants.TenantOnboarding","title":"Onboarding das empresas","fields":[],"columns":["tenant","company_done","branding_done","unit_done","professional_done","service_done","schedule_done","payment_done","public_page_done","completed_at"],"order":"tenant__name","create":False,"edit":False},
     "historico-empresas":{"model":"tenants.TenantStatusHistory","title":"Histórico das empresas","fields":[],"columns":["tenant","from_status","to_status","reason","changed_by","created_at"],"order":"-created_at","create":False,"edit":False},
-    "acessos-suporte":{"model":"operations.SupportAccessSession","title":"Acessos remotos de suporte","fields":[],"columns":["ticket","support_user","started_at","ended_at"],"order":"-started_at","create":False,"edit":False},
+    "acessos-suporte":{"model":"operations.SupportAccessSession","title":"Acessos remotos de suporte","fields":[],"columns":["ticket","tenant","master_user","started_at","ended_at"],"order":"-started_at","create":False,"edit":False},
     "verificacoes-backup":{"model":"operations.BackupVerification","title":"Verificações de backup","fields":[],"columns":["backup","status","verification_type","verified_at"],"order":"-verified_at","create":False,"edit":False},
     "alertas-cron":{"model":"operations.CronAlertLog","title":"Alertas dos jobs","fields":[],"columns":["alert_key","channel","status","message","created_at"],"order":"-created_at","create":False,"edit":False},
     "solicitacoes-billing":{"model":"operations.BillingSupportRequest","title":"Solicitações financeiras","fields":[],"columns":["tenant","request_type","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "configuracoes-plataforma":{"model":"operations.PlatformSetting","title":"Configurações da plataforma","fields":[],"columns":["tenant","key","is_secret","updated_at"],"order":"key","create":False,"edit":False},
-    "blog":{"model":"contenthub.BlogPost","title":"Blog","fields":["slug","title","excerpt","content","status","published_at"],"columns":["title","slug","status","published_at"],"order":"-published_at,-created_at"},
-    "landings":{"model":"contenthub.LandingPage","title":"Landing pages","fields":["slug","title","headline","subheadline","cta_label","cta_url","active"],"columns":["title","slug","active","updated_at"],"order":"title"},
+    "blog":{"model":"contenthub.BlogPost","title":"Blog","fields":["slug","title","excerpt","content","status","featured","meta_title","meta_description","published_at"],"columns":["title","slug","status","published_at"],"order":"-published_at,-created_at","special":"blog"},
+    "landings":{"model":"contenthub.LandingPage","title":"Landing pages","fields":["slug","locale","segment","headline","subheadline","body","cta_label","cta_url","seo_title","seo_description","active"],"columns":["headline","slug","locale","segment","active","updated_at"],"order":"title"},
     "avaliacoes-publicas":{"model":"contenthub.PublicReview","title":"Avaliações públicas","fields":["tenant","customer_name","rating","comment","active"],"columns":["tenant","customer_name","rating","active","created_at"],"order":"-created_at"},
     "marketing-contatos":{"model":"communications.MarketingLead","title":"Contatos de e-mail marketing","fields":["name","email","status","source"],"columns":["name","email","status","source","created_at"],"order":"-created_at"},
     "marketing-campanhas":{"model":"communications.MarketingCampaign","title":"Campanhas de e-mail","fields":[],"columns":["subject","status","total_count","sent_count","failed_count","created_at"],"order":"-created_at","create":False,"edit":False},
@@ -210,6 +210,8 @@ def resource_form(request,slug,pk=None):
             row.updated_by=request.user
         if config.get("special")=="subscription_exemption" and not row.granted_by_id:
             row.granted_by=request.user
+        if config.get("special")=="blog" and not row.author_id:
+            row.author=request.user
         try:
             row.full_clean()
             row.save()
