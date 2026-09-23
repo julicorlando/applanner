@@ -112,6 +112,20 @@ class Command(BaseCommand):
             cur.execute(sql,params or ())
             return cur.fetchall()
 
+    def _legacy_media_name(self,value):
+        if not value:
+            return ""
+        raw=str(value).strip().replace("\\","/")
+        if raw.startswith(("http://","https://")):
+            from urllib.parse import urlparse
+            raw=urlparse(raw).path
+        raw=raw.lstrip("/")
+        for prefix in ("public/uploads/","uploads/","public/"):
+            if raw.startswith(prefix):
+                raw=raw[len(prefix):]
+                break
+        return raw
+
     def _restore_times(self,model,pk,row):
         field_names={field.name for field in model._meta.fields}
         values={}
@@ -171,8 +185,8 @@ class Command(BaseCommand):
                 "category":row.get("category") or "",
                 "default_locale":(row.get("default_locale") or "pt_BR").replace("_","-").lower(),
                 "locale":(row.get("default_locale") or "pt_BR").replace("_","-").lower(),
-                "logo":row.get("logo_path") or "",
-                "cover":row.get("cover_path") or "",
+                "logo":self._legacy_media_name(row.get("logo_path")),
+                "cover":self._legacy_media_name(row.get("cover_path")),
                 "primary_color":row.get("primary_color") or "#2563eb",
                 "menu_color":row.get("menu_color") or "#17213b",
                 "menu_text_color":row.get("menu_text_color") or "#dce3f7",
@@ -369,7 +383,7 @@ class Command(BaseCommand):
                     "email":row.get("email") or "",
                     "phone":row.get("phone") or "",
                     "specialty":row.get("specialty") or "",
-                    "photo":row.get("photo_path") or "",
+                    "photo":self._legacy_media_name(row.get("photo_path")),
                     "commission_percent":row.get("commission_percent"),
                     "active":bool(row.get("active",1)),
                 },
