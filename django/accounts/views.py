@@ -1,6 +1,10 @@
+import hashlib
+import secrets
+from datetime import timedelta
 from urllib.parse import quote
 
 from django.conf import settings
+from django.core.mail import send_mail
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
@@ -10,7 +14,7 @@ from django.db.models import Q
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from .models import LoginAudit, LoginHistory, SecurityEvent
+from .models import EmailVerificationToken, LoginAudit, LoginHistory, PasswordResetToken, SecurityEvent
 from .security import (
     consume_recovery_code, decrypt_secret, encrypt_secret, generate_recovery_codes,
     generate_totp_secret, issue_trusted_device, validate_trusted_device, verify_totp,
@@ -199,3 +203,105 @@ def logout_view(request):
     response=redirect(settings.LOGOUT_REDIRECT_URL)
     response.delete_cookie(TRUSTED_COOKIE)
     return response
+
+
+@never_cache
+def password_reset_request(request):
+    if request.method=="POST":
+        email=(request.POST.get("email") or "").strip().lower()
+        user=User.objects.filter(email=email,is_active=True).first()
+        if user:
+            PasswordResetToken.objects.filter(user=user,used_at__isnull=True).update(used_at=timezone.now())
+            raw=secrets.token_urlsafe(32)
+            PasswordResetToken.objects.create(
+                user=user,
+                token_hash=hashlib.sha256(raw.encode()).hexdigest(),
+                expires_at=timezone.now()+timedelta(hours=1),
+            )
+            url=request.build_absolute_uri(
+                f"/account/password-reset/{raw}/"
+            )
+            send_mail(
+                "Redefinição de senha — ApPlanner",
+                f"Use este link em até 1 hora para redefinir sua senha: {url}",
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+        messages.success(request,"Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação.")
+        return redirect("accounts:password-reset-request")
+    return render(request,"accounts/password_reset_request.html")
+
+
+@never_cache
+def password_reset_confirm(request,token):
+    digest=hashlib.sha256(token.encode()).hexdigest()
+    row=PasswordResetToken.objects.select_related("user").filter(
+        token_hash=digest,used_at__isnull=True,expires_at__gt=timezone.now()
+    ).first()
+    if not row:
+        messages.error(request,"Link de recuperação inválido ou expirado.")
+        return redirect("accounts:password-reset-request")
+    if request.method=="POST":
+        password=request.POST.get("password") or ""
+        confirmation=request.POST.get("password_confirmation") or ""
+        if len(password)<8:
+            messages.error(request,"A nova senha deve ter pelo menos 8 caracteres.")
+        elif password!=confirmation:
+            messages.error(request,"As senhas não conferem.")
+        else:
+            user=row.user
+            user.set_password(password)
+            user.password_changed_at=timezone.now()
+            user.must_change_password=False
+            user.session_version+=1
+            user.save(update_fields=["password","password_changed_at","must_change_password","session_version"])
+            row.used_at=timezone.now()
+            row.save(update_fields=["used_at"])
+            user.trusted_devices.all().delete()
+            messages.success(request,"Senha redefinida. Faça login com a nova senha.")
+            return redirect("accounts:login")
+    return render(request,"accounts/password_reset_confirm.html",{"token":token})
+
+
+@login_required
+@require_POST
+def send_verification(request):
+    if request.user.email_verified_at:
+        messages.info(request,"Seu e-mail já está verificado.")
+        return redirect(settings.LOGIN_REDIRECT_URL)
+    EmailVerificationToken.objects.filter(user=request.user,used_at__isnull=True).update(used_at=timezone.now())
+    raw=secrets.token_urlsafe(32)
+    EmailVerificationToken.objects.create(
+        user=request.user,
+        token_hash=hashlib.sha256(raw.encode()).hexdigest(),
+        expires_at=timezone.now()+timedelta(hours=24),
+    )
+    url=request.build_absolute_uri(f"/account/verify-email/{raw}/")
+    send_mail(
+        "Verifique seu e-mail — ApPlanner",
+        f"Confirme seu e-mail usando este link em até 24 horas: {url}",
+        settings.DEFAULT_FROM_EMAIL,
+        [request.user.email],
+        fail_silently=False,
+    )
+    messages.success(request,"Link de verificação enviado.")
+    return redirect(settings.LOGIN_REDIRECT_URL)
+
+
+@never_cache
+def verify_email(request,token):
+    digest=hashlib.sha256(token.encode()).hexdigest()
+    row=EmailVerificationToken.objects.select_related("user").filter(
+        token_hash=digest,used_at__isnull=True,expires_at__gt=timezone.now()
+    ).first()
+    if not row:
+        messages.error(request,"Link de verificação inválido ou expirado.")
+        return redirect("accounts:login")
+    now=timezone.now()
+    row.used_at=now
+    row.save(update_fields=["used_at"])
+    row.user.email_verified_at=now
+    row.user.save(update_fields=["email_verified_at"])
+    messages.success(request,"E-mail verificado com sucesso.")
+    return redirect("accounts:login")
