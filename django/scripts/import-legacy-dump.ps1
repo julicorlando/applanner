@@ -29,18 +29,35 @@ if ($status -ne "healthy") { throw "MariaDB legado não ficou saudável." }
 $db = if ($env:LEGACY_CLONE_DATABASE) { $env:LEGACY_CLONE_DATABASE } else { "appnannerbr_planner" }
 $user = if ($env:LEGACY_CLONE_USER) { $env:LEGACY_CLONE_USER } else { "legacy" }
 $pass = if ($env:LEGACY_CLONE_PASSWORD) { $env:LEGACY_CLONE_PASSWORD } else { "legacy-local-2026" }
+$rootPass = if ($env:LEGACY_CLONE_ROOT_PASSWORD) { $env:LEGACY_CLONE_ROOT_PASSWORD } else { "legacy-root-local-2026" }
+
+if ($db -notmatch '^[A-Za-z0-9_]+$' -or $user -notmatch '^[A-Za-z0-9_]+$') {
+    throw "Nome de banco/usuário do clone inválido."
+}
+
+Write-Host "Recriando banco de homologação $db..."
+$resetSql = "DROP DATABASE IF EXISTS $db; CREATE DATABASE $db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL PRIVILEGES ON $db.* TO '$user'@'%'; FLUSH PRIVILEGES;"
+docker compose @compose exec -T legacy-db mariadb "-uroot" "-p$rootPass" -e $resetSql
 
 Write-Host "Restaurando dump em $db..."
-Get-Content -Raw -Encoding UTF8 $SqlPath | docker compose @compose exec -T legacy-db mariadb "-u$user" "-p$pass" $db
+Get-Content -Raw -Encoding UTF8 $SqlPath | docker compose @compose exec -T legacy-db mariadb --default-character-set=utf8mb4 "-uroot" "-p$rootPass" $db
 
 Write-Host "Recriando web com conexão ao clone..."
 docker compose @compose up -d --force-recreate web
 
 Write-Host "Executando ETL em dry-run..."
 docker compose @compose exec web python manage.py import_legacy_core --dry-run
-docker compose @compose exec web python manage.py import_legacy_specialized --dry-run
+$specialArgs = @("python","manage.py","import_legacy_specialized","--dry-run")
+if (-not $env:LEGACY_APP_KEY) {
+    Write-Warning "LEGACY_APP_KEY não configurada: segredos, gateways, contas bancárias e prontuários serão ignorados neste ensaio."
+    $specialArgs += "--skip-sensitive"
+}
+docker compose @compose exec web @specialArgs
 
 if ($Apply) {
+    if (-not $env:LEGACY_APP_KEY) {
+        throw "Para aplicar a migração completa, configure LEGACY_APP_KEY com a chave do PHP antigo."
+    }
     Write-Host "Aplicando ETL..."
     docker compose @compose exec web python manage.py import_legacy_core
     docker compose @compose exec web python manage.py import_legacy_specialized
