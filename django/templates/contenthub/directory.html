@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Estabelecimentos — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Encontre estabelecimentos.</h1><p>Veja empresas com página pública e agendamento pelo ApPlanner.</p></div><button class="button ghost" id="nearby">Ordenar por proximidade</button></div>
+  <div class="segment-grid">
+    {% for card in cards %}
+    <article>
+      <span>{{ card.tenant.category|default:"Estabelecimento" }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
+      <h3>{{ card.tenant.name }}</h3>
+      <p>{{ card.tenant.description|truncatechars:180 }}</p>
+      {% with unit=card.units.0 %}{% if unit %}<p>{{ unit.city }}{% if unit.state %}/{{ unit.state }}{% endif %}{% if unit.district %} · {{ unit.district }}{% endif %}</p>{% endif %}{% endwith %}
+      <a href="{% url 'tenant-public' card.tenant.public_slug %}">Abrir página e agendar →</a>
+    </article>
+    {% empty %}<p class="empty">Nenhum estabelecimento público no momento.</p>{% endfor %}
+  </div>
+</section>
+<script>
+document.getElementById('nearby').addEventListener('click',()=>{
+  if(!navigator.geolocation){return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const u=new URL(window.location.href);
+    u.searchParams.set('lat',pos.coords.latitude);
+    u.searchParams.set('lon',pos.coords.longitude);
+    window.location.href=u.toString();
+  });
+});
+</script>
+{% endblock %}
