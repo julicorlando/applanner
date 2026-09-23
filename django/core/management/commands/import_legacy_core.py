@@ -13,7 +13,7 @@ from accounts.security import encrypt_secret
 from billing.models import Module, Payment, Plan, PlanModule, Subscription, TenantModule
 from core.legacy_crypto import decrypt_php_aes_gcm
 from scheduling.models import Appointment, Customer, Professional, Service
-from tenants.models import Tenant
+from tenants.models import Tenant, Unit
 
 
 ROLE_PRIORITY=["master","support","commercial","manager","professional","user"]
@@ -69,6 +69,7 @@ class Command(BaseCommand):
                     self._tenant_modules(conn)
                 else:
                     self._tenants(conn)
+                    self._units(conn)
                     self._rbac(conn)
                     self._users(conn,skip_2fa=options["skip_2fa"])
                     self._customers(conn)
@@ -156,19 +157,87 @@ class Command(BaseCommand):
     def _tenants(self,conn):
         rows=self._rows(conn,"SELECT * FROM tenants ORDER BY id")
         for row in rows:
-            obj,_=Tenant.objects.update_or_create(
-                id=row["id"],
-                defaults={
-                    "name":row["name"],
-                    "slug":row["slug"],
-                    "document":row.get("document") or "",
-                    "email":row.get("email") or "",
-                    "phone":row.get("phone") or "",
-                    "status":row.get("status") or "trial",
-                },
-            )
+            defaults={
+                "name":row["name"],
+                "slug":row["slug"],
+                "public_slug":row.get("public_slug"),
+                "public_short_code":row.get("public_short_code"),
+                "public_booking_enabled":bool(row.get("public_booking_enabled",1)),
+                "document":row.get("document") or "",
+                "email":row.get("email") or "",
+                "phone":row.get("phone") or "",
+                "description":row.get("description") or "",
+                "category":row.get("category") or "",
+                "default_locale":(row.get("default_locale") or "pt_BR").replace("_","-").lower(),
+                "locale":(row.get("default_locale") or "pt_BR").replace("_","-").lower(),
+                "logo":row.get("logo_path") or "",
+                "cover":row.get("cover_path") or "",
+                "primary_color":row.get("primary_color") or "#2563eb",
+                "menu_color":row.get("menu_color") or "#17213b",
+                "menu_text_color":row.get("menu_text_color") or "#dce3f7",
+                "background_color":row.get("background_color") or "#f4f6fb",
+                "text_color":row.get("text_color") or "#17213b",
+                "font_family":row.get("font_family") or "Inter",
+                "font_size":int(row.get("font_size") or 15),
+                "accepted_payment_methods":self._json_value(row.get("accepted_payment_methods"),default=[]),
+                "public_sections":self._json_value(row.get("public_sections"),default=[]),
+                "public_layout":row.get("public_layout") or "editorial",
+                "public_headline":row.get("public_headline") or "",
+                "public_subheadline":row.get("public_subheadline") or "",
+                "public_cta_label":row.get("public_cta_label") or "",
+                "public_announcement":row.get("public_announcement") or "",
+                "public_accent_color":row.get("public_accent_color") or "",
+                "public_section_order":self._json_value(row.get("public_section_order"),default=[]),
+                "public_seo_title":row.get("public_seo_title") or "",
+                "public_seo_description":row.get("public_seo_description") or "",
+                "public_instagram":row.get("public_instagram") or "",
+                "public_enabled":bool(row.get("public_enabled",0)),
+                "onboarding_step":int(row.get("onboarding_step") or 1),
+                "status":row.get("status") or "trial",
+                "deleted_at":aware(row.get("deleted_at")),
+            }
+            obj,_=Tenant.objects.update_or_create(id=row["id"],defaults=defaults)
             self._restore_times(Tenant,obj.pk,row)
         self.stdout.write(f"tenants: {len(rows)}")
+
+    def _units(self,conn):
+        if "units" not in self.columns:
+            self.stdout.write("units: tabela legada ausente; ignorando.")
+            return
+        rows=self._rows(conn,"SELECT * FROM units ORDER BY id")
+        for row in rows:
+            obj,_=Unit.objects.update_or_create(
+                id=row["id"],
+                defaults={
+                    "tenant_id":row["tenant_id"],
+                    "name":row["name"],
+                    "address":row.get("address") or "",
+                    "address_number":row.get("address_number") or "",
+                    "address_complement":row.get("address_complement") or "",
+                    "district":row.get("district") or "",
+                    "city":row.get("city") or "",
+                    "state":row.get("state") or "",
+                    "postal_code":row.get("postal_code") or "",
+                    "latitude":row.get("latitude"),
+                    "longitude":row.get("longitude"),
+                    "geocoded_at":aware(row.get("geocoded_at")),
+                    "phone":row.get("phone") or "",
+                    "whatsapp":row.get("whatsapp") or "",
+                    "email":row.get("email") or "",
+                    "instagram":row.get("instagram") or "",
+                    "facebook":row.get("facebook") or "",
+                    "tiktok":row.get("tiktok") or "",
+                    "website":row.get("website") or "",
+                    "map_url":row.get("map_url") or "",
+                    "amenities":self._json_value(row.get("amenities"),default=[]),
+                    "payment_methods":self._json_value(row.get("payment_methods"),default=[]),
+                    "public_notes":row.get("public_notes") or "",
+                    "is_primary":bool(row.get("is_primary",0)),
+                    "active":bool(row.get("active",1)),
+                },
+            )
+            self._restore_times(Unit,obj.pk,row)
+        self.stdout.write(f"units: {len(rows)}")
 
     def _users(self,conn,skip_2fa=False):
         two_factor="u.two_factor_secret" if self._has("users","two_factor_secret") else "NULL AS two_factor_secret"
@@ -266,8 +335,15 @@ class Command(BaseCommand):
                 id=row["id"],
                 defaults={
                     "tenant_id":row["tenant_id"],
+                    "unit_id":row.get("unit_id"),
                     "user_id":row.get("user_id"),
                     "name":row["name"],
+                    "public_slug":row.get("public_slug"),
+                    "email":row.get("email") or "",
+                    "phone":row.get("phone") or "",
+                    "specialty":row.get("specialty") or "",
+                    "photo":row.get("photo_path") or "",
+                    "commission_percent":row.get("commission_percent"),
                     "active":bool(row.get("active",1)),
                 },
             )
@@ -301,11 +377,20 @@ class Command(BaseCommand):
                     "customer_id":row["customer_id"],
                     "professional_id":row.get("professional_id"),
                     "service_id":row["service_id"],
+                    "service_price_snapshot":row.get("service_price_snapshot"),
                     "starts_at":aware(row["starts_at"]),
                     "ends_at":aware(row["ends_at"]),
                     "status":row.get("status") or "pending",
                     "source":row.get("source") or "internal",
                     "notes":row.get("notes") or "",
+                    "customer_manage_token_hash":row.get("customer_manage_token_hash"),
+                    "customer_manage_token_encrypted":"",
+                    "customer_confirmed_at":aware(row.get("customer_confirmed_at")),
+                    "checked_in_at":aware(row.get("checked_in_at")),
+                    "service_started_at":aware(row.get("service_started_at")),
+                    "service_completed_at":aware(row.get("service_completed_at")),
+                    "reminder_24h_sent_at":aware(row.get("reminder_24h_sent_at")),
+                    "reminder_2h_sent_at":aware(row.get("reminder_2h_sent_at")),
                     "created_by_id":row.get("created_by"),
                 },
             )
@@ -336,16 +421,16 @@ class Command(BaseCommand):
             Module.objects.update_or_create(id=row["id"],defaults=defaults)
         self.stdout.write(f"modules: {len(rows)}")
 
-    def _json_value(self,value):
+    def _json_value(self,value,default=None):
+        fallback={} if default is None else default
         if isinstance(value,str):
             if not value.strip():
-                return {}
+                return fallback
             try:
-                parsed=json.loads(value)
-                return parsed if isinstance(parsed,dict) else {"legacy":parsed}
+                return json.loads(value)
             except json.JSONDecodeError:
-                return {"legacy":value}
-        return value if isinstance(value,dict) else {}
+                return fallback
+        return value if value is not None else fallback
 
     def _plans(self,conn):
         rows=self._rows(conn,"SELECT * FROM plans ORDER BY id")
@@ -434,10 +519,20 @@ class Command(BaseCommand):
                 defaults={
                     "tenant_id":row["tenant_id"],
                     "plan_id":row["plan_id"],
+                    "billing_cycle":row.get("billing_cycle") or "monthly",
+                    "contracted_price":row.get("contracted_price"),
+                    "base_contracted_price":row.get("base_contracted_price"),
+                    "addon_contracted_price":Decimal(str(row.get("addon_contracted_price") or 0)),
                     "status":row.get("status") or "trial",
                     "started_at":aware(row["started_at"]),
+                    "trial_started_at":aware(row.get("trial_started_at")),
+                    "trial_ends_at":aware(row.get("trial_ends_at")),
+                    "trial_days_snapshot":row.get("trial_days_snapshot"),
                     "next_billing_at":aware(row.get("next_billing_at")),
                     "cancelled_at":aware(row.get("cancelled_at")),
+                    "provider_customer_id":row.get("provider_customer_id") or "",
+                    "provider_subscription_id":row.get("provider_subscription_id") or "",
+                    "provider_plan_id":row.get("provider_plan_id") or "",
                 },
             )
             self._restore_times(Subscription,obj.pk,row)
@@ -451,8 +546,14 @@ class Command(BaseCommand):
                 defaults={
                     "tenant_id":row["tenant_id"],
                     "subscription_id":row.get("subscription_id"),
+                    "purpose":row.get("purpose") or "subscription",
+                    "reference_id":row.get("reference_id"),
                     "provider":row.get("provider") or "",
+                    "environment":row.get("environment") or "unknown",
                     "provider_reference":row.get("provider_reference") or "",
+                    "provider_status":row.get("provider_status") or "",
+                    "provider_payment_id":row.get("provider_payment_id") or "",
+                    "idempotency_key":row.get("idempotency_key") or "",
                     "amount":Decimal(str(row.get("amount") or 0)),
                     "status":row.get("status") or "pending",
                     "due_at":aware(row.get("due_at")),
