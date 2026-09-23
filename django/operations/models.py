@@ -224,3 +224,59 @@ class PlatformSetting(models.Model):
     class Meta:
         constraints=[models.UniqueConstraint(fields=["tenant","key"],name="uq_platform_setting_tenant_key")]
         indexes=[models.Index(fields=["key"],name="ops_setting_key_idx")]
+
+
+class LegacyRuntimeJob(models.Model):
+    """Snapshot da fila PHP antiga. Nunca é executado pelo Celery."""
+    tenant=models.ForeignKey(
+        "tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="legacy_runtime_jobs",
+    )
+    type=models.CharField(max_length=100)
+    payload_encrypted=models.TextField()
+    status=models.CharField(max_length=16,db_index=True)
+    attempts=models.PositiveSmallIntegerField(default=0)
+    available_at=models.DateTimeField(db_index=True)
+    locked_at=models.DateTimeField(null=True,blank=True)
+    failed_at=models.DateTimeField(null=True,blank=True)
+    last_error=models.CharField(max_length=500,blank=True)
+    created_at=models.DateTimeField()
+    updated_at=models.DateTimeField()
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["status","available_at"],name="ops_legacy_job_status_idx"),
+            models.Index(fields=["type","created_at"],name="ops_legacy_job_type_idx"),
+        ]
+
+
+class LegacyFailedJobArchive(models.Model):
+    """Falhas históricas da fila PHP antiga, mantidas apenas para auditoria."""
+    tenant=models.ForeignKey(
+        "tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="legacy_failed_jobs",
+    )
+    type=models.CharField(max_length=100)
+    payload_encrypted=models.TextField()
+    status=models.CharField(max_length=16,db_index=True)
+    attempts=models.PositiveSmallIntegerField(default=0)
+    available_at=models.DateTimeField()
+    locked_at=models.DateTimeField(null=True,blank=True)
+    failed_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField()
+    updated_at=models.DateTimeField()
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["status","failed_at"],name="ops_legacy_fail_status_idx"),
+        ]
+
+
+class LegacyMigrationRecord(models.Model):
+    """Histórico das migrations SQL do PHP, preservado para rastreabilidade."""
+    migration=models.CharField(max_length=190,db_index=True)
+    batch=models.PositiveIntegerField()
+    executed_at=models.DateTimeField()
+
+    class Meta:
+        ordering=["id"]
