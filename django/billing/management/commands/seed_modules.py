@@ -7,48 +7,48 @@ MODULES={
     "products":{
         "name":"Produtos, PDV e vendas",
         "description":"Cadastro de produtos, frente de caixa (PDV) e venda de produtos.",
-        "active":True,"sort_order":10,
+        "active":True,"sort_order":0,"addon_monthly_price":"49.99","addon_sellable":True,
     },
     "stock":{
         "name":"Controle de estoque",
         "description":"Saldos, movimentações e alerta de estoque mínimo.",
-        "active":True,"sort_order":20,
+        "active":True,"sort_order":0,"addon_monthly_price":"9.99","addon_sellable":True,
     },
     "finance":{
         "name":"Financeiro e controle de caixa",
         "description":"Receitas, despesas, formas de pagamento, abertura e fechamento de caixa.",
-        "active":True,"sort_order":30,
+        "active":True,"sort_order":0,"addon_monthly_price":"14.99","addon_sellable":True,
     },
     "behavior":{
         "name":"Inteligência de retorno",
         "description":"Convites de retorno e relacionamento com os clientes.",
-        "active":True,"sort_order":40,
+        "active":True,"sort_order":0,"addon_monthly_price":"89.90","addon_sellable":True,
     },
     "whatsapp":{"name":"WhatsApp","description":"Comunicação por WhatsApp.","active":False,"sort_order":41},
     "multiunit":{
         "name":"Multiunidade",
         "description":"Gestão de mais de uma unidade no mesmo estabelecimento.",
-        "active":True,"sort_order":50,
+        "active":True,"sort_order":0,"addon_monthly_price":"39.99","addon_sellable":True,
     },
     "packages":{
         "name":"Pacotes e mensalidades",
         "description":"Pacotes de serviços, créditos e mensalidades recorrentes.",
-        "active":True,"sort_order":55,
+        "active":True,"sort_order":0,"addon_monthly_price":"19.99","addon_sellable":True,
     },
     "loyalty":{
         "name":"Fidelidade",
         "description":"Pontos, regras e recompensas para fidelização.",
-        "active":True,"sort_order":56,
+        "active":True,"sort_order":0,"addon_monthly_price":"14.99","addon_sellable":True,
     },
     "waitlist":{
         "name":"Lista de espera inteligente",
         "description":"Fila para preencher horários que ficarem disponíveis.",
-        "active":True,"sort_order":57,
+        "active":True,"sort_order":0,"addon_monthly_price":"29.99","addon_sellable":True,
     },
-    "custom_domain":{
+    "custom-domain":{
         "name":"Domínio personalizado",
         "description":"Uso de domínio próprio na página pública.",
-        "active":True,"sort_order":58,
+        "active":True,"sort_order":0,"addon_monthly_price":"59.99","addon_sellable":True,
     },
     "medical_records":{"name":"Prontuários","description":"Prontuário clínico.","active":False,"sort_order":60},
     "odontology":{"name":"Odontologia","description":"Recursos de odontologia.","active":False,"sort_order":61},
