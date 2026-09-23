@@ -11,36 +11,37 @@ CAPABILITIES={
     "auto.manage":"Automotivo",
     "engagement.manage":"Relacionamento, pacotes, fidelidade e domínio",
     "healthcare.manage":"Saúde e prontuário",
+    "communications.manage":"Comunicação, notificações e WhatsApp",
     "support.manage":"Suporte",
     "commercial.manage":"Comercial",
 }
 ROLES={
     "tenant-admin":("Administrador da empresa",[
         "agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage",
-        "engagement.manage","healthcare.manage","support.manage",
+        "engagement.manage","healthcare.manage","communications.manage","support.manage",
     ]),
     "owner":("Proprietário",[
         "agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage",
-        "engagement.manage","healthcare.manage","support.manage",
+        "engagement.manage","healthcare.manage","communications.manage","support.manage",
     ]),
     "manager":("Gestor",[
         "agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage",
-        "engagement.manage","healthcare.manage","support.manage",
+        "engagement.manage","healthcare.manage","communications.manage","support.manage",
     ]),
     "reception":("Atendimento",[
-        "agenda.manage","barber.manage","arena.manage","auto.manage","engagement.manage","support.manage",
+        "agenda.manage","barber.manage","arena.manage","auto.manage","engagement.manage","communications.manage","support.manage",
     ]),
     "professional":("Profissional",[
-        "agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","support.manage",
+        "agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","communications.manage","support.manage",
     ]),
     "finance":("Financeiro",["finance.manage"]),
     "barber-manager":("Gestor Barbearia",["agenda.manage","barber.manage","finance.manage","engagement.manage"]),
     "arena-manager":("Gestor Arena",["arena.manage","finance.manage","engagement.manage"]),
     "auto-manager":("Gestor Automotivo",["agenda.manage","auto.manage","finance.manage","engagement.manage"]),
     "healthcare":("Saúde",["agenda.manage","healthcare.manage","support.manage"]),
-    "commercial":("Comercial",["commercial.manage","support.manage"]),
+    "commercial":("Comercial",["commercial.manage","communications.manage","support.manage"]),
     "support":("Suporte",["support.manage"]),
-    "user":("Usuário",["agenda.manage","support.manage"]),
+    "user":("Usuário",["agenda.manage","communications.manage","support.manage"]),
 }
 
 
