@@ -242,3 +242,9 @@ class WhatsAppMessage(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["conversation","id"],name="comm_wa_message_idx")]
+
+
+class MarketingCampaignReferrer(models.Model):
+    campaign=models.OneToOneField(MarketingCampaign,primary_key=True,on_delete=models.CASCADE,related_name="referrer")
+    referrer_user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="referred_marketing_campaigns")
+    created_at=models.DateTimeField(auto_now_add=True)
