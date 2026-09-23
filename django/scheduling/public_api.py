@@ -39,13 +39,11 @@ def _parse_start(tenant,value):
 
 
 def _candidate_professionals(tenant,service):
-    service_linked=Professional.objects.filter(
-        tenant=tenant,active=True,services=service
-    )
-    unrestricted=Professional.objects.filter(
-        tenant=tenant,active=True,services__isnull=True
-    )
-    return (service_linked|unrestricted).distinct().order_by("name","pk")
+    # Keep this queryset lockable on PostgreSQL. Service eligibility is checked
+    # by AvailabilityService before a candidate is exposed or selected.
+    return Professional.objects.filter(
+        tenant=tenant,active=True
+    ).order_by("name","pk")
 
 
 class PublicAvailabilityAPIView(APIView):
@@ -157,6 +155,8 @@ class PublicBookingAPIView(APIView):
         else:
             # Lock candidates and pick the first one that remains free.
             for candidate in _candidate_professionals(tenant,service).select_for_update():
+                if not availability.professional_offers(tenant,candidate.pk,service.pk):
+                    continue
                 if availability.is_available(
                     tenant,candidate,starts_at,ends_at,public_rules=True
                 ):
@@ -290,6 +290,10 @@ class CustomerAppointmentAPIView(APIView):
             for candidate in _candidate_professionals(
                 appointment.tenant,appointment.service
             ).select_for_update():
+                if not availability.professional_offers(
+                    appointment.tenant,candidate.pk,appointment.service_id
+                ):
+                    continue
                 if availability.is_available(
                     appointment.tenant,candidate,starts_at,ends_at,
                     exclude_appointment_id=appointment.pk,public_rules=True,
