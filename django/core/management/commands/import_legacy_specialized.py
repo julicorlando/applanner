@@ -62,7 +62,6 @@ SPECS=[
     {"table":"behavior_service_profiles","model":"engagement.BehaviorServiceProfile","rename":{"intervals":"intervals_json"}},
     {"table":"behavior_events","model":"engagement.BehaviorEvent","rename":{"payload":"payload_json"}},
     {"table":"platform_automation_log","model":"engagement.PlatformAutomationLog"},
-    {"table":"marketing_campaign_referrers","model":"communications.MarketingCampaignReferrer","keys":["campaign_id"]},
     {"table":"public_reviews","model":"contenthub.PublicReview"},
     {"table":"sports_dynamic_pricing_audit","model":"arena.DynamicPricingAudit","rename":{"details":"details_json"}},
 
@@ -86,7 +85,6 @@ SPECS=[
     {"table":"waitlist_entries","model":"engagement.WaitlistEntry"},
     {"table":"tenant_domains","model":"engagement.TenantDomain"},
     {"table":"marketing_referral_profiles","model":"engagement.ReferralProfile","keys":["user_id"]},
-    {"table":"marketing_referral_visits","model":"engagement.ReferralVisit"},
 
     {"table":"professional_service_commissions","model":"barber.ProfessionalServiceCommission"},
     {"table":"professional_compensation_models","model":"barber.ProfessionalCompensationModel","keys":["professional_id"]},
@@ -162,6 +160,8 @@ SPECS=[
     {"table":"revenue_attributions","model":"communications.RevenueAttribution"},
     {"table":"marketing_leads","model":"communications.MarketingLead"},
     {"table":"marketing_campaigns","model":"communications.MarketingCampaign","rename":{"image":"image_path"}},
+    {"table":"marketing_campaign_referrers","model":"communications.MarketingCampaignReferrer","keys":["campaign_id"]},
+    {"table":"marketing_referral_visits","model":"engagement.ReferralVisit"},
     {"table":"marketing_deliveries","model":"communications.MarketingDelivery"},
     {"table":"whatsapp_conversations","model":"communications.WhatsAppConversation","rename":{"context":"context_json"}},
     {"table":"whatsapp_messages","model":"communications.WhatsAppMessage"},
@@ -221,6 +221,7 @@ class Command(BaseCommand):
         conn=pymysql.connect(**cfg)
         self.tables=self._load_tables(conn)
         self.legacy_key=os.getenv("LEGACY_APP_KEY","")
+        self.reference_maps=self._load_reference_maps(conn)
         total=0
         try:
             with transaction.atomic():
@@ -289,6 +290,31 @@ class Command(BaseCommand):
                 break
         return raw
 
+    def _load_reference_maps(self,conn):
+        result={"module_id":{},"plan_id":{}}
+        if "modules" in self.tables:
+            Module=apps.get_model("billing.Module")
+            for row in self._rows(conn,"modules"):
+                target=Module.objects.filter(slug=row["slug"]).values_list("pk",flat=True).first()
+                if target:
+                    result["module_id"][row["id"]]=target
+        if "plans" in self.tables:
+            Plan=apps.get_model("billing.Plan")
+            for row in self._rows(conn,"plans"):
+                target=Plan.objects.filter(slug=row["slug"]).values_list("pk",flat=True).first()
+                if target:
+                    result["plan_id"][row["id"]]=target
+        return result
+
+    def _map_reference(self,attname,value):
+        if value is None:
+            return None
+        if attname=="module_id":
+            return self.reference_maps.get("module_id",{}).get(value,value)
+        if attname in {"plan_id","base_plan_id","from_plan_id","to_plan_id"}:
+            return self.reference_maps.get("plan_id",{}).get(value,value)
+        return value
+
     def _normalize(self,field,value):
         if value is None:
             return None
@@ -331,6 +357,7 @@ class Command(BaseCommand):
                 value=row.get(source)
                 if attname in mappings:
                     value=mappings[attname].get(value,value)
+                value=self._map_reference(attname,value)
                 defaults[attname]=self._normalize(field,value)
 
             keys=spec.get("keys")
@@ -338,9 +365,11 @@ class Command(BaseCommand):
                 lookup={}
                 for key in keys:
                     target=next((dst for dst,src in rename.items() if src==key),key)
+                    raw=row.get(key)
+                    raw=self._map_reference(target,raw)
                     lookup[target]=(
-                        self._normalize(fields[target],row.get(key))
-                        if target in fields else row.get(key)
+                        self._normalize(fields[target],raw)
+                        if target in fields else raw
                     )
             elif "id" in row and "id" in fields:
                 lookup={"id":row["id"]}
