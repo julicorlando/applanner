@@ -12,7 +12,7 @@ LEGACY_ROLE_CAPABILITIES={
     "manager":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
     "reception":{"agenda.manage","engagement.manage","communications.manage","support.manage","barber.manage","arena.manage","auto.manage"},
     "professional":{"agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","communications.manage","support.manage"},
-    "commercial":{"commercial.manage","communications.manage","support.manage"},
+    "commercial":{"commercial.manage","communications.manage"},
     "finance":{"finance.manage"},
     "barber-manager":{"agenda.manage","barber.manage","finance.manage","engagement.manage"},
     "arena-manager":{"arena.manage","finance.manage","engagement.manage"},
@@ -35,6 +35,12 @@ def user_capabilities(user):
         ).values_list("slug",flat=True).distinct()
     )
     linked.update(LEGACY_ROLE_CAPABILITIES.get(getattr(user,"role",""),set()))
+    if getattr(user,"role","")=="commercial":
+        from commercial.models import CommercialProfile
+        if CommercialProfile.objects.filter(
+            user=user,active=True,support_enabled=True
+        ).exists():
+            linked.add("support.manage")
     return linked
 
 
