@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Módulos adicionais — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'billing-subscription-status' %}">← Assinatura</a><span class="eyebrow">ASSINATURA</span><h1>Módulos adicionais</h1><p>Solicite recursos extras; após aprovação eles são incorporados ao valor da assinatura.</p></div></div>
+  <div class="portal-module-grid">
+    {% for module in available %}
+    <article class="portal-module-card"><span class="portal-module-kicker">ADICIONAL</span><h3>{{ module.name }}</h3><p>{{ module.description }}</p><strong>{% if module.addon_monthly_price %}R$ {{ module.addon_monthly_price }}/mês{% else %}Sob consulta{% endif %}</strong>
+      <form method="post" style="margin-top:16px">{% csrf_token %}<input type="hidden" name="action" value="request"><input type="hidden" name="module" value="{{ module.pk }}"><button class="button primary">Solicitar módulo</button></form>
+    </article>
+    {% empty %}<article class="panel"><p class="empty">Nenhum módulo adicional disponível para sua assinatura.</p></article>{% endfor %}
+  </div>
+  <div class="dashboard-grid" style="margin-top:14px">
+    <article class="panel"><div class="panel-head"><h2>Solicitações</h2></div>
+      {% for row in requests %}<div class="module-row"><span></span><div style="flex:1"><strong>{{ row.module }}</strong><small>{{ row.get_status_display }} · R$ {{ row.quoted_monthly_price }}/mês</small></div></div>{% empty %}<p class="empty">Nenhuma solicitação.</p>{% endfor %}
+    </article>
+    <article class="panel"><div class="panel-head"><h2>Ativos</h2></div>
+      {% for row in active_addons %}<div class="module-row"><span></span><div style="flex:1"><strong>{{ row.module }}</strong><small>R$ {{ row.monthly_price }}/mês</small></div><form method="post" onsubmit="return confirm('Cancelar este módulo adicional?')">{% csrf_token %}<input type="hidden" name="action" value="cancel"><input type="hidden" name="addon" value="{{ row.pk }}"><button class="nav-link">Cancelar</button></form></div>{% empty %}<p class="empty">Nenhum adicional ativo.</p>{% endfor %}
+    </article>
+  </div>
+</section>
+{% endblock %}

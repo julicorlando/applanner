@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:480px">
+  <h1>Verificação em duas etapas</h1>
+  {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+  <form method="post">{% csrf_token %}
+    <p><label>Código do autenticador ou recuperação<br><input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus></label></p>
+    <button type="submit">Verificar</button>
+  </form>
+</main>
+{% endblock %}

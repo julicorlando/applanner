@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:700px">
+  <h1>Códigos de recuperação</h1>
+  <p>Guarde estes códigos em local seguro. Cada código funciona uma única vez.</p>
+  <ul>{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
+  <p><a href="/">Continuar</a></p>
+</main>
+{% endblock %}

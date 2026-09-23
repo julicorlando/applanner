@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ resource.title }} — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">{{ module.title }}</span><h1>{{ resource.title }}</h1></div>
+    {% if can_create %}<a class="button primary" href="{% url 'portal-resource-create' module_slug resource_slug %}">Novo cadastro</a>{% endif %}
+  </div>
+  <form class="portal-search" method="get"><input type="search" name="q" value="{{ q }}" placeholder="Pesquisar"><button class="button" type="submit">Buscar</button></form>
+  <div class="table-card">
+    <table class="portal-table">
+      <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th></th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+          <td class="table-actions">
+            {% if resource.detail %}<a href="{% url 'portal-resource-detail' module_slug resource_slug row.obj.pk %}">Abrir</a>{% endif %}
+            {% if can_edit %}<a href="{% url 'portal-resource-edit' module_slug resource_slug row.obj.pk %}">Editar</a>{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="99" class="empty-table">Nenhum registro encontrado.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

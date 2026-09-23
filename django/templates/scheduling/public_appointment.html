@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Meu agendamento — {{ appointment.tenant.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">MEU AGENDAMENTO</span><h1>{{ appointment.service.name }}</h1><p>{{ appointment.tenant.name }}</p></div><div class="status-pill">{{ appointment.get_status_display }}</div></div>
+  <article class="panel">
+    <div class="appointment-row"><time>{{ appointment.starts_at|date:"d/m H:i" }}</time><div><strong>{{ appointment.professional.name|default:"Profissional a definir" }}</strong><span>{{ appointment.customer.name }}</span></div><em>R$ {{ appointment.service_price_snapshot|default:appointment.service.price }}</em></div>
+  </article>
+  {% if capabilities.can_reschedule %}
+  <article class="panel" style="margin-top:14px">
+    <h2>Remarcar</h2>
+    <form method="post" class="portal-form" id="reschedule-form">{% csrf_token %}<input type="hidden" name="action" value="reschedule">
+      <div class="form-field"><label>Profissional</label><select name="professional_id" id="manage-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if professional.pk == appointment.professional_id %}selected{% endif %}>{{ professional.name }}</option>{% endfor %}</select></div>
+      <div class="form-field"><label>Data</label><input id="manage-date" type="date" required></div>
+      <div class="form-field"><label>Horário disponível</label><select id="manage-slot" name="starts_at" required><option value="">Escolha a data</option></select></div>
+      <button class="button primary" type="submit">Confirmar remarcação</button>
+    </form>
+  </article>
+  {% endif %}
+  {% if capabilities.can_cancel %}
+  <article class="panel" style="margin-top:14px"><form method="post" onsubmit="return confirm('Cancelar este agendamento?')">{% csrf_token %}<input type="hidden" name="action" value="cancel"><button class="button ghost">Cancelar agendamento</button></form></article>
+  {% endif %}
+</section>
+{% if capabilities.can_reschedule %}
+<script>
+(() => {
+ const date=document.getElementById('manage-date'), prof=document.getElementById('manage-professional'), slots=document.getElementById('manage-slot');
+ async function load(){
+   if(!date.value)return;
+   slots.innerHTML='<option>Carregando...</option>';
+   const q=new URLSearchParams({service_id:'{{ appointment.service_id }}',date:date.value});
+   if(prof.value)q.set('professional_id',prof.value);
+   const r=await fetch('/api/public/{{ appointment.tenant.public_slug|default:appointment.tenant.slug }}/availability/?'+q);
+   const d=await r.json(); slots.innerHTML='<option value="">Selecione</option>';
+   (d.slots||[]).forEach(s=>{const o=document.createElement('option');o.value=s.value;o.textContent=s.label+(s.professional_name?' · '+s.professional_name:'');slots.appendChild(o)});
+   if(!(d.slots||[]).length)slots.innerHTML='<option value="">Sem horários disponíveis</option>';
+ }
+ date.addEventListener('change',load);prof.addEventListener('change',load);
+})();
+</script>
+{% endif %}
+{% endblock %}

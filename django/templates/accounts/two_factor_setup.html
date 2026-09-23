@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:700px">
+  <h1>Autenticação em duas etapas</h1>
+  {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+  {% if enabled %}
+    <p>O 2FA está ativo nesta conta.</p>
+    <form method="post" action="{% url 'accounts:two-factor-disable' %}">{% csrf_token %}
+      <label>Senha atual <input type="password" name="password" required></label>
+      <button type="submit">Desativar 2FA</button>
+    </form>
+  {% else %}
+    <p>Adicione esta chave ao seu aplicativo autenticador:</p>
+    <p><code>{{ secret }}</code></p>
+    <p style="overflow-wrap:anywhere"><code>{{ provisioning_uri }}</code></p>
+    <form method="post">{% csrf_token %}
+      <label>Código de 6 dígitos <input name="code" inputmode="numeric" required></label>
+      <button type="submit">Ativar 2FA</button>
+    </form>
+  {% endif %}
+</main>
+{% endblock %}

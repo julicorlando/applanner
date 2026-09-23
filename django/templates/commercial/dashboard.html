@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Comercial — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><span class="eyebrow">COMERCIAL</span><h1>Pipeline comercial</h1><p>Leads, propostas e aprovações em um só lugar.</p></div><a class="button primary" href="{% url 'commercial-proposal-create' %}">Nova proposta</a></div>
+  <div class="metric-grid">
+    <article><span>Novos</span><strong>{{ lead_counts.new|default:0 }}</strong></article>
+    <article><span>Em atendimento</span><strong>{{ lead_counts.in_service|default:0 }}</strong></article>
+    <article><span>Qualificados</span><strong>{{ lead_counts.qualified|default:0 }}</strong></article>
+    <article><span>Convertidos</span><strong>{{ lead_counts.converted|default:0 }}</strong></article>
+  </div>
+  <div class="dashboard-grid">
+    <div class="panel"><div class="panel-head"><h2>Leads</h2></div>
+      <div class="table-card"><table class="portal-table"><thead><tr><th>Nome</th><th>Negócio</th><th>Status</th><th>Responsável</th><th></th></tr></thead><tbody>
+      {% for lead in leads %}<tr><td>{{ lead.name }}</td><td>{{ lead.business_type }}</td><td>{{ lead.get_status_display }}</td><td>{{ lead.assigned_to|default:"Fila" }}</td><td class="table-actions"><a href="{% url 'commercial-lead-detail' lead.pk %}">Abrir</a></td></tr>{% empty %}<tr><td colspan="5">Nenhum lead.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div>
+    <div class="panel"><div class="panel-head"><h2>Propostas recentes</h2></div>
+      {% for proposal in proposals %}<div class="module-row"><span></span><div style="flex:1"><a href="{% url 'commercial-proposal-detail' proposal.pk %}"><strong>{{ proposal.title }}</strong></a><small style="display:block;color:var(--muted)">{{ proposal.customer_name }} · {{ proposal.get_status_display }} · R$ {{ proposal.final_price }}</small></div>
+      {% if proposal.status == "draft" %}<form method="post" action="{% url 'commercial-proposal-action' proposal.pk %}">{% csrf_token %}<input type="hidden" name="action" value="send"><button class="nav-link">Enviar</button></form>{% endif %}
+      {% if request.user.is_superuser and proposal.approval_status == "pending" %}<form method="post" action="{% url 'commercial-proposal-action' proposal.pk %}">{% csrf_token %}<input type="hidden" name="action" value="approve"><button class="nav-link">Aprovar</button></form>{% endif %}</div>{% empty %}<p class="empty">Nenhuma proposta.</p>{% endfor %}
+    </div>
+  </div>
+  <div class="panel" style="margin-top:14px">
+    <div class="panel-head"><h2>Comissões</h2></div>
+    <div class="table-card"><table class="portal-table"><thead><tr><th>Comercial</th><th>Empresa</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody>
+    {% for row in commissions %}<tr><td>{{ row.commercial_user }}</td><td>{{ row.tenant }}</td><td>R$ {{ row.commission_amount }}</td><td>{{ row.get_status_display }}</td><td class="table-actions">{% if request.user.is_superuser %}{% if row.status == "projected" %}<form method="post" action="{% url 'commercial-commission-action' row.pk %}">{% csrf_token %}<input type="hidden" name="action" value="approve"><button class="nav-link">Aprovar</button></form>{% elif row.status == "approved" %}<form method="post" action="{% url 'commercial-commission-action' row.pk %}">{% csrf_token %}<input type="hidden" name="action" value="pay"><button class="nav-link">Pagar</button></form>{% endif %}{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="empty-table">Nenhuma comissão.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Assinatura — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">ASSINATURA</span><h1>Seu plano</h1></div></div>
+  <article class="panel">
+    {% if subscription %}
+      <h2>{{ subscription.plan.name }}</h2>
+      <div class="module-row"><span></span><div><strong>Status</strong><small>{{ subscription.get_status_display }}</small></div></div>
+      <div class="module-row"><span></span><div><strong>Ciclo</strong><small>{{ subscription.get_billing_cycle_display }}</small></div></div>
+      <div class="module-row"><span></span><div><strong>Valor contratado</strong><small>R$ {{ subscription.contracted_price }}</small></div></div>
+      {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
+    {% else %}<p>Nenhuma assinatura encontrada.</p>{% endif %}
+  <div class="form-actions" style="margin-top:18px"><a class="button primary" href="{% url 'billing-subscription-modules' %}">Gerenciar módulos adicionais</a></div>
+  </article>
+</section>
+{% endblock %}

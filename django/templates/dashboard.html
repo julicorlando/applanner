@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ tenant.name }}{% endblock %}
+{% block content %}
+<div class="shell dashboard">
+  <div class="dashboard-head">
+    <div>
+      <span class="eyebrow">VISÃO DE HOJE</span>
+      <h1>{{ tenant.name }}</h1>
+      <p>{{ today_pending }} compromisso{{ today_pending|pluralize }} ainda pela frente.</p>
+    </div>
+    <div class="dashboard-head-actions">
+      <a class="button ghost" href="/app/">Ver todos os módulos</a>
+      <div class="status-pill">{{ subscription.get_status_display|default:"Operação ativa" }}</div>
+    </div>
+  </div>
+
+  <section class="metric-grid">
+    <article><span>Agenda hoje</span><strong>{{ today_total }}</strong><small>{{ today_pending }} próximos</small></article>
+    <article><span>Clientes ativos</span><strong>{{ customers }}</strong><small>base do estabelecimento</small></article>
+    <article><span>Equipe</span><strong>{{ professionals }}</strong><small>profissionais ativos</small></article>
+    <article><span>Receita do mês</span><strong>R$ {{ revenue|floatformat:2 }}</strong><small>transações pagas</small></article>
+  </section>
+
+  <section class="module-launcher">
+    <div class="panel-head module-launcher-head">
+      <div><span class="eyebrow">OPERAÇÃO</span><h2>Acesse cada área do ApPlanner</h2></div>
+      <a href="/app/">Central operacional →</a>
+    </div>
+    <div class="module-launcher-grid">
+      <a href="/app/agenda/agendamentos/"><span>01</span><strong>Agenda</strong><small>Agendamentos, clientes, equipe e serviços</small></a>
+      <a href="/app/financeiro/pdv/"><span>02</span><strong>Financeiro & PDV</strong><small>Vendas, caixa, estoque e comissões</small></a>
+      <a href="/app/barbearia/comandas/"><span>03</span><strong>Barbearia & Salão</strong><small>Fila, comandas, metas e remuneração</small></a>
+      <a href="/app/arena/jogos/"><span>04</span><strong>Arena & Quadras</strong><small>Reservas, rachas, turmas, torneios e comandas</small></a>
+      <a href="/app/auto/ordens/"><span>05</span><strong>Automotivo</strong><small>Veículos, boxes, OS, inspeção e materiais</small></a>
+      <a href="/app/relacionamento/pacotes-clientes/"><span>06</span><strong>Relacionamento</strong><small>Pacotes, recorrência, fidelidade e espera</small></a>
+      <a href="/app/saude/prontuarios/"><span>07</span><strong>Saúde</strong><small>Prontuário criptografado e auditoria</small></a>
+      <a href="/app/suporte/chamados/"><span>08</span><strong>Suporte</strong><small>Chamados e acompanhamento</small></a>
+      <a href="/app/comunicacao/"><span>09</span><strong>Comunicação & WhatsApp</strong><small>Inbox, atendimento humano e notificações</small></a>
+    </div>
+  </section>
+
+  <div class="dashboard-grid">
+    <section class="panel">
+      <div class="panel-head"><h2>Próximos atendimentos</h2><a href="/app/agenda/agendamentos/">Abrir agenda →</a></div>
+      <div class="appointment-list">
+        {% for item in next_appointments %}
+          <div class="appointment-row">
+            <time>{{ item.starts_at|date:"H:i" }}</time>
+            <div><strong>{{ item.customer.name }}</strong><span>{{ item.service.name }}{% if item.professional %} · {{ item.professional.name }}{% endif %}</span></div>
+            <em>{{ item.get_status_display }}</em>
+          </div>
+        {% empty %}<p class="empty">Nenhum atendimento para hoje.</p>{% endfor %}
+      </div>
+    </section>
+    <aside class="panel modules-panel">
+      <div class="panel-head"><h2>Módulos do plano</h2></div>
+      {% for link in modules %}<div class="module-row"><span></span><b>{{ link.module.name }}</b></div>{% empty %}<p class="empty">Os módulos do plano aparecerão aqui.</p>{% endfor %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:480px">
+  <h1>Entrar no ApPlanner</h1>
+  {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+  <form method="post">{% csrf_token %}
+    <p><label>E-mail<br><input type="email" name="email" autocomplete="username" required></label></p>
+    <p><label>Senha<br><input type="password" name="password" autocomplete="current-password" required></label></p>
+    <p><label><input type="checkbox" name="remember_device" value="1"> confiar neste dispositivo após o 2FA</label></p>
+    <button type="submit">Entrar</button>
+  </form>
+  <p><a href="{% url 'accounts:password-reset-request' %}">Esqueci minha senha</a></p>
+</main>
+{% endblock %}
