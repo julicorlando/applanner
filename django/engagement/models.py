@@ -219,6 +219,7 @@ class ReferralProfile(TimeStampedModel):
 
 class ReferralVisit(models.Model):
     referrer_user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="referral_visits")
+    campaign=models.ForeignKey("communications.MarketingCampaign",null=True,blank=True,on_delete=models.SET_NULL,related_name="referral_visits")
     lead=models.ForeignKey("communications.MarketingLead",null=True,blank=True,on_delete=models.SET_NULL,related_name="referral_visits")
     visit_token_hash=models.CharField(max_length=64,unique=True)
     ip_hash=models.CharField(max_length=64,blank=True)
