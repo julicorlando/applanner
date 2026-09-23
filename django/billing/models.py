@@ -299,6 +299,7 @@ class WebhookEvent(models.Model):
 
 class TenantPaymentConnection(TimeStampedModel):
     class Status(models.TextChoices):
+        PENDING="pending","Pendente"
         CONNECTED="connected","Conectado"
         ERROR="error","Erro"
         DISABLED="disabled","Desabilitado"
