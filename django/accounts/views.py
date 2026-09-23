@@ -6,9 +6,11 @@ from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.db.models import Q
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from .models import LoginAudit, LoginHistory, SecurityEvent
 from .security import (
     consume_recovery_code, decrypt_secret, encrypt_secret, generate_recovery_codes,
     generate_totp_secret, issue_trusted_device, validate_trusted_device, verify_totp,
@@ -16,6 +18,20 @@ from .security import (
 
 User=get_user_model()
 TRUSTED_COOKIE="applanner_trusted_device"
+
+def _record_login_event(request,email,*,user=None,result="failed",reason=""):
+    ip=request.META.get("REMOTE_ADDR") or None
+    agent=(request.META.get("HTTP_USER_AGENT") or "")[:500]
+    LoginAudit.objects.create(
+        tenant=getattr(user,"tenant",None),user=user,email_attempted=email or "",
+        event_type="login",result=result,ip_address=ip,user_agent=agent,
+        failure_reason_code=reason[:60],
+    )
+    LoginHistory.objects.create(
+        user=user,email=email or "",successful=result=="success",
+        ip_address=ip,user_agent=agent,
+    )
+
 
 
 @never_cache
@@ -27,14 +43,33 @@ def login_view(request):
         password=request.POST.get("password") or ""
         user=authenticate(request,email=email,password=password)
         if not user:
+            candidate=User.objects.filter(email=email).first()
+            _record_login_event(request,email,user=candidate,result="failed",reason="invalid_credentials")
             messages.error(request,"E-mail ou senha inválidos.")
             return render(request,"accounts/login.html",status=400)
         if not user.is_active:
+            _record_login_event(request,email,user=user,result="blocked",reason="inactive")
             messages.error(request,"Conta inativa.")
+            return render(request,"accounts/login.html",status=403)
+
+        active_block=user.blocks.filter(unblocked_at__isnull=True).filter(
+            Q(expires_at__isnull=True)|Q(expires_at__gt=timezone.now())
+        ).first()
+        if active_block:
+            _record_login_event(request,email,user=user,result="blocked",reason=active_block.reason_code)
+            SecurityEvent.objects.create(
+                tenant=user.tenant,user=user,event_type="blocked_login",
+                severity=SecurityEvent.Severity.MEDIUM,
+                ip_address=request.META.get("REMOTE_ADDR") or None,
+                user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:500],
+                metadata={"reason_code":active_block.reason_code},
+            )
+            messages.error(request,"Acesso temporariamente bloqueado. Contate o suporte.")
             return render(request,"accounts/login.html",status=403)
 
         trusted=request.COOKIES.get(TRUSTED_COOKIE,"")
         if user.two_factor_enabled and not (trusted and validate_trusted_device(user,trusted)):
+            _record_login_event(request,email,user=user,result="challenge",reason="two_factor")
             request.session["pre_2fa_user_id"]=user.pk
             request.session["pre_2fa_remember"]=bool(request.POST.get("remember_device"))
             request.session.cycle_key()
@@ -42,6 +77,7 @@ def login_view(request):
 
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version
+        _record_login_event(request,email,user=user,result="success")
         return redirect(request.GET.get("next") or settings.LOGIN_REDIRECT_URL)
     return render(request,"accounts/login.html")
 
