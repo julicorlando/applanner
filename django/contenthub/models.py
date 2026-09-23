@@ -40,3 +40,15 @@ class LandingPage(TimeStampedModel):
 
     class Meta:
         constraints=[models.UniqueConstraint(fields=["slug","locale"],name="uq_landing_locale")]
+
+
+class PublicReview(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="public_reviews")
+    customer_name=models.CharField(max_length=120)
+    rating=models.PositiveSmallIntegerField()
+    comment=models.CharField(max_length=500)
+    active=models.BooleanField(default=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","active","created_at"],name="content_review_tenant_idx")]
