@@ -9,6 +9,7 @@
 - [x] Multi-tenant / multiempresa
 - [x] Usuário por e-mail, bcrypt PHP -> Argon2
 - [x] 2FA, recovery codes e trusted devices
+- [x] Recuperação de senha, verificação de e-mail e troca obrigatória de senha temporária
 - [x] RBAC estrutural e revogação de sessão
 - [x] Staticfiles/WhiteNoise e ambiente local VS Code/Docker
 - [x] Portal operacional inicial fora do Django Admin
@@ -24,12 +25,12 @@
 - [x] WhatsApp provider/webhook, tracking de e-mail e handoff humano
 - [x] Planos, assinaturas, módulos, checkout e Mercado Pago
 - [x] Pix, cartão tokenizado, recorrência e webhooks HMAC
-- [x] Branding, multiunidade e páginas públicas base
+- [x] Branding, multiunidade, página pública completa, link por profissional, escolha automática de profissional e gestão pública do agendamento
 
 ## Segmentos
 
 - [x] Barbearia: fila, comanda, remuneração, metas, estoque e financeiro
-- [x] Portal de fila/comandas (consulta de comandas; operações avançadas ainda em evolução)
+- [x] Portal de fila/comandas com itens, pagamentos, fechamento, metas e remuneração
 - [x] Arena: quadras, reservas, preços, bloqueios, mensalistas, jogos, waitlist, turmas, torneios e comandas — modelos
 - [x] Arena: reserva com cálculo/validação de disponibilidade e preço
 - [x] Portal Arena: quadras, reservas, mensalistas, turmas e torneios
@@ -55,8 +56,10 @@
 - [x] ETL de núcleo MySQL -> PostgreSQL
 - [x] ETL especializado para tabelas de módulos
 - [x] Recriptografia AES-256-GCM PHP -> Fernet Django
+- [x] Normalização de caminhos de mídia do PHP (`public/uploads`) para `MEDIA_ROOT`
 - [x] Celery Beat para jobs principais e especializados
-- [ ] Validar ETL especializado contra clone real do MySQL legado
+- [x] Clone MariaDB 10.11 + script PowerShell para restaurar dump e executar dry-run
+- [ ] Executar o dry-run completo com o dump atual no ambiente local do usuário
 - [x] Ferramenta de cópia/verificação SHA-256 de mídia disponível (`sync_legacy_media`)
 - [ ] Executar cópia dos uploads/mídia reais do legado
 - [x] Ferramenta de auditoria automatizada de contagens/IDs disponível (`audit_legacy_parity`)
