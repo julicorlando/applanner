@@ -12,6 +12,8 @@ DIRECT=[
     ("tenants","tenants.Tenant"),
     ("units","tenants.Unit"),
     ("users","accounts.User"),
+    ("email_verification_tokens","accounts.EmailVerificationToken"),
+    ("password_reset_tokens","accounts.PasswordResetToken"),
     ("roles","accounts.PlatformRole"),
     ("permissions","accounts.Capability"),
     ("role_permissions","accounts.RoleCapability"),
@@ -43,8 +45,6 @@ IGNORED={
     "migrations":"histórico de migrations do PHP; substituído pelas migrations Django",
     "jobs":"fila de execução do runtime PHP; Celery assume essa função",
     "jobs_failed_archive":"histórico técnico da fila PHP; não é dado operacional",
-    "email_verification_tokens":"token efêmero de autenticação; não deve atravessar o cutover",
-    "password_reset_tokens":"token efêmero de autenticação; não deve atravessar o cutover",
 }
 
 
