@@ -95,6 +95,9 @@ if ($Apply) {
     docker compose @compose exec web python manage.py import_legacy_core
     docker compose @compose exec web python manage.py import_legacy_specialized
 
+    Write-Host "Reposicionando sequences do PostgreSQL..."
+    docker compose @compose exec web python manage.py reset_db_sequences
+
     Write-Host "Auditando tabelas, IDs e cobertura de colunas..."
     docker compose @compose exec web python manage.py audit_legacy_parity --strict
 
