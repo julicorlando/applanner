@@ -26,6 +26,7 @@ MODULE_CAPABILITIES = {
     "relacionamento":"engagement.manage",
     "saude":"healthcare.manage",
     "suporte":"support.manage",
+    "comunicacao":"communications.manage",
 }
 
 PORTAL_MODULES = {
@@ -62,6 +63,41 @@ PORTAL_MODULES = {
                 "fields": ["name","description","duration_minutes","price","active"],
                 "columns": ["name","duration_minutes","price","active"],
                 "order": "name",
+            },
+            "unidades": {
+                "model": "tenants.Unit",
+                "title": "Unidades",
+                "fields": ["name","address","address_number","district","city","state","postal_code","phone","whatsapp","email","is_primary","active"],
+                "columns": ["name","city","state","phone","is_primary","active"],
+                "order": "-is_primary,name",
+            },
+            "expedientes": {
+                "model": "scheduling.ProfessionalAvailability",
+                "title": "Expedientes",
+                "fields": ["professional","weekday","start_time","end_time","active"],
+                "columns": ["professional","weekday","start_time","end_time","active"],
+                "order": "professional__name,weekday,start_time",
+            },
+            "intervalos": {
+                "model": "scheduling.ProfessionalBreak",
+                "title": "Intervalos",
+                "fields": ["professional","weekday","start_time","end_time","label","active"],
+                "columns": ["professional","weekday","start_time","end_time","label","active"],
+                "order": "professional__name,weekday,start_time",
+            },
+            "folgas": {
+                "model": "scheduling.ProfessionalTimeOff",
+                "title": "Folgas, férias e bloqueios",
+                "fields": ["professional","type","starts_at","ends_at","reason","status"],
+                "columns": ["professional","type","starts_at","ends_at","reason","status"],
+                "order": "-starts_at",
+            },
+            "configuracao": {
+                "model": "scheduling.TenantScheduleSettings",
+                "title": "Configuração da agenda",
+                "fields": ["minimum_notice_minutes","maximum_days_ahead","slot_interval_minutes","buffer_minutes","customer_can_cancel","customer_can_reschedule","cancel_notice_minutes","reminder_24h_enabled","reminder_2h_enabled"],
+                "columns": ["minimum_notice_minutes","maximum_days_ahead","slot_interval_minutes","buffer_minutes","customer_can_cancel","customer_can_reschedule"],
+                "order": "tenant_id",
             },
         },
     },
@@ -167,6 +203,48 @@ PORTAL_MODULES = {
                 "fields": ["unit","name","slug","description","surface","indoor","lighting","capacity","minimum_minutes","maximum_minutes","interval_minutes","active","sort_order"],
                 "columns": ["name","surface","minimum_minutes","maximum_minutes","active"],
                 "order": "sort_order,name",
+            },
+            "modalidades": {
+                "model": "arena.Modality",
+                "title": "Modalidades",
+                "fields": ["name","description","active","sort_order"],
+                "columns": ["name","description","active","sort_order"],
+                "order": "sort_order,name",
+            },
+            "horarios-quadras": {
+                "model": "arena.CourtHours",
+                "title": "Horários das quadras",
+                "fields": ["court","weekday","start_time","end_time","active"],
+                "columns": ["court","weekday","start_time","end_time","active"],
+                "order": "court__name,weekday,start_time",
+            },
+            "precos": {
+                "model": "arena.PriceRule",
+                "title": "Preços e regras",
+                "fields": ["court","modality","weekday","start_time","end_time","price_per_hour","priority","active","rule_type","specific_date","valid_from","valid_to","minimum_duration_minutes","maximum_duration_minutes","label"],
+                "columns": ["court","label","rule_type","weekday","price_per_hour","priority","active"],
+                "order": "court__name,-priority",
+            },
+            "bloqueios": {
+                "model": "arena.CourtBlock",
+                "title": "Bloqueios de quadra",
+                "fields": ["court","starts_at","ends_at","reason","status"],
+                "columns": ["court","starts_at","ends_at","reason","status"],
+                "order": "-starts_at",
+            },
+            "espera-arena": {
+                "model": "arena.WaitlistEntry",
+                "title": "Lista de espera da Arena",
+                "fields": ["customer","court","modality","customer_name","customer_phone","customer_email","notify_email","notify_whatsapp","preferred_date","preferred_start","preferred_end","flexibility_minutes","duration_minutes","status","notes"],
+                "columns": ["customer_name","court","modality","preferred_date","status","offer_expires_at"],
+                "order": "preferred_date,created_at",
+            },
+            "configuracao-arena": {
+                "model": "arena.ArenaSettings",
+                "title": "Configuração da Arena",
+                "fields": ["payment_deadline_minutes","waitlist_offer_minutes","allow_waitlist","allow_games","dynamic_pricing_enabled","dynamic_min_multiplier","dynamic_max_multiplier","reservation_reminder_enabled","reservation_reminder_hours","crm_return_enabled","crm_return_days","idle_slot_campaign_enabled","idle_slot_hours_before","public_rules","cancellation_policy"],
+                "columns": ["allow_waitlist","allow_games","dynamic_pricing_enabled","reservation_reminder_enabled","crm_return_enabled"],
+                "order": "tenant_id",
             },
             "reservas": {
                 "model": "arena.Reservation",
@@ -286,6 +364,41 @@ PORTAL_MODULES = {
                 "columns": ["membership","vehicle","created_at"],
                 "order": "-created_at",
             },
+            "manutencoes": {
+                "model": "auto.VehicleMaintenance",
+                "title": "Histórico e manutenção",
+                "fields": ["vehicle","source_job","title","performed_at","next_due_at","warranty_until","notes"],
+                "columns": ["vehicle","title","performed_at","next_due_at","warranty_until"],
+                "order": "-performed_at",
+            },
+            "crm": {
+                "model": "auto.CRMEvent",
+                "title": "CRM automotivo",
+                "fields": ["vehicle","customer","event_type","due_at","status","channel","notified_at","notes"],
+                "columns": ["vehicle","customer","event_type","due_at","status","channel"],
+                "order": "due_at",
+            },
+            "materiais-servico": {
+                "model": "auto.ServiceMaterial",
+                "title": "Materiais por serviço",
+                "fields": ["service","product","quantity"],
+                "columns": ["service","product","quantity"],
+                "order": "service__name,product__name",
+            },
+            "etapas-servico": {
+                "model": "auto.ServiceStep",
+                "title": "Etapas por serviço",
+                "fields": ["service","name","step_type","expected_minutes","sort_order","active"],
+                "columns": ["service","name","step_type","expected_minutes","active"],
+                "order": "service__name,sort_order",
+            },
+            "configuracao-auto": {
+                "model": "auto.AutoSettings",
+                "title": "Configuração automotiva",
+                "fields": ["public_enabled","slot_interval_minutes","default_buffer_minutes","require_checkin_photos","require_delivery_acceptance","crm_default_return_days","terms_text"],
+                "columns": ["public_enabled","slot_interval_minutes","default_buffer_minutes","require_checkin_photos","require_delivery_acceptance","crm_default_return_days"],
+                "order": "tenant_id",
+            },
         },
     },
     "relacionamento": {
@@ -370,6 +483,33 @@ PORTAL_MODULES = {
                 "custom_create": "medical_record",
                 "edit": False,
                 "detail": "medical_record",
+            },
+        },
+    },
+    "comunicacao": {
+        "capability":"communications.manage",
+        "title": "Comunicação",
+        "description": "WhatsApp, atendimento humano e notificações.",
+        "resources": {
+            "whatsapp": {
+                "model": "communications.WhatsAppConversation",
+                "title": "WhatsApp",
+                "fields": [],
+                "columns": ["contact_name","wa_id","status","assigned_to","last_message_at"],
+                "order": "-last_message_at",
+                "create": False,
+                "edit": False,
+                "custom_list": "communications_inbox",
+            },
+            "notificacoes": {
+                "model": "communications.UserNotification",
+                "title": "Notificações",
+                "fields": [],
+                "columns": ["type","title","severity","read_at","created_at"],
+                "order": "-created_at",
+                "create": False,
+                "edit": False,
+                "custom_list": "communications_notifications",
             },
         },
     },
@@ -531,6 +671,8 @@ def _save_special(obj, *, resource, request, tenant, is_new):
     special=resource.get("special")
     if _field(obj.__class__,"tenant"):
         obj.tenant=tenant
+    if is_new and _field(obj.__class__,"created_by") and not getattr(obj,"created_by_id",None):
+        obj.created_by=request.user
 
     if special=="appointment":
         if obj.service_id and obj.starts_at:
@@ -651,6 +793,10 @@ def resource_list(request,module_slug,resource_slug):
         return redirect("engagement-waitlist")
     if resource.get("custom_list")=="engagement_domains":
         return redirect("engagement-domains")
+    if resource.get("custom_list")=="communications_inbox":
+        return redirect("communications-inbox")
+    if resource.get("custom_list")=="communications_notifications":
+        return redirect("communications-notifications")
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")
