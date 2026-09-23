@@ -9,7 +9,7 @@ from tenants.models import Tenant
 class BarberPortalTests(TestCase):
     def setUp(self):
         self.tenant=Tenant.objects.create(name="Barber",slug="barber-test")
-        self.user=User.objects.create_user(email="barber@example.com",password="StrongPassword123!",tenant=self.tenant)
+        self.user=User.objects.create_user(email="barber@example.com",password="StrongPassword123!",tenant=self.tenant,role="barber-manager")
         self.customer=Customer.objects.create(tenant=self.tenant,name="Cliente")
         self.professional=Professional.objects.create(tenant=self.tenant,name="Profissional")
         self.service=Service.objects.create(tenant=self.tenant,name="Corte",duration_minutes=30,price="50.00")
@@ -21,3 +21,15 @@ class BarberPortalTests(TestCase):
         })
         self.assertEqual(response.status_code,302)
         self.assertEqual(BarberCommand.objects.filter(tenant=self.tenant).count(),1)
+
+
+    def test_regular_user_is_denied(self):
+        other=User.objects.create_user(
+            email="basic-barber@example.com",password="StrongPassword123!",
+            tenant=self.tenant,role="user",
+        )
+        self.client.force_login(other)
+        response=self.client.post(reverse("barber-command-create"),{
+            "customer":self.customer.pk,"professional":self.professional.pk,
+        })
+        self.assertEqual(response.status_code,403)
