@@ -27,6 +27,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "accounts.middleware.SessionVersionMiddleware",
+    "accounts.middleware.MustChangePasswordMiddleware",
     "accounts.route_middleware.CapabilityRouteMiddleware",
     "core.middleware.TenantContextMiddleware",
     "legal.middleware.LegalAcceptanceMiddleware",
