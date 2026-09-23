@@ -25,6 +25,7 @@ urlpatterns = [
     path("app/financeiro/", include("finance.urls")),
     path("app/relacionamento/", include("engagement.urls")),
     path("app/suporte/", include("operations.urls")),
+    path("app/comunicacao/", include("communications.urls")),
     path("app/", include("core.portal_urls")),
     path("commercial/", include("commercial.urls")),
     path("master/", include("core.master_urls")),
