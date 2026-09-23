@@ -298,6 +298,11 @@ class WebhookEvent(models.Model):
 
 
 class TenantPaymentConnection(TimeStampedModel):
+    class AuthType(models.TextChoices):
+        OAUTH="oauth","OAuth"
+        API_CREDENTIALS="api_credentials","Credenciais de API"
+        MANUAL="manual","Manual"
+
     class Status(models.TextChoices):
         PENDING="pending","Pendente"
         CONNECTED="connected","Conectado"
@@ -308,9 +313,10 @@ class TenantPaymentConnection(TimeStampedModel):
     provider=models.CharField(max_length=60,default="mercadopago")
     display_name=models.CharField(max_length=120,default="Mercado Pago")
     environment=models.CharField(max_length=16,choices=PaymentGateway.Environment.choices)
+    auth_type=models.CharField(max_length=20,choices=AuthType.choices,default=AuthType.API_CREDENTIALS)
     credentials_encrypted=models.TextField(blank=True)
     metadata=models.JSONField(default=dict,blank=True)
-    status=models.CharField(max_length=16,choices=Status.choices,default=Status.CONNECTED,db_index=True)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING,db_index=True)
     last_tested_at=models.DateTimeField(null=True,blank=True)
     last_sync_at=models.DateTimeField(null=True,blank=True)
     last_error_code=models.CharField(max_length=120,blank=True)
