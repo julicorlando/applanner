@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from accounts.models import User
+from accounts.permissions import has_capability
 from billing.models import Plan
 
 from .models import CommercialProfile,Lead,Proposal
@@ -66,3 +67,20 @@ class CommercialPortalTests(TestCase):
         self.assertEqual(proposal.base_plan,self.plan)
         self.assertIn("Financeiro teste",proposal.modules)
         self.assertEqual(response.url,f"/commercial/propostas/{proposal.pk}/")
+
+
+class CommercialSupportParityTests(TestCase):
+    def test_support_access_respects_legacy_profile_flag(self):
+        user=User.objects.create_user(
+            email="commercial-support@example.test",
+            password="StrongPassword123!",
+            role="commercial",
+        )
+        profile=CommercialProfile.objects.create(
+            user=user,commission_percent=Decimal("10"),
+            max_discount_percent=Decimal("5"),support_enabled=False,
+        )
+        self.assertFalse(has_capability(user,"support.manage"))
+        profile.support_enabled=True
+        profile.save(update_fields=["support_enabled"])
+        self.assertTrue(has_capability(user,"support.manage"))
