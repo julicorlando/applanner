@@ -224,6 +224,11 @@ class Command(BaseCommand):
         total=0
         try:
             with transaction.atomic():
+                if not options["skip_sensitive"]:
+                    total+=self._platform_settings(conn,selected)
+                    total+=self._payment_gateways(conn,selected)
+                    total+=self._tenant_payment_connections(conn,selected)
+                    total+=self._platform_bank_accounts(conn,selected)
                 for spec in SPECS:
                     if selected and spec["table"] not in selected:
                         continue
@@ -237,10 +242,6 @@ class Command(BaseCommand):
                 total+=self._sports_price_rule_extensions(conn,selected)
                 total+=self._terms_acceptances(conn,selected)
                 if not options["skip_sensitive"]:
-                    total+=self._platform_settings(conn,selected)
-                    total+=self._payment_gateways(conn,selected)
-                    total+=self._tenant_payment_connections(conn,selected)
-                    total+=self._platform_bank_accounts(conn,selected)
                     total+=self._medical_records(conn,selected)
                 if options["dry_run"]:
                     transaction.set_rollback(True)
