@@ -15,8 +15,9 @@ from django.utils.text import slugify
 
 from accounts.models import PlatformRole,UserRole
 from tenants.models import Tenant,Unit
-from .models import Plan,Subscription
+from .models import Module,ModuleRequest,Plan,Subscription,TenantModuleAddon
 from .payment_services import create_platform_subscription
+from .module_services import cancel_module_addon,request_module
 
 User=get_user_model()
 
@@ -128,7 +129,7 @@ def signup(request):
                 UserRole.objects.get_or_create(user=user,role=tenant_admin)
             subscription=Subscription.objects.create(
                 tenant=tenant,plan=plan,billing_cycle=cycle,
-                contracted_price=contracted,
+                contracted_price=contracted,base_contracted_price=contracted,addon_contracted_price=0,
                 status=Subscription.Status.TRIAL if trial_days else Subscription.Status.PAST_DUE,
                 started_at=now,trial_started_at=now if trial_days else None,
                 trial_ends_at=trial_end,trial_days_snapshot=trial_days,
@@ -167,3 +168,58 @@ def subscription_status(request):
         if request.user.tenant_id else None
     )
     return render(request,"billing/subscription_status.html",{"subscription":subscription})
+
+
+@login_required
+def subscription_modules(request):
+    if not request.user.tenant_id:
+        messages.error(request,"Selecione uma empresa.")
+        return redirect("billing-subscription-status")
+    tenant=request.user.tenant
+    subscription=Subscription.objects.filter(tenant=tenant).select_related("plan").order_by("-started_at").first()
+    if not subscription:
+        messages.error(request,"Assinatura não encontrada.")
+        return redirect("billing-subscription-status")
+    if request.method=="POST":
+        action=request.POST.get("action")
+        try:
+            if action=="request":
+                module=get_object_or_404(Module,pk=request.POST.get("module"),active=True)
+                row=request_module(tenant=tenant,module=module,user=request.user,note=request.POST.get("note",""))
+                messages.success(request,f"Solicitação de {row.module.name} enviada ao Master.")
+            elif action=="cancel":
+                addon=get_object_or_404(TenantModuleAddon,pk=request.POST.get("addon"),tenant=tenant)
+                cancel_module_addon(addon=addon,user=request.user)
+                messages.success(request,"Módulo adicional cancelado e assinatura atualizada.")
+            else:
+                raise ValidationError("Ação inválida.")
+        except (ValidationError,RuntimeError,ValueError) as exc:
+            messages.error(request,str(exc))
+        return redirect("billing-subscription-modules")
+
+    plan_module_ids=set(
+        subscription.plan.module_links.filter(enabled=True).values_list("module_id",flat=True)
+    )
+    active_ids=set(
+        TenantModuleAddon.objects.filter(
+            tenant=tenant,status=TenantModuleAddon.Status.ACTIVE
+        ).values_list("module_id",flat=True)
+    )
+    pending_ids=set(
+        ModuleRequest.objects.filter(
+            tenant=tenant,status__in=[
+                ModuleRequest.Status.PENDING,ModuleRequest.Status.APPROVED,
+                ModuleRequest.Status.AWAITING_PAYMENT,ModuleRequest.Status.ACTIVE,
+            ]
+        ).values_list("module_id",flat=True)
+    )
+    available=Module.objects.filter(
+        active=True,addon_sellable=True
+    ).exclude(pk__in=plan_module_ids|active_ids|pending_ids).order_by("sort_order","name")
+    return render(request,"billing/modules.html",{
+        "subscription":subscription,"available":available,
+        "requests":ModuleRequest.objects.filter(tenant=tenant).select_related("module").order_by("-created_at")[:100],
+        "active_addons":TenantModuleAddon.objects.filter(
+            tenant=tenant,status=TenantModuleAddon.Status.ACTIVE
+        ).select_related("module").order_by("module__name"),
+    })
