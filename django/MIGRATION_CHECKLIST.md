@@ -54,11 +54,13 @@
 ## Migração de dados e jobs
 
 - [x] ETL de núcleo MySQL -> PostgreSQL
-- [x] ETL especializado para tabelas de módulos
+- [x] ETL especializado para todas as 192 tabelas do dump atual (dados operacionais + histórico técnico)
 - [x] Recriptografia AES-256-GCM PHP -> Fernet Django
 - [x] Normalização de caminhos de mídia do PHP (`public/uploads`) para `MEDIA_ROOT`
 - [x] Celery Beat para jobs principais e especializados
 - [x] Clone MariaDB 10.11 + script PowerShell para restaurar dump e executar dry-run
+- [x] Fila PHP antiga preservada como histórico somente leitura; jobs não são reexecutados no Celery
+- [x] Histórico de migrations PHP preservado para rastreabilidade
 - [ ] Executar o dry-run completo com o dump atual no ambiente local do usuário
 - [x] Ferramenta de cópia/verificação SHA-256 de mídia disponível (`sync_legacy_media`)
 - [ ] Executar cópia dos uploads/mídia reais do legado
