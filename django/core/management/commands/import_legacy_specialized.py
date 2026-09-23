@@ -301,6 +301,8 @@ class Command(BaseCommand):
                 if field.primary_key:
                     continue
                 source=rename.get(attname,attname)
+                if source not in row and attname.endswith("_id") and field.name in row:
+                    source=field.name
                 if source not in row:
                     continue
                 value=row.get(source)
