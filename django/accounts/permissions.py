@@ -13,6 +13,12 @@ LEGACY_ROLE_CAPABILITIES={
     "reception":{"agenda.manage","engagement.manage","support.manage","barber.manage","arena.manage","auto.manage"},
     "professional":{"agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","support.manage"},
     "commercial":{"commercial.manage","support.manage"},
+    "finance":{"finance.manage"},
+    "barber-manager":{"agenda.manage","barber.manage","finance.manage","engagement.manage"},
+    "arena-manager":{"arena.manage","finance.manage","engagement.manage"},
+    "auto-manager":{"agenda.manage","auto.manage","finance.manage","engagement.manage"},
+    "healthcare":{"agenda.manage","healthcare.manage","support.manage"},
+    "tenant-admin":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
     "support":{"support.manage"},
     "user":{"agenda.manage","support.manage"},
 }
