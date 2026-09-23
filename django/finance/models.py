@@ -274,3 +274,17 @@ class PlatformBankAccount(TimeStampedModel):
                 name="uq_platform_default_bank",
             )
         ]
+
+
+class ProductEvent(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,related_name="product_events")
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="product_events")
+    event_type=models.CharField(max_length=80,db_index=True)
+    metadata=models.JSONField(default=dict,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["event_type","created_at"],name="finance_product_evt_idx"),
+            models.Index(fields=["tenant","created_at"],name="finance_product_tenant_idx"),
+        ]
