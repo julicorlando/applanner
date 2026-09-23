@@ -105,31 +105,54 @@ def _platform_dashboard(request):
     })
 
 
+def _public_tenant_context(tenant,professional=None):
+    from contenthub.models import PublicReview
+    from engagement.models import ServicePackage,TenantLoyaltySettings
+    from finance.models import Product
+
+    services=tenant.services.filter(active=True).order_by("name")[:100]
+    professionals=tenant.professionals.filter(active=True).order_by("name")[:100]
+    if professional is not None:
+        offered=professional.services.filter(active=True)
+        if offered.exists():
+            services=offered.order_by("name")[:100]
+    units=tenant.units.filter(active=True).order_by("-is_primary","name")
+    products=Product.objects.filter(tenant=tenant,active=True).order_by("name")[:24]
+    packages=ServicePackage.objects.filter(tenant=tenant,active=True).order_by("name")[:24]
+    reviews=PublicReview.objects.filter(tenant=tenant,active=True).order_by("-created_at")[:12]
+    loyalty=TenantLoyaltySettings.objects.filter(tenant=tenant,enabled=True).first()
+    return {
+        "tenant":tenant,"services":services,"professionals":professionals,"units":units,
+        "products":products,"packages":packages,"reviews":reviews,"loyalty":loyalty,
+        "public_slug":tenant.public_slug or tenant.slug,"selected_professional":professional,
+    }
+
+
 def tenant_public(request,slug=None):
     from tenants.models import Tenant
     if slug:
         tenant=get_object_or_404(
-            Tenant,
-            status=Tenant.Status.ACTIVE,
-            public_enabled=True,
-            public_slug=slug,
+            Tenant,status=Tenant.Status.ACTIVE,public_enabled=True,public_slug=slug,
         )
     else:
         tenant=getattr(request,"tenant",None)
         if not tenant or tenant.status!=Tenant.Status.ACTIVE or not tenant.public_enabled:
             return render(request,"home.html")
+    return render(request,"tenant_public.html",_public_tenant_context(tenant))
 
-    services=tenant.services.filter(active=True).order_by("name")[:50]
-    professionals=tenant.professionals.filter(active=True).order_by("name")[:50]
-    units=tenant.units.filter(active=True).order_by("-is_primary","name")
-    public_slug=tenant.public_slug or tenant.slug
-    return render(request,"tenant_public.html",{
-        "tenant":tenant,
-        "services":services,
-        "professionals":professionals,
-        "units":units,
-        "public_slug":public_slug,
-    })
+
+def professional_public(request,slug,professional_slug):
+    from scheduling.models import Professional
+    from tenants.models import Tenant
+    tenant=get_object_or_404(
+        Tenant,status=Tenant.Status.ACTIVE,public_enabled=True,public_slug=slug,
+    )
+    professional=get_object_or_404(
+        Professional,tenant=tenant,active=True,public_slug=professional_slug,
+    )
+    return render(
+        request,"tenant_public.html",_public_tenant_context(tenant,professional=professional)
+    )
 
 
 def home(request):
