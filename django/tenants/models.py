@@ -95,3 +95,29 @@ class Unit(TimeStampedModel):
 
     def __str__(self):
         return f"{self.tenant} — {self.name}"
+
+
+class TenantOnboarding(models.Model):
+    tenant=models.OneToOneField(Tenant,primary_key=True,on_delete=models.CASCADE,related_name="onboarding")
+    company_done=models.BooleanField(default=False)
+    branding_done=models.BooleanField(default=False)
+    unit_done=models.BooleanField(default=False)
+    professional_done=models.BooleanField(default=False)
+    service_done=models.BooleanField(default=False)
+    schedule_done=models.BooleanField(default=False)
+    payment_done=models.BooleanField(default=False)
+    public_page_done=models.BooleanField(default=False)
+    completed_at=models.DateTimeField(null=True,blank=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+
+class TenantStatusHistory(models.Model):
+    tenant=models.ForeignKey(Tenant,on_delete=models.CASCADE,related_name="status_history")
+    from_status=models.CharField(max_length=40)
+    to_status=models.CharField(max_length=40)
+    reason=models.CharField(max_length=500)
+    changed_by=models.ForeignKey("accounts.User",on_delete=models.PROTECT,related_name="tenant_status_changes")
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","created_at"],name="tenant_status_hist_idx")]
