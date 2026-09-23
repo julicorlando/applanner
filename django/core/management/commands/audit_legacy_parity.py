@@ -1,5 +1,7 @@
 import hashlib
+import json
 import os
+from decimal import Decimal
 
 import pymysql
 from django.apps import apps
@@ -42,6 +44,19 @@ TRANSFORMED={
 }
 
 IGNORED={}
+
+# Compare business values as well as IDs: equal row counts cannot prove that a
+# plan still grants the same modules or that its contracted price survived ETL.
+VALUE_FIELDS={
+    "modules": ("slug","name","description","addon_monthly_price","addon_sellable","sort_order","active"),
+    "plans": ("slug","name","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","public_visible","is_custom","featured","sort_order","features_json"),
+    "plan_modules": ("plan_id","module_id","enabled"),
+    "tenant_modules": ("tenant_id","module_id","enabled"),
+    "subscriptions": ("id","tenant_id","plan_id","billing_cycle","contracted_price","base_contracted_price","addon_contracted_price","status","trial_days_snapshot","provider_customer_id","provider_subscription_id","provider_plan_id"),
+    "role_permissions": ("role_id","permission_id"),
+    "user_roles": ("user_id","role_id"),
+}
+BOOLEAN_FIELDS={"addon_sellable","active","trial_without_card","public_visible","is_custom","featured","enabled"}
 
 
 class Command(BaseCommand):
@@ -119,6 +134,16 @@ class Command(BaseCommand):
                 )
                 if not ok:
                     failures.append(table)
+                if table in VALUE_FIELDS:
+                    differences=self._value_differences(conn,table,model,legacy_tables[table])
+                    if differences:
+                        failures.append(table+":valores")
+                        self.stderr.write(self.style.ERROR(
+                            f"{table}: valores/vínculos divergentes ({len(differences)} linhas; "
+                            f"amostra de chaves: {', '.join(differences[:5])})"
+                        ))
+                    else:
+                        self.stdout.write(f"{table}: valores/vínculos OK")
 
             if (not selected or "appointments" in selected) and "appointments" in legacy_tables and "vehicle_id" in legacy_tables["appointments"]:
                 with conn.cursor() as cur:
@@ -204,6 +229,51 @@ class Command(BaseCommand):
             "AutoField","BigAutoField","IntegerField","BigIntegerField",
             "PositiveIntegerField","PositiveBigIntegerField","SmallIntegerField",
         }
+
+    def _value_differences(self,conn,table,model,source_columns):
+        fields=[field for field in VALUE_FIELDS[table] if field in source_columns]
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT {','.join('`'+field+'`' for field in fields)} FROM `{table}`")
+            source=cur.fetchall()
+        target_fields=["features" if field=="features_json" else field for field in fields]
+        target=list(model.objects.values(*target_fields))
+        # Slugs are stable across catalog seeding, even when generated PKs differ.
+        id_slugs={}
+        target_slugs={}
+        for catalog in ("plans","modules"):
+            if table not in ("plan_modules","tenant_modules","subscriptions"):
+                break
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT id,slug FROM `{catalog}`")
+                id_slugs[catalog]={row["id"]:row["slug"] for row in cur.fetchall()}
+            catalog_model=apps.get_model("billing.Plan" if catalog=="plans" else "billing.Module")
+            target_slugs[catalog]=dict(catalog_model.objects.values_list("pk","slug"))
+        def normalized(row,legacy):
+            values=[]
+            for field,target_field in zip(fields,target_fields):
+                value=row[field if legacy else target_field]
+                if field=="features_json":
+                    value=json.loads(value) if isinstance(value,str) and value else (value or {})
+                    value=json.dumps(value,sort_keys=True,ensure_ascii=False)
+                elif field in BOOLEAN_FIELDS:
+                    value=bool(value)
+                elif "price" in field and value is not None:
+                    value=str(Decimal(str(value)).normalize())
+                elif field in ("plan_id","module_id"):
+                    catalog="plans" if field=="plan_id" else "modules"
+                    if legacy:
+                        value=id_slugs.get(catalog,{}).get(value,value)
+                    else:
+                        value=target_slugs.get(catalog,{}).get(value,value)
+                values.append(value)
+            return tuple(values)
+        from collections import Counter
+        left=Counter(normalized(row,True) for row in source)
+        right=Counter(normalized(row,False) for row in target)
+        # Only report row identifiers; never emit prices, provider tokens or PII.
+        mismatch=left-right
+        mismatch.update(right-left)
+        return list(dict.fromkeys(str(row[0]) for row in mismatch))
 
     def _hash(self,values):
         digest=hashlib.sha256()
