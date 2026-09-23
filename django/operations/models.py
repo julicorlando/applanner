@@ -185,3 +185,42 @@ class DataImportJob(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["tenant","-created_at"],name="ops_import_tenant_idx")]
+
+
+class BillingSupportRequest(TimeStampedModel):
+    class RequestType(models.TextChoices):
+        ACCOUNT_DELETION="account_deletion","Exclusão de conta"
+        INVOICE="invoice","Nota/fatura"
+    class Status(models.TextChoices):
+        PENDING="pending","Pendente"
+        APPROVED="approved","Aprovado"
+        COMPLETED="completed","Concluído"
+        REJECTED="rejected","Rejeitado"
+        CANCELLED="cancelled","Cancelado"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="billing_support_requests")
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="billing_support_requests")
+    ticket=models.OneToOneField(SupportTicket,on_delete=models.CASCADE,related_name="billing_request")
+    request_type=models.CharField(max_length=20,choices=RequestType.choices)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING,db_index=True)
+    reference_period=models.CharField(max_length=20,blank=True)
+    deadline_at=models.DateTimeField(null=True,blank=True)
+    attachment_message=models.ForeignKey(SupportMessage,null=True,blank=True,on_delete=models.SET_NULL,related_name="+")
+    reviewed_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="billing_support_reviews")
+    reviewed_at=models.DateTimeField(null=True,blank=True)
+    completed_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","request_type","status"],name="ops_billing_req_idx")]
+
+
+class PlatformSetting(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.CASCADE,related_name="platform_settings")
+    key=models.CharField(max_length=150)
+    value=models.TextField(blank=True)
+    is_secret=models.BooleanField(default=False)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["tenant","key"],name="uq_platform_setting_tenant_key")]
+        indexes=[models.Index(fields=["key"],name="ops_setting_key_idx")]
