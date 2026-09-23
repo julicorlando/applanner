@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp — {{ tenant.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><a class="back-link" href="/app/">← Operação</a><span class="eyebrow">COMUNICAÇÃO</span><h1>WhatsApp</h1><p>Conversas recebidas, fila humana e atendimento.</p></div><a class="button ghost" href="{% url 'communications-notifications' %}">Notificações</a></div>
+  <div class="table-card"><table class="portal-table"><thead><tr><th>Contato</th><th>Status</th><th>Responsável</th><th>Última mensagem</th><th></th></tr></thead><tbody>
+  {% for row in rows %}<tr><td><strong>{{ row.contact_name|default:row.wa_id }}</strong><br><small>{{ row.wa_id }}</small></td><td>{{ row.get_status_display }}</td><td>{{ row.assigned_to|default:"—" }}</td><td>{{ row.last_message_at }}</td><td class="table-actions"><a href="{% url 'communications-conversation' row.pk %}">Abrir</a></td></tr>{% empty %}<tr><td colspan="5" class="empty-table">Nenhuma conversa.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

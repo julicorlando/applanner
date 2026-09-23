@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ conversation.contact_name|default:conversation.wa_id }} — WhatsApp{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'communications-inbox' %}">← WhatsApp</a><span class="eyebrow">ATENDIMENTO · {{ conversation.get_status_display|upper }}</span><h1>{{ conversation.contact_name|default:conversation.wa_id }}</h1><p>{{ conversation.wa_id }}{% if conversation.assigned_to %} · {{ conversation.assigned_to }}{% endif %}</p></div></div>
+  <article class="panel">
+    {% for item in thread %}
+      <div class="appointment-row"><time>{{ item.created_at|date:"d/m H:i" }}</time><div><strong>{% if item.direction == "in" %}Cliente{% elif item.user %}{{ item.user }}{% else %}{{ item.get_sender_type_display }}{% endif %}</strong><span>{{ item.body|default:item.message_type }}</span></div><em>{{ item.get_status_display }}</em></div>
+    {% empty %}<p class="empty">Sem mensagens.</p>{% endfor %}
+  </article>
+  <form method="post" action="{% url 'communications-conversation-action' conversation.pk %}" class="portal-form panel" style="margin-top:14px">{% csrf_token %}<input type="hidden" name="action" value="reply"><div class="form-field"><label>Responder</label><textarea name="body" rows="4" required></textarea></div><button class="button primary">Enviar pelo WhatsApp</button></form>
+  <div class="form-actions" style="margin-top:14px">
+    <form method="post" action="{% url 'communications-conversation-action' conversation.pk %}">{% csrf_token %}<input type="hidden" name="action" value="human"><button class="button">Assumir atendimento</button></form>
+    <form method="post" action="{% url 'communications-conversation-action' conversation.pk %}">{% csrf_token %}<input type="hidden" name="action" value="bot"><button class="button ghost">Devolver ao bot</button></form>
+    <form method="post" action="{% url 'communications-conversation-action' conversation.pk %}">{% csrf_token %}<input type="hidden" name="action" value="close"><button class="button ghost">Encerrar</button></form>
+  </div>
+</section>
+{% endblock %}
