@@ -13,6 +13,7 @@ CAPABILITIES={
     "healthcare.manage":"Saúde e prontuário",
     "communications.manage":"Comunicação, notificações e WhatsApp",
     "support.manage":"Suporte",
+    "master.support.impersonate":"Acesso assistido autorizado pelo cliente",
     "commercial.manage":"Comercial",
 }
 ROLES={
@@ -40,7 +41,7 @@ ROLES={
     "auto-manager":("Gestor Automotivo",["agenda.manage","auto.manage","finance.manage","engagement.manage"]),
     "healthcare":("Saúde",["agenda.manage","healthcare.manage","support.manage"]),
     "commercial":("Comercial",["commercial.manage","communications.manage"]),
-    "support":("Suporte",["support.manage"]),
+    "support":("Suporte",["support.manage","master.support.impersonate"]),
     "user":("Usuário",["agenda.manage","communications.manage","support.manage"]),
 }
 

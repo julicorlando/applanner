@@ -30,6 +30,14 @@
       {% endif %}
     </nav>
   </header>
+  {% if request.support_actor %}
+    <div class="panel" role="status" style="margin:12px auto;max-width:1100px;padding:14px">
+      Acesso assistido ativo por {{ request.support_actor.email }}. Suas ações são registradas.
+      <form method="post" action="{% url 'support-end-access' %}" style="display:inline">
+        {% csrf_token %}<button class="button" type="submit">Encerrar acesso</button>
+      </form>
+    </div>
+  {% endif %}
   {% if messages %}
   <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
   {% endif %}

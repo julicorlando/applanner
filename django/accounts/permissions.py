@@ -19,7 +19,7 @@ LEGACY_ROLE_CAPABILITIES={
     "auto-manager":{"agenda.manage","auto.manage","finance.manage","engagement.manage"},
     "healthcare":{"agenda.manage","healthcare.manage","support.manage"},
     "tenant-admin":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
-    "support":{"support.manage"},
+    "support":{"support.manage","master.support.impersonate"},
     "user":{"agenda.manage","communications.manage","support.manage"},
 }
 

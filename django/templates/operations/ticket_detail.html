@@ -29,8 +29,13 @@
         <button class="button">{% if ticket.remote_access_allowed %}Revogar autorização{% else %}Autorizar suporte{% endif %}</button>
       </form>
     {% endif %}
+    {% if can_impersonate and ticket.remote_access_allowed and ticket.status != 'resolved' and ticket.status != 'closed' %}
+      <form method="post" action="{% url 'support-start-access' ticket.pk %}">
+        {% csrf_token %}<button class="button">Iniciar acesso assistido</button>
+      </form>
+    {% endif %}
   </div>
-  {% if request.user.is_staff or request.user.is_superuser %}
+  {% if can_manage_status %}
     <form method="post" class="panel" style="margin-top:14px">
       {% csrf_token %}<input type="hidden" name="action" value="status">
       <select name="status">{% for value,label in status_choices %}
