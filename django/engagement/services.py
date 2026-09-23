@@ -1,4 +1,5 @@
 from datetime import timedelta
+from calendar import monthrange
 from decimal import Decimal, ROUND_DOWN
 
 from django.core.exceptions import ValidationError
@@ -108,7 +109,7 @@ def create_membership(*,tenant,customer,package,cycle,amount=None,start_date=Non
     if cycle not in {value for value,_ in CustomerMembership.Cycle.choices}:
         raise ValidationError("Ciclo inválido.")
     start=start_date or timezone.localdate()
-    next_due=start+timedelta(days=90 if cycle==CustomerMembership.Cycle.QUARTERLY else 30)
+    next_due=advance_months(start,3 if cycle==CustomerMembership.Cycle.QUARTERLY else 1)
     membership=CustomerMembership.objects.create(
         tenant=tenant,customer=customer,package=package,cycle=cycle,
         recurring_amount=Decimal(str(amount if amount is not None else package.price)),
@@ -123,10 +124,22 @@ def create_membership(*,tenant,customer,package,cycle,amount=None,start_date=Non
             amount=membership.recurring_amount,payer_email=payer_email,back_url=back_url,
             cycle_months=3 if cycle==CustomerMembership.Cycle.QUARTERLY else 1,
         )
+        membership.billing_mode="provider"
+        membership.provider_status=recurring.status
         membership.provider_subscription_id=recurring.provider_subscription_id
-        membership.save(update_fields=["provider_subscription_id","updated_at"])
-        membership.checkout_url=recurring.checkout_url
+        membership.provider_checkout_url=recurring.checkout_url
+        membership.save(update_fields=[
+            "billing_mode","provider_status","provider_subscription_id",
+            "provider_checkout_url","updated_at",
+        ])
     return membership
+
+
+def advance_months(value,months):
+    target=(value.year*12+value.month-1)+months
+    year,month=divmod(target,12)
+    month+=1
+    return value.replace(year=year,month=month,day=min(value.day,monthrange(year,month)[1]))
 
 
 @transaction.atomic

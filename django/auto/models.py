@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from core.models import TimeStampedModel
 
 
@@ -12,6 +13,7 @@ class AutoSettings(models.Model):
     require_delivery_acceptance=models.BooleanField(default=False)
     crm_default_return_days=models.PositiveSmallIntegerField(default=30)
     terms_text=models.TextField(blank=True)
+    created_at=models.DateTimeField(default=timezone.now,editable=False)
     updated_at=models.DateTimeField(auto_now=True)
 
 
@@ -319,6 +321,7 @@ class AutoCommandItem(models.Model):
     cost_snapshot=models.DecimalField(max_digits=12,decimal_places=2,null=True,blank=True)
     approved_estimate=models.ForeignKey(Estimate,null=True,blank=True,on_delete=models.SET_NULL,related_name="command_items")
     is_primary_service=models.BooleanField(default=False)
+    created_at=models.DateTimeField(default=timezone.now,editable=False)
 
 
 class AutoCommandPayment(models.Model):

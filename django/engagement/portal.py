@@ -136,8 +136,8 @@ def packages(request):
                         back_url=(settings.PUBLIC_BASE_URL or request.build_absolute_uri("/")).rstrip("/")+"/",
                         online_payment=d["online_payment"],
                     )
-                    if getattr(obj,"checkout_url",""):
-                        messages.success(request,f"Recorrência criada. Checkout: {obj.checkout_url}")
+                    if obj.provider_checkout_url:
+                        messages.success(request,f"Recorrência criada. Checkout: {obj.provider_checkout_url}")
                     else: messages.success(request,"Mensalidade criada.")
             elif action=="consume":
                 consume=ConsumeForm(request.POST,tenant=tenant,prefix="consume")

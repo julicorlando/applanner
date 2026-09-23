@@ -163,6 +163,7 @@ class Appointment(TimeStampedModel):
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="appointments")
     customer=models.ForeignKey(Customer,on_delete=models.PROTECT,related_name="appointments")
+    vehicle=models.ForeignKey("auto.Vehicle",null=True,blank=True,on_delete=models.SET_NULL,related_name="appointments")
     professional=models.ForeignKey(Professional,null=True,blank=True,on_delete=models.SET_NULL,related_name="appointments")
     service=models.ForeignKey(Service,on_delete=models.PROTECT,related_name="appointments")
     service_price_snapshot=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
@@ -180,6 +181,14 @@ class Appointment(TimeStampedModel):
     reminder_24h_sent_at=models.DateTimeField(null=True,blank=True)
     reminder_2h_sent_at=models.DateTimeField(null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
+
+    def clean(self):
+        super().clean()
+        if self.vehicle_id and self.customer_id and (
+            self.vehicle.customer_id!=self.customer_id or self.vehicle.tenant_id!=self.tenant_id
+        ):
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"vehicle":"O veículo deve pertencer ao cliente e à empresa do agendamento."})
 
     class Meta:
         indexes=[

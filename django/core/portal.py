@@ -38,8 +38,8 @@ PORTAL_MODULES = {
             "agendamentos": {
                 "model": "scheduling.Appointment",
                 "title": "Agendamentos",
-                "fields": ["customer","professional","service","starts_at","status","source","notes"],
-                "columns": ["starts_at","customer","service","professional","status"],
+                "fields": ["customer","vehicle","professional","service","starts_at","status","source","notes"],
+                "columns": ["starts_at","customer","vehicle","service","professional","status"],
                 "order": "-starts_at",
                 "special": "appointment",
             },

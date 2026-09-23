@@ -3,10 +3,12 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import get_object_or_404,redirect,render
+from django.utils import timezone
 
 from tenants.models import Tenant
-from .models import SupportMessage,SupportTicket
+from .models import SupportAccessSession,SupportMessage,SupportTicket
 
 
 def _tenant(request):
@@ -35,7 +37,25 @@ def ticket_detail(request,pk):
     form=MessageForm(request.POST or None,request.FILES or None)
     if request.method=="POST":
         action=request.POST.get("action")
-        if action=="message" and form.is_valid():
+        if action=="remote_access":
+            if request.user.pk!=ticket.user_id:
+                raise PermissionDenied("Somente o solicitante pode autorizar o acesso.")
+            with transaction.atomic():
+                ticket=SupportTicket.objects.select_for_update().get(pk=ticket.pk)
+                allowed=request.POST.get("allowed")=="1"
+                if allowed and ticket.status==SupportTicket.Status.CLOSED:
+                    raise PermissionDenied("Chamado encerrado.")
+                ticket.remote_access_allowed=allowed
+                ticket.remote_access_allowed_at=timezone.now() if allowed else None
+                ticket.remote_access_revoked_at=None if allowed else timezone.now()
+                ticket.save(update_fields=[
+                    "remote_access_allowed","remote_access_allowed_at",
+                    "remote_access_revoked_at","updated_at",
+                ])
+                if not allowed:
+                    SupportAccessSession.objects.filter(ticket=ticket,ended_at__isnull=True).update(ended_at=timezone.now())
+            messages.success(request,"Autorização de suporte atualizada.")
+        elif action=="message" and form.is_valid():
             row=form.save(commit=False);row.ticket=ticket;row.user=request.user;row.save()
             if request.user==ticket.user:
                 ticket.status=SupportTicket.Status.OPEN

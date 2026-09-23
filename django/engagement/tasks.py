@@ -1,11 +1,10 @@
-from datetime import timedelta
-
 from celery import shared_task
 from django.utils import timezone
 
 from finance.models import FinancialTransaction
 
 from .models import CustomerMembership,CustomerPackage,WaitlistEntry
+from .services import advance_months
 
 
 @shared_task
@@ -13,6 +12,7 @@ def bill_due_memberships(limit=250):
     today=timezone.localdate()
     rows=CustomerMembership.objects.filter(
         status=CustomerMembership.Status.ACTIVE,
+        billing_mode="manual",
         next_due_at__lte=today,
     ).select_related("tenant","customer","package").order_by("next_due_at")[:limit]
     count=0
@@ -33,9 +33,9 @@ def bill_due_memberships(limit=250):
                 "competence_at":row.next_due_at,
             },
         )
-        row.last_billed_at=today
-        row.next_due_at=row.next_due_at+timedelta(
-            days=90 if row.cycle==CustomerMembership.Cycle.QUARTERLY else 30
+        row.last_billed_at=row.next_due_at
+        row.next_due_at=advance_months(
+            row.next_due_at,3 if row.cycle==CustomerMembership.Cycle.QUARTERLY else 1
         )
         row.save(update_fields=["last_billed_at","next_due_at","updated_at"])
         count+=1

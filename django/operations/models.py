@@ -22,9 +22,16 @@ class SupportTicket(TimeStampedModel):
     category=models.CharField(max_length=40)
     subject=models.CharField(max_length=190)
     description=models.TextField()
+    source_url=models.CharField(max_length=500,blank=True)
+    browser_context=models.CharField(max_length=500,blank=True)
+    app_version=models.CharField(max_length=40,blank=True)
+    error_id=models.CharField(max_length=60,blank=True)
     priority=models.CharField(max_length=12,choices=Priority.choices,default=Priority.NORMAL)
     status=models.CharField(max_length=20,choices=Status.choices,default=Status.OPEN,db_index=True)
     assigned_to=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="support_assignments")
+    remote_access_allowed=models.BooleanField(default=False)
+    remote_access_allowed_at=models.DateTimeField(null=True,blank=True)
+    remote_access_revoked_at=models.DateTimeField(null=True,blank=True)
 
     class Meta:
         indexes=[models.Index(fields=["tenant","status"],name="ops_ticket_tenant_idx")]
@@ -42,6 +49,7 @@ class SupportAccessSession(models.Model):
     ticket=models.ForeignKey(SupportTicket,on_delete=models.CASCADE,related_name="access_sessions")
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="support_access_sessions")
     master_user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="support_access_sessions")
+    impersonated_user=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="impersonated_support_sessions")
     started_at=models.DateTimeField()
     ended_at=models.DateTimeField(null=True,blank=True)
     ip_address=models.GenericIPAddressField(null=True,blank=True)

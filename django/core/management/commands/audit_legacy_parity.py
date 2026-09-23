@@ -120,6 +120,19 @@ class Command(BaseCommand):
                 if not ok:
                     failures.append(table)
 
+            if (not selected or "appointments" in selected) and "appointments" in legacy_tables and "vehicle_id" in legacy_tables["appointments"]:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT id,vehicle_id FROM appointments WHERE vehicle_id IS NOT NULL ORDER BY id")
+                    legacy_links={row["id"]:row["vehicle_id"] for row in cur.fetchall()}
+                target_links=dict(apps.get_model("scheduling.Appointment").objects.exclude(
+                    vehicle_id__isnull=True
+                ).values_list("pk","vehicle_id"))
+                if legacy_links!=target_links:
+                    failures.append("appointments.vehicle_id")
+                    self.stderr.write(self.style.ERROR("appointments.vehicle_id: vínculos de veículo divergentes"))
+                else:
+                    self.stdout.write(f"appointments.vehicle_id: {len(legacy_links)} vínculos OK")
+
             for table,note in TRANSFORMED.items():
                 if table in legacy_tables and (not selected or table in selected):
                     count=self._legacy_count(conn,table)

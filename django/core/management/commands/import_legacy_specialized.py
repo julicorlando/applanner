@@ -242,6 +242,7 @@ class Command(BaseCommand):
                     imported=self._copy(conn,spec)
                     total+=imported
                     self.stdout.write(f"{spec['table']}: {imported}")
+                total+=self._appointment_vehicles(conn,selected)
                 total+=self._customer_package_usage(conn,selected)
                 total+=self._sports_price_rule_extensions(conn,selected)
                 total+=self._terms_acceptances(conn,selected)
@@ -424,6 +425,33 @@ class Command(BaseCommand):
                 },
             )
             count+=1
+        return count
+
+    def _appointment_vehicles(self,conn,selected):
+        # Vehicles are imported here, after import_legacy_core has created appointments.
+        # Keep the relationship even though the source tables are loaded in two phases.
+        if selected and "customer_vehicles" not in selected and "appointments" not in selected:
+            return 0
+        if "appointments" not in self.tables or "vehicle_id" not in self.tables["appointments"]:
+            return 0
+        Appointment=apps.get_model("scheduling.Appointment")
+        Vehicle=apps.get_model("auto.Vehicle")
+        count=0
+        with conn.cursor() as cur:
+            cur.execute("SELECT id,tenant_id,customer_id,vehicle_id FROM appointments WHERE vehicle_id IS NOT NULL")
+            for row in cur.fetchall():
+                vehicle=Vehicle.objects.filter(
+                    pk=row["vehicle_id"],tenant_id=row["tenant_id"],customer_id=row["customer_id"],
+                ).first()
+                if not vehicle:
+                    raise CommandError(f"appointments #{row['id']}: veículo legado não encontrado no tenant/cliente")
+                updated=Appointment.objects.filter(
+                    pk=row["id"],tenant_id=row["tenant_id"],customer_id=row["customer_id"],
+                ).update(vehicle_id=vehicle.pk)
+                if not updated:
+                    raise CommandError(f"appointments #{row['id']}: agendamento legado não encontrado no tenant/cliente")
+                count+=updated
+        self.stdout.write(f"appointments.vehicle_id: {count}")
         return count
 
     def _selected_table(self,table,selected):
