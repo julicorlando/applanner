@@ -57,3 +57,24 @@ python manage.py import_legacy_core --catalog-only
 ```
 
 Configure antes as variáveis `LEGACY_MYSQL_HOST`, `LEGACY_MYSQL_PORT`, `LEGACY_MYSQL_DATABASE`, `LEGACY_MYSQL_USER` e `LEGACY_MYSQL_PASSWORD`. O modo `--catalog-only` não importa clientes ou agendamentos.
+
+
+## Homologar a partir de um dump SQL
+
+Não conecte o ETL diretamente à produção para o primeiro ensaio. Use o clone MariaDB isolado:
+
+```powershell
+.\scripts\import-legacy-dump.ps1 -SqlPath "C:\caminho\appnannerbr_planner.sql"
+```
+
+O primeiro uso faz apenas `--dry-run`. Depois de revisar a saída:
+
+```powershell
+.\scripts\import-legacy-dump.ps1 -SqlPath "C:\caminho\appnannerbr_planner.sql" -Apply
+```
+
+O fluxo restaura o dump em MariaDB 10.11, executa `import_legacy_core`,
+`import_legacy_specialized` e finaliza com `audit_legacy_parity --strict`.
+
+Nunca versione dumps reais do banco, pois podem conter dados pessoais, hashes,
+tokens e configurações sensíveis.
