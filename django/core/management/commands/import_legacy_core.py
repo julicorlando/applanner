@@ -139,28 +139,39 @@ class Command(BaseCommand):
     def _rbac(self,conn):
         if "roles" not in self.columns or "permissions" not in self.columns:
             self.stdout.write("rbac: tabelas legadas não encontradas; ignorando.")
+            self.role_id_map={}
+            self.capability_id_map={}
             return
 
         roles=self._rows(conn,"SELECT id,slug,name FROM roles ORDER BY id")
+        self.role_id_map={}
+        imported_roles=[]
         for row in roles:
-            PlatformRole.objects.update_or_create(
-                id=row["id"],
-                defaults={"slug":row["slug"],"name":row["name"]},
+            obj,_=PlatformRole.objects.update_or_create(
+                slug=row["slug"],defaults={"name":row["name"]},
             )
+            self.role_id_map[row["id"]]=obj.pk
+            imported_roles.append(obj.pk)
 
         permissions=self._rows(conn,"SELECT id,slug,name FROM permissions ORDER BY id")
+        self.capability_id_map={}
         for row in permissions:
-            Capability.objects.update_or_create(
-                id=row["id"],
-                defaults={"slug":row["slug"],"name":row["name"]},
+            obj,_=Capability.objects.update_or_create(
+                slug=row["slug"],defaults={"name":row["name"]},
             )
+            self.capability_id_map[row["id"]]=obj.pk
 
-        RoleCapability.objects.all().delete()
+        RoleCapability.objects.filter(role_id__in=imported_roles).delete()
         if "role_permissions" in self.columns:
             links=self._rows(conn,"SELECT role_id,permission_id FROM role_permissions")
             RoleCapability.objects.bulk_create([
-                RoleCapability(role_id=row["role_id"],capability_id=row["permission_id"])
+                RoleCapability(
+                    role_id=self.role_id_map[row["role_id"]],
+                    capability_id=self.capability_id_map[row["permission_id"]],
+                )
                 for row in links
+                if row["role_id"] in self.role_id_map
+                and row["permission_id"] in self.capability_id_map
             ],ignore_conflicts=True)
         else:
             links=[]
@@ -323,8 +334,9 @@ class Command(BaseCommand):
                 (row["id"],),
             ) if "user_roles" in self.columns else []
             UserRole.objects.bulk_create([
-                UserRole(user=user,role_id=role_row["role_id"])
+                UserRole(user=user,role_id=self.role_id_map[role_row["role_id"]])
                 for role_row in role_ids
+                if role_row["role_id"] in getattr(self,"role_id_map",{})
             ],ignore_conflicts=True)
 
         self.stdout.write(f"users: {len(rows)} | 2FA recriptografado: {migrated_2fa}")
@@ -439,13 +451,13 @@ class Command(BaseCommand):
         self.stdout.write(f"appointments: {len(rows)}")
 
     def _modules(self,conn):
+        self.module_id_map={}
         if "modules" not in self.columns:
             self.stdout.write("modules: tabela legada ausente; ignorando.")
             return
         rows=self._rows(conn,"SELECT * FROM modules ORDER BY id")
         for row in rows:
             defaults={
-                "slug":row["slug"],
                 "name":row["name"],
                 "description":row.get("description") or "",
                 "active":bool(row.get("active",1)),
@@ -459,7 +471,8 @@ class Command(BaseCommand):
                 defaults["addon_sellable"]=bool(row.get("addon_sellable"))
             if self._has("modules","sort_order"):
                 defaults["sort_order"]=int(row.get("sort_order") or 0)
-            Module.objects.update_or_create(id=row["id"],defaults=defaults)
+            obj,_=Module.objects.update_or_create(slug=row["slug"],defaults=defaults)
+            self.module_id_map[row["id"]]=obj.pk
         self.stdout.write(f"modules: {len(rows)}")
 
     def _json_value(self,value,default=None):
@@ -474,6 +487,7 @@ class Command(BaseCommand):
         return value if value is not None else fallback
 
     def _plans(self,conn):
+        self.plan_id_map={}
         rows=self._rows(conn,"SELECT * FROM plans ORDER BY id")
         for row in rows:
             defaults={
@@ -509,7 +523,8 @@ class Command(BaseCommand):
                 creator_id=row.get("created_by_user_id")
                 defaults["created_by_id"]=creator_id if creator_id and User.objects.filter(pk=creator_id).exists() else None
 
-            obj,_=Plan.objects.update_or_create(id=row["id"],defaults=defaults)
+            obj,_=Plan.objects.update_or_create(slug=row["slug"],defaults=defaults)
+            self.plan_id_map[row["id"]]=obj.pk
             self._restore_times(Plan,obj.pk,row)
         self.stdout.write(f"plans: {len(rows)}")
 
@@ -520,12 +535,14 @@ class Command(BaseCommand):
         rows=self._rows(conn,"SELECT plan_id,module_id,enabled FROM plan_modules ORDER BY plan_id,module_id")
         valid=[]
         for row in rows:
-            if Plan.objects.filter(pk=row["plan_id"]).exists() and Module.objects.filter(pk=row["module_id"]).exists():
+            plan_id=getattr(self,"plan_id_map",{}).get(row["plan_id"],row["plan_id"])
+            module_id=getattr(self,"module_id_map",{}).get(row["module_id"],row["module_id"])
+            if Plan.objects.filter(pk=plan_id).exists() and Module.objects.filter(pk=module_id).exists():
                 PlanModule.objects.update_or_create(
-                    plan_id=row["plan_id"],module_id=row["module_id"],
+                    plan_id=plan_id,module_id=module_id,
                     defaults={"enabled":bool(row.get("enabled",1))},
                 )
-                valid.append((row["plan_id"],row["module_id"]))
+                valid.append((plan_id,module_id))
         legacy_plan_ids={plan_id for plan_id,_ in valid}
         if legacy_plan_ids:
             keep=set(valid)
@@ -543,10 +560,11 @@ class Command(BaseCommand):
         for row in rows:
             if not Tenant.objects.filter(pk=row["tenant_id"]).exists():
                 continue
-            if not Module.objects.filter(pk=row["module_id"]).exists():
+            module_id=getattr(self,"module_id_map",{}).get(row["module_id"],row["module_id"])
+            if not Module.objects.filter(pk=module_id).exists():
                 continue
             TenantModule.objects.update_or_create(
-                tenant_id=row["tenant_id"],module_id=row["module_id"],
+                tenant_id=row["tenant_id"],module_id=module_id,
                 defaults={"enabled":bool(row.get("enabled",1))},
             )
             count+=1
@@ -559,7 +577,7 @@ class Command(BaseCommand):
                 id=row["id"],
                 defaults={
                     "tenant_id":row["tenant_id"],
-                    "plan_id":row["plan_id"],
+                    "plan_id":getattr(self,"plan_id_map",{}).get(row["plan_id"],row["plan_id"]),
                     "billing_cycle":row.get("billing_cycle") or "monthly",
                     "contracted_price":row.get("contracted_price"),
                     "base_contracted_price":row.get("base_contracted_price"),
