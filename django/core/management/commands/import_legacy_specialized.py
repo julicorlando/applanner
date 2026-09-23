@@ -42,7 +42,7 @@ SPECS=[
     {"table":"subscription_notice_log","model":"billing.SubscriptionNoticeLog"},
     {"table":"module_requests","model":"billing.ModuleRequest"},
     {"table":"tenant_module_addons","model":"billing.TenantModuleAddon"},
-    {"table":"webhook_events","model":"billing.WebhookEvent"},
+    {"table":"webhook_events","model":"billing.WebhookEvent","rename":{"payload":"payload_json"}},
     {"table":"provider_events","model":"billing.ProviderEvent"},
     {"table":"pix_charges","model":"billing.PixCharge"},
     {"table":"tenant_payment_transactions","model":"billing.TenantPaymentTransaction"},
