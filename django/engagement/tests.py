@@ -3,9 +3,11 @@ from decimal import Decimal
 from django.test import TestCase
 
 from scheduling.models import Customer
+from accounts.models import User
+from communications.models import MarketingCampaign,MarketingLead
 from tenants.models import Tenant
 
-from .models import LoyaltyAccount,TenantLoyaltySettings
+from .models import LoyaltyAccount,ReferralVisit,TenantLoyaltySettings
 from .services import earn_points,issue_reward
 
 
@@ -41,3 +43,22 @@ class LoyaltyTests(TestCase):
         account=LoyaltyAccount.objects.get(tenant=self.tenant,customer=self.customer)
         self.assertEqual(account.points,20)
         self.assertEqual(reward.reward_value,Decimal("10.00"))
+
+
+class ReferralMigrationParityTests(TestCase):
+    def test_referral_visit_preserves_campaign_attribution(self):
+        user=User.objects.create_user(
+            email="referrer@example.test",password="StrongPassword123!"
+        )
+        campaign=MarketingCampaign.objects.create(
+            subject="Campanha",body="Conteúdo",created_by=user
+        )
+        lead=MarketingLead.objects.create(
+            name="Lead",email="lead-referral@example.test",source="campaign"
+        )
+        visit=ReferralVisit.objects.create(
+            referrer_user=user,campaign=campaign,lead=lead,
+            visit_token_hash="a"*64,clicked_at="2026-09-23T10:00:00Z",
+        )
+        self.assertEqual(visit.campaign,campaign)
+        self.assertEqual(visit.lead,lead)
