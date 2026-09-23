@@ -77,30 +77,37 @@ if ($state -ne "running") {
     throw "Django de homologação não iniciou."
 }
 
-Write-Host "Executando ETL completo em dry-run..."
-docker compose @compose exec web python manage.py import_legacy_core --dry-run
-$specialArgs = @("python","manage.py","import_legacy_specialized","--dry-run")
+if ($Apply -and -not $env:LEGACY_APP_KEY) {
+    throw "Para a homologação completa, configure LEGACY_APP_KEY localmente com a chave do PHP antigo."
+}
+
+Write-Host "Importando núcleo no PostgreSQL isolado..."
+$coreArgs = @("python","manage.py","import_legacy_core")
 if (-not $env:LEGACY_APP_KEY) {
-    Write-Warning "LEGACY_APP_KEY não configurada: segredos, gateways, contas bancárias e prontuários serão ignorados neste ensaio."
+    $coreArgs += "--skip-2fa"
+}
+docker compose @compose exec web @coreArgs
+
+Write-Host "Importando módulos especializados..."
+$specialArgs = @("python","manage.py","import_legacy_specialized")
+if (-not $env:LEGACY_APP_KEY) {
+    Write-Warning "LEGACY_APP_KEY não configurada: a base de pré-homologação será criada sem segredos, gateways, contas bancárias e prontuários."
     $specialArgs += "--skip-sensitive"
 }
 docker compose @compose exec web @specialArgs
 
-if ($Apply) {
-    if (-not $env:LEGACY_APP_KEY) {
-        throw "Para aplicar a migração completa, configure LEGACY_APP_KEY localmente com a chave do PHP antigo."
-    }
+Write-Host "Reposicionando sequences do PostgreSQL..."
+docker compose @compose exec web python manage.py reset_db_sequences
 
-    Write-Host "Aplicando ETL no PostgreSQL isolado..."
-    docker compose @compose exec web python manage.py import_legacy_core
-    docker compose @compose exec web python manage.py import_legacy_specialized
-
-    Write-Host "Reposicionando sequences do PostgreSQL..."
-    docker compose @compose exec web python manage.py reset_db_sequences
-
-    Write-Host "Auditando tabelas, IDs e cobertura de colunas..."
+if ($env:LEGACY_APP_KEY) {
+    Write-Host "Auditando tabelas, IDs e cobertura de colunas em modo estrito..."
     docker compose @compose exec web python manage.py audit_legacy_parity --strict
+} else {
+    Write-Host "Auditando a pré-homologação; divergências sensíveis são esperadas sem LEGACY_APP_KEY..."
+    docker compose @compose exec web python manage.py audit_legacy_parity
+}
 
+if ($Apply) {
     Write-Host "Aplicando RBAC adicional do Django após validar os dados legados..."
     docker compose @compose exec web python manage.py seed_rbac
 
@@ -108,11 +115,17 @@ if ($Apply) {
     docker compose @compose up -d --force-recreate worker beat
 
     Write-Host ""
-    Write-Host "Migração aplicada e auditada no banco isolado."
+    Write-Host "Migração completa aplicada e auditada no banco isolado."
     Write-Host "Abra http://127.0.0.1:8000/ para homologar."
     Write-Host "Seu PostgreSQL local original não foi apagado."
 } else {
     Write-Host ""
-    Write-Host "Dry-run concluído. Nenhum registro legado foi persistido."
-    Write-Host "Rode novamente com -Apply após configurar LEGACY_APP_KEY para gerar a base homologada."
+    Write-Host "Pré-homologação criada no PostgreSQL isolado."
+    Write-Host "Abra http://127.0.0.1:8000/ para conferir os dados migrados."
+    if (-not $env:LEGACY_APP_KEY) {
+        Write-Host "Para validar também os dados criptografados, configure LEGACY_APP_KEY e rode novamente com -Apply."
+    } else {
+        Write-Host "A auditoria estrita foi executada. Use -Apply para habilitar o RBAC adicional e os workers da homologação."
+    }
 }
+
