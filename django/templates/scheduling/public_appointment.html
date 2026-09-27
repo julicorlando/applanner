@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Meu agendamento — {{ appointment.tenant.name }}{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
@@ -12,8 +13,8 @@
     <form method="post" class="portal-form" id="reschedule-form">{% csrf_token %}<input type="hidden" name="action" value="reschedule">
       <div class="form-field"><label>Profissional</label><select name="professional_id" id="manage-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if professional.pk == appointment.professional_id %}selected{% endif %}>{{ professional.name }}</option>{% endfor %}</select></div>
       <div class="form-field"><label>Data</label><input id="manage-date" type="date" required></div>
-      <div class="form-field"><label>Horário disponível</label><select id="manage-slot" name="starts_at" required><option value="">Escolha a data</option></select></div>
-      <button class="button primary" type="submit">Confirmar remarcação</button>
+      <div class="form-field"><label id="manage-slot-label">Horários disponíveis</label><input type="hidden" id="manage-slot" name="starts_at"><div id="manage-slots" class="booking-slots" role="group" aria-labelledby="manage-slot-label"></div><small id="manage-slot-status" role="status" aria-live="polite">Escolha a data para ver os horários.</small></div>
+      <button class="button primary" id="manage-submit" type="submit" disabled>Confirmar remarcação</button>
     </form>
   </article>
   {% endif %}
@@ -22,20 +23,21 @@
   {% endif %}
 </section>
 {% if capabilities.can_reschedule %}
+<script src="{% static 'js/booking-slots.js' %}"></script>
 <script>
 (() => {
  const date=document.getElementById('manage-date'), prof=document.getElementById('manage-professional'), slots=document.getElementById('manage-slot');
- async function load(){
-   if(!date.value)return;
-   slots.innerHTML='<option>Carregando...</option>';
+ const submit=document.getElementById('manage-submit');
+ const today=new Date();date.min=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+ const picker=createBookingSlotPicker({container:document.getElementById('manage-slots'),input:slots,status:document.getElementById('manage-slot-status'),onChange:selected=>{submit.disabled=!selected;}});
+ function load(){
+   if(!date.value){picker.reset('Escolha a data para ver os horários.');return;}
    const q=new URLSearchParams({service_id:'{{ appointment.service_id }}',date:date.value});
    if(prof.value)q.set('professional_id',prof.value);
-   const r=await fetch('/api/public/{{ appointment.tenant.public_slug|default:appointment.tenant.slug }}/availability/?'+q);
-   const d=await r.json(); slots.innerHTML='<option value="">Selecione</option>';
-   (d.slots||[]).forEach(s=>{const o=document.createElement('option');o.value=s.value;o.textContent=s.label+(s.professional_name?' · '+s.professional_name:'');slots.appendChild(o)});
-   if(!(d.slots||[]).length)slots.innerHTML='<option value="">Sem horários disponíveis</option>';
+   picker.load('/api/public/{{ appointment.tenant.public_slug|default:appointment.tenant.slug }}/availability/?'+q);
  }
  date.addEventListener('change',load);prof.addEventListener('change',load);
+ document.getElementById('reschedule-form').addEventListener('submit',event=>{if(!slots.value)event.preventDefault();});
 })();
 </script>
 {% endif %}

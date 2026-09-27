@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ tenant.public_seo_title|default:tenant.name }}{% endblock %}
 {% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
 {% block content %}
@@ -27,8 +28,8 @@
         <div class="form-field"><label>Serviço</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
         <div class="form-field"><label>Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
         <div class="form-field"><label>Data</label><input id="booking-date" type="date" required></div>
-        <div class="form-field"><label>Horário</label><select id="booking-slot" required><option value="">Escolha serviço e data</option></select></div>
       </div>
+      <div class="form-field"><label id="booking-slot-label">Horários disponíveis</label><input type="hidden" id="booking-slot"><div id="booking-slots" class="booking-slots" role="group" aria-labelledby="booking-slot-label"></div><small id="booking-slot-status" role="status" aria-live="polite">Escolha o serviço e a data para ver os horários.</small></div>
       <div class="portal-module-grid" style="margin-top:14px">
         <div class="form-field"><label>Seu nome</label><input id="booking-name" required minlength="2"></div>
         <div class="form-field"><label>Telefone</label><input id="booking-phone" autocomplete="tel"></div>
@@ -72,6 +73,7 @@
 {% if units %}<section class="shell section"><div class="section-head"><span class="eyebrow">UNIDADES</span><h2>Onde encontrar.</h2></div><div class="segment-grid">{% for unit in units %}<article><span>{% if unit.is_primary %}Principal{% else %}Unidade{% endif %}</span><h3>{{ unit.name }}</h3><p>{{ unit.address }} {{ unit.address_number }}{% if unit.district %}<br>{{ unit.district }}{% endif %}{% if unit.city %}<br>{{ unit.city }}/{{ unit.state }}{% endif %}</p>{% if unit.whatsapp %}<strong>{{ unit.whatsapp }}</strong>{% endif %}{% if unit.instagram %}<p>{{ unit.instagram }}</p>{% endif %}{% if unit.map_url %}<a href="{{ unit.map_url }}" target="_blank" rel="noopener">Ver localização →</a>{% endif %}</article>{% endfor %}</div></section>{% endif %}
 
 {% if tenant.public_booking_enabled %}
+<script src="{% static 'js/booking-slots.js' %}"></script>
 <script>
 (() => {
   const form=document.getElementById('public-booking');
@@ -81,30 +83,20 @@
   const slot=document.getElementById('booking-slot');
   const feedback=document.getElementById('booking-feedback');
   const csrf=form.querySelector('[name=csrfmiddlewaretoken]').value;
-  const today=new Date(); date.min=today.toISOString().slice(0,10);
+  const today=new Date(); date.min=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+  const picker=createBookingSlotPicker({container:document.getElementById('booking-slots'),input:slot,status:document.getElementById('booking-slot-status')});
 
-  async function loadSlots(){
-    if(!service.value || !date.value){slot.innerHTML='<option value="">Escolha serviço e data</option>';return;}
-    slot.innerHTML='<option value="">Carregando...</option>';
+  function loadSlots(){
+    if(!service.value || !date.value){picker.reset('Escolha o serviço e a data para ver os horários.');return;}
     const query=new URLSearchParams({service_id:service.value,date:date.value});
     if(professional.value)query.set('professional_id',professional.value);
-    try{
-      const response=await fetch('/api/public/{{ public_slug }}/availability/?'+query.toString());
-      const data=await response.json();
-      slot.innerHTML='<option value="">Selecione</option>';
-      (data.slots||[]).forEach(item=>{
-        const option=document.createElement('option');
-        option.value=item.value;
-        option.textContent=item.label+(professional.value?'':(' · '+(item.professional_name||'Disponível')));
-        slot.appendChild(option);
-      });
-      if(!(data.slots||[]).length)slot.innerHTML='<option value="">Sem horários disponíveis</option>';
-    }catch(e){slot.innerHTML='<option value="">Não foi possível consultar horários</option>';}
+    picker.load('/api/public/{{ public_slug }}/availability/?'+query.toString());
   }
   service.addEventListener('change',loadSlots); professional.addEventListener('change',loadSlots); date.addEventListener('change',loadSlots);
 
   form.addEventListener('submit',async event=>{
     event.preventDefault(); feedback.textContent='Confirmando...';
+    if(!slot.value){feedback.innerHTML='<div class="flash error">Selecione um horário disponível.</div>';return;}
     const payload={
       service_id:service.value,professional_id:professional.value,starts_at:slot.value,
       name:document.getElementById('booking-name').value,

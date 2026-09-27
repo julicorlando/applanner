@@ -1,4 +1,5 @@
-from datetime import date, datetime, time
+import hashlib
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from django.test import TestCase
@@ -112,3 +113,27 @@ class PublicBookingFlowTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertContains(response,self.professionals[0].name)
         self.assertContains(response,"AGENDAMENTO ONLINE")
+
+    def test_public_booking_shows_slot_buttons_instead_of_dropdown(self):
+        response=self.client.get(f"/p/{self.tenant.public_slug}/")
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'id="booking-slots"')
+        self.assertContains(response,'js/booking-slots.js')
+        self.assertNotContains(response,'<select id="booking-slot"')
+
+    def test_reschedule_shows_slot_buttons_instead_of_dropdown(self):
+        from django.utils import timezone
+        customer=Customer.objects.create(tenant=self.tenant,name="Cliente Teste")
+        token="token-de-teste"
+        start=timezone.now()+timedelta(days=7)
+        appointment=Appointment.objects.create(
+            tenant=self.tenant,customer=customer,service=self.service,
+            professional=self.professionals[0],starts_at=start,
+            ends_at=start+timedelta(minutes=30),status=Appointment.Status.CONFIRMED,
+            customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest(),
+        )
+        response=self.client.get(f"/agendamento/{token}/")
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'id="manage-slots"')
+        self.assertContains(response,'id="manage-submit" type="submit" disabled')
+        self.assertNotContains(response,'<select id="manage-slot"')
