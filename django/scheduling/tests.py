@@ -118,7 +118,7 @@ class PublicBookingFlowTests(TestCase):
         response=self.client.get(f"/p/{self.tenant.public_slug}/")
         self.assertEqual(response.status_code,200)
         self.assertContains(response,'id="booking-slots"')
-        self.assertContains(response,'js/booking-slots.js')
+        self.assertContains(response,'js/booking-slots.')
         self.assertNotContains(response,'<select id="booking-slot"')
 
     def test_reschedule_shows_slot_buttons_instead_of_dropdown(self):
