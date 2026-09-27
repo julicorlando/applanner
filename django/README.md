@@ -82,3 +82,8 @@ O fluxo restaura o dump em MariaDB 10.11, executa `import_legacy_core`,
 
 Nunca versione dumps reais do banco, pois podem conter dados pessoais, hashes,
 tokens e configurações sensíveis.
+# WhatsApp do Master via QR code
+
+No Coolify, defina `MASTER_WHATSAPP_GATEWAY_TOKEN` com um segredo aleatório longo e faça o redeploy da aplicação Compose. Acesse **Master → WhatsApp do Master → Gerar QR code** e leia o código em **WhatsApp → Aparelhos conectados → Conectar aparelho** no celular do número usado pelo Master. O serviço `master-whatsapp` mantém a sessão no volume `master_whatsapp_session`; preserve esse volume nos redeploys e proteja o seu backup. O gateway fica acessível somente na rede interna do Compose. Apenas superusuários veem o QR code e podem ler, associar ou enviar mensagens. Contatos novos podem ser associados manualmente a uma empresa depois da primeira conversa.
+
+Esta conexão usa a biblioteca Baileys para vincular um dispositivo do WhatsApp Web. Ela é independente da integração oficial Cloud API dos estabelecimentos e depende da disponibilidade e do protocolo do WhatsApp Web; mudanças no protocolo podem exigir atualização do gateway. O chatbot por estabelecimento continua na integração Cloud API existente. Para testar a integração real, é preciso publicar o Compose, ler o QR code com um número do Master e trocar mensagens de teste.

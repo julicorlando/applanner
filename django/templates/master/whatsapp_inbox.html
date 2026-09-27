@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp do Master — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">ATENDIMENTO DA PLATAFORMA</span><h1>WhatsApp do Master</h1><p>Atenda empresas cadastradas e novos contatos em uma caixa de entrada separada dos estabelecimentos.</p></div></div>
+  <div class="panel" style="margin-bottom:20px">
+    <h2>Conectar o número do Master</h2>
+    {% if configured %}
+      <p id="wa-state" role="status" aria-live="polite">Consultando conexão...</p>
+      <img id="wa-qr" alt="QR code para vincular o WhatsApp do Master" style="display:none;width:min(320px,100%);height:auto">
+      <p>Abra o WhatsApp no celular → <strong>Aparelhos conectados</strong> → <strong>Conectar aparelho</strong> e leia o código acima. Ele expira e se atualiza automaticamente.</p>
+      <form method="post" action="{% url 'master-whatsapp-connect' %}" style="display:inline">{% csrf_token %}<button class="button primary">Gerar QR code</button></form>
+      <form method="post" action="{% url 'master-whatsapp-disconnect' %}" style="display:inline" onsubmit="return confirm('Desvincular o WhatsApp do Master?')">{% csrf_token %}<button class="button ghost">Desvincular</button></form>
+    {% else %}<p>Defina <code>MASTER_WHATSAPP_GATEWAY_TOKEN</code> nas variáveis do Coolify e publique novamente para ativar o pareamento.</p>{% endif %}
+  </div>
+  <div class="panel" style="margin-bottom:20px"><h2>Iniciar conversa</h2><p>Use o número com código do país e DDD. Exemplo: 5581999999999.</p><form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="start-phone">WhatsApp</label><input id="start-phone" name="phone" type="tel" required></div><div class="form-field"><label for="start-name">Nome (opcional)</label><input id="start-name" name="name"></div><div class="form-actions"><button class="button primary">Abrir atendimento</button></div></form></div>
+  <div class="panel"><h2>Conversas</h2><div class="tenant-picker">{% for row in rows %}<a href="{% url 'master-whatsapp-conversation' row.pk %}"><strong>{{ row.contact_name|default:row.wa_id }}</strong><span>{{ row.tenant.name|default:'Nova empresa / não associada' }} · {{ row.last_message_at|date:'d/m/Y H:i' }}</span></a>{% empty %}<p>Nenhuma conversa recebida ainda.</p>{% endfor %}</div></div>
+</section>
+{% if configured %}<script>
+(() => {
+  const status=document.getElementById('wa-state'), image=document.getElementById('wa-qr');
+  async function update(){
+    try{
+      const response=await fetch('{% url "master-whatsapp-status" %}',{cache:'no-store'});
+      const data=await response.json();
+      const labels={connected:'Conectado. Você já pode responder às empresas.',qr:'Aguardando leitura do QR code.',connecting:'Conectando ao WhatsApp...',disconnected:'Desconectado. Clique em Gerar QR code.',unavailable:'Serviço indisponível.'};
+      status.textContent=data.error||labels[data.state]||'Consultando conexão...';
+      image.style.display=data.qr?.startsWith('data:image/png;base64,')?'block':'none';
+      if(image.style.display==='block')image.src=data.qr;else image.removeAttribute('src');
+    }catch{status.textContent='Não foi possível consultar a conexão.';image.style.display='none';}
+  }
+  update();setInterval(update,5000);
+})();
+</script>{% endif %}
+{% endblock %}

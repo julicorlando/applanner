@@ -82,6 +82,8 @@ jobs:
           DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost
           PUBLIC_BASE_URL: http://localhost
         run: docker compose -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.legacy.yml config --quiet
+      - name: Build Master WhatsApp QR gateway
+        run: docker build -t applanner-master-whatsapp-test ./master-whatsapp
       - name: Django system check
         run: python manage.py check
       - name: Collect static files

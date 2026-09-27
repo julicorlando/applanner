@@ -137,6 +137,12 @@ def _guard(user):
         raise PermissionDenied("Acesso restrito ao Master.")
 
 
+from communications.master_whatsapp import (  # noqa: E402
+    master_whatsapp_inbox,master_whatsapp_status,master_whatsapp_connect,
+    master_whatsapp_disconnect,master_whatsapp_receive,master_whatsapp_conversation,
+)
+
+
 def _field(model,name):
     try:
         return model._meta.get_field(name)

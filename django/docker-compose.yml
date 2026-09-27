@@ -34,6 +34,8 @@ x-app-environment: &app-environment
   LEGACY_MYSQL_PASSWORD: ${LEGACY_MYSQL_PASSWORD:-}
   LEGACY_APP_KEY: ${LEGACY_APP_KEY:-}
   BACKUP_DIR: ${BACKUP_DIR:-/app/media/backups}
+  MASTER_WHATSAPP_GATEWAY_URL: http://master-whatsapp:3100
+  MASTER_WHATSAPP_GATEWAY_TOKEN: ${MASTER_WHATSAPP_GATEWAY_TOKEN:-}
 
 services:
   web:
@@ -107,7 +109,19 @@ services:
       timeout: 5s
       retries: 10
 
+  master-whatsapp:
+    build: ./master-whatsapp
+    restart: unless-stopped
+    environment:
+      MASTER_WHATSAPP_GATEWAY_TOKEN: ${MASTER_WHATSAPP_GATEWAY_TOKEN:-}
+      MASTER_WHATSAPP_CALLBACK_URL: http://web:8000/master/whatsapp/receber/
+    volumes:
+      - master_whatsapp_session:/app/session
+    expose:
+      - "3100"
+
 volumes:
   postgres_data:
   redis_data:
   media:
+  master_whatsapp_session:

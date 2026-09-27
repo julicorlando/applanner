@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Atendimento WhatsApp — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-whatsapp' %}">← Caixa de entrada</a><span class="eyebrow">ATENDIMENTO MASTER</span><h1>{{ row.contact_name|default:row.wa_id }}</h1><p>{{ row.wa_id }} · {{ row.tenant.name|default:'Empresa ainda não associada' }}</p></div></div>
+  <div class="panel" style="margin-bottom:16px"><h2>Empresa atendida</h2><form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="assign"><div class="form-field"><label for="tenant-id">Associar conversa a uma empresa</label><select id="tenant-id" name="tenant_id"><option value="">Nova empresa / não associada</option>{% for tenant in tenants %}<option value="{{ tenant.pk }}" {% if row.tenant_id == tenant.pk %}selected{% endif %}>{{ tenant.name }}</option>{% endfor %}</select></div><button class="button">Salvar associação</button></form></div>
+  <div class="panel" style="margin-bottom:16px"><h2>Mensagens</h2><div aria-live="polite">{% for message in thread %}<div class="appointment-row"><time>{{ message.created_at|date:'d/m H:i' }}</time><div><strong>{% if message.direction == 'out' %}Master{% else %}Contato{% endif %}</strong><span style="white-space:pre-wrap">{{ message.body }}</span></div></div>{% empty %}<p>Conversa sem mensagens.</p>{% endfor %}</div></div>
+  <div class="panel"><h2>Responder como Master</h2><form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="reply"><div class="form-field"><label for="message-body">Mensagem</label><textarea name="body" id="message-body" required maxlength="4096" rows="4"></textarea></div><button class="button primary">Enviar mensagem</button></form></div>
+</section>
+{% endblock %}

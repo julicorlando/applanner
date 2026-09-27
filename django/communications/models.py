@@ -217,6 +217,29 @@ class ChatbotFlow(TimeStampedModel):
     rules=models.JSONField(default=list,blank=True)
 
 
+class MasterWhatsAppConversation(TimeStampedModel):
+    """Central da plataforma, independente das conversas WhatsApp dos tenants."""
+    wa_id=models.CharField(max_length=80,unique=True)
+    contact_name=models.CharField(max_length=150,blank=True)
+    tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,related_name="master_whatsapp_conversations")
+    last_message_at=models.DateTimeField()
+
+    class Meta:
+        ordering=["-last_message_at"]
+
+
+class MasterWhatsAppMessage(models.Model):
+    conversation=models.ForeignKey(MasterWhatsAppConversation,on_delete=models.CASCADE,related_name="messages")
+    provider_message_id=models.CharField(max_length=190,unique=True)
+    direction=models.CharField(max_length=4,choices=[("in","Entrada"),("out","Saída")])
+    body=models.TextField(blank=True)
+    sent_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering=["id"]
+
+
 class WhatsAppMessage(models.Model):
     class Direction(models.TextChoices):
         IN="in","Entrada"
