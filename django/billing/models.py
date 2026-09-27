@@ -84,6 +84,7 @@ class Subscription(TimeStampedModel):
     provider_customer_id=models.CharField(max_length=190,blank=True)
     provider_subscription_id=models.CharField(max_length=190,blank=True,db_index=True)
     provider_plan_id=models.CharField(max_length=190,blank=True)
+    provider_checkout_url=models.URLField(max_length=1000,blank=True)
 
 
 class CheckoutSession(TimeStampedModel):

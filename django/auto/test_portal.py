@@ -10,7 +10,7 @@ from tenants.models import Tenant
 
 class AutoPortalTests(TestCase):
     def setUp(self):
-        self.tenant=Tenant.objects.create(name="Auto",slug="auto-test")
+        self.tenant=Tenant.objects.create(name="Auto",slug="auto-test",category="Automotivo")
         self.user=User.objects.create_user(email="auto@example.com",password="StrongPassword123!",tenant=self.tenant,role="auto-manager")
         customer=Customer.objects.create(tenant=self.tenant,name="Cliente")
         service=Service.objects.create(tenant=self.tenant,name="Detail",duration_minutes=60,price="100.00")

@@ -2,7 +2,15 @@
 {% block title %}Master — ApPlanner{% endblock %}
 {% block content %}
 <section class="shell portal-page">
-  <div class="portal-heading"><div><span class="eyebrow">MASTER</span><h1>Central da plataforma</h1><p>Operação, clientes, receita, suporte e saúde do SaaS.</p></div></div>
-  <div class="portal-module-grid">{% for item in cards %}<article class="portal-module-card"><span class="portal-module-kicker">{{ forloop.counter|stringformat:"02d" }}</span><h2>{{ item.title }}</h2><p>{{ item.count }} registros</p><div class="portal-resource-links"><a href="{% url 'master-resource-list' item.slug %}">Gerenciar <span>→</span></a></div></article>{% endfor %}</div>
+  <div class="portal-heading"><div><span class="eyebrow">MASTER</span><h1>Central da plataforma</h1><p>Gerencie os estabelecimentos, publique planos e acompanhe as solicitações comerciais e de suporte.</p></div></div>
+  <div class="metric-grid" style="margin-bottom:22px">
+    <article><span>Planos à venda</span><strong>{{ public_plans }}</strong><small>Ativos e visíveis para novos clientes</small></article>
+    <article><span>Funções disponíveis</span><strong>{{ active_modules }}</strong><small>Módulos ativos no catálogo</small></article>
+  </div>
+  <div class="panel" style="margin-bottom:22px"><h2>Primeiros passos</h2><p><a href="{% url 'master-resource-list' 'planos' %}">1. Configure preços, teste grátis e visibilidade dos planos</a> · <a href="{% url 'master-resource-list' 'modulos' %}">2. Revise os módulos</a> · <a href="{% url 'master-resource-list' 'empresas' %}">3. Ative a página pública dos estabelecimentos</a> · <a href="{% url 'master-resource-list' 'conexoes-pagamento' %}">4. Verifique as integrações de pagamento</a>.</p><p>Em cada plano, use <strong>Módulos</strong> para marcar as funções disponíveis. <a href="{% url 'billing-plans' %}" target="_blank" rel="noopener">Ver página de vendas →</a></p><p><a class="button ghost" href="{% url 'master-chatbot' %}">Configurar fluxo do chatbot →</a></p></div>
+  {% for group in groups %}<details class="master-group" {% if forloop.first %}open{% endif %}>
+    <summary>{{ group.title }} <small>{{ group.cards|length }} áreas</small></summary>
+    <div class="portal-module-grid">{% for item in group.cards %}<article class="portal-module-card"><h2>{{ item.title }}</h2><p>{{ item.count }} registros</p><div class="portal-resource-links"><a href="{% url 'master-resource-list' item.slug %}">Gerenciar <span>→</span></a></div></article>{% endfor %}</div>
+  </details>{% endfor %}
 </section>
 {% endblock %}

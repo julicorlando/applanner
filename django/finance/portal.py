@@ -7,6 +7,7 @@ from django.core.exceptions import PermissionDenied,ValidationError
 from django.shortcuts import get_object_or_404,redirect,render
 
 from accounts.permissions import require_any_capability
+from billing.segment_access import require_feature
 
 from scheduling.models import Customer,Professional
 from tenants.models import Tenant,Unit
@@ -16,6 +17,7 @@ from .services import cancel_sale,close_cash_session,create_sale,open_cash_sessi
 
 def _tenant(request):
     if request.user.tenant_id:
+        require_feature(request.user.tenant,"products" if request.path.startswith("/app/financeiro/pdv/") else "finance")
         return request.user.tenant
     if request.user.is_superuser:
         tid=request.session.get("portal_tenant_id")

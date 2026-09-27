@@ -38,6 +38,10 @@ Use o repositório Git com Build Pack **Docker Compose**.
 - Não publique PostgreSQL ou Redis diretamente na internet.
 - Cadastre os segredos no ambiente do Coolify a partir de `.env.example`.
 
+Ao implantar esta atualização, o `web` aplica migrations, sincroniza os módulos e cria três planos públicos de homologação (Profissional, Inicial e Empresarial, com sete dias de teste) **somente se não houver outro plano público ativo**. Planos importados do PHP e edições feitas no Master não são sobrescritos. Revise preços, módulos incluídos, segmentos e período de teste em **Master → Planos** antes de vender. Na ficha da empresa, marque **Página pública** e informe as coordenadas da unidade para aparecer e ordenar por distância em `/directory/`. O JSON anterior está em `/api/directory/`.
+
+O cliente acompanha a assinatura e inicia o pagamento em **Meu plano e pagamento** (`/billing/assinatura/`); o botão depende de um gateway Mercado Pago validado no ambiente. O Master configura um fluxo simples por empresa em `/master/chatbot/`, com mensagens, palavras-chave e transferência para humano. A automação só pode ser ativada quando o número Cloud API do estabelecimento e as credenciais de WhatsApp estiverem configurados. A implementação atual usa token e webhook da Cloud API: **pareamento por QR code e atendimento centralizado de empresas ainda não cadastradas exigem outra integração e não estão implementados**.
+
 ## Estado
 
 Esta branch é de migração/homologação e ainda não substitui a produção PHP. Veja `MIGRATION_CHECKLIST.md`, `ARCHITECTURE.md` e `SECURITY.md`.

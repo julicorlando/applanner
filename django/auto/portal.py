@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from billing.segment_access import require_segment
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied,ValidationError
@@ -22,6 +23,7 @@ from .services import (
 
 def _tenant(request):
     if request.user.tenant_id:
+        require_segment(request.user.tenant,"auto")
         return request.user.tenant
     if request.user.is_superuser:
         tenant_id=request.session.get("portal_tenant_id")

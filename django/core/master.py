@@ -11,7 +11,23 @@ from django.utils import timezone
 from billing.models import Module, Plan, PlanModule
 
 
+FIELD_LABELS={
+    "name":"Nome","slug":"Identificador","description":"Descrição","category":"Segmento",
+    "monthly_price":"Valor mensal","quarterly_price":"Valor trimestral","semiannual_price":"Valor semestral",
+    "annual_price":"Valor anual","trial_days":"Dias de teste grátis","trial_without_card":"Teste sem cartão",
+    "active":"Ativo","public_visible":"Visível na página de planos","is_custom":"Plano personalizado",
+    "featured":"Em destaque","sort_order":"Ordem de exibição","public_enabled":"Página pública ativa",
+    "public_booking_enabled":"Agendamento público ativo","email":"E-mail","phone":"Telefone",
+    "status":"Situação","created_at":"Criado em","updated_at":"Atualizado em",
+}
+
+
 class PlanMasterForm(forms.ModelForm):
+    segments=forms.MultipleChoiceField(
+        choices=[("barbearia","Barbearia e salão"),("auto","Automotivo e lava-jato"),
+                 ("arena","Arena e quadras"),("saude","Clínica e saúde")],
+        widget=forms.CheckboxSelectMultiple,required=False,label="Segmentos incluídos no plano",
+    )
     professionals_limit=forms.IntegerField(min_value=1,required=False,label="Limite de profissionais")
     units_limit=forms.IntegerField(min_value=1,required=False,label="Limite de unidades")
     included_features=forms.CharField(
@@ -29,9 +45,12 @@ class PlanMasterForm(forms.ModelForm):
 
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
+        for key,field in self.fields.items():
+            if key in FIELD_LABELS:field.label=FIELD_LABELS[key]
         features=(getattr(self.instance,"features",None) or {}) if self.instance else {}
         self.fields["professionals_limit"].initial=features.get("professionals")
         self.fields["units_limit"].initial=features.get("units")
+        self.fields["segments"].initial=features.get("segments",[value for value,_ in self.fields["segments"].choices])
         self.fields["included_features"].initial="\n".join(features.get("included_features") or [])
 
     def save(self,commit=True):
@@ -41,6 +60,7 @@ class PlanMasterForm(forms.ModelForm):
             features["professionals"]=self.cleaned_data["professionals_limit"]
         if self.cleaned_data.get("units_limit"):
             features["units"]=self.cleaned_data["units_limit"]
+        features["segments"]=self.cleaned_data["segments"]
         features["included_features"]=[
             line.strip() for line in (self.cleaned_data.get("included_features") or "").splitlines()
             if line.strip()
@@ -52,7 +72,7 @@ class PlanMasterForm(forms.ModelForm):
 
 
 MASTER_RESOURCES={
-    "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","created_at"],"order":"-created_at"},
+    "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","public_enabled","created_at"],"order":"-created_at"},
     "planos":{"model":"billing.Plan","title":"Planos","fields":["name","slug","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","public_visible","is_custom","featured","sort_order"],"columns":["name","monthly_price","trial_days","active","public_visible","is_custom","featured"],"order":"sort_order,name","special":"plan"},
     "modulos":{"model":"billing.Module","title":"Módulos","fields":["name","slug","description","addon_monthly_price","addon_sellable","sort_order","active"],"columns":["name","slug","addon_monthly_price","addon_sellable","active"],"order":"sort_order,name"},
     "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":["tenant","module","quoted_monthly_price","status","tenant_note","master_note"],"columns":["tenant","module","quoted_monthly_price","status","created_at"],"order":"-created_at"},
@@ -167,7 +187,98 @@ def _value(obj,name):
 def home(request):
     _guard(request.user)
     cards=[{"slug":slug,"title":cfg["title"],"count":apps.get_model(cfg["model"]).objects.count()} for slug,cfg in MASTER_RESOURCES.items()]
-    return render(request,"master/home.html",{"cards":cards})
+    sections=[
+        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento"}),
+        ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
+        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","aquisicao","meta-conversoes"}),
+        ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing"}),
+    ]
+    assigned=set().union(*(slugs for _,slugs in sections))
+    grouped=[{"title":title,"cards":[card for card in cards if card["slug"] in slugs]} for title,slugs in sections]
+    grouped.append({"title":"Auditoria e configurações","cards":[card for card in cards if card["slug"] not in assigned]})
+    return render(request,"master/home.html",{
+        "cards":cards,"groups":grouped,
+        "public_plans":Plan.objects.filter(active=True,public_visible=True,is_custom=False).count(),
+        "active_modules":Module.objects.filter(active=True).count(),
+    })
+
+
+class ChatbotMasterForm(forms.Form):
+    tenant=forms.ModelChoiceField(queryset=None,label="Estabelecimento")
+    phone_number_id=forms.CharField(max_length=100,required=False,label="ID do número na WhatsApp Cloud API")
+    enabled=forms.BooleanField(required=False,label="Ativar respostas automáticas")
+    greeting=forms.CharField(max_length=1000,label="Mensagem inicial",widget=forms.Textarea(attrs={"rows":3}))
+    fallback=forms.CharField(max_length=1000,label="Mensagem antes do atendimento humano",widget=forms.Textarea(attrs={"rows":3}))
+    handoff=forms.CharField(max_length=1000,label="Mensagem de transferência",widget=forms.Textarea(attrs={"rows":3}))
+    rules_text=forms.CharField(required=False,label="Respostas por assunto",widget=forms.Textarea(attrs={"rows":8,"placeholder":"horário;funcionamento | Nosso horário de atendimento é..."}))
+
+    def __init__(self,*args,**kwargs):
+        from tenants.models import Tenant
+        super().__init__(*args,**kwargs)
+        self.fields["tenant"].queryset=Tenant.objects.filter(deleted_at__isnull=True).order_by("name")
+
+    def clean_rules_text(self):
+        lines=(self.cleaned_data["rules_text"] or "").splitlines()
+        if len(lines)>20:
+            raise forms.ValidationError("Cadastre até 20 respostas.")
+        result=[]
+        for line in lines:
+            if not line.strip():
+                continue
+            keywords,separator,reply=line.partition("|")
+            triggers=[part.strip() for part in keywords.split(";") if part.strip()]
+            if not separator or not triggers or not reply.strip() or len(reply.strip())>1000 or any(len(trigger)>80 for trigger in triggers):
+                raise forms.ValidationError("Use uma linha por resposta: palavra;outra palavra | texto da resposta (até 1.000 caracteres).")
+            result.append({"keywords":triggers,"reply":reply.strip()})
+        return result
+
+
+@login_required
+def chatbot_flow(request):
+    from communications.models import ChatbotFlow
+    from django.conf import settings
+    from tenants.models import Tenant
+
+    _guard(request.user)
+    selected_id=request.POST.get("tenant") if request.method=="POST" else request.GET.get("tenant")
+    flow=ChatbotFlow.objects.filter(tenant_id=selected_id).select_related("tenant").first() if selected_id and str(selected_id).isdigit() else None
+    initial={"tenant":selected_id,"greeting":"Olá! Como podemos ajudar?", "fallback":"Vou encaminhar você para nossa equipe.","handoff":"Vou chamar um atendente para ajudar você."}
+    if flow:
+        initial.update({"enabled":flow.enabled,"greeting":flow.greeting,"fallback":flow.fallback,"handoff":flow.handoff,
+                        "rules_text":"\n".join(";".join(rule.get("keywords",[]))+" | "+rule.get("reply","") for rule in flow.rules)})
+        initial["phone_number_id"]=(flow.tenant.metadata or {}).get("whatsapp_phone_number_id","")
+    elif selected_id and str(selected_id).isdigit():
+        tenant=Tenant.objects.filter(pk=selected_id).first()
+        if tenant:
+            initial["phone_number_id"]=(tenant.metadata or {}).get("whatsapp_phone_number_id","")
+    form=ChatbotMasterForm(request.POST or None,initial=initial)
+    if request.method=="POST" and form.is_valid():
+        data=form.cleaned_data
+        if data["phone_number_id"] and Tenant.objects.filter(
+            metadata__whatsapp_phone_number_id=data["phone_number_id"],deleted_at__isnull=True,
+        ).exclude(pk=data["tenant"].pk).exists():
+            form.add_error("phone_number_id","Esse número já está vinculado a outra empresa.")
+        if data["enabled"] and not (
+            settings.WHATSAPP_ACCESS_TOKEN and settings.WHATSAPP_PHONE_NUMBER_ID
+            and settings.WHATSAPP_APP_SECRET and settings.WHATSAPP_VERIFY_TOKEN
+            and data["phone_number_id"]==settings.WHATSAPP_PHONE_NUMBER_ID
+        ):
+            form.add_error("enabled","Configure a Cloud API no servidor e vincule o número ao estabelecimento antes de ativar.")
+    if request.method=="POST" and form.is_valid() and not form.errors:
+        data=form.cleaned_data
+        if data["phone_number_id"]:
+            tenant=data["tenant"]
+            tenant.metadata={**(tenant.metadata or {}),"whatsapp_phone_number_id":data["phone_number_id"]}
+            tenant.save(update_fields=["metadata","updated_at"])
+        ChatbotFlow.objects.update_or_create(tenant=data["tenant"],defaults={
+            "enabled":data["enabled"],"greeting":data["greeting"],
+            "fallback":data["fallback"],"handoff":data["handoff"],"rules":data["rules_text"],
+        })
+        messages.success(request,"Fluxo do chatbot salvo.")
+        return redirect(f"{request.path}?tenant={data['tenant'].pk}")
+    return render(request,"master/chatbot.html",{"form":form,"flow":flow,
+        "whatsapp_configured":bool(settings.WHATSAPP_ACCESS_TOKEN and settings.WHATSAPP_PHONE_NUMBER_ID and settings.WHATSAPP_APP_SECRET and settings.WHATSAPP_VERIFY_TOKEN),
+        "phone_number_id":settings.WHATSAPP_PHONE_NUMBER_ID})
 
 
 @login_required
@@ -185,9 +296,13 @@ def resource_list(request,slug):
     order=config.get("order")
     if order: qs=qs.order_by(*[x.strip() for x in order.split(",")])
     columns=config["columns"]
-    headers=[str(_field(model,c).verbose_name).title() if _field(model,c) else c.replace("_"," ").title() for c in columns]
+    headers=[FIELD_LABELS.get(c) or (str(_field(model,c).verbose_name).title() if _field(model,c) else c.replace("_"," ").title()) for c in columns]
     rows=[{"obj":obj,"cells":[_value(obj,c) for c in columns]} for obj in qs[:300]]
-    return render(request,"master/list.html",{"slug":slug,"resource":config,"headers":headers,"rows":rows,"q":q})
+    help_text={
+        "planos":"Para publicar um plano, marque Ativo e Visível ao público. Use Módulos em cada plano para escolher as funções; preços e dias de teste são editados no próprio plano.",
+        "empresas":"Para aparecer no diretório, a empresa precisa estar ativa ou em teste, com Página pública ligada. Informe cidade e latitude/longitude da unidade para ordenar por proximidade.",
+    }
+    return render(request,"master/list.html",{"slug":slug,"resource":config,"headers":headers,"rows":rows,"q":q,"help_text":help_text.get(slug)})
 
 
 @login_required
@@ -199,6 +314,8 @@ def resource_form(request,slug,pk=None):
     obj=get_object_or_404(model,pk=pk) if pk else None
     Form=PlanMasterForm if config.get("special")=="plan" else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"]))
     form=Form(request.POST or None,instance=obj)
+    for name,field in form.fields.items():
+        if name in FIELD_LABELS:field.label=FIELD_LABELS[name]
     for name,field in form.fields.items():
         mf=_field(model,name)
         if mf and mf.get_internal_type()=="DateTimeField":

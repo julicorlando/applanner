@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import Sum
+from django.db.models import Q,Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -132,11 +132,13 @@ def tenant_public(request,slug=None):
     from tenants.models import Tenant
     if slug:
         tenant=get_object_or_404(
-            Tenant,status=Tenant.Status.ACTIVE,public_enabled=True,public_slug=slug,
+            Tenant.objects.filter(Q(public_slug=slug)|Q(public_slug__isnull=True,slug=slug)),
+            status__in=[Tenant.Status.TRIAL,Tenant.Status.ACTIVE],
+            public_enabled=True,deleted_at__isnull=True,
         )
     else:
         tenant=getattr(request,"tenant",None)
-        if not tenant or tenant.status!=Tenant.Status.ACTIVE or not tenant.public_enabled:
+        if not tenant or tenant.status not in [Tenant.Status.TRIAL,Tenant.Status.ACTIVE] or not tenant.public_enabled:
             return render(request,"home.html")
     return render(request,"tenant_public.html",_public_tenant_context(tenant))
 
@@ -145,7 +147,9 @@ def professional_public(request,slug,professional_slug):
     from scheduling.models import Professional
     from tenants.models import Tenant
     tenant=get_object_or_404(
-        Tenant,status=Tenant.Status.ACTIVE,public_enabled=True,public_slug=slug,
+        Tenant.objects.filter(Q(public_slug=slug)|Q(public_slug__isnull=True,slug=slug)),
+        status__in=[Tenant.Status.TRIAL,Tenant.Status.ACTIVE],
+        public_enabled=True,deleted_at__isnull=True,
     )
     professional=get_object_or_404(
         Professional,tenant=tenant,active=True,public_slug=professional_slug,
@@ -162,4 +166,6 @@ def home(request):
         return _platform_dashboard(request)
     if getattr(request,"tenant",None):
         return tenant_public(request)
-    return render(request,"home.html")
+    from billing.models import Plan
+    plans=Plan.objects.filter(active=True,public_visible=True,is_custom=False).order_by("sort_order","name")[:4]
+    return render(request,"home.html",{"plans":plans})

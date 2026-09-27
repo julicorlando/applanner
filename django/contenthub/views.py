@@ -6,7 +6,7 @@ from .models import BlogPost,LandingPage
 
 
 def public_directory(request):
-    rows=Tenant.objects.filter(public_enabled=True,status=Tenant.Status.ACTIVE).order_by("name")[:200]
+    rows=Tenant.objects.filter(public_enabled=True,status__in=[Tenant.Status.ACTIVE,Tenant.Status.TRIAL],deleted_at__isnull=True).order_by("name")[:200]
     data=[]
     for tenant in rows:
         units=list(tenant.units.filter(active=True).values(
@@ -41,26 +41,34 @@ def _distance_km(lat1,lon1,lat2,lon2):
 
 def public_directory_page(request):
     rows=Tenant.objects.filter(
-        public_enabled=True,status=Tenant.Status.ACTIVE
+        public_enabled=True,status__in=[Tenant.Status.ACTIVE,Tenant.Status.TRIAL],deleted_at__isnull=True
     ).prefetch_related("units").order_by("name")
     lat=request.GET.get("lat")
     lon=request.GET.get("lon")
+    try:
+        if lat is not None and lon is not None:
+            latitude,longitude=float(lat),float(lon)
+            if not (math.isfinite(latitude) and math.isfinite(longitude) and -90<=latitude<=90 and -180<=longitude<=180):
+                raise ValueError
+        else:
+            latitude=longitude=None
+    except (TypeError,ValueError):
+        latitude=longitude=None
     cards=[]
     for tenant in rows[:300]:
         units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
         distances=[]
-        if lat and lon:
-            try:
-                distances=[
-                    _distance_km(lat,lon,unit.latitude,unit.longitude)
-                    for unit in units if unit.latitude is not None and unit.longitude is not None
-                ]
-            except (TypeError,ValueError):
-                distances=[]
+        if latitude is not None:
+            distances=[
+                (_distance_km(latitude,longitude,unit.latitude,unit.longitude),unit)
+                for unit in units if unit.latitude is not None and unit.longitude is not None
+            ]
+            distances.sort(key=lambda item:item[0])
         cards.append({
             "tenant":tenant,"units":units,
-            "distance_km":min(distances) if distances else None,
+            "nearest_unit":distances[0][1] if distances else (units[0] if units else None),
+            "distance_km":distances[0][0] if distances else None,
         })
-    if lat and lon:
+    if latitude is not None:
         cards.sort(key=lambda row:(row["distance_km"] is None,row["distance_km"] or 0,row["tenant"].name))
-    return render(request,"contenthub/directory.html",{"cards":cards,"lat":lat,"lon":lon})
+    return render(request,"contenthub/directory.html",{"cards":cards,"located":latitude is not None})

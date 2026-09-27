@@ -5,7 +5,9 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from tenants.models import Tenant
-from .models import MarketingDelivery, WhatsAppConversation, WhatsAppMessage
+from .models import ChatbotFlow, MarketingDelivery, WhatsAppConversation, WhatsAppMessage
+from .chatbot import next_reply
+from .tasks import send_chatbot_reply
 from .whatsapp import verify_webhook_signature
 
 
@@ -13,7 +15,8 @@ from .whatsapp import verify_webhook_signature
 def whatsapp_webhook(request):
     if request.method=="GET":
         if (
-            request.GET.get("hub.mode")=="subscribe"
+            settings.WHATSAPP_VERIFY_TOKEN
+            and request.GET.get("hub.mode")=="subscribe"
             and request.GET.get("hub.verify_token")==settings.WHATSAPP_VERIFY_TOKEN
         ):
             return HttpResponse(request.GET.get("hub.challenge",""))
@@ -35,12 +38,13 @@ def whatsapp_webhook(request):
             tenant=Tenant.objects.filter(metadata__whatsapp_phone_number_id=phone_number_id).first()
             if not tenant:
                 continue
+            flow=ChatbotFlow.objects.filter(tenant=tenant,enabled=True).first()
             contacts={str(c.get("wa_id")):(c.get("profile") or {}).get("name","") for c in value.get("contacts",[])}
             for message in value.get("messages",[]):
                 wa_id=str(message.get("from") or "")
-                if not wa_id:
+                if not wa_id or not message.get("id"):
                     continue
-                conversation,_=WhatsAppConversation.objects.get_or_create(
+                conversation,first_message=WhatsAppConversation.objects.get_or_create(
                     tenant=tenant,wa_id=wa_id,
                     defaults={
                         "contact_name":contacts.get(wa_id,""),
@@ -48,7 +52,7 @@ def whatsapp_webhook(request):
                     },
                 )
                 body=((message.get("text") or {}).get("body") or "")
-                WhatsAppMessage.objects.get_or_create(
+                _,created=WhatsAppMessage.objects.get_or_create(
                     provider_message_id=str(message.get("id") or ""),
                     defaults={
                         "conversation":conversation,"tenant":tenant,
@@ -58,10 +62,17 @@ def whatsapp_webhook(request):
                         "body":body,"status":WhatsAppMessage.Status.RECEIVED,
                     },
                 )
-                if any(term in body.lower() for term in ("atendente","humano","falar com alguém")):
+                if not created:
+                    continue
+                reply=None
+                if flow and message.get("type")=="text" and phone_number_id==settings.WHATSAPP_PHONE_NUMBER_ID:
+                    reply,conversation.status=next_reply(flow,conversation,body,first_message=first_message)
+                elif any(term in body.lower() for term in ("atendente","humano","falar com alguém")):
                     conversation.status=WhatsAppConversation.Status.WAITING_HUMAN
                 conversation.last_message_at=timezone.now()
                 conversation.save(update_fields=["status","last_message_at","updated_at"])
+                if reply:
+                    send_chatbot_reply.delay(conversation.pk,reply)
     return JsonResponse({"ok":True})
 
 

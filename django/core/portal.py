@@ -14,6 +14,8 @@ from django.utils import timezone
 
 from accounts.permissions import has_capability,require_any_capability
 from arena.services import ArenaReservationService
+from billing.segment_access import require_segment,segment_enabled
+from billing.entitlements import active_subscription,module_enabled
 from healthcare.services import create_record, read_record
 
 
@@ -28,6 +30,28 @@ MODULE_CAPABILITIES = {
     "suporte":"support.manage",
     "comunicacao":"communications.manage",
 }
+
+# Módulos do catálogo comercial ligados às telas existentes.
+RESOURCE_ENTITLEMENTS={
+    ("financeiro","lancamentos"):"finance",("financeiro","produtos"):"products",
+    ("financeiro","pdv"):"products",("financeiro","caixa"):"finance",
+    ("financeiro","comissoes"):"finance",
+    ("relacionamento","inteligencia"):"behavior",
+    ("relacionamento","pacotes"):"packages",
+    ("relacionamento","pacotes-clientes"):"packages",
+    ("relacionamento","recorrencias"):"packages",
+    ("relacionamento","fidelidade"):"loyalty",
+    ("relacionamento","espera"):"waitlist",
+    ("relacionamento","dominios"):"custom-domain",
+    ("comunicacao","whatsapp"):"whatsapp",
+}
+
+
+def _feature_allowed(user,tenant,module_slug,resource_slug):
+    if user.is_superuser or not tenant or not active_subscription(tenant):
+        return True
+    entitlement=RESOURCE_ENTITLEMENTS.get((module_slug,resource_slug))
+    return not entitlement or module_enabled(tenant,entitlement)
 
 PORTAL_MODULES = {
     "agenda": {
@@ -561,10 +585,14 @@ def _require_tenant(request):
     raise PermissionDenied("Seu usuário não está vinculado a uma empresa.")
 
 
-def _require_module_access(user,module):
+def _require_module_access(user,module,tenant=None,module_slug=None,resource_slug=None):
     capability=module.get("capability")
     if capability:
         require_any_capability(user,capability)
+    if tenant and not user.is_superuser and module_slug in {"barbearia","arena","auto","saude"}:
+        require_segment(tenant,{"barbearia":"barbearia","arena":"arena","auto":"auto","saude":"saude"}[module_slug])
+    if resource_slug and not _feature_allowed(user,tenant,module_slug,resource_slug):
+        raise PermissionDenied("Esta função não está incluída no plano da empresa.")
 
 
 def _resource(module_slug, resource_slug):
@@ -697,8 +725,11 @@ def _save_special(obj, *, resource, request, tenant, is_new):
             obj.created_by=request.user
     elif special=="support_ticket":
         if is_new:
+            from operations.triage import classify_priority
             obj.user=request.user
             obj.protocol=f"SUP-{tenant.pk}-{timezone.now():%Y%m%d%H%M}-{secrets.token_hex(2).upper()}"
+            obj.priority=classify_priority(obj.category,obj.subject,obj.description)
+            obj.status=obj.Status.OPEN
     return obj
 
 
@@ -748,9 +779,15 @@ def home(request):
         capability=module.get("capability")
         if capability and not has_capability(request.user,capability):
             continue
+        if not request.user.is_superuser and slug in {"barbearia","arena","auto","saude"} and not segment_enabled(tenant,{"barbearia":"barbearia","arena":"arena","auto":"auto","saude":"saude"}[slug]):
+            continue
         resources=[]
         for resource_slug,resource in module["resources"].items():
+            if not _feature_allowed(request.user,tenant,slug,resource_slug):
+                continue
             resources.append({"slug":resource_slug,"title":resource["title"]})
+        if not resources:
+            continue
         modules.append({"slug":slug,"title":module["title"],"description":module["description"],"resources":resources})
     return render(request,"portal/home.html",{"tenant":tenant,"modules":modules})
 
@@ -771,7 +808,7 @@ def resource_list(request,module_slug,resource_slug):
     require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
-    _require_module_access(request.user,module_for_access)
+    _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
     module,resource,model=_resource(module_slug,resource_slug)
     if resource.get("custom_list")=="arena_games":
         return redirect("arena-games")
@@ -826,7 +863,7 @@ def resource_create(request,module_slug,resource_slug):
     require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
-    _require_module_access(request.user,module_for_access)
+    _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")
@@ -873,6 +910,9 @@ def resource_create(request,module_slug,resource_slug):
         if not resource.get("create",True):
             raise PermissionDenied
         form=_model_form(model,resource,request.POST or None,tenant=tenant)
+        if resource.get("special")=="support_ticket":
+            form.fields.pop("priority",None)
+            form.fields.pop("status",None)
         if request.method=="POST" and form.is_valid():
             obj=form.save(commit=False)
             obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=True)
@@ -897,7 +937,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
     require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
-    _require_module_access(request.user,module_for_access)
+    _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")
@@ -929,7 +969,7 @@ def resource_detail(request,module_slug,resource_slug,pk):
     require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
-    _require_module_access(request.user,module_for_access)
+    _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")

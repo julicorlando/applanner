@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
-<main class="container" style="max-width:480px">
-  <h1>Entrar no ApPlanner</h1>
-  {% for message in messages %}<p>{{ message }}</p>{% endfor %}
-  <form method="post">{% csrf_token %}
-    <p><label>E-mail<br><input type="email" name="email" autocomplete="username" required></label></p>
-    <p><label>Senha<br><input type="password" name="password" autocomplete="current-password" required></label></p>
-    <p><label><input type="checkbox" name="remember_device" value="1"> confiar neste dispositivo após o 2FA</label></p>
-    <button type="submit">Entrar</button>
-  </form>
-  <p><a href="{% url 'accounts:password-reset-request' %}">Esqueci minha senha</a></p>
-</main>
+<section class="shell login-layout">
+  <div class="login-intro"><span class="eyebrow">SUA OPERAÇÃO EM UM SÓ LUGAR</span><h1>Bem-vindo de volta.</h1><p>Entre para acompanhar sua agenda, clientes, equipe e resultados.</p><a href="{% url 'billing-plans' %}">Ainda não usa o ApPlanner? Conheça os planos →</a></div>
+  <div class="panel login-card"><h2>Acesse sua conta</h2><p>Informe o e-mail e a senha cadastrados.</p>
+    <form method="post" class="portal-form">{% csrf_token %}
+      <div class="form-field"><label for="login-email">E-mail</label><input id="login-email" type="email" name="email" autocomplete="username" required autofocus></div>
+      <div class="form-field"><label for="login-password">Senha</label><input id="login-password" type="password" name="password" autocomplete="current-password" required></div>
+      <div class="form-field checkbox-field"><label for="remember-device">Confiar neste dispositivo após a verificação em duas etapas</label><input id="remember-device" type="checkbox" name="remember_device" value="1"></div>
+      <button class="button primary" type="submit">Entrar no ApPlanner</button>
+    </form>
+    <p><a href="{% url 'accounts:password-reset-request' %}">Esqueceu sua senha?</a></p>
+  </div>
+</section>
 {% endblock %}

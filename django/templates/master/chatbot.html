@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Chatbot WhatsApp — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">ATENDIMENTO</span><h1>Fluxo do chatbot</h1><p>Defina respostas por assunto para cada estabelecimento e encaminhe os demais casos a um atendente.</p></div></div>
+  <div class="panel" style="margin-bottom:20px">
+    {% if whatsapp_configured %}<p>WhatsApp Cloud API configurada. Informe no formulário o ID do número configurado no servidor e vincule-o ao estabelecimento.</p>
+    {% else %}<p>WhatsApp Cloud API ainda não configurada no servidor. Salve o fluxo agora e configure as credenciais antes de ativar o atendimento.</p>{% endif %}
+    <p>A integração atual usa a API oficial por token e webhook. Conexão por QR code requer outro provedor compatível e ainda não está disponível.</p>
+    <p>Webhook de recebimento: <code>{{ request.scheme }}://{{ request.get_host }}{% url 'whatsapp-webhook' %}</code>. Configure o token de verificação e a assinatura no provedor.</p>
+    <p>Para responder manualmente, <a href="{% url 'portal-home' %}?trocar=1">selecione a empresa no portal</a> e abra <strong>Comunicação → WhatsApp</strong>. Contatos de empresas ainda não cadastradas exigem uma caixa de entrada própria da plataforma.</p>
+  </div>
+  <form method="get" class="portal-form panel" style="margin-bottom:20px"><div class="form-field"><label for="select-tenant">Editar fluxo do estabelecimento</label><select id="select-tenant" name="tenant">{% for choice in form.fields.tenant.queryset %}<option value="{{ choice.pk }}" {% if flow.tenant_id == choice.pk %}selected{% endif %}>{{ choice.name }}</option>{% endfor %}</select></div><button class="button ghost">Carregar fluxo</button></form>
+  <form method="post" class="portal-form panel">{% csrf_token %}
+    {% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    <p>Uma linha por assunto: <code>agendar;marcar horário | Para agendar, acesse o link público do estabelecimento.</code> Se alguém pedir “atendente”, “humano” ou “pessoa”, a conversa entra na fila humana.</p>
+    <button class="button primary">Salvar fluxo</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import time
+from unittest.mock import patch
 from decimal import Decimal
 
 from django.test import SimpleTestCase
@@ -70,7 +71,7 @@ from django.test import TestCase
 
 from accounts.models import User
 from tenants.models import Tenant,Unit
-from .models import Plan,Subscription
+from .models import PaymentGateway,Plan,Subscription
 
 
 class PublicSignupTests(TestCase):
@@ -112,3 +113,27 @@ class PublicSignupTests(TestCase):
         subscription=Subscription.objects.get(tenant=tenant)
         self.assertEqual(subscription.plan,self.plan)
         self.assertEqual(subscription.status,Subscription.Status.TRIAL)
+
+    def test_owner_can_resume_secure_payment_link(self):
+        from django.utils import timezone
+        from .payment_services import create_platform_subscription
+
+        tenant=Tenant.objects.create(name="Assinante",slug="assinante")
+        owner=User.objects.create_user(email="pay@example.com",password="StrongPassword123!",role="owner",tenant=tenant)
+        subscription=Subscription.objects.create(tenant=tenant,plan=self.plan,started_at=timezone.now(),contracted_price="49.90")
+        PaymentGateway.objects.create(environment="sandbox",active=True,last_test_status="validated",
+                                      access_token_encrypted="unused",webhook_secret_encrypted="unused",webhook_url="https://example.test/webhook")
+
+        class Provider:
+            def create_subscription(self,**kwargs):
+                return {"reference":"preapproval-123","init_point":"https://example.test/pagar"}
+
+        with patch("billing.payment_services.platform_provider",return_value=Provider()):
+            create_platform_subscription(subscription=subscription,payer_email=owner.email,
+                                         back_url="https://example.test/voltar",idempotency_key="idempotent")
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.provider_checkout_url,"https://example.test/pagar")
+        self.client.force_login(owner)
+        response=self.client.post("/billing/assinatura/pagar/")
+        self.assertRedirects(response,"https://example.test/pagar",fetch_redirect_response=False)
+        self.assertContains(self.client.get("/billing/assinatura/"),"Continuar pagamento seguro")

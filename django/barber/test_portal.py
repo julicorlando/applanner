@@ -8,7 +8,7 @@ from tenants.models import Tenant
 
 class BarberPortalTests(TestCase):
     def setUp(self):
-        self.tenant=Tenant.objects.create(name="Barber",slug="barber-test")
+        self.tenant=Tenant.objects.create(name="Barber",slug="barber-test",category="Barbearia")
         self.user=User.objects.create_user(email="barber@example.com",password="StrongPassword123!",tenant=self.tenant,role="barber-manager")
         self.customer=Customer.objects.create(tenant=self.tenant,name="Cliente")
         self.professional=Professional.objects.create(tenant=self.tenant,name="Profissional")

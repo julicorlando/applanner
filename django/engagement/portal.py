@@ -1,4 +1,5 @@
 from accounts.permissions import require_any_capability
+from billing.segment_access import require_feature
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,7 +12,12 @@ from .models import TenantDomain
 
 
 def _tenant(request):
-    if request.user.tenant_id:return request.user.tenant
+    if request.user.tenant_id:
+        module={"engagement-intelligence":"behavior","engagement-domains":"custom-domain",
+                "engagement-packages":"packages","engagement-loyalty":"loyalty",
+                "engagement-waitlist":"waitlist"}.get(request.resolver_match.url_name)
+        if module:require_feature(request.user.tenant,module)
+        return request.user.tenant
     if request.user.is_superuser:
         tid=request.session.get("portal_tenant_id")
         if tid:return Tenant.objects.filter(pk=tid).first()

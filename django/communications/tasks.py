@@ -125,3 +125,17 @@ def process_marketing_deliveries(limit=100):
     for delivery_id in ids:
         send_marketing_delivery.delay(delivery_id)
     return len(ids)
+@shared_task
+def send_chatbot_reply(conversation_id, body):
+    from .models import WhatsAppConversation, WhatsAppMessage
+    from .whatsapp import send_text
+
+    conversation=WhatsAppConversation.objects.get(pk=conversation_id)
+    provider_id=send_text(conversation.wa_id,body)
+    WhatsAppMessage.objects.create(
+        conversation=conversation,tenant=conversation.tenant,
+        provider_message_id=provider_id or None,
+        direction=WhatsAppMessage.Direction.OUT,
+        sender_type=WhatsAppMessage.SenderType.BOT,
+        message_type="text",body=body,status=WhatsAppMessage.Status.SENT,
+    )

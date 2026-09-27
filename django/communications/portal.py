@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
 
 from accounts.permissions import require_any_capability
+from billing.segment_access import require_feature
 from tenants.models import Tenant
 from .models import UserNotification,WhatsAppConversation,WhatsAppMessage
 from .whatsapp import WhatsAppProviderError,send_text
@@ -12,6 +13,8 @@ from .whatsapp import WhatsAppProviderError,send_text
 
 def _tenant(request):
     if request.user.tenant_id:
+        if request.resolver_match.url_name in {"communications-inbox","communications-conversation","communications-conversation-action"}:
+            require_feature(request.user.tenant,"whatsapp")
         return request.user.tenant
     if request.user.is_superuser:
         tid=request.session.get("portal_tenant_id")

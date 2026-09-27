@@ -208,6 +208,15 @@ class WhatsAppConversation(TimeStampedModel):
         indexes=[models.Index(fields=["tenant","status","last_message_at"],name="comm_wa_inbox_idx")]
 
 
+class ChatbotFlow(TimeStampedModel):
+    tenant=models.OneToOneField("tenants.Tenant",on_delete=models.CASCADE,related_name="chatbot_flow")
+    enabled=models.BooleanField(default=False)
+    greeting=models.CharField(max_length=1000,default="Olá! Como podemos ajudar?")
+    fallback=models.CharField(max_length=1000,default="Vou encaminhar sua mensagem para nossa equipe.")
+    handoff=models.CharField(max_length=1000,default="Vou chamar um atendente para ajudar você.")
+    rules=models.JSONField(default=list,blank=True)
+
+
 class WhatsAppMessage(models.Model):
     class Direction(models.TextChoices):
         IN="in","Entrada"

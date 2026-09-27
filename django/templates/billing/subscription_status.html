@@ -10,6 +10,12 @@
       <div class="module-row"><span></span><div><strong>Ciclo</strong><small>{{ subscription.get_billing_cycle_display }}</small></div></div>
       <div class="module-row"><span></span><div><strong>Valor contratado</strong><small>R$ {{ subscription.contracted_price }}</small></div></div>
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
+      {% if subscription.status == 'trial' or subscription.status == 'past_due' %}
+        {% if subscription.provider_checkout_url %}<p><a class="button primary" href="{{ subscription.provider_checkout_url }}" rel="noopener">Continuar pagamento seguro</a></p>
+        {% elif subscription.provider_subscription_id %}<p>A autorização de pagamento já foi iniciada. Solicite ajuda ao suporte para recuperar o link.</p>
+        {% else %}<p>Quer ativar a cobrança do seu plano? O pagamento é concluído no ambiente seguro do provedor configurado pelo Master.</p>
+        <form method="post" action="{% url 'billing-subscription-checkout' %}">{% csrf_token %}<button class="button primary">Ir para o pagamento</button></form>{% endif %}
+      {% endif %}
     {% else %}<p>Nenhuma assinatura encontrada.</p>{% endif %}
   <div class="form-actions" style="margin-top:18px"><a class="button primary" href="{% url 'billing-subscription-modules' %}">Gerenciar módulos adicionais</a></div>
   </article>

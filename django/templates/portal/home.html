@@ -6,6 +6,15 @@
     <div><span class="eyebrow">ÁREA OPERACIONAL</span><h1>{{ tenant.name }}</h1><p>Escolha um módulo para gerenciar a operação.</p></div>
     {% if request.user.is_superuser %}<a class="button ghost" href="{% url 'portal-home' %}?trocar=1">Empresa atual</a>{% endif %}
   </div>
+  <section class="panel" style="margin-bottom:20px">
+    <h2>Links para compartilhar</h2>
+    {% if tenant.public_enabled %}
+      <p>Página do estabelecimento: <a href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}</a></p>
+      {% for professional in tenant.professionals.all %}
+        {% if professional.active and professional.public_slug %}<p>{{ professional.name }}: <a href="{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}</a></p>{% endif %}
+      {% endfor %}
+    {% else %}<p>Sua página pública está desativada. Peça ao Master para ativar “Página pública” no cadastro da empresa.</p>{% endif %}
+  </section>
   <div class="portal-module-grid">
     {% for item in modules %}
       <article class="portal-module-card">

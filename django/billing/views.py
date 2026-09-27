@@ -46,7 +46,12 @@ class SignupForm(forms.Form):
     plan=forms.ModelChoiceField(queryset=Plan.objects.none(),label="Plano")
     billing_cycle=forms.ChoiceField(choices=Subscription.BillingCycle.choices,label="Ciclo")
     business_name=forms.CharField(max_length=150,label="Nome do negócio")
-    category=forms.CharField(max_length=60,required=False,label="Segmento")
+    category=forms.CharField(max_length=60,label="Segmento",widget=forms.Select(choices=[
+        ("","Selecione"),("barbearia","Barbearia"),("salao","Salão de beleza"),
+        ("estetica","Estética"),("auto","Lava-jato e automotivo"),
+        ("arena","Arena e quadras"),("clinica","Clínica e saúde"),
+        ("servicos","Outros serviços"),
+    ]))
     owner_name=forms.CharField(max_length=150,label="Seu nome")
     email=forms.EmailField(label="E-mail")
     phone=forms.CharField(max_length=32,required=False,label="Telefone")
@@ -69,6 +74,15 @@ class SignupForm(forms.Form):
 
     def clean(self):
         data=super().clean()
+        plan=data.get("plan")
+        category=(data.get("category") or "").lower()
+        if plan and category:
+            segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
+                     "arena":"arena","clinica":"saude"}.get(category)
+            if segment and "segments" in (plan.features or {}) and segment not in plan.features["segments"]:
+                self.add_error("plan","Este plano não inclui o segmento selecionado. Escolha outro plano ou solicite uma proposta personalizada.")
+            if segment=="arena" and not plan.module_links.filter(module__slug="sports_courts",enabled=True,module__active=True).exists():
+                self.add_error("plan","Arena requer um plano com o módulo Arena. Use Monte o seu para receber uma proposta.")
         password=data.get("password") or ""
         if password and password!=data.get("password_confirm"):
             self.add_error("password_confirm","As senhas não conferem.")
@@ -92,6 +106,38 @@ def plans(request):
         ]
         cards.append({"plan":plan,"modules":modules})
     return render(request,"billing/plans.html",{"cards":cards})
+
+
+class CustomPlanForm(forms.Form):
+    name=forms.CharField(max_length=160,label="Seu nome")
+    business_type=forms.CharField(max_length=100,label="Tipo de negócio")
+    email=forms.EmailField(label="E-mail")
+    phone=forms.CharField(max_length=30,label="Telefone")
+    modules=forms.ModelMultipleChoiceField(queryset=Module.objects.none(),widget=forms.CheckboxSelectMultiple,label="Funções desejadas")
+    consent=forms.BooleanField(label="Autorizo o contato para receber uma proposta do ApPlanner")
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fields["modules"].queryset=Module.objects.filter(active=True).order_by("sort_order","name")
+
+
+def custom_plan(request):
+    from commercial.models import Lead
+
+    form=CustomPlanForm(request.POST or None)
+    if request.method=="POST" and form.is_valid():
+        data=form.cleaned_data
+        Lead.objects.create(
+            name=data["name"],business_type=data["business_type"],
+            email=data["email"],phone=data["phone"],
+            source="custom_plan",consent_granted=True,
+            consent_at=timezone.now(),consent_version="custom_plan_v1",
+            consent_purpose="Contato comercial para proposta de plano personalizado",
+            notes="Módulos solicitados: "+", ".join(module.name for module in data["modules"]),
+        )
+        messages.success(request,"Recebemos sua seleção. Nossa equipe entrará em contato para montar sua proposta.")
+        return redirect("billing-custom-plan")
+    return render(request,"billing/custom_plan.html",{"form":form})
 
 
 def signup(request):
@@ -168,6 +214,38 @@ def subscription_status(request):
         if request.user.tenant_id else None
     )
     return render(request,"billing/subscription_status.html",{"subscription":subscription})
+
+
+@login_required
+def subscription_checkout(request):
+    if request.method!="POST":
+        return redirect("billing-subscription-status")
+    if not request.user.tenant_id or request.user.role not in {"owner","manager"}:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Somente o responsável pode iniciar o pagamento da assinatura.")
+    subscription=Subscription.objects.filter(tenant=request.user.tenant).order_by("-started_at").first()
+    if not subscription or subscription.status not in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
+        messages.error(request,"Não há cobrança pendente para esta assinatura.")
+        return redirect("billing-subscription-status")
+    if subscription.provider_subscription_id:
+        if subscription.provider_checkout_url.startswith("https://"):
+            return redirect(subscription.provider_checkout_url)
+        messages.info(request,"Já existe uma autorização de cobrança iniciada. Entre em contato com o suporte se precisar de um novo link.")
+        return redirect("billing-subscription-status")
+    try:
+        remote=create_platform_subscription(
+            subscription=subscription,payer_email=request.user.email,
+            back_url=request.build_absolute_uri("/billing/assinatura/"),
+            idempotency_key=f"customer-checkout-{subscription.pk}",
+        )
+    except (RuntimeError,ValueError) as exc:
+        messages.error(request,"Não foi possível iniciar o pagamento: "+str(exc))
+        return redirect("billing-subscription-status")
+    url=remote.get("init_point") or ""
+    if url.startswith("https://"):
+        return redirect(url)
+    messages.error(request,"O provedor não disponibilizou um link seguro de pagamento.")
+    return redirect("billing-subscription-status")
 
 
 @login_required

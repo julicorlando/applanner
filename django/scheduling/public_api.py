@@ -22,8 +22,9 @@ class PublicBookingThrottle(throttling.AnonRateThrottle):
 
 
 def _tenant(slug):
+    from django.db.models import Q
     return Tenant.objects.filter(
-        public_slug=slug,
+        Q(public_slug=slug)|Q(public_slug__isnull=True,slug=slug),
         public_enabled=True,
         public_booking_enabled=True,
         status__in=[Tenant.Status.TRIAL,Tenant.Status.ACTIVE],

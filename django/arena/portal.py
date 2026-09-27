@@ -5,6 +5,7 @@ from django.core.exceptions import PermissionDenied,ValidationError
 from django.shortcuts import get_object_or_404,redirect,render
 
 from accounts.permissions import require_any_capability
+from billing.segment_access import require_segment
 
 from finance.models import Product
 from scheduling.models import Customer
@@ -21,6 +22,7 @@ from .operations import (
 
 def _tenant(request):
     if request.user.tenant_id:
+        require_segment(request.user.tenant,"arena")
         return request.user.tenant
     if request.user.is_superuser:
         tid=request.session.get("portal_tenant_id")

@@ -4,10 +4,11 @@
 <section class="marketing-hero shell">
   <div class="hero-copy">
     <span class="eyebrow">AGENDA · OPERAÇÃO · RELACIONAMENTO</span>
-    <h1>Menos abas.<br>Mais negócio acontecendo.</h1>
-    <p class="lead">Agendamentos, equipe, pagamentos, clientes e automações em uma plataforma modular feita para serviços que precisam crescer sem perder o controle.</p>
+    <h1>Transforme horários livres em clientes.</h1>
+    <p class="lead">Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar. Experimente grátis pelo período indicado no plano escolhido.</p>
     <div class="actions">
-      <a class="button primary" href="/planos/">Ver planos</a>
+      <a class="button primary" href="{% url 'billing-plans' %}">Conhecer os planos</a>
+      <a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
       <a class="button ghost" href="/account/login/">Já tenho conta</a>
     </div>
     <div class="trust-row">
@@ -27,6 +28,22 @@
       <div><time>14:00</time><span class="event"><b>Operação organizada</b><small>Lembretes automáticos</small></span></div>
     </div>
   </div>
+</section>
+
+<section class="shell section" id="planos">
+  <div class="section-head"><span class="eyebrow">ESCOLHA COMO COMEÇAR</span><h2>Planos para o seu momento.</h2><p>Preços e condições definidos no painel Master. O teste grátis depende do plano escolhido.</p></div>
+  <div class="pricing-grid">
+    {% for plan in plans %}
+    <article class="pricing-card {% if plan.featured %}featured{% endif %}">
+      {% if plan.featured %}<span class="status-pill">Em destaque</span>{% endif %}
+      <h3>{{ plan.name }}</h3><p>{{ plan.description }}</p>
+      <div class="price-line"><small>R$</small><strong>{{ plan.monthly_price }}</strong><span>/mês</span></div>
+      {% if plan.trial_days %}<p class="trial-highlight">{{ plan.trial_days }} dias grátis{% if plan.trial_without_card %} · sem cartão{% endif %}</p>{% endif %}
+      <a class="button primary" href="{% url 'billing-signup' %}?plan={{ plan.pk }}">{% if plan.trial_days %}Começar teste grátis{% else %}Escolher plano{% endif %}</a>
+    </article>
+    {% empty %}<p>Os planos estarão disponíveis em breve. <a href="{% url 'billing-custom-plan' %}">Solicite uma proposta personalizada</a>.</p>{% endfor %}
+  </div>
+  <p style="margin-top:24px"><a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu: selecione as funções →</a></p>
 </section>
 
 <section class="proof-strip">

@@ -15,9 +15,10 @@
         {% for item in card.plan.features.included_features %}<li>{{ item }}</li>{% endfor %}
         {% for module in card.modules %}<li>{{ module.name }}</li>{% endfor %}
       </ul>
-      <a class="button primary" href="{% url 'billing-signup' %}?plan={{ card.plan.pk }}">Escolher {{ card.plan.name }}</a>
+      <a class="button primary" href="{% url 'billing-signup' %}?plan={{ card.plan.pk }}">{% if card.plan.trial_days %}Testar {{ card.plan.trial_days }} dias grátis{% else %}Escolher {{ card.plan.name }}{% endif %}</a>
     </article>
     {% empty %}<div class="panel"><p>Nenhum plano público disponível.</p></div>{% endfor %}
   </div>
+  <div class="panel" style="margin-top:24px"><h2>Precisa de outra combinação?</h2><p>Escolha as funções do seu negócio e receba uma proposta personalizada.</p><a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano →</a></div>
 </section>
 {% endblock %}
