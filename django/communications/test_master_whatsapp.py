@@ -93,8 +93,9 @@ class MasterWhatsAppTests(TestCase):
         row=MasterWhatsAppConversation.objects.create(wa_id="5581999999999@s.whatsapp.net",last_message_at=timezone.now())
         plan=Plan.objects.create(name="Plano Barbeiro",slug="barbeiro-proposal",monthly_price="90")
         proposal=Proposal.objects.create(commercial_user=self.master,plan=plan,title="Plano para barbearia",
-            final_price="90",public_token="proposal-whatsapp-test-1234567890",
+            final_price="90",public_token="proposal-wa-test-1234567890",
             approval_status=Proposal.Approval.PENDING)
+        self.assertLessEqual(len(proposal.public_token),32)
         self.client.force_login(self.master)
         url=reverse("master-whatsapp-conversation",args=[row.pk])
         with patch("communications.master_whatsapp._gateway") as gateway:
