@@ -118,6 +118,8 @@ EMAIL_PORT=env.int("EMAIL_PORT",default=587)
 EMAIL_HOST_USER=env("EMAIL_HOST_USER",default="")
 EMAIL_HOST_PASSWORD=env("EMAIL_HOST_PASSWORD",default="")
 EMAIL_USE_TLS=env.bool("EMAIL_USE_TLS",default=True)
+EMAIL_USE_SSL=env.bool("EMAIL_USE_SSL",default=False)
+EMAIL_TIMEOUT=env.int("EMAIL_TIMEOUT",default=15)
 DEFAULT_FROM_EMAIL=env("DEFAULT_FROM_EMAIL",default="contato@applanner.com.br")
 
 WHATSAPP_GRAPH_BASE_URL=env("WHATSAPP_GRAPH_BASE_URL",default="")

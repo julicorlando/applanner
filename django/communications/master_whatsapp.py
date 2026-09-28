@@ -379,7 +379,8 @@ def master_whatsapp_receive(request):
         body=str(data.get("text") or "")[:4096]
         name=str(data.get("name") or "")[:150]
     except (ValueError,TypeError,KeyError,json.JSONDecodeError):
-        return JsonResponse({"error":"Mensagem inválida."},status=400)
+        logger.warning("WhatsApp Master: evento recusado (formato inválido; valide JID, ID e status do recibo).")
+        return JsonResponse({"error":"Evento inválido: confira o identificador do contato, o ID da mensagem e o tipo de recibo."},status=400)
     row,_=MasterWhatsAppConversation.objects.get_or_create(
         wa_id=wa_id,defaults={"contact_name":name,"last_message_at":timezone.now()},
     )

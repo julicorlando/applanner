@@ -3,11 +3,13 @@
 {% block content %}
 <section class="shell portal-page narrow">
   <div class="portal-heading"><div><a class="back-link" href="{% url 'billing-subscription-status' %}">← Meu plano e pagamento</a><span class="eyebrow">PIX</span><h1>Pague seu plano</h1><p>{{ subscription.plan.name }} · R$ {{ charge.amount }} · válido até {{ charge.expires_at|date:'d/m/Y H:i' }}</p></div></div>
-  <article class="panel">
+  <article class="panel pix-checkout">
+    <div class="pix-checkout-header"><span class="pix-checkout-icon" aria-hidden="true">◆</span><div><h2>Pagamento seguro por Pix</h2><p>Escolha como prefere pagar: QR code, copia e cola ou página do Mercado Pago.</p></div></div>
     <p>O pagamento será confirmado automaticamente pelo Mercado Pago. A assinatura só será ativada após a confirmação. Para os próximos ciclos via Pix, será preciso fazer um novo pagamento.</p>
-    {% if charge.qr_code_base64 %}<img src="data:image/png;base64,{{ charge.qr_code_base64 }}" alt="QR code para pagar a assinatura com Pix" style="display:block;width:min(320px,100%);height:auto;margin:18px auto">{% endif %}
+    {% if charge.qr_code_base64 %}<img class="pix-checkout-qr" src="data:image/png;base64,{{ charge.qr_code_base64 }}" alt="QR code para pagar a assinatura com Pix">{% endif %}
     {% if charge.qr_code %}<div class="form-field"><label for="pix-copy">Pix copia e cola</label><textarea id="pix-copy" rows="4" readonly>{{ charge.qr_code }}</textarea><button type="button" class="button" onclick="navigator.clipboard.writeText(document.getElementById('pix-copy').value).then(()=>this.textContent='Código copiado')">Copiar código Pix</button></div>{% endif %}
-    {% if charge.ticket_url %}<p><a href="{{ charge.ticket_url }}" class="button ghost" rel="noopener noreferrer" target="_blank">Abrir comprovante no Mercado Pago</a></p>{% endif %}
+    {% if not charge.qr_code_base64 and charge.qr_code %}<p class="payment-hint">O Mercado Pago disponibilizou o código Pix para copiar e colar; use o botão acima no seu aplicativo bancário.</p>{% endif %}
+    {% if charge.ticket_url %}<p><a href="{{ charge.ticket_url }}" class="button ghost" rel="noopener noreferrer" target="_blank">Abrir pagamento no Mercado Pago ↗</a></p>{% endif %}
     <p><a href="{% url 'billing-subscription-status' %}">Verificar situação da assinatura →</a></p>
   </article>
 </section>

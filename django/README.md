@@ -122,7 +122,32 @@ Empresas importadas e já em uso preservam o acesso atual. Configure SMTP no
 Coolify para que a confirmação por e-mail funcione; pagamentos de planos
 continuam acessíveis durante a configuração inicial.
 
+Para ativar o envio de confirmação no Coolify, configure `EMAIL_HOST`,
+`EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` e `DEFAULT_FROM_EMAIL`
+com os dados fornecidos pelo serviço SMTP. Na porta 587 use `EMAIL_USE_TLS=true`
+e `EMAIL_USE_SSL=false`; na porta 465 use `EMAIL_USE_TLS=false` e
+`EMAIL_USE_SSL=true`. O tempo limite `EMAIL_TIMEOUT` é 15 segundos por padrão.
+O remetente deve ser autorizado pelo provedor. Após salvar e redeployar,
+solicite a verificação em `/inicio/` e confira a entrega e os logs do serviço
+`web`. Não use backend de console ou memória em produção: eles não entregam
+e-mails reais. Nunca exponha a senha SMTP nos logs ou nas capturas de tela.
+
+O Pix gera a Order na API do Mercado Pago com a expiração associada ao
+pagamento. A conta recebedora precisa de chave Pix habilitada e o pagador
+precisa ser outra conta. Na homologação, o ambiente de teste do Mercado Pago
+tem regras próprias para valores e pagador; não trate o QR de teste como
+cobrança real. Se a API recusar a criação, revise a mensagem mostrada na tela
+e verifique as credenciais da conta vendedora em Master → Mercado Pago.
+
 ## Fluxo e recibos do WhatsApp Master
+
+Se o painel mostrar “O Django recusou o callback (HTTP 400)”, confira
+`PUBLIC_BASE_URL=https://applanner.axionwebdigital.com.br` e a presença de
+`applanner.axionwebdigital.com.br` em `DJANGO_ALLOWED_HOSTS`, salvando e
+redeployando os serviços. Um evento com formato inválido mostra um motivo
+específico; eventos recusados permanecem na fila persistente do gateway para
+nova tentativa. Confira `web` e `master-whatsapp` nos logs do Coolify para
+identificar se a recusa vem do host ou do formato do evento.
 
 Em **Master → WhatsApp do Master → Configurar fluxo**, o Master pode criar etapas
 com a sintaxe `etapa | palavra;sinônimo | resposta | próxima etapa | sim/não`.

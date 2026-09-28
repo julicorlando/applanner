@@ -50,6 +50,15 @@ class MasterWhatsAppTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertEqual(MasterWhatsAppConversation.objects.get().wa_id,payload["from"])
 
+    def test_webhook_reports_invalid_event_without_storing_it(self):
+        response=self.client.post(
+            reverse("master-whatsapp-receive"),data=json.dumps({"from":"invalid","id":"msg-1"}),
+            content_type="application/json",HTTP_AUTHORIZATION="Bearer test-gateway-secret",
+        )
+        self.assertEqual(response.status_code,400)
+        self.assertIn("identificador do contato",response.json()["error"])
+        self.assertFalse(MasterWhatsAppMessage.objects.exists())
+
     @override_settings(ALLOWED_HOSTS=["applanner.example.test"],SECURE_SSL_REDIRECT=True)
     def test_internal_gateway_callback_passes_host_and_https_validation(self):
         event={"from":"5581999999999@s.whatsapp.net","id":"gateway-inbound-1","text":"Quero contratar"}

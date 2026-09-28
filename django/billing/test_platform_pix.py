@@ -69,6 +69,7 @@ class PlatformPixTests(TestCase):
             response=self.client.post("/billing/assinatura/pix/",{"payment_email":"buyer@testuser.com"})
         self.assertEqual(response.status_code,302)
         self.assertEqual(provider.return_value.create_pix_order.call_args.kwargs["payer_email"],"buyer@testuser.com")
+        self.assertContains(self.client.get("/billing/assinatura/pix/"),"000201PIX-VALIDO")
 
     def test_invalid_payer_email_does_not_call_provider(self):
         self.client.force_login(self.owner)

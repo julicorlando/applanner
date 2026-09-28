@@ -118,10 +118,10 @@ class MercadoPagoProvider:
             "transactions":{
                 "payments":[{
                     "amount":str(amount),
+                    "expiration_time":f"PT{hours}H",
                     "payment_method":{
                         "id":"pix",
                         "type":"bank_transfer",
-                        "expiration_time":f"PT{hours}H",
                     },
                 }]
             },

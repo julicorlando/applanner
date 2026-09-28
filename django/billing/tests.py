@@ -53,6 +53,27 @@ class MercadoPagoSignatureTests(SimpleTestCase):
 
 
 class MercadoPagoProviderTests(SimpleTestCase):
+    def test_pix_order_places_expiration_on_payment_and_returns_copy_code(self):
+        calls=[]
+
+        def transport(method,path,payload,idempotency,token):
+            calls.append((method,path,payload,idempotency))
+            return {"id":"order-1","transactions":{"payments":[{
+                "id":"payment-1","status":"action_required",
+                "payment_method":{"id":"pix","qr_code":"000201PIX","qr_code_base64":""},
+            }]}}
+
+        result=MercadoPagoProvider("TEST-123456789012345",transport=transport).create_pix_order(
+            amount=Decimal("49.90"),external_reference="subscription:1",payer_email="buyer@testuser.com",
+            idempotency_key="pix-1",
+        )
+        method,path,body,key=calls[0]
+        payment=body["transactions"]["payments"][0]
+        self.assertEqual((method,path,key),("POST","/v1/orders","pix-1"))
+        self.assertEqual(payment["expiration_time"],"PT24H")
+        self.assertEqual(payment["payment_method"],{"id":"pix","type":"bank_transfer"})
+        self.assertEqual(result["qr_code"],"000201PIX")
+
     def test_subscription_payload_preserves_cycle_and_trial(self):
         calls=[]
 

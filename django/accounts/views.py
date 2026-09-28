@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 import smtplib
 from datetime import timedelta
@@ -26,6 +27,7 @@ from .security import (
 
 User=get_user_model()
 TRUSTED_COOKIE="applanner_trusted_device"
+logger=logging.getLogger(__name__)
 
 def _record_login_event(request,email,*,user=None,result="failed",reason=""):
     ip=request.META.get("REMOTE_ADDR") or None
@@ -277,6 +279,15 @@ def send_verification(request):
     if request.user.email_verified_at:
         messages.info(request,"Seu e-mail já está verificado.")
         return redirect(settings.LOGIN_REDIRECT_URL)
+    if settings.EMAIL_BACKEND=="django.core.mail.backends.smtp.EmailBackend":
+        if not settings.EMAIL_HOST or (bool(settings.EMAIL_HOST_USER)!=bool(settings.EMAIL_HOST_PASSWORD)):
+            logger.error("SMTP incompleto: EMAIL_HOST e credenciais SMTP precisam ser configurados no Coolify")
+            messages.error(request,"O envio de e-mails ainda não está configurado. Contate o suporte para ativar a confirmação.")
+            return redirect("tenant-onboarding" if request.user.tenant_id else settings.LOGIN_REDIRECT_URL)
+        if settings.EMAIL_USE_TLS and settings.EMAIL_USE_SSL:
+            logger.error("SMTP inválido: EMAIL_USE_TLS e EMAIL_USE_SSL não podem estar ativos ao mesmo tempo")
+            messages.error(request,"A configuração de segurança do e-mail está inválida. Contate o suporte.")
+            return redirect("tenant-onboarding" if request.user.tenant_id else settings.LOGIN_REDIRECT_URL)
     if EmailVerificationToken.objects.filter(
         user=request.user,used_at__isnull=True,
         created_at__gte=timezone.now()-timedelta(seconds=60),
@@ -292,14 +303,17 @@ def send_verification(request):
     )
     url=request.build_absolute_uri(f"/account/verify-email/{raw}/")
     try:
-        send_mail(
+        delivered=send_mail(
             "Verifique seu e-mail — ApPlanner",
             f"Confirme seu e-mail usando este link em até 24 horas: {url}",
             settings.DEFAULT_FROM_EMAIL,
             [request.user.email],
             fail_silently=False,
         )
-    except (OSError,smtplib.SMTPException):
+        if delivered!=1:
+            raise RuntimeError("SMTP não confirmou o envio")
+    except (OSError,smtplib.SMTPException,RuntimeError,ValueError) as exc:
+        logger.warning("Falha no envio do e-mail de confirmação (%s). Verifique host, porta, TLS/SSL, autenticação e remetente no Coolify.",type(exc).__name__)
         verification.delete()
         messages.error(request,"Não foi possível enviar o e-mail de confirmação. Tente mais tarde ou contate o suporte.")
         return redirect("tenant-onboarding" if request.user.tenant_id else settings.LOGIN_REDIRECT_URL)

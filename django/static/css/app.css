@@ -69,3 +69,19 @@ body{background:linear-gradient(180deg,#f5f7ff 0,#f8fafc 380px)}
 .portal-form :is(input,select,textarea):focus-visible{border-color:#6273ed}
 @media(prefers-reduced-motion:reduce){.metric-grid article,.module-launcher-grid a{transition:none}}
 .chat-composer{grid-template-columns:minmax(0,1fr) auto auto}.chat-composer #chat-attachment{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}.chat-attach-label{cursor:pointer;padding:11px;border:1px solid var(--line);border-radius:10px;white-space:nowrap;font-weight:750}.chat-attach-label:focus-within{outline:2px solid var(--accent)}.chat-attachment{display:inline-block;padding:8px 12px;background:#e7efff;border-radius:10px;font-weight:750;text-decoration:none;overflow-wrap:anywhere}@media(max-width:560px){.chat-composer{grid-template-columns:minmax(0,1fr) auto}.chat-composer .chat-attach-label{grid-row:2}.chat-composer small{grid-row:3}}
+
+/* Cobrança e central de atendimento: hierarquia visual e estados de foco. */
+.pix-checkout{padding:clamp(20px,4vw,36px);border-radius:24px;background:linear-gradient(145deg,#fff,#f8fbff)}
+.pix-checkout-header{display:flex;align-items:center;gap:16px;padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.pix-checkout-header h2{font-size:1.2rem;margin:0 0 4px}.pix-checkout-header p{margin:0;color:var(--muted);font-size:.86rem}
+.pix-checkout-icon{display:grid;place-items:center;flex:none;width:50px;height:50px;border-radius:15px;background:#e9f7f3;color:#0a805b;font-size:1.7rem}
+.pix-checkout-qr{display:block;width:min(320px,100%);height:auto;padding:12px;margin:20px auto;border:1px solid #dce8e4;border-radius:18px;background:white}
+.pix-checkout textarea{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.85rem;word-break:break-all}
+.chat-shell{border-radius:24px;border-color:#d5e2de;box-shadow:0 24px 60px #16362818}
+.chat-contact{transition:background .18s ease,transform .18s ease}.chat-contact:hover{transform:translateX(3px)}
+.chat-main .chat-header{background:linear-gradient(110deg,#effaf5,#f6f9fc);border-bottom:1px solid #dce9e3}
+.chat-thread{background-color:#eef5f0;background-image:radial-gradient(#afc8ba65 1px,transparent 1px);background-size:26px 26px}
+.chat-bubble{box-shadow:0 4px 14px #143a2412}.chat-bubble.out{background:#dcf8e7}
+.chat-composer textarea{min-height:50px;max-height:170px}.chat-composer :is(textarea,.chat-attach-label,.button):focus-visible,.pix-checkout :is(textarea,.button):focus-visible{outline:3px solid #549bdb;outline-offset:2px}
+@media(max-width:700px){.chat-contact:hover{transform:none}.pix-checkout-header{align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.chat-contact{transition:none}}
