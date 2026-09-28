@@ -3,7 +3,7 @@
 {% block content %}
 <section class="shell portal-page">
   <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">ATENDIMENTO DA PLATAFORMA</span><h1>WhatsApp do Master</h1><p>Atenda empresas cadastradas e novos contatos em uma caixa de entrada separada dos estabelecimentos.</p></div></div>
-  <div class="panel" style="margin-bottom:20px">
+  <div class="chat-shell"><aside class="chat-sidebar"><h2>Conversas</h2>{% for row in rows %}<a class="chat-contact" href="{% url 'master-whatsapp-conversation' row.pk %}"><span class="chat-avatar">{{ row.contact_name|default:row.wa_id|slice:':1'|upper }}</span><span><strong>{{ row.contact_name|default:row.wa_id }}</strong><small>{{ row.tenant.name|default:'Novo contato' }} · {{ row.last_message_at|date:'d/m H:i' }}</small></span></a>{% empty %}<p class="empty">Nenhuma conversa ainda.</p>{% endfor %}</aside><div class="chat-main"><div class="panel" style="margin:16px">
     <h2>Conectar o número do Master</h2>
     {% if configured %}
       <p id="wa-state" role="status" aria-live="polite">Consultando conexão...</p>
@@ -13,8 +13,8 @@
       <form method="post" action="{% url 'master-whatsapp-disconnect' %}" style="display:inline" onsubmit="return confirm('Desvincular o WhatsApp do Master?')">{% csrf_token %}<button class="button ghost">Desvincular</button></form>
     {% else %}<p>Defina <code>MASTER_WHATSAPP_GATEWAY_TOKEN</code> nas variáveis do Coolify e publique novamente para ativar o pareamento.</p>{% endif %}
   </div>
-  <div class="panel" style="margin-bottom:20px"><h2>Iniciar conversa</h2><p>Use o número com código do país e DDD. Exemplo: 5581999999999.</p><form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="start-phone">WhatsApp</label><input id="start-phone" name="phone" type="tel" required></div><div class="form-field"><label for="start-name">Nome (opcional)</label><input id="start-name" name="name"></div><div class="form-actions"><button class="button primary">Abrir atendimento</button></div></form></div>
-  <div class="panel"><h2>Conversas</h2><div class="tenant-picker">{% for row in rows %}<a href="{% url 'master-whatsapp-conversation' row.pk %}"><strong>{{ row.contact_name|default:row.wa_id }}</strong><span>{{ row.tenant.name|default:'Nova empresa / não associada' }} · {{ row.last_message_at|date:'d/m/Y H:i' }}</span></a>{% empty %}<p>Nenhuma conversa recebida ainda.</p>{% endfor %}</div></div>
+  <div class="panel" style="margin:16px"><h2>Iniciar conversa</h2><p>Use o número com código do país e DDD. Exemplo: 5581999999999.</p><form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="start-phone">WhatsApp</label><input id="start-phone" name="phone" type="tel" required></div><div class="form-field"><label for="start-name">Nome (opcional)</label><input id="start-name" name="name"></div><div class="form-actions"><button class="button primary">Abrir atendimento</button></div></form></div>
+</div></div>
 </section>
 {% if configured %}<script>
 (() => {
