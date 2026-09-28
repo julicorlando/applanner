@@ -34,6 +34,7 @@ MIDDLEWARE = [
     "accounts.route_middleware.CapabilityRouteMiddleware",
     "core.middleware.TenantContextMiddleware",
     "legal.middleware.LegalAcceptanceMiddleware",
+    "tenants.onboarding_middleware.IncompleteOnboardingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

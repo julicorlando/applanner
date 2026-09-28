@@ -100,6 +100,7 @@ class Unit(TimeStampedModel):
 
 class TenantOnboarding(models.Model):
     tenant=models.OneToOneField(Tenant,primary_key=True,on_delete=models.CASCADE,related_name="onboarding")
+    required=models.BooleanField(default=False)
     company_done=models.BooleanField(default=False)
     branding_done=models.BooleanField(default=False)
     unit_done=models.BooleanField(default=False)

@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from accounts.models import PlatformRole,UserRole
-from tenants.models import Tenant,Unit
+from tenants.models import Tenant,Unit,TenantOnboarding
 from .models import Module,ModuleRequest,Plan,Subscription,TenantModuleAddon,PixCharge,Payment
 from .payment_services import create_platform_subscription,create_platform_pix_charge
 from .module_services import cancel_module_addon,request_module
@@ -170,6 +170,7 @@ def signup(request):
                 tenant=tenant,name=data["business_name"],is_primary=True,
                 email=data["email"],phone=data["phone"],active=True,
             )
+            TenantOnboarding.objects.create(tenant=tenant,required=True)
             user=User.objects.create_user(
                 email=data["email"],password=data["password"],tenant=tenant,
                 first_name=data["owner_name"],role="owner",is_active=True,
@@ -209,7 +210,7 @@ def signup(request):
                     "Conta criada, mas a cobrança ainda não pôde ser iniciada: "+str(exc),
                 )
         messages.success(request,"Conta criada. Bem-vindo ao ApPlanner.")
-        return redirect("home")
+        return redirect("tenant-onboarding")
     return render(request,"billing/signup.html",{"form":form,"selected_plan":selected})
 
 

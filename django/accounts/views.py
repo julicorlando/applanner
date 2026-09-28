@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+import smtplib
 from datetime import timedelta
 from urllib.parse import quote
 
@@ -15,6 +16,7 @@ from django.utils import timezone
 from django.db.models import Q
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from .models import EmailVerificationToken, LoginAudit, LoginHistory, PasswordResetToken, SecurityEvent
 from .security import (
@@ -84,7 +86,10 @@ def login_view(request):
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version
         _record_login_event(request,email,user=user,result="success")
-        return redirect(request.GET.get("next") or settings.LOGIN_REDIRECT_URL)
+        destination=request.GET.get("next") or settings.LOGIN_REDIRECT_URL
+        if not url_has_allowed_host_and_scheme(destination,allowed_hosts={request.get_host()},require_https=request.is_secure()):
+            destination=settings.LOGIN_REDIRECT_URL
+        return redirect(destination)
     return render(request,"accounts/login.html")
 
 
@@ -272,23 +277,34 @@ def send_verification(request):
     if request.user.email_verified_at:
         messages.info(request,"Seu e-mail já está verificado.")
         return redirect(settings.LOGIN_REDIRECT_URL)
+    if EmailVerificationToken.objects.filter(
+        user=request.user,used_at__isnull=True,
+        created_at__gte=timezone.now()-timedelta(seconds=60),
+    ).exists():
+        messages.info(request,"Já enviamos um link. Aguarde um minuto antes de solicitar outro.")
+        return redirect("tenant-onboarding" if request.user.tenant_id else settings.LOGIN_REDIRECT_URL)
     EmailVerificationToken.objects.filter(user=request.user,used_at__isnull=True).update(used_at=timezone.now())
     raw=secrets.token_urlsafe(32)
-    EmailVerificationToken.objects.create(
+    verification=EmailVerificationToken.objects.create(
         user=request.user,
         token_hash=hashlib.sha256(raw.encode()).hexdigest(),
         expires_at=timezone.now()+timedelta(hours=24),
     )
     url=request.build_absolute_uri(f"/account/verify-email/{raw}/")
-    send_mail(
-        "Verifique seu e-mail — ApPlanner",
-        f"Confirme seu e-mail usando este link em até 24 horas: {url}",
-        settings.DEFAULT_FROM_EMAIL,
-        [request.user.email],
-        fail_silently=False,
-    )
+    try:
+        send_mail(
+            "Verifique seu e-mail — ApPlanner",
+            f"Confirme seu e-mail usando este link em até 24 horas: {url}",
+            settings.DEFAULT_FROM_EMAIL,
+            [request.user.email],
+            fail_silently=False,
+        )
+    except (OSError,smtplib.SMTPException):
+        verification.delete()
+        messages.error(request,"Não foi possível enviar o e-mail de confirmação. Tente mais tarde ou contate o suporte.")
+        return redirect("tenant-onboarding" if request.user.tenant_id else settings.LOGIN_REDIRECT_URL)
     messages.success(request,"Link de verificação enviado.")
-    return redirect(settings.LOGIN_REDIRECT_URL)
+    return redirect("tenant-onboarding" if request.user.tenant_id else settings.LOGIN_REDIRECT_URL)
 
 
 @never_cache
