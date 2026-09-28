@@ -25,6 +25,15 @@ class BlogPost(TimeStampedModel):
         indexes=[models.Index(fields=["status","published_at"],name="content_blog_public_idx")]
 
 
+class PlatformHomepage(models.Model):
+    """Conteúdo público da página inicial, editável pelo Master."""
+    logo=models.ImageField(upload_to="platform/",blank=True)
+    hero_title=models.CharField(max_length=160,default="Transforme horários livres em clientes.")
+    hero_description=models.CharField(max_length=400,default="Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar.")
+    closing_title=models.CharField(max_length=160,default="Organize hoje. Escale amanhã.")
+    updated_at=models.DateTimeField(auto_now=True)
+
+
 class LandingPage(TimeStampedModel):
     slug=models.SlugField(max_length=120)
     locale=models.CharField(max_length=10,default="pt-br")

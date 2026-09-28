@@ -27,15 +27,8 @@
       <a href="/app/">Central operacional →</a>
     </div>
     <div class="module-launcher-grid">
-      <a href="/app/agenda/agendamentos/"><span>01</span><strong>Agenda</strong><small>Agendamentos, clientes, equipe e serviços</small></a>
-      <a href="/app/financeiro/pdv/"><span>02</span><strong>Financeiro & PDV</strong><small>Vendas, caixa, estoque e comissões</small></a>
-      <a href="/app/barbearia/comandas/"><span>03</span><strong>Barbearia & Salão</strong><small>Fila, comandas, metas e remuneração</small></a>
-      <a href="/app/arena/jogos/"><span>04</span><strong>Arena & Quadras</strong><small>Reservas, rachas, turmas, torneios e comandas</small></a>
-      <a href="/app/auto/ordens/"><span>05</span><strong>Automotivo</strong><small>Veículos, boxes, OS, inspeção e materiais</small></a>
-      <a href="/app/relacionamento/pacotes-clientes/"><span>06</span><strong>Relacionamento</strong><small>Pacotes, recorrência, fidelidade e espera</small></a>
-      <a href="/app/saude/prontuarios/"><span>07</span><strong>Saúde</strong><small>Prontuário criptografado e auditoria</small></a>
-      <a href="/app/suporte/chamados/"><span>08</span><strong>Suporte</strong><small>Chamados e acompanhamento</small></a>
-      <a href="/app/comunicacao/"><span>09</span><strong>Comunicação & WhatsApp</strong><small>Inbox, atendimento humano e notificações</small></a>
+      {% for item in available_modules %}<a href="{% url 'portal-resource-list' item.slug item.resources.0.slug %}"><span>{{ forloop.counter|stringformat:'02d' }}</span><strong>{{ item.title }}</strong><small>{{ item.description }}</small></a>{% empty %}<p class="empty">Nenhum módulo liberado para seu usuário e plano.</p>{% endfor %}
+      <a href="{% url 'tenant-branding' %}"><span>★</span><strong>Minha página pública</strong><small>Logo, capa, apresentação e agendamentos</small></a>
     </div>
   </section>
 

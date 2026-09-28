@@ -75,7 +75,7 @@ class PlanMasterForm(forms.ModelForm):
 
 
 MASTER_RESOURCES={
-    "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","public_enabled","created_at"],"order":"-created_at"},
+    "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","logo","cover","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","public_enabled","created_at"],"order":"-created_at"},
     "planos":{"model":"billing.Plan","title":"Planos","fields":["name","slug","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","public_visible","is_custom","featured","sort_order"],"columns":["name","monthly_price","trial_days","active","public_visible","is_custom","featured"],"order":"sort_order,name","special":"plan"},
     "modulos":{"model":"billing.Module","title":"Módulos","fields":["name","slug","description","addon_monthly_price","addon_sellable","sort_order","active"],"columns":["name","slug","addon_monthly_price","addon_sellable","active"],"order":"sort_order,name"},
     "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":["tenant","module","quoted_monthly_price","status","tenant_note","master_note"],"columns":["tenant","module","quoted_monthly_price","status","created_at"],"order":"-created_at"},
@@ -121,7 +121,7 @@ MASTER_RESOURCES={
     "alertas-cron":{"model":"operations.CronAlertLog","title":"Alertas dos jobs","fields":[],"columns":["alert_key","channel","status","message","created_at"],"order":"-created_at","create":False,"edit":False},
     "solicitacoes-billing":{"model":"operations.BillingSupportRequest","title":"Solicitações financeiras","fields":[],"columns":["tenant","request_type","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "configuracoes-plataforma":{"model":"operations.PlatformSetting","title":"Configurações da plataforma","fields":[],"columns":["tenant","key","is_secret","updated_at"],"order":"key","create":False,"edit":False},
-    "blog":{"model":"contenthub.BlogPost","title":"Blog","fields":["slug","title","excerpt","content","status","featured","meta_title","meta_description","published_at"],"columns":["title","slug","status","published_at"],"order":"-published_at,-created_at","special":"blog"},
+    "blog":{"model":"contenthub.BlogPost","title":"Blog","fields":["slug","title","excerpt","content","cover","status","featured","meta_title","meta_description","published_at"],"columns":["title","slug","status","published_at"],"order":"-published_at,-created_at","special":"blog"},
     "landings":{"model":"contenthub.LandingPage","title":"Landing pages","fields":["slug","locale","segment","headline","subheadline","body","cta_label","cta_url","seo_title","seo_description","active"],"columns":["headline","slug","locale","segment","active","updated_at"],"order":"headline"},
     "avaliacoes-publicas":{"model":"contenthub.PublicReview","title":"Avaliações públicas","fields":["tenant","customer_name","rating","comment","active"],"columns":["tenant","customer_name","rating","active","created_at"],"order":"-created_at"},
     "marketing-contatos":{"model":"communications.MarketingLead","title":"Contatos de e-mail marketing","fields":["name","email","status","source"],"columns":["name","email","status","source","created_at"],"order":"-created_at"},
@@ -355,7 +355,7 @@ def resource_form(request,slug,pk=None):
     if pk is not None and not config.get("edit",True): raise PermissionDenied
     obj=get_object_or_404(model,pk=pk) if pk else None
     Form=PlanMasterForm if config.get("special")=="plan" else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"]))
-    form=Form(request.POST or None,instance=obj)
+    form=Form(request.POST or None,request.FILES or None,instance=obj)
     for name,field in form.fields.items():
         if name in FIELD_LABELS:field.label=FIELD_LABELS[name]
     for name,field in form.fields.items():

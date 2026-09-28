@@ -3,6 +3,7 @@ from django.urls import include, path
 
 from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_webhook
 from core.views import healthz, home, professional_public, tenant_public
+from core.branding import public_platform_logo, public_tenant_image, public_professional_image, public_blog_image
 from communications.views import marketing_click, marketing_open, whatsapp_webhook
 from contenthub.views import blog_post, landing, public_directory, public_directory_page
 from scheduling.public_views import appointment_page
@@ -14,6 +15,10 @@ from scheduling.public_api import (
 
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
+    path("imagens/logo/",public_platform_logo,name="public-platform-logo"),
+    path("imagens/empresa/<int:pk>/<str:kind>/",public_tenant_image,name="public-tenant-image"),
+    path("imagens/profissional/<int:pk>/",public_professional_image,name="public-professional-image"),
+    path("imagens/noticia/<int:pk>/",public_blog_image,name="public-blog-image"),
     path("", home, name="home"),
     path("admin/", admin.site.urls),
     path("account/", include("accounts.urls")),

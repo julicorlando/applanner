@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Master — ApPlanner{% endblock %}
 {% block content %}
+<section class="shell" style="padding-top:20px"><a class="button primary" href="{% url 'master-homepage' %}">Editar página inicial e logo →</a> <a class="button ghost" href="{% url 'master-resource-list' 'blog' %}">Publicar notícias →</a></section>
 <section class="shell" style="padding-top:20px"><a class="button" href="{% url 'master-platform-payment' %}">Configurar Mercado Pago da plataforma →</a></section>
 <section class="shell" style="padding-top:20px"><a class="button" href="{% url 'master-whatsapp' %}">WhatsApp do Master · QR code e atendimento às empresas →</a></section>
 <section class="shell portal-page">

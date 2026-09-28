@@ -5,13 +5,13 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from billing.models import Plan
 from accounts.models import User
-from .models import CommercialCommission, CommercialProfile, Lead, Proposal
+from .models import CommercialCommission, CommercialProfile, Lead, LeadHistory, Proposal
 from .services import approve_proposal, change_lead_status, claim_lead, transfer_lead
 
 
@@ -39,6 +39,50 @@ class ProposalForm(forms.ModelForm):
         self.fields["expires_at"].input_formats=["%Y-%m-%dT%H:%M"]
 
 
+class ProspectForm(forms.ModelForm):
+    class Meta:
+        model=Lead
+        fields=["name","phone","email","business_type","estimated_value","source",
+                "notes","next_contact_at","consent_granted","do_not_contact"]
+        labels={"name":"Nome do contato","phone":"WhatsApp / telefone","email":"E-mail",
+                "business_type":"Segmento","estimated_value":"Valor potencial mensal",
+                "source":"Origem do lead","notes":"Notas da prospecção",
+                "next_contact_at":"Próximo contato","consent_granted":"Autorizou comunicações",
+                "do_not_contact":"Não contatar"}
+        widgets={"notes":forms.Textarea(attrs={"rows":4}),
+                 "next_contact_at":forms.DateTimeInput(attrs={"type":"datetime-local"},format="%Y-%m-%dT%H:%M")}
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fields["next_contact_at"].input_formats=["%Y-%m-%dT%H:%M"]
+        self.fields["source"].initial="prospeccao_manual"
+
+    def clean(self):
+        data=super().clean()
+        phone=(data.get("phone") or "").strip()
+        email=(data.get("email") or "").strip()
+        if phone and Lead.objects.filter(phone=phone,anonymized_at__isnull=True).exists():
+            self.add_error("phone","Já existe um lead com este telefone.")
+        if email and Lead.objects.filter(email__iexact=email,anonymized_at__isnull=True).exists():
+            self.add_error("email","Já existe um lead com este e-mail.")
+        return data
+
+
+@login_required
+def prospect_create(request):
+    _require_commercial(request.user)
+    form=ProspectForm(request.POST or None)
+    if request.method=="POST" and form.is_valid():
+        lead=form.save(commit=False)
+        lead.assigned_to=request.user
+        lead.assigned_at=timezone.now()
+        lead.save()
+        LeadHistory.objects.create(lead=lead,action=LeadHistory.Action.CREATED,actor_user=request.user,to_user=request.user)
+        messages.success(request,"Lead cadastrado na carteira comercial.")
+        return redirect("commercial-lead-detail",pk=lead.pk)
+    return render(request,"commercial/prospect_form.html",{"form":form})
+
+
 @login_required
 def dashboard(request):
     profile=_require_commercial(request.user)
@@ -51,12 +95,23 @@ def dashboard(request):
         proposals=proposals.filter(commercial_user=request.user)
         commissions=commissions.filter(commercial_user=request.user)
         count_qs=Lead.objects.filter(assigned_to=request.user)
+    q=(request.GET.get("q") or "").strip()[:100]
+    status=request.GET.get("status","")
+    if q:
+        leads=leads.filter(Q(name__icontains=q)|Q(business_type__icontains=q)|Q(email__icontains=q)|Q(phone__icontains=q))
+    if status in Lead.Status.values:
+        leads=leads.filter(status=status)
+    open_leads=leads.exclude(status__in=[Lead.Status.CONVERTED,Lead.Status.LOST])
+    funnel=[{"slug":code,"title":label,"leads":leads.filter(status=code)[:15]} for code,label in Lead.Status.choices]
     return render(request,"commercial/dashboard.html",{
         "profile":profile,
         "lead_counts":dict(count_qs.values_list("status").annotate(total=Count("id"))),
         "leads":leads[:100],
         "proposals":proposals[:60],
         "commissions":commissions[:60],
+        "funnel":funnel,"q":q,"status_filter":status,
+        "follow_ups":open_leads.filter(next_contact_at__lte=timezone.now()).order_by("next_contact_at")[:12],
+        "status_choices":Lead.Status.choices,
     })
 
 

@@ -7,5 +7,6 @@ urlpatterns=[
     path("cadastro/",views.signup,name="billing-signup"),
     path("billing/assinatura/",views.subscription_status,name="billing-subscription-status"),
     path("billing/assinatura/pagar/",views.subscription_checkout,name="billing-subscription-checkout"),
+    path("billing/assinatura/pix/",views.subscription_pix,name="billing-subscription-pix"),
     path("billing/modulos/",views.subscription_modules,name="billing-subscription-modules"),
 ]

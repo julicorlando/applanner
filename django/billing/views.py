@@ -15,8 +15,8 @@ from django.utils.text import slugify
 
 from accounts.models import PlatformRole,UserRole
 from tenants.models import Tenant,Unit
-from .models import Module,ModuleRequest,Plan,Subscription,TenantModuleAddon
-from .payment_services import create_platform_subscription
+from .models import Module,ModuleRequest,Plan,Subscription,TenantModuleAddon,PixCharge,Payment
+from .payment_services import create_platform_subscription,create_platform_pix_charge
 from .module_services import cancel_module_addon,request_module
 
 User=get_user_model()
@@ -45,6 +45,10 @@ def _unique_slug(name):
 class SignupForm(forms.Form):
     plan=forms.ModelChoiceField(queryset=Plan.objects.none(),label="Plano")
     billing_cycle=forms.ChoiceField(choices=Subscription.BillingCycle.choices,label="Ciclo")
+    payment_method=forms.ChoiceField(
+        choices=[("card","Cartão · assinatura automática"),("pix","Pix · pagamento por ciclo")],
+        required=False,initial="card",label="Como deseja pagar",
+    )
     business_name=forms.CharField(max_length=150,label="Nome do negócio")
     category=forms.CharField(max_length=60,label="Segmento",widget=forms.Select(choices=[
         ("","Selecione"),("barbearia","Barbearia"),("salao","Salão de beleza"),
@@ -187,6 +191,9 @@ def signup(request):
         needs_payment=(not plan.trial_without_card) or not trial_days
         if needs_payment:
             try:
+                if data.get("payment_method")=="pix":
+                    create_platform_pix_charge(subscription=subscription,payer_email=user.email)
+                    return redirect("billing-subscription-pix")
                 remote=create_platform_subscription(
                     subscription=subscription,payer_email=user.email,
                     back_url=request.build_absolute_uri("/billing/assinatura/"),
@@ -213,7 +220,36 @@ def subscription_status(request):
         .select_related("plan").order_by("-started_at").first()
         if request.user.tenant_id else None
     )
-    return render(request,"billing/subscription_status.html",{"subscription":subscription})
+    pix_charge=(PixCharge.objects.select_related("payment").filter(
+        subscription=subscription,payment__status=Payment.Status.PENDING,
+        expires_at__gt=timezone.now(),
+    ).order_by("-created_at").first() if subscription else None)
+    return render(request,"billing/subscription_status.html",{"subscription":subscription,"pix_charge":pix_charge})
+
+
+@login_required
+def subscription_pix(request):
+    if not request.user.tenant_id or request.user.role not in {"owner","manager"}:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Somente o responsável pode iniciar o pagamento da assinatura.")
+    subscription=Subscription.objects.filter(tenant=request.user.tenant).order_by("-started_at").first()
+    if not subscription or subscription.status not in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
+        messages.error(request,"Não há cobrança pendente para esta assinatura.")
+        return redirect("billing-subscription-status")
+    if request.method=="POST":
+        try:
+            create_platform_pix_charge(subscription=subscription,payer_email=request.user.email)
+        except (RuntimeError,ValueError) as exc:
+            messages.error(request,"Não foi possível gerar o Pix: "+str(exc))
+            return redirect("billing-subscription-status")
+        return redirect("billing-subscription-pix")
+    charge=PixCharge.objects.select_related("payment").filter(
+        subscription=subscription,payment__status=Payment.Status.PENDING,
+        expires_at__gt=timezone.now(),
+    ).order_by("-created_at").first()
+    if not charge:
+        return redirect("billing-subscription-status")
+    return render(request,"billing/subscription_pix.html",{"charge":charge,"subscription":subscription})
 
 
 @login_required
@@ -227,6 +263,9 @@ def subscription_checkout(request):
     if not subscription or subscription.status not in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
         messages.error(request,"Não há cobrança pendente para esta assinatura.")
         return redirect("billing-subscription-status")
+    if PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING,expires_at__gt=timezone.now()).exists():
+        messages.info(request,"Já existe um Pix pendente. Confira o código antes de iniciar outra cobrança.")
+        return redirect("billing-subscription-pix")
     if subscription.provider_subscription_id:
         if subscription.provider_checkout_url.startswith("https://"):
             return redirect(subscription.provider_checkout_url)

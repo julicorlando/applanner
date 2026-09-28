@@ -77,7 +77,7 @@ PORTAL_MODULES = {
             "profissionais": {
                 "model": "scheduling.Professional",
                 "title": "Profissionais",
-                "fields": ["unit","name","public_slug","email","phone","specialty","commission_percent","active"],
+                "fields": ["unit","name","public_slug","photo","email","phone","specialty","commission_percent","active"],
                 "columns": ["name","specialty","phone","active"],
                 "order": "name",
             },
@@ -774,22 +774,27 @@ def home(request):
         Tenant=apps.get_model("tenants","Tenant")
         return render(request,"portal/select_tenant.html",{"tenants":Tenant.objects.order_by("name")})
 
+    modules=available_modules(request.user,tenant)
+    return render(request,"portal/home.html",{"tenant":tenant,"modules":modules})
+
+
+def available_modules(user,tenant):
     modules=[]
     for slug,module in PORTAL_MODULES.items():
         capability=module.get("capability")
-        if capability and not has_capability(request.user,capability):
+        if capability and not has_capability(user,capability):
             continue
-        if not request.user.is_superuser and slug in {"barbearia","arena","auto","saude"} and not segment_enabled(tenant,{"barbearia":"barbearia","arena":"arena","auto":"auto","saude":"saude"}[slug]):
+        if not user.is_superuser and slug in {"barbearia","arena","auto","saude"} and not segment_enabled(tenant,{"barbearia":"barbearia","arena":"arena","auto":"auto","saude":"saude"}[slug]):
             continue
         resources=[]
         for resource_slug,resource in module["resources"].items():
-            if not _feature_allowed(request.user,tenant,slug,resource_slug):
+            if not _feature_allowed(user,tenant,slug,resource_slug):
                 continue
             resources.append({"slug":resource_slug,"title":resource["title"]})
         if not resources:
             continue
         modules.append({"slug":slug,"title":module["title"],"description":module["description"],"resources":resources})
-    return render(request,"portal/home.html",{"tenant":tenant,"modules":modules})
+    return modules
 
 
 @login_required
@@ -909,7 +914,7 @@ def resource_create(request,module_slug,resource_slug):
     else:
         if not resource.get("create",True):
             raise PermissionDenied
-        form=_model_form(model,resource,request.POST or None,tenant=tenant)
+        form=_model_form(model,resource,request.POST or None,request.FILES or None,tenant=tenant)
         if resource.get("special")=="support_ticket":
             form.fields.pop("priority",None)
             form.fields.pop("status",None)
@@ -945,7 +950,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
     if not resource.get("edit",True):
         raise PermissionDenied
     obj=get_object_or_404(_tenant_queryset(model,tenant),pk=pk)
-    form=_model_form(model,resource,request.POST or None,instance=obj,tenant=tenant)
+    form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant)
     if request.method=="POST" and form.is_valid():
         obj=form.save(commit=False)
         obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=False)

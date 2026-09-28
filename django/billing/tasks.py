@@ -23,9 +23,17 @@ def reconcile_subscription_states():
         trial_ends_at__isnull=False,
         trial_ends_at__lt=now,
     ).update(status=Subscription.Status.PAST_DUE,updated_at=now)
+    due_pix=Subscription.objects.filter(
+        status=Subscription.Status.ACTIVE,provider_subscription_id="",
+        next_billing_at__isnull=False,next_billing_at__lte=now,
+        payments__metadata__method="pix",payments__status=Payment.Status.PAID,
+    ).distinct().values_list("pk",flat=True)
+    due_pix_count=Subscription.objects.filter(pk__in=due_pix).update(
+        status=Subscription.Status.PAST_DUE,updated_at=now,
+    )
     overdue=Payment.objects.filter(
         status=Payment.Status.PENDING,
         due_at__isnull=False,
         due_at__lt=now,
     ).count()
-    return {"expired_trials":expired_trials,"pending_overdue":overdue}
+    return {"expired_trials":expired_trials,"pix_renewals_due":due_pix_count,"pending_overdue":overdue}

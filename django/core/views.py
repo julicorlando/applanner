@@ -36,6 +36,7 @@ def _tenant_dashboard(request):
     from billing.models import TenantModule
     from finance.models import FinancialTransaction
     from scheduling.models import Appointment,Customer,Professional
+    from .portal import available_modules
 
     tenant=request.user.tenant
     now=timezone.localtime()
@@ -81,6 +82,7 @@ def _tenant_dashboard(request):
             "customer","service","professional"
         ).order_by("starts_at")[:8],
         "modules":modules,
+        "available_modules":available_modules(request.user,tenant),
         "subscription":subscription,
     })
 
@@ -167,5 +169,7 @@ def home(request):
     if getattr(request,"tenant",None):
         return tenant_public(request)
     from billing.models import Plan
+    from contenthub.models import BlogPost
     plans=Plan.objects.filter(active=True,public_visible=True,is_custom=False).order_by("sort_order","name")[:4]
-    return render(request,"home.html",{"plans":plans})
+    posts=BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED).order_by("-featured","-published_at","-created_at")[:3]
+    return render(request,"home.html",{"plans":plans,"posts":posts})

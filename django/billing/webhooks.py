@@ -1,6 +1,7 @@
 import hashlib
 import json
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 
 from django.db import transaction
 from django.http import JsonResponse
@@ -11,6 +12,8 @@ from tenants.models import Tenant
 from .mercadopago import MercadoPagoProvider
 from .models import (
     Payment,
+    PixCharge,
+    CheckoutSession,
     PaymentGateway,
     Subscription,
     TenantPaymentConnection,
@@ -129,7 +132,43 @@ def _reconcile_platform(event,gateway,data,resource_id):
     kind=str(data.get("type") or "")
     action=str(data.get("action") or "")
 
-    if kind=="payment" or action.startswith("payment."):
+    if kind=="order" or action.startswith("order."):
+        order=provider.get_order(resource_id)
+        charge=PixCharge.objects.select_related("payment","subscription","checkout_session").filter(
+            provider_order_id=resource_id,payment__environment=gateway.environment,
+        ).first()
+        if charge:
+            payment=charge.payment
+            if order.get("external_reference")!=payment.provider_reference or order.get("currency_id")!="BRL":
+                raise ValueError("Pedido Pix não corresponde à cobrança registrada.")
+            details=(order.get("transactions") or {}).get("payments") or []
+            confirmed=order.get("status")=="processed" and any(
+                row.get("status") in {"approved","processed"} and (row.get("payment_method") or {}).get("id")=="pix"
+                for row in details
+            )
+            if confirmed:
+                paid_amount=Decimal(str(order.get("total_paid_amount") or "0"))
+                if paid_amount!=payment.amount:
+                    raise ValueError("Valor do Pix confirmado difere da cobrança.")
+                paid_at=timezone.now()
+                payment.status=Payment.Status.PAID
+                payment.paid_at=payment.paid_at or paid_at
+                payment.provider_status="processed"
+                paid_row=next(row for row in details if row.get("status") in {"approved","processed"} and (row.get("payment_method") or {}).get("id")=="pix")
+                payment.provider_payment_id=str(paid_row.get("id") or payment.provider_payment_id)
+                payment.save(update_fields=["status","paid_at","provider_status","provider_payment_id","updated_at"])
+                charge.status="paid"
+                charge.paid_at=charge.paid_at or paid_at
+                charge.save(update_fields=["status","paid_at","updated_at"])
+                charge.checkout_session.status=CheckoutSession.Status.PAID
+                charge.checkout_session.save(update_fields=["status","updated_at"])
+                subscription=charge.subscription
+                if subscription.status in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
+                    subscription.status=Subscription.Status.ACTIVE
+                    months={"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[subscription.billing_cycle]
+                    subscription.next_billing_at=max(subscription.trial_ends_at or paid_at,paid_at)+relativedelta(months=months)
+                    subscription.save(update_fields=["status","next_billing_at","updated_at"])
+    elif kind=="payment" or action.startswith("payment."):
         remote=provider.get_payment(resource_id)
         external=str(remote.get("external_reference") or "")
         payment=Payment.objects.filter(
@@ -140,12 +179,19 @@ def _reconcile_platform(event,gateway,data,resource_id):
                 provider="mercadopago",provider_reference=external
             ).order_by("-id").first()
         if payment:
+            if payment.metadata.get("method")=="pix" and external!=payment.provider_reference:
+                raise ValueError("Pagamento Pix não corresponde à cobrança registrada.")
             payment.provider_payment_id=resource_id
             payment.provider_status=str(remote.get("status") or "")
-            payment.status=_payment_status(payment.provider_status)
-            if remote.get("transaction_amount") is not None:
+            if payment.metadata.get("method")=="pix":
+                # Orders Pix are confirmed using GET /v1/orders/{id}, amount and currency.
+                if payment.status!=Payment.Status.PAID:
+                    payment.status=Payment.Status.PENDING
+            else:
+                payment.status=_payment_status(payment.provider_status)
+            if remote.get("transaction_amount") is not None and payment.metadata.get("method")!="pix":
                 payment.amount=Decimal(str(remote["transaction_amount"]))
-            if payment.status==Payment.Status.PAID:
+            if payment.status==Payment.Status.PAID and payment.metadata.get("method")!="pix":
                 payment.paid_at=payment.paid_at or timezone.now()
                 if payment.subscription_id:
                     Subscription.objects.filter(pk=payment.subscription_id).update(

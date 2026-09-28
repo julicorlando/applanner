@@ -127,6 +127,7 @@ def master_whatsapp_conversation(request,pk):
         return redirect("master-whatsapp-conversation",pk=row.pk)
     return render(request,"master/whatsapp_conversation.html",{
         "row":row,"thread":row.messages.select_related("sent_by")[:500],
+        "conversations":MasterWhatsAppConversation.objects.select_related("tenant")[:100],
         "tenants":Tenant.objects.filter(deleted_at__isnull=True).order_by("name")[:500],
     })
 

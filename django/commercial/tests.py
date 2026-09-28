@@ -48,6 +48,24 @@ class CommercialPortalTests(TestCase):
         )
         self.client.force_login(self.sales)
 
+    def test_manual_prospect_and_duplicate_prevention(self):
+        data={"name":"Barbearia Central","phone":"5581999999999","email":"novo@example.com",
+              "business_type":"Barbearia","estimated_value":"200","source":"prospeccao_manual",
+              "notes":"Contato inicial","next_contact_at":"","consent_granted":"on"}
+        response=self.client.post("/commercial/leads/novo/",data)
+        self.assertEqual(response.status_code,302)
+        lead=Lead.objects.get(email="novo@example.com")
+        self.assertEqual(lead.assigned_to,self.sales)
+        self.assertTrue(lead.history.filter(action="created").exists())
+        self.assertEqual(self.client.post("/commercial/leads/novo/",data).status_code,200)
+        self.assertEqual(Lead.objects.filter(email="novo@example.com").count(),1)
+        self.assertContains(self.client.get("/commercial/?q=Central"),"Barbearia Central")
+
+    def test_commercial_role_required_for_new_lead(self):
+        other=User.objects.create_user(email="visitor@example.com",password="StrongPassword!123")
+        self.client.force_login(other)
+        self.assertEqual(self.client.get("/commercial/leads/novo/").status_code,403)
+
     def test_proposal_captures_plan_snapshot(self):
         from billing.models import Module,PlanModule
         module=Module.objects.create(slug="finance-test",name="Financeiro teste",active=True)

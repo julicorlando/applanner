@@ -40,7 +40,7 @@ Use o repositório Git com Build Pack **Docker Compose**.
 
 Ao implantar esta atualização, o `web` aplica migrations, sincroniza os módulos e cria três planos públicos de homologação (Profissional, Inicial e Empresarial, com sete dias de teste) **somente se não houver outro plano público ativo**. Planos importados do PHP e edições feitas no Master não são sobrescritos. Revise preços, módulos incluídos, segmentos e período de teste em **Master → Planos** antes de vender. Na ficha da empresa, marque **Página pública** e informe as coordenadas da unidade para aparecer e ordenar por distância em `/directory/`. O JSON anterior está em `/api/directory/`.
 
-O cliente acompanha a assinatura e inicia o pagamento em **Meu plano e pagamento** (`/billing/assinatura/`). O Master configura o gateway de cobrança das assinaturas em **Master → Mercado Pago do ApPlanner** (`/master/pagamentos/mercado-pago/`): cadastra o webhook informado na tela no Mercado Pago Developers, seleciona o ambiente correto, informa a Public Key, o Access Token e a chave secreta do webhook e clica em **Testar e ativar conexão**. A conexão é validada pela API e os segredos ficam criptografados no banco. As variáveis `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` do exemplo de ambiente não ativam esse gateway sozinhas. Use credenciais de teste para homologar cobranças antes de selecionar Produção.
+O cliente acompanha a assinatura e escolhe **cartão recorrente** ou **Pix por ciclo** em **Meu plano e pagamento** (`/billing/assinatura/`). O Pix exibe QR code e copia e cola, e só ativa a assinatura depois de um webhook de Order confirmado pelo provedor com valor e moeda correspondentes. O Master configura o gateway em **Master → Mercado Pago do ApPlanner** (`/master/pagamentos/mercado-pago/`): cadastra o webhook informado na tela no Mercado Pago Developers, ativa notificações de **Orders, pagamentos e assinaturas**, seleciona o ambiente correto, informa a Public Key, o Access Token e a chave secreta do webhook e clica em **Testar e ativar conexão**. A conexão é validada pela API e os segredos ficam criptografados no banco. As variáveis `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` não ativam esse gateway sozinhas. Use credenciais de teste para homologar cobranças antes de selecionar Produção.
 
 O Master configura um fluxo simples por empresa em `/master/chatbot/`, com mensagens, palavras-chave e transferência para humano. A automação por estabelecimento só pode ser ativada quando o número Cloud API e as credenciais de WhatsApp estiverem configurados. O WhatsApp separado da plataforma, com QR code e caixa de entrada exclusiva do Master, está em `/master/whatsapp/`; veja a seção específica abaixo.
 
@@ -89,3 +89,18 @@ tokens e configurações sensíveis.
 No Coolify, defina `MASTER_WHATSAPP_GATEWAY_TOKEN` com um segredo aleatório longo e faça o redeploy da aplicação Compose. Acesse **Master → WhatsApp do Master → Gerar QR code** e leia o código em **WhatsApp → Aparelhos conectados → Conectar aparelho** no celular do número usado pelo Master. O serviço `master-whatsapp` mantém a sessão no volume `master_whatsapp_session`; preserve esse volume nos redeploys e proteja o seu backup. O gateway fica acessível somente na rede interna do Compose. Apenas superusuários veem o QR code e podem ler, associar ou enviar mensagens. Contatos novos podem ser associados manualmente a uma empresa depois da primeira conversa.
 
 Esta conexão usa a biblioteca Baileys para vincular um dispositivo do WhatsApp Web. Ela é independente da integração oficial Cloud API dos estabelecimentos e depende da disponibilidade e do protocolo do WhatsApp Web; mudanças no protocolo podem exigir atualização do gateway. O chatbot por estabelecimento continua na integração Cloud API existente. Para testar a integração real, é preciso publicar o Compose, ler o QR code com um número do Master e trocar mensagens de teste.
+
+## Identidade visual e notícias
+
+No Master, acesse **Página inicial** para editar a logo e os textos da página de vendas.
+Em **Master → Blog**, crie uma notícia, envie uma imagem de capa e marque o status
+**Publicado** para exibi-la no index. Para a empresa, **Operação → Minha página**
+permite editar a logo, capa e apresentação públicas; **Agenda → Profissionais**
+permite enviar a foto opcional de cada profissional. Somente imagens de empresas
+publicadas, profissionais ativos, notícias publicadas e a logo da plataforma são
+servidas por URLs públicas específicas. Preserve o volume `media` do Compose nos
+redeploys para manter os uploads.
+
+No checkout, o responsável escolhe cartão recorrente ou Pix para o ciclo atual.
+O Pix requer um webhook `order` do Mercado Pago confirmado pelo servidor antes
+de ativar a assinatura; renovações por Pix requerem pagamento a cada ciclo.

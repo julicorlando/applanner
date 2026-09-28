@@ -1,4 +1,6 @@
 from decimal import Decimal
+from datetime import timedelta
+from secrets import token_hex
 
 from django.db import transaction
 from django.utils import timezone
@@ -7,6 +9,9 @@ from core.crypto import decrypt_json, decrypt_text, encrypt_json, encrypt_text
 from .mercadopago import MercadoPagoProvider
 from .models import (
     PaymentGateway,
+    CheckoutSession,
+    Payment,
+    PixCharge,
     Subscription,
     TenantPaymentConnection,
     TenantRecurringSubscription,
@@ -89,6 +94,71 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
     subscription.provider_checkout_url=checkout_url if checkout_url.startswith("https://") else ""
     subscription.save(update_fields=["provider_subscription_id","provider_plan_id","provider_checkout_url","updated_at"])
     return remote
+
+
+@transaction.atomic
+def create_platform_pix_charge(*,subscription,payer_email):
+    """One-off Pix for the current billing cycle; never authorizes recurring charges."""
+    subscription=Subscription.objects.select_for_update().select_related("plan","tenant").get(pk=subscription.pk)
+    if subscription.status not in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
+        raise ValueError("Não há cobrança pendente para esta assinatura.")
+    if subscription.provider_subscription_id:
+        raise ValueError("Há um pagamento por cartão iniciado. Solicite ajuda ao suporte para mudar para Pix.")
+    previous=PixCharge.objects.select_related("payment").filter(
+        subscription=subscription,payment__status=Payment.Status.PENDING,
+        expires_at__gt=timezone.now(),
+    ).order_by("-created_at").first()
+    if previous:
+        return previous
+    gateway=PaymentGateway.objects.filter(
+        provider="mercadopago",active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED,
+    ).first()
+    if not gateway:
+        raise RuntimeError("Mercado Pago da plataforma não está configurado.")
+    amount=subscription.contracted_price
+    if amount is None:
+        months={"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[subscription.billing_cycle]
+        amount=getattr(subscription.plan,{"monthly":"monthly_price","quarterly":"quarterly_price","semiannual":"semiannual_price","annual":"annual_price"}[subscription.billing_cycle]) or subscription.plan.monthly_price*months
+    amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+    if amount<=0:
+        raise ValueError("Valor da assinatura inválido.")
+    public_id=token_hex(16)
+    expiry=timezone.now()+timedelta(hours=24)
+    checkout=CheckoutSession.objects.create(
+        public_id=public_id,tenant=subscription.tenant,plan=subscription.plan,
+        billing_cycle=subscription.billing_cycle,subtotal=amount,total=amount,
+        status=CheckoutSession.Status.AWAITING_PAYMENT,
+        idempotency_key="subscription-pix-"+public_id,expires_at=expiry,
+    )
+    reference="subscription-pix:"+public_id
+    payment=Payment.objects.create(
+        tenant=subscription.tenant,subscription=subscription,purpose="subscription",
+        reference_id=subscription.pk,provider="mercadopago",environment=gateway.environment,
+        provider_reference=reference,idempotency_key="subscription-pix-"+public_id,
+        amount=amount,status=Payment.Status.PENDING,due_at=expiry,
+        metadata={"method":"pix","checkout_session_id":checkout.pk},
+    )
+    remote=platform_provider(gateway).create_pix_order(
+        amount=amount,external_reference=reference,payer_email=payer_email,
+        expiration_hours=24,idempotency_key="subscription-pix-"+public_id,
+    )
+    qr=remote.get("qr_code") or ""
+    qr_base64=remote.get("qr_code_base64") or ""
+    if not remote.get("order_id") or not (qr or qr_base64):
+        raise RuntimeError("Mercado Pago não retornou o código Pix. Tente novamente.")
+    ticket_url=remote.get("ticket_url") or ""
+    if ticket_url and not ticket_url.startswith("https://"):
+        ticket_url=""
+    payment.provider_status=remote.get("status") or "pending"
+    payment.provider_payment_id=remote.get("payment_id") or ""
+    payment.save(update_fields=["provider_status","provider_payment_id","updated_at"])
+    return PixCharge.objects.create(
+        public_id=public_id,tenant=subscription.tenant,subscription=subscription,
+        checkout_session=checkout,payment=payment,provider_order_id=remote["order_id"],
+        provider_payment_id=remote.get("payment_id") or "",amount=amount,
+        qr_code=qr,qr_code_base64=qr_base64,ticket_url=ticket_url,
+        status="pending",expires_at=expiry,
+    )
 
 
 @transaction.atomic

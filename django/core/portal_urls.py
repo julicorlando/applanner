@@ -1,7 +1,9 @@
 from django.urls import path
 from . import portal
+from .branding import tenant_branding
 
 urlpatterns = [
+    path("minha-pagina/",tenant_branding,name="tenant-branding"),
     path("", portal.home, name="portal-home"),
     path("tenant/<int:tenant_id>/", portal.select_tenant, name="portal-select-tenant"),
     path("<slug:module_slug>/<slug:resource_slug>/", portal.resource_list, name="portal-resource-list"),

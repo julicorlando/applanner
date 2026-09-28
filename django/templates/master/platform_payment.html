@@ -12,7 +12,7 @@
   <article class="panel">
     <h2>Cadastrar ou substituir credenciais</h2>
     <p>Crie uma aplicação em Mercado Pago Developers. Selecione <strong>Testes</strong> para homologação e <strong>Produção</strong> apenas quando estiver pronto para cobranças reais. Obtenha a chave secreta na configuração de notificações Webhooks da mesma aplicação.</p>
-    <p>URL para cadastrar nas notificações Webhooks do Mercado Pago: <code>{{ webhook_url }}</code>. Ative as notificações de pagamentos e assinaturas. A URL deve usar HTTPS.</p>
+    <p>URL para cadastrar nas notificações Webhooks do Mercado Pago: <code>{{ webhook_url }}</code>. Ative as notificações de <strong>Orders, pagamentos e assinaturas</strong> na aplicação. A URL deve usar HTTPS.</p>
     <form method="post" class="portal-form">{% csrf_token %}
       {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
       {% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% if field.errors %}<div class="field-error">{{ field.errors }}</div>{% endif %}</div>{% endfor %}

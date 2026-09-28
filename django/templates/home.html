@@ -4,8 +4,8 @@
 <section class="marketing-hero shell">
   <div class="hero-copy">
     <span class="eyebrow">AGENDA · OPERAÇÃO · RELACIONAMENTO</span>
-    <h1>Transforme horários livres em clientes.</h1>
-    <p class="lead">Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar. Experimente grátis pelo período indicado no plano escolhido.</p>
+    <h1>{{ platform_branding.hero_title|default:"Transforme horários livres em clientes." }}</h1>
+    <p class="lead">{{ platform_branding.hero_description|default:"Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar." }} Experimente grátis pelo período indicado no plano escolhido.</p>
     <div class="actions">
       <a class="button primary" href="{% url 'billing-plans' %}">Conhecer os planos</a>
       <a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
@@ -46,6 +46,7 @@
   <p style="margin-top:24px"><a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu: selecione as funções →</a></p>
 </section>
 
+<section class="shell section" id="noticias"><div class="section-head"><span class="eyebrow">NOVIDADES</span><h2>Notícias e ideias para seu negócio.</h2></div><div class="segment-grid">{% for post in posts %}<article class="news-card">{% if post.cover %}<img src="{% url 'public-blog-image' post.pk %}" alt="Capa de {{ post.title }}" loading="lazy">{% endif %}<span>{{ post.published_at|date:"d/m/Y" }}</span><h3>{{ post.title }}</h3><p>{{ post.excerpt }}</p><a href="{% url 'blog-post' post.slug %}">Ler notícia →</a></article>{% empty %}<p class="empty">Novidades em breve.</p>{% endfor %}</div></section>
 <section class="proof-strip">
   <div class="shell proof-grid">
     <div><strong>Uma base</strong><span>para agenda e operação</span></div>
@@ -81,7 +82,7 @@
 
 <section class="shell closing">
   <span class="eyebrow">APPLANNER</span>
-  <h2>Organize hoje.<br>Escale sem refazer tudo amanhã.</h2>
+  <h2>{{ platform_branding.closing_title|default:"Organize hoje. Escale amanhã." }}</h2>
   <a class="button primary light" href="/planos/">Escolher um plano</a>
 </section>
 {% endblock %}
