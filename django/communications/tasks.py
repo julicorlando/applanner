@@ -1,9 +1,32 @@
 from celery import shared_task
+from datetime import timedelta
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.utils import timezone
 
 from .models import MarketingDelivery, Notification
+
+
+@shared_task(bind=True,max_retries=3,autoretry_for=(ValueError,KeyError),retry_backoff=True)
+def process_master_chatbot(self,message_id):
+    from .master_whatsapp_flow import process_master_automation
+    process_master_automation(message_id)
+
+
+@shared_task
+def retry_master_chatbot_queue():
+    from .models import MasterWhatsAppFlow,MasterWhatsAppMessage
+    flow=MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).first()
+    if not flow:
+        return 0
+    recent=max(flow.updated_at,timezone.now()-timedelta(hours=2))
+    ids=list(MasterWhatsAppMessage.objects.filter(
+        direction="in",flow_processed_at__isnull=True,created_at__gte=recent,
+        conversation__human_handoff=False,
+    ).order_by("id").values_list("id",flat=True)[:100])
+    for pk in ids:
+        process_master_chatbot.delay(pk)
+    return len(ids)
 
 
 @shared_task(bind=True,max_retries=5,autoretry_for=(Exception,),retry_backoff=True,retry_jitter=True)

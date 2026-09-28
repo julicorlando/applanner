@@ -1,21 +1,105 @@
 """WhatsApp Web gateway and inbox restricted to platform superusers."""
+import base64
 import hmac
+from io import BytesIO
 import json
+import logging
 import re
+from pathlib import Path
 
 import requests
+from PIL import Image, UnidentifiedImageError
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse, JsonResponse
+from django.db import transaction
+from django.db.models import Q
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from tenants.models import Tenant
-from .models import MasterWhatsAppConversation, MasterWhatsAppMessage
+from .models import (MasterWhatsAppConversation,MasterWhatsAppMessage,
+    MasterWhatsAppDeliveryEvent,MasterWhatsAppFlow)
+
+logger=logging.getLogger(__name__)
+
+
+def _validated_attachment(uploaded):
+    if not uploaded:
+        return None
+    if uploaded.size>5*1024*1024 or uploaded.size==0:
+        raise ValueError("O anexo deve ter até 5 MB.")
+    name=re.sub(r"[^A-Za-z0-9._-]","_",Path(uploaded.name).name)[:120] or "arquivo"
+    suffix=Path(name).suffix.lower()
+    data=uploaded.read()
+    uploaded.seek(0)
+    if suffix==".pdf" and data.startswith(b"%PDF-"):
+        mime="application/pdf"
+    elif suffix in {".png",".jpg",".jpeg",".webp"}:
+        try:
+            image=Image.open(BytesIO(data))
+            if image.width*image.height>20_000_000:
+                raise ValueError("A imagem tem resolução muito grande.")
+            image.verify()
+            mime={"PNG":"image/png","JPEG":"image/jpeg","WEBP":"image/webp"}.get(image.format)
+        except (UnidentifiedImageError,OSError,Image.DecompressionBombError) as exc:
+            raise ValueError("Envie uma imagem PNG, JPG ou WebP válida.") from exc
+        allowed_suffixes={"image/png":{".png"},"image/jpeg":{".jpg",".jpeg"},
+                          "image/webp":{".webp"}}
+        if suffix not in allowed_suffixes.get(mime,set()):
+            raise ValueError("A extensão não corresponde à imagem enviada.")
+    else:
+        raise ValueError("Use imagem PNG/JPG/WebP ou documento PDF.")
+    return {"base64":base64.b64encode(data).decode(),"mime":mime,"name":name}
+
+
+def _apply_receipts(message):
+    events=MasterWhatsAppDeliveryEvent.objects.filter(
+        provider_message_id=message.provider_message_id,recipient_jid=message.recipient_jid,
+    ).values_list("status","created_at")
+    updates=[]
+    for status,received in events:
+        if status=="delivered" and not message.delivered_at:
+            message.delivered_at=received
+            updates.append("delivered_at")
+        if status=="read" and not message.read_at:
+            message.read_at=received
+            message.delivered_at=message.delivered_at or received
+            updates.extend(["read_at","delivered_at"])
+    if message.read_at:
+        message.delivery_status="read"
+    elif message.delivered_at:
+        message.delivery_status="delivered"
+    if updates:
+        message.save(update_fields=list(set(updates+["delivery_status"])))
+
+
+def record_outbound_message(*,conversation,sent,body,sent_by,attachment=None,mime="",filename=""):
+    recipient=sent.get("to") or conversation.wa_id
+    if not re.fullmatch(r"[0-9]{10,20}@(s\.whatsapp\.net|lid)",recipient):
+        raise ValueError("O WhatsApp não informou um destinatário válido.")
+    with transaction.atomic():
+        row=MasterWhatsAppMessage.objects.create(
+            conversation=conversation,provider_message_id=sent["id"],direction="out",
+            body=body,sent_by=sent_by,recipient_jid=recipient,
+            attachment=attachment or "",attachment_mime=mime,attachment_name=filename,
+        )
+        _apply_receipts(row)
+    return row
+
+
+def _receipt_label(message,contact):
+    if message.direction!="out":
+        return ""
+    if message.read_at:
+        return f"{contact} leu às {timezone.localtime(message.read_at):%d/%m %H:%M}"
+    if message.delivered_at:
+        return f"{contact} recebeu às {timezone.localtime(message.delivered_at):%d/%m %H:%M}"
+    return "Enviada · aguardando confirmação de entrega"
 
 
 def _master(request):
@@ -31,7 +115,8 @@ def _gateway(method, path, payload=None):
     try:
         response=requests.request(
             method,address.rstrip("/")+path,
-            headers={"Authorization":"Bearer "+token},json=payload,timeout=12,
+            headers={"Authorization":"Bearer "+token},json=payload,
+            timeout=45 if payload and payload.get("file") else 12,
         )
         data=response.json()
     except (requests.RequestException,ValueError) as exc:
@@ -54,8 +139,12 @@ def master_whatsapp_inbox(request):
             wa_id=wa_id,defaults={"contact_name":(request.POST.get("name") or "")[:150],"last_message_at":timezone.now()},
         )
         return redirect("master-whatsapp-conversation",pk=row.pk)
+    q=(request.GET.get("q") or "").strip()[:80]
+    rows=MasterWhatsAppConversation.objects.select_related("tenant")
+    if q:
+        rows=rows.filter(Q(contact_name__icontains=q)|Q(wa_id__icontains=q)|Q(tenant__name__icontains=q))
     return render(request,"master/whatsapp_inbox.html",{
-        "rows":MasterWhatsAppConversation.objects.select_related("tenant")[:200],
+        "rows":rows[:200],"q":q,
         "configured":bool(settings.MASTER_WHATSAPP_GATEWAY_TOKEN and settings.MASTER_WHATSAPP_GATEWAY_URL),
     })
 
@@ -109,19 +198,31 @@ def master_whatsapp_conversation(request,pk):
                 row.tenant=tenant
                 row.save(update_fields=["tenant","updated_at"])
                 messages.success(request,"Empresa associada à conversa.")
+        elif action=="handoff":
+            row.human_handoff=request.POST.get("enabled")=="1"
+            row.save(update_fields=["human_handoff","updated_at"])
+            row.messages.filter(direction="in",flow_processed_at__isnull=True).update(flow_processed_at=timezone.now())
+            messages.success(request,"Atendimento humano ativado." if row.human_handoff else "Fluxo automático retomado.")
         elif action=="reply":
             body=(request.POST.get("body") or "").strip()
-            if not body or len(body)>4096:
-                messages.error(request,"Escreva uma mensagem de até 4096 caracteres.")
+            uploaded=request.FILES.get("attachment")
+            if (not body and not uploaded) or len(body)>4096:
+                messages.error(request,"Escreva uma mensagem ou selecione uma imagem/PDF de até 5 MB.")
             else:
                 try:
-                    sent=_gateway("POST","/send",{"to":row.wa_id,"text":body})
-                    MasterWhatsAppMessage.objects.create(
-                        conversation=row,provider_message_id=sent["id"],direction="out",body=body,sent_by=request.user,
-                    )
+                    attachment=_validated_attachment(uploaded)
+                    payload={"to":row.wa_id,"text":body}
+                    if attachment:
+                        payload["file"]=attachment
+                    sent=_gateway("POST","/send",payload)
+                    record_outbound_message(conversation=row,sent=sent,body=body,sent_by=request.user,
+                        attachment=uploaded,mime=attachment["mime"] if attachment else "",
+                        filename=attachment["name"] if attachment else "")
+                    row.human_handoff=True
+                    row.messages.filter(direction="in",flow_processed_at__isnull=True).update(flow_processed_at=timezone.now())
                     row.last_message_at=timezone.now()
-                    row.save(update_fields=["last_message_at","updated_at"])
-                    messages.success(request,"Mensagem encaminhada ao WhatsApp. A entrega ao destinatário ainda não foi confirmada.")
+                    row.save(update_fields=["human_handoff","last_message_at","updated_at"])
+                    messages.success(request,"Mensagem enviada. Acompanhe a entrega e leitura nesta conversa.")
                 except (ValueError,KeyError) as exc:
                     messages.error(request,str(exc))
         return redirect("master-whatsapp-conversation",pk=row.pk)
@@ -129,7 +230,64 @@ def master_whatsapp_conversation(request,pk):
         "row":row,"thread":row.messages.select_related("sent_by")[:500],
         "conversations":MasterWhatsAppConversation.objects.select_related("tenant")[:100],
         "tenants":Tenant.objects.filter(deleted_at__isnull=True).order_by("name")[:500],
+        "flow_enabled":MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).exists(),
     })
+
+
+@login_required
+@require_GET
+def master_whatsapp_messages(request,pk):
+    _master(request)
+    row=get_object_or_404(MasterWhatsAppConversation,pk=pk)
+    contact=row.contact_name or row.wa_id
+    thread=list(row.messages.order_by("-id")[:200])
+    from django.urls import reverse
+    return JsonResponse({"messages":[{
+        "id":item.pk,"body":item.body,"direction":item.direction,
+        "time":timezone.localtime(item.created_at).strftime("%d/%m %H:%M"),
+        "receipt":_receipt_label(item,contact),
+        "attachment_url":reverse("master-whatsapp-attachment",args=[item.pk]) if item.attachment else "",
+        "attachment_name":item.attachment_name,"attachment_mime":item.attachment_mime,
+    } for item in reversed(thread)],"human_handoff":row.human_handoff})
+
+
+@login_required
+@require_GET
+def master_whatsapp_attachment(request,pk):
+    _master(request)
+    item=get_object_or_404(MasterWhatsAppMessage,pk=pk)
+    if not item.attachment:
+        from django.http import Http404
+        raise Http404
+    try:
+        response=FileResponse(item.attachment.open("rb"),content_type=item.attachment_mime or "application/octet-stream")
+    except (FileNotFoundError,OSError):
+        from django.http import Http404
+        raise Http404 from None
+    response["X-Content-Type-Options"]="nosniff"
+    response["Cache-Control"]="private, no-store"
+    response["Content-Disposition"]=f'attachment; filename="{item.attachment_name or "arquivo"}"'
+    return response
+
+
+@login_required
+def master_whatsapp_flow(request):
+    _master(request)
+    from .master_whatsapp_flow import MasterFlowForm
+    flow,_=MasterWhatsAppFlow.objects.get_or_create(pk=1)
+    form=MasterFlowForm(request.POST or None,instance=flow)
+    if request.method=="POST" and form.is_valid():
+        if form.cleaned_data["enabled"] and not (
+            settings.MASTER_WHATSAPP_GATEWAY_TOKEN and settings.MASTER_WHATSAPP_GATEWAY_URL
+        ):
+            form.add_error("enabled","Configure o WhatsApp do Master no Coolify antes de ativar o fluxo.")
+        else:
+            row=form.save(commit=False)
+            row.steps=form.cleaned_data["steps_text"]
+            row.save()
+            messages.success(request,"Fluxo do Master salvo.")
+            return redirect("master-whatsapp-flow")
+    return render(request,"master/whatsapp_flow.html",{"form":form,"flow":flow})
 
 
 @csrf_exempt
@@ -140,8 +298,27 @@ def master_whatsapp_receive(request):
     received=request.headers.get("Authorization","")
     if not expected or not hmac.compare_digest(received,"Bearer "+expected):
         return HttpResponse(status=403)
+    if len(request.body)>16384:
+        return JsonResponse({"error":"Evento muito grande."},status=413)
     try:
         data=json.loads(request.body)
+        if data.get("event")=="receipt":
+            recipient=str(data["to"])
+            msg_id=str(data["id"])
+            status=str(data["status"])
+            if (not re.fullmatch(r"[0-9]{10,20}@(s\.whatsapp\.net|lid)",recipient)
+                or not 1<=len(msg_id)<=190 or status not in {"delivered","read"}):
+                raise ValueError
+            with transaction.atomic():
+                MasterWhatsAppDeliveryEvent.objects.get_or_create(
+                    provider_message_id=msg_id,recipient_jid=recipient,status=status,
+                )
+                message=MasterWhatsAppMessage.objects.select_for_update().filter(
+                    provider_message_id=msg_id,recipient_jid=recipient,direction="out",
+                ).first()
+                if message:
+                    _apply_receipts(message)
+            return JsonResponse({"ok":True})
         wa_id=str(data["from"])
         msg_id=str(data["id"])
         if not re.fullmatch(r"[0-9]{10,20}@(s\.whatsapp\.net|lid)",wa_id) or not 1<=len(msg_id)<=190:
@@ -153,11 +330,18 @@ def master_whatsapp_receive(request):
     row,_=MasterWhatsAppConversation.objects.get_or_create(
         wa_id=wa_id,defaults={"contact_name":name,"last_message_at":timezone.now()},
     )
-    _,created=MasterWhatsAppMessage.objects.get_or_create(
+    incoming,created=MasterWhatsAppMessage.objects.get_or_create(
         provider_message_id=msg_id,defaults={"conversation":row,"direction":"in","body":body},
     )
     if created:
         row.contact_name=name or row.contact_name
         row.last_message_at=timezone.now()
         row.save(update_fields=["contact_name","last_message_at","updated_at"])
+        if MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).exists():
+            from .tasks import process_master_chatbot
+            try:
+                process_master_chatbot.delay(incoming.pk)
+            except Exception:
+                # The inbound message stays stored and visible for manual response.
+                logger.exception("Could not queue Master WhatsApp flow for message %s",incoming.pk)
     return JsonResponse({"ok":True})

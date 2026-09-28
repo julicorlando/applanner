@@ -3,8 +3,8 @@
 {% block content %}
 <section class="shell portal-page">
   <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">ATENDIMENTO DA PLATAFORMA</span><h1>WhatsApp do Master</h1><p>Atenda empresas cadastradas e novos contatos em uma caixa de entrada separada dos estabelecimentos.</p></div></div>
-  <div class="chat-shell"><aside class="chat-sidebar"><h2>Conversas</h2>{% for row in rows %}<a class="chat-contact" href="{% url 'master-whatsapp-conversation' row.pk %}"><span class="chat-avatar">{{ row.contact_name|default:row.wa_id|slice:':1'|upper }}</span><span><strong>{{ row.contact_name|default:row.wa_id }}</strong><small>{{ row.tenant.name|default:'Novo contato' }} · {{ row.last_message_at|date:'d/m H:i' }}</small></span></a>{% empty %}<p class="empty">Nenhuma conversa ainda.</p>{% endfor %}</aside><div class="chat-main"><div class="panel" style="margin:16px">
-    <h2>Conectar o número do Master</h2>
+  <div class="chat-shell"><aside class="chat-sidebar"><h2>Conversas</h2><form method="get" class="portal-search"><input name="q" value="{{ q }}" placeholder="Buscar nome, empresa ou número" aria-label="Buscar conversas"><button class="button ghost">Buscar</button></form>{% for row in rows %}<a class="chat-contact" href="{% url 'master-whatsapp-conversation' row.pk %}"><span class="chat-avatar">{{ row.contact_name|default:row.wa_id|slice:':1'|upper }}</span><span><strong>{{ row.contact_name|default:row.wa_id }}</strong><small>{{ row.tenant.name|default:'Novo contato' }} · {{ row.last_message_at|date:'d/m H:i' }}</small></span></a>{% empty %}<p class="empty">Nenhuma conversa ainda.</p>{% endfor %}</aside><div class="chat-main"><div class="panel" style="margin:16px">
+    <h2>Conectar o número do Master</h2><p><a class="button ghost" href="{% url 'master-whatsapp-flow' %}">Configurar fluxo de atendimento →</a></p>
     {% if configured %}
       <p id="wa-state" role="status" aria-live="polite">Consultando conexão...</p>
       <img id="wa-qr" alt="QR code para vincular o WhatsApp do Master" style="display:none;width:min(320px,100%);height:auto">

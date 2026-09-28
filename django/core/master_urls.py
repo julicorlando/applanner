@@ -1,6 +1,7 @@
 from django.urls import path
 from . import master
 from .branding import platform_homepage
+from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment
 
 urlpatterns=[
     path("pagina-inicial/",platform_homepage,name="master-homepage"),
@@ -10,6 +11,9 @@ urlpatterns=[
     path("whatsapp/parear/",master.master_whatsapp_connect,name="master-whatsapp-connect"),
     path("whatsapp/desconectar/",master.master_whatsapp_disconnect,name="master-whatsapp-disconnect"),
     path("whatsapp/receber/",master.master_whatsapp_receive,name="master-whatsapp-receive"),
+    path("whatsapp/fluxo/",master_whatsapp_flow,name="master-whatsapp-flow"),
+    path("whatsapp/anexo/<int:pk>/",master_whatsapp_attachment,name="master-whatsapp-attachment"),
+    path("whatsapp/<int:pk>/mensagens/",master_whatsapp_messages,name="master-whatsapp-messages"),
     path("whatsapp/<int:pk>/",master.master_whatsapp_conversation,name="master-whatsapp-conversation"),
     path("acoes/<str:action>/",master.operational_action,name="master-operational-action"),
     path("acoes/<str:action>/<int:pk>/",master.operational_action,name="master-operational-object-action"),

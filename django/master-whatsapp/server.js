@@ -69,6 +69,16 @@ async function connect() {
     }
     await flush();
   });
+  client.ev.on('messages.update', async updates => {
+    for (const { key, update } of updates) {
+      const code = Number(update?.status);
+      if (!key?.fromMe || !key.id || !contactJid.test(key.remoteJid || '') || code < 3) continue;
+      const status = code >= 4 ? 'read' : 'delivered';
+      pending.push({ event: 'receipt', to: key.remoteJid, id: key.id, status });
+      await fs.writeFile(pendingFile, JSON.stringify(pending), { mode: 0o600 });
+    }
+    await flush();
+  });
 }
 
 function reply(res, status, data) {
@@ -102,11 +112,34 @@ http.createServer(async (req, res) => {
       let raw = '';
       for await (const chunk of req) {
         raw += chunk;
-        if (raw.length > 10000) return reply(res, 413, { error: 'Mensagem muito longa.' });
+        if (raw.length > 8 * 1024 * 1024) return reply(res, 413, { error: 'Arquivo muito grande.' });
       }
       const data = JSON.parse(raw);
-      if (!contactJid.test(data.to || '') || !data.text || data.text.length > 4096) {
+      if (!contactJid.test(data.to || '') || typeof data.text !== 'string' || data.text.length > 4096 || (!data.text.trim() && !data.file)) {
         return reply(res, 400, { error: 'Destinatário ou mensagem inválidos.' });
+      }
+      let content = { text: data.text };
+      if (data.file) {
+        const file = data.file;
+        if (typeof file.base64 !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(file.base64) ||
+            !['image/png', 'image/jpeg', 'image/webp', 'application/pdf'].includes(file.mime) ||
+            typeof file.name !== 'string' || file.name.length > 120) {
+          return reply(res, 400, { error: 'Tipo de anexo inválido.' });
+        }
+        const media = Buffer.from(file.base64, 'base64');
+        if (!media.length || media.length > 5 * 1024 * 1024) return reply(res, 413, { error: 'Arquivo muito grande.' });
+        if (file.mime === 'application/pdf') {
+          if (media.subarray(0, 5).toString() !== '%PDF-') return reply(res, 400, { error: 'PDF inválido.' });
+          content = { document: media, mimetype: file.mime, fileName: file.name };
+        } else {
+          if (file.mime === 'image/png' && !media.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')) ||
+              file.mime === 'image/jpeg' && !media.subarray(0, 3).equals(Buffer.from('ffd8ff', 'hex')) ||
+              file.mime === 'image/webp' && media.subarray(8, 12).toString() !== 'WEBP') {
+            return reply(res, 400, { error: 'Imagem inválida.' });
+          }
+          content = { image: media, mimetype: file.mime };
+        }
+        if (data.text.trim()) content.caption = data.text;
       }
       let recipient = data.to;
       if (recipient.endsWith('@s.whatsapp.net')) {
@@ -114,9 +147,9 @@ http.createServer(async (req, res) => {
         if (!found?.exists) return reply(res, 404, { error: 'Este número não foi encontrado no WhatsApp. Confira DDD e código do país.' });
         recipient = found.jid || recipient;
       }
-      const message = await socket.sendMessage(recipient, { text: data.text });
+      const message = await socket.sendMessage(recipient, content);
       if (!message?.key?.id) return reply(res, 503, { error: 'O WhatsApp não confirmou o envio. Tente novamente.' });
-      return reply(res, 200, { id: message.key.id });
+      return reply(res, 200, { id: message.key.id, to: recipient });
     }
     return reply(res, 404, { error: 'Rota não encontrada.' });
   } catch (error) {

@@ -223,6 +223,8 @@ class MasterWhatsAppConversation(TimeStampedModel):
     contact_name=models.CharField(max_length=150,blank=True)
     tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,related_name="master_whatsapp_conversations")
     last_message_at=models.DateTimeField()
+    human_handoff=models.BooleanField(default=False)
+    flow_state=models.CharField(max_length=80,blank=True)
 
     class Meta:
         ordering=["-last_message_at"]
@@ -235,9 +237,42 @@ class MasterWhatsAppMessage(models.Model):
     body=models.TextField(blank=True)
     sent_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
     created_at=models.DateTimeField(auto_now_add=True)
+    recipient_jid=models.CharField(max_length=80,blank=True)
+    delivery_status=models.CharField(max_length=12,choices=[
+        ("sent","Enviada"),("delivered","Entregue"),("read","Lida"),
+    ],default="sent")
+    delivered_at=models.DateTimeField(null=True,blank=True)
+    read_at=models.DateTimeField(null=True,blank=True)
+    flow_processed_at=models.DateTimeField(null=True,blank=True)
+    attachment=models.FileField(upload_to="master-whatsapp/",blank=True)
+    attachment_mime=models.CharField(max_length=60,blank=True)
+    attachment_name=models.CharField(max_length=120,blank=True)
 
     class Meta:
         ordering=["id"]
+
+
+class MasterWhatsAppFlow(models.Model):
+    """One platform-only chatbot, independent of tenant Cloud API flows."""
+    enabled=models.BooleanField(default=False)
+    greeting=models.CharField(max_length=1000,default="Olá! Como podemos ajudar sua empresa?")
+    fallback=models.CharField(max_length=1000,default="Não entendi. Conte com outras palavras ou escreva atendimento.")
+    handoff=models.CharField(max_length=1000,default="Vou encaminhar você para nosso atendimento humano.")
+    steps=models.JSONField(default=list,blank=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+
+class MasterWhatsAppDeliveryEvent(models.Model):
+    """Durable receipts, including those received before the send response is stored."""
+    provider_message_id=models.CharField(max_length=190)
+    recipient_jid=models.CharField(max_length=80)
+    status=models.CharField(max_length=12)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(
+            fields=["provider_message_id","recipient_jid","status"],name="master_wa_receipt_unique",
+        )]
 
 
 class WhatsAppMessage(models.Model):

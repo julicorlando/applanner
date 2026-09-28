@@ -104,3 +104,29 @@ redeploys para manter os uploads.
 No checkout, o responsável escolhe cartão recorrente ou Pix para o ciclo atual.
 O Pix requer um webhook `order` do Mercado Pago confirmado pelo servidor antes
 de ativar a assinatura; renovações por Pix requerem pagamento a cada ciclo.
+
+## Primeira entrada de novas empresas
+
+Contas criadas em `/cadastro/` passam obrigatoriamente por `/inicio/`: dados da
+empresa e CPF/CNPJ validado, endereço da unidade, serviço, profissional, dias e
+horários, identidade da página e meios aceitos. A página pública continua
+desligada até o proprietário confirmar o e-mail e concluir a publicação.
+Usuários da equipe aguardam o responsável concluir antes de acessar a operação.
+Empresas importadas e já em uso preservam o acesso atual. Configure SMTP no
+Coolify para que a confirmação por e-mail funcione; pagamentos de planos
+continuam acessíveis durante a configuração inicial.
+
+## Fluxo e recibos do WhatsApp Master
+
+Em **Master → WhatsApp do Master → Configurar fluxo**, o Master pode criar etapas
+com a sintaxe `etapa | palavra;sinônimo | resposta | próxima etapa | sim/não`.
+O estado da conversa avança conforme as palavras recebidas; `atendimento` ou
+`humano` chama uma pessoa. Ao enviar uma resposta manual, o fluxo pausa nessa
+conversa até **Retomar fluxo**. Configure worker, beat e a sessão do gateway.
+Os eventos do WhatsApp atualizam **Enviada**, **Entregue** e **Lida**; a ausência
+de recibo significa confirmação indisponível, nunca entrega comprovada.
+O Master pode enviar imagens PNG/JPG/WebP e PDFs de até 5 MB; os anexos ficam no
+volume persistente `media` e a rota de download requer superusuário. O fluxo é
+executado pelo Celery e retomado pelo beat quando a fila estiver disponível.
+Valide envio, entrega, leitura e transferência com o número real pareado antes
+de assumir esses estados como homologados em produção.
