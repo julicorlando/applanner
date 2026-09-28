@@ -108,6 +108,7 @@ def _platform_dashboard(request):
 
 
 def _public_tenant_context(tenant,professional=None):
+    from billing.entitlements import active_subscription,module_enabled
     from contenthub.models import PublicReview
     from engagement.models import ServicePackage,TenantLoyaltySettings
     from finance.models import Product
@@ -127,6 +128,7 @@ def _public_tenant_context(tenant,professional=None):
         "tenant":tenant,"services":services,"professionals":professionals,"units":units,
         "products":products,"packages":packages,"reviews":reviews,"loyalty":loyalty,
         "public_slug":tenant.public_slug or tenant.slug,"selected_professional":professional,
+        "waitlist_enabled":not active_subscription(tenant) or module_enabled(tenant,"waitlist"),
     }
 
 
