@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.utils import timezone
 from tenants.models import Tenant
 from engagement.models import WaitlistEntry
+from billing.models import Plan, Subscription
 from .models import Service
 
 
@@ -26,3 +27,12 @@ class PublicWaitlistTests(TestCase):
     def test_rejects_past_day(self):
         payload={**self.payload,'date':(timezone.localdate()-timedelta(days=1)).isoformat()}
         self.assertEqual(self.client.post(self.url,payload,content_type='application/json').status_code,400)
+
+    def test_plan_without_waitlist_hides_offer_and_rejects_request(self):
+        plan=Plan.objects.create(name='Agenda básica',slug='basic-no-waitlist',monthly_price=20)
+        Subscription.objects.create(tenant=self.tenant,plan=plan,status=Subscription.Status.ACTIVE,
+            started_at=timezone.now())
+        page=self.client.get('/p/agenda-wait/')
+        self.assertEqual(page.status_code,200)
+        self.assertNotContains(page,'id="booking-waitlist"')
+        self.assertEqual(self.client.post(self.url,self.payload,content_type='application/json').status_code,403)
