@@ -121,7 +121,7 @@ def master_whatsapp_conversation(request,pk):
                     )
                     row.last_message_at=timezone.now()
                     row.save(update_fields=["last_message_at","updated_at"])
-                    messages.success(request,"Mensagem enviada.")
+                    messages.success(request,"Mensagem encaminhada ao WhatsApp. A entrega ao destinatário ainda não foi confirmada.")
                 except (ValueError,KeyError) as exc:
                     messages.error(request,str(exc))
         return redirect("master-whatsapp-conversation",pk=row.pk)
@@ -143,7 +143,7 @@ def master_whatsapp_receive(request):
         data=json.loads(request.body)
         wa_id=str(data["from"])
         msg_id=str(data["id"])
-        if not re.fullmatch(r"[0-9]{10,15}@s\.whatsapp\.net",wa_id) or not 1<=len(msg_id)<=190:
+        if not re.fullmatch(r"[0-9]{10,20}@(s\.whatsapp\.net|lid)",wa_id) or not 1<=len(msg_id)<=190:
             raise ValueError
         body=str(data.get("text") or "")[:4096]
         name=str(data.get("name") or "")[:150]

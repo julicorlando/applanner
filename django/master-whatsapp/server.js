@@ -16,6 +16,7 @@ let qr = null;
 let reconnect;
 let pending = [];
 const logger = pino({ level: 'warn' });
+const contactJid = /^\d{10,20}@(s\.whatsapp\.net|lid)$/;
 
 async function flush() {
   if (!callback || !secret || !pending.length) return;
@@ -60,8 +61,9 @@ async function connect() {
   client.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
     for (const msg of messages) {
-      const from = msg.key?.remoteJid;
-      if (msg.key?.fromMe || !/^\d{10,15}@s\.whatsapp\.net$/.test(from || '') || !msg.key?.id) continue;
+      const from = [msg.key?.remoteJidAlt, msg.key?.remoteJid].find(jid => contactJid.test(jid || '') && jid.endsWith('@s.whatsapp.net'))
+        || msg.key?.remoteJid;
+      if (msg.key?.fromMe || !contactJid.test(from || '') || !msg.key?.id) continue;
       pending.push({ from, id: msg.key.id, name: msg.pushName || '', text: msg.message?.conversation || msg.message?.extendedTextMessage?.text || '' });
       await fs.writeFile(pendingFile, JSON.stringify(pending), { mode: 0o600 });
     }
@@ -103,10 +105,17 @@ http.createServer(async (req, res) => {
         if (raw.length > 10000) return reply(res, 413, { error: 'Mensagem muito longa.' });
       }
       const data = JSON.parse(raw);
-      if (!/^\d{10,15}@s\.whatsapp\.net$/.test(data.to || '') || !data.text || data.text.length > 4096) {
+      if (!contactJid.test(data.to || '') || !data.text || data.text.length > 4096) {
         return reply(res, 400, { error: 'Destinatário ou mensagem inválidos.' });
       }
-      const message = await socket.sendMessage(data.to, { text: data.text });
+      let recipient = data.to;
+      if (recipient.endsWith('@s.whatsapp.net')) {
+        const [found] = await socket.onWhatsApp(recipient);
+        if (!found?.exists) return reply(res, 404, { error: 'Este número não foi encontrado no WhatsApp. Confira DDD e código do país.' });
+        recipient = found.jid || recipient;
+      }
+      const message = await socket.sendMessage(recipient, { text: data.text });
+      if (!message?.key?.id) return reply(res, 503, { error: 'O WhatsApp não confirmou o envio. Tente novamente.' });
       return reply(res, 200, { id: message.key.id });
     }
     return reply(res, 404, { error: 'Rota não encontrada.' });

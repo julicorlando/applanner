@@ -34,6 +34,24 @@ class MasterWhatsAppTests(TestCase):
         self.assertEqual(MasterWhatsAppMessage.objects.count(),1)
         self.assertIsNone(MasterWhatsAppConversation.objects.get().tenant_id)
 
+    def test_webhook_accepts_lid_contact_for_incoming_message(self):
+        payload={"from":"123456789012345@lid","id":"lid-message-1","text":"Minha empresa precisa de ajuda"}
+        response=self.client.post(
+            reverse("master-whatsapp-receive"),data=json.dumps(payload),content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer test-gateway-secret",
+        )
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(MasterWhatsAppConversation.objects.get().wa_id,payload["from"])
+
+    @patch("communications.master_whatsapp._gateway",side_effect=ValueError("Número não encontrado no WhatsApp"))
+    def test_failed_send_does_not_claim_delivery_or_save_message(self,_):
+        row=MasterWhatsAppConversation.objects.create(wa_id="5581999999999@s.whatsapp.net",last_message_at=timezone.now())
+        self.client.force_login(self.master)
+        url=reverse("master-whatsapp-conversation",args=[row.pk])
+        self.assertEqual(self.client.post(url,{"action":"reply","body":"Olá"}).status_code,302)
+        self.assertFalse(row.messages.exists())
+        self.assertContains(self.client.get(url),"Número não encontrado")
+
     @patch("communications.master_whatsapp._gateway",return_value={"id":"sent-1"})
     def test_master_can_link_company_and_reply(self,gateway):
         row=MasterWhatsAppConversation.objects.create(wa_id="5581999999999@s.whatsapp.net",last_message_at=timezone.now())
