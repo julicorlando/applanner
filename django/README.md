@@ -90,6 +90,12 @@ No Coolify, defina `MASTER_WHATSAPP_GATEWAY_TOKEN` com um segredo aleatório lon
 
 Esta conexão usa a biblioteca Baileys para vincular um dispositivo do WhatsApp Web. Ela é independente da integração oficial Cloud API dos estabelecimentos e depende da disponibilidade e do protocolo do WhatsApp Web; mudanças no protocolo podem exigir atualização do gateway. O chatbot por estabelecimento continua na integração Cloud API existente. Para testar a integração real, é preciso publicar o Compose, ler o QR code com um número do Master e trocar mensagens de teste.
 
+Para receber respostas no Coolify, configure `PUBLIC_BASE_URL=https://applanner.axionwebdigital.com.br`, mantendo o domínio em `DJANGO_ALLOWED_HOSTS`. O gateway faz o callback para `web:8000` na rede privada com o Host público e indica na caixa de entrada quantas mensagens aguardam e se o Django recusou o callback. Após o deploy, envie uma mensagem **de outro número para o número pareado** e confira Master → WhatsApp do Master. Conversas de novos contatos podem virar leads no funil por meio de **Adicionar ao Comercial**. Para contato `@lid`, informe o telefone antes de registrar o lead.
+
+Se o Mercado Pago recusar uma compra porque pagador e recebedor são a mesma conta, informe outro **e-mail do pagador** no cadastro ou em **Meu plano e pagamento**. Na homologação, configure as credenciais da conta vendedora e pague com uma conta compradora de teste diferente. A conta já criada pode continuar pelo link de **Meu plano e pagamento**; nenhum pagamento é confirmado sem retorno do provedor e verificação do webhook.
+
+No Master, crie o lead a partir da conversa, monte uma proposta a partir de um plano público e envie o link aprovado pelo WhatsApp. Quando o comprador aceitar a proposta, o link **Criar conta e contratar** usa o preço mensal combinado na assinatura e impede uso duplicado ou e-mail diferente do destinatário da proposta. Alterações nos módulos do plano depois da proposta exigem uma nova oferta. O checkout continua dependendo das credenciais, dos webhooks e dos testes reais do Mercado Pago.
+
 ## Identidade visual e notícias
 
 No Master, acesse **Página inicial** para editar a logo e os textos da página de vendas.

@@ -9,6 +9,19 @@ from django.test import SimpleTestCase
 from .mercadopago import MercadoPagoProvider
 
 
+class MercadoPagoFailureTests(SimpleTestCase):
+    def test_same_payer_and_collector_explains_separate_buyer(self):
+        from unittest.mock import Mock, patch
+        response=Mock(status_code=400)
+        response.json.return_value={"message":"Payer and collector cannot be the same user"}
+        with patch("billing.mercadopago.requests.request",return_value=response):
+            with self.assertRaisesRegex(RuntimeError,"e-mail de comprador diferente"):
+                MercadoPagoProvider("TEST-1234567890123456").create_subscription(
+                    reason="Plano",external_reference="subscription:1",payer_email="seller@example.com",
+                    back_url="https://example.com/billing/",amount="49.90",
+                )
+
+
 class MercadoPagoSignatureTests(SimpleTestCase):
     def test_valid_signature_matches_documented_manifest(self):
         secret="test-webhook-secret-123"
@@ -113,6 +126,32 @@ class PublicSignupTests(TestCase):
         subscription=Subscription.objects.get(tenant=tenant)
         self.assertEqual(subscription.plan,self.plan)
         self.assertEqual(subscription.status,Subscription.Status.TRIAL)
+
+    def test_accepted_proposal_preserves_agreed_price_and_is_single_use(self):
+        from commercial.models import Proposal
+        proposal=Proposal.objects.create(
+            commercial_user=User.objects.create_superuser(email="master-proposal@example.test",password="StrongPassword!123"),
+            plan=self.plan,title="Condição comercial",customer_email="buyer@example.test",
+            final_price=Decimal("39.90"),public_token="single-use-proposal-123456789012",
+            status=Proposal.Status.CONVERTED,
+        )
+        url=f"/cadastro/?plan={self.plan.pk}&proposal={proposal.public_token}"
+        self.assertContains(self.client.get(url),"E-mail de quem pagará")
+        data={"plan":self.plan.pk,"proposal_token":proposal.public_token,
+            "billing_cycle":Subscription.BillingCycle.MONTHLY,"business_name":"Nova barbearia",
+            "category":"barbearia","owner_name":"Comprador","email":"buyer@example.test",
+            "password":"StrongPassword!123","password_confirm":"StrongPassword!123"}
+        wrong=self.client.post("/cadastro/",{**data,"email":"outro@example.test"})
+        self.assertEqual(wrong.status_code,200)
+        self.assertFalse(Tenant.objects.filter(name="Nova barbearia").exists())
+        response=self.client.post("/cadastro/",data)
+        self.assertEqual(response.status_code,302)
+        proposal.refresh_from_db()
+        self.assertIsNotNone(proposal.tenant_id)
+        self.assertEqual(Subscription.objects.get(tenant=proposal.tenant).contracted_price,Decimal("39.90"))
+        self.client.logout()
+        self.assertEqual(self.client.post("/cadastro/",{**data,"email":"buyer2@example.test"}).status_code,200)
+        self.assertEqual(Tenant.objects.filter(name="Nova barbearia").count(),1)
 
     def test_owner_can_resume_secure_payment_link(self):
         from django.utils import timezone

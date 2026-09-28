@@ -46,6 +46,11 @@ class MercadoPagoProvider:
 
         if not 200<=response.status_code<300:
             message=str(data.get("message") or data.get("error") or "requisição recusada")[:300]
+            if "payer and collector cannot be the same user" in message.lower():
+                raise MercadoPagoError(
+                    "O pagador não pode ser a mesma conta Mercado Pago que recebe a cobrança. "
+                    "Informe um e-mail de comprador diferente e, em testes, entre no Mercado Pago com a conta compradora."
+                )
             raise MercadoPagoError(f"Mercado Pago HTTP {response.status_code}: {message}")
         if not isinstance(data,dict):
             raise MercadoPagoError("Resposta inválida do Mercado Pago.")

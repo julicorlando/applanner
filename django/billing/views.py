@@ -18,6 +18,7 @@ from tenants.models import Tenant,Unit,TenantOnboarding
 from .models import Module,ModuleRequest,Plan,Subscription,TenantModuleAddon,PixCharge,Payment
 from .payment_services import create_platform_subscription,create_platform_pix_charge
 from .module_services import cancel_module_addon,request_module
+from commercial.models import Proposal
 
 User=get_user_model()
 
@@ -43,6 +44,7 @@ def _unique_slug(name):
 
 
 class SignupForm(forms.Form):
+    proposal_token=forms.CharField(required=False,max_length=32,widget=forms.HiddenInput)
     plan=forms.ModelChoiceField(queryset=Plan.objects.none(),label="Plano")
     billing_cycle=forms.ChoiceField(choices=Subscription.BillingCycle.choices,label="Ciclo")
     payment_method=forms.ChoiceField(
@@ -58,6 +60,8 @@ class SignupForm(forms.Form):
     ]))
     owner_name=forms.CharField(max_length=150,label="Seu nome")
     email=forms.EmailField(label="E-mail")
+    payment_email=forms.EmailField(required=False,label="E-mail de quem pagará (se diferente)",
+        help_text="Em testes, use uma conta compradora diferente da conta vendedora do Mercado Pago.")
     phone=forms.CharField(max_length=32,required=False,label="Telefone")
     password=forms.CharField(widget=forms.PasswordInput,label="Senha")
     password_confirm=forms.CharField(widget=forms.PasswordInput,label="Confirmar senha")
@@ -79,6 +83,22 @@ class SignupForm(forms.Form):
     def clean(self):
         data=super().clean()
         plan=data.get("plan")
+        token=data.get("proposal_token")
+        if token:
+            proposal=Proposal.objects.filter(public_token=token,status=Proposal.Status.CONVERTED,
+                tenant__isnull=True).first()
+            if (not proposal or not plan or proposal.plan_id!=plan.pk
+                or proposal.expires_at and proposal.expires_at<=timezone.now()
+                or proposal.final_price<=0):
+                self.add_error("plan","A proposta não está disponível para este plano. Solicite um novo link ao Comercial.")
+            elif data.get("billing_cycle")!=Subscription.BillingCycle.MONTHLY:
+                self.add_error("billing_cycle","Esta proposta é mensal. Escolha o ciclo mensal.")
+            elif proposal.customer_email and proposal.customer_email.lower()!=str(data.get("email") or "").lower():
+                self.add_error("email","Use o e-mail indicado na proposta.")
+            else:
+                current=set(plan.module_links.filter(enabled=True,module__active=True).values_list("module__name",flat=True))
+                if current!=set(proposal.modules or []):
+                    self.add_error("plan","O catálogo deste plano mudou. Solicite a atualização da proposta.")
         category=(data.get("category") or "").lower()
         if plan and category:
             segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
@@ -149,7 +169,11 @@ def signup(request):
     selected=Plan.objects.filter(
         pk=plan_id,active=True,public_visible=True,is_custom=False
     ).first() if plan_id else None
+    proposal=Proposal.objects.filter(public_token=request.GET.get("proposal", "")[:32],
+        status=Proposal.Status.CONVERTED,tenant__isnull=True).first() if request.GET.get("proposal") else None
     form=SignupForm(request.POST or None,selected_plan=selected)
+    if request.method!="POST" and request.GET.get("proposal"):
+        form.fields["proposal_token"].initial=request.GET["proposal"][:32]
     if request.method=="POST" and form.is_valid():
         data=form.cleaned_data
         plan=data["plan"]
@@ -159,6 +183,16 @@ def signup(request):
         trial_end=now+timedelta(days=trial_days) if trial_days else None
         contracted=Decimal(str(_price(plan,cycle))).quantize(Decimal("0.01"))
         with transaction.atomic():
+            proposal=None
+            if data.get("proposal_token"):
+                proposal=Proposal.objects.select_for_update().filter(
+                    public_token=data["proposal_token"],status=Proposal.Status.CONVERTED,
+                    tenant__isnull=True,plan=plan,
+                ).first()
+                if not proposal:
+                    form.add_error("plan","Esta proposta já foi contratada ou expirou.")
+                    return render(request,"billing/signup.html",{"form":form,"selected_plan":selected})
+                contracted=proposal.final_price
             slug=_unique_slug(data["business_name"])
             tenant=Tenant.objects.create(
                 name=data["business_name"],slug=slug,public_slug=slug,
@@ -186,20 +220,24 @@ def signup(request):
                 trial_ends_at=trial_end,trial_days_snapshot=trial_days,
                 next_billing_at=trial_end or now,
             )
+            if proposal:
+                proposal.tenant=tenant
+                proposal.save(update_fields=["tenant","updated_at"])
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version
 
         needs_payment=(not plan.trial_without_card) or not trial_days
         if needs_payment:
             try:
+                payer_email=data.get("payment_email") or user.email
                 if data.get("payment_method")=="pix":
-                    create_platform_pix_charge(subscription=subscription,payer_email=user.email)
+                    create_platform_pix_charge(subscription=subscription,payer_email=payer_email)
                     return redirect("billing-subscription-pix")
                 remote=create_platform_subscription(
-                    subscription=subscription,payer_email=user.email,
+                    subscription=subscription,payer_email=payer_email,
                     back_url=request.build_absolute_uri("/billing/assinatura/"),
                     idempotency_key="signup-"+hashlib.sha256(
-                        f"{tenant.pk}|{subscription.pk}|{cycle}".encode()
+                        f"{tenant.pk}|{subscription.pk}|{cycle}|{payer_email}".encode()
                     ).hexdigest()[:56],
                 )
                 if remote.get("init_point"):
@@ -211,7 +249,7 @@ def signup(request):
                 )
         messages.success(request,"Conta criada. Bem-vindo ao ApPlanner.")
         return redirect("tenant-onboarding")
-    return render(request,"billing/signup.html",{"form":form,"selected_plan":selected})
+    return render(request,"billing/signup.html",{"form":form,"selected_plan":selected,"proposal":proposal})
 
 
 @login_required
@@ -239,8 +277,9 @@ def subscription_pix(request):
         return redirect("billing-subscription-status")
     if request.method=="POST":
         try:
-            create_platform_pix_charge(subscription=subscription,payer_email=request.user.email)
-        except (RuntimeError,ValueError) as exc:
+            payer_email=forms.EmailField().clean(request.POST.get("payment_email") or request.user.email)
+            create_platform_pix_charge(subscription=subscription,payer_email=payer_email)
+        except (RuntimeError,ValueError,ValidationError) as exc:
             messages.error(request,"Não foi possível gerar o Pix: "+str(exc))
             return redirect("billing-subscription-status")
         return redirect("billing-subscription-pix")
@@ -273,12 +312,13 @@ def subscription_checkout(request):
         messages.info(request,"Já existe uma autorização de cobrança iniciada. Entre em contato com o suporte se precisar de um novo link.")
         return redirect("billing-subscription-status")
     try:
+        payer_email=forms.EmailField().clean(request.POST.get("payment_email") or request.user.email)
         remote=create_platform_subscription(
-            subscription=subscription,payer_email=request.user.email,
+            subscription=subscription,payer_email=payer_email,
             back_url=request.build_absolute_uri("/billing/assinatura/"),
-            idempotency_key=f"customer-checkout-{subscription.pk}",
+            idempotency_key=f"customer-checkout-{subscription.pk}-"+hashlib.sha256(payer_email.encode()).hexdigest()[:16],
         )
-    except (RuntimeError,ValueError) as exc:
+    except (RuntimeError,ValueError,ValidationError) as exc:
         messages.error(request,"Não foi possível iniciar o pagamento: "+str(exc))
         return redirect("billing-subscription-status")
     url=remote.get("init_point") or ""

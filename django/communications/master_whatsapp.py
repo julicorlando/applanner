@@ -22,6 +22,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from tenants.models import Tenant
+from commercial.models import Lead, LeadHistory
+from commercial.models import Proposal
+from django.urls import reverse
 from .models import (MasterWhatsAppConversation,MasterWhatsAppMessage,
     MasterWhatsAppDeliveryEvent,MasterWhatsAppFlow)
 
@@ -154,7 +157,10 @@ def master_whatsapp_inbox(request):
 def master_whatsapp_status(request):
     _master(request)
     try:
-        return JsonResponse(_gateway("GET","/status"))
+        state=_gateway("GET","/status")
+        latest=MasterWhatsAppConversation.objects.order_by("-last_message_at").values_list("pk","last_message_at").first()
+        state["inbox_revision"]=f"{latest[0]}:{latest[1].isoformat()}" if latest else ""
+        return JsonResponse(state)
     except ValueError as exc:
         return JsonResponse({"state":"unavailable","error":str(exc)},status=503)
 
@@ -198,6 +204,48 @@ def master_whatsapp_conversation(request,pk):
                 row.tenant=tenant
                 row.save(update_fields=["tenant","updated_at"])
                 messages.success(request,"Empresa associada à conversa.")
+        elif action=="create_lead":
+            phone=row.wa_id.split("@")[0] if row.wa_id.endswith("@s.whatsapp.net") else ""
+            if not phone:
+                phone=re.sub(r"\D","",request.POST.get("phone", ""))
+            if not 10<=len(phone)<=15:
+                messages.error(request,"Informe o telefone com país e DDD para adicionar o contato ao Comercial.")
+            else:
+                with transaction.atomic():
+                    lead=Lead.objects.select_for_update().filter(phone=phone,anonymized_at__isnull=True).first()
+                    if not lead:
+                        lead=Lead.objects.create(
+                            name=row.contact_name or phone,phone=phone,email="",business_type="A identificar",
+                            source="whatsapp_master",status=Lead.Status.IN_SERVICE,
+                            assigned_to=request.user,assigned_at=timezone.now(),
+                        )
+                        LeadHistory.objects.create(lead=lead,action=LeadHistory.Action.CREATED,
+                            to_user=request.user,actor_user=request.user,notes="Contato iniciado no WhatsApp do Master")
+                messages.success(request,"Lead disponível no funil comercial.")
+                return redirect("commercial-lead-detail",pk=lead.pk)
+        elif action=="send_proposal":
+            proposal_id=request.POST.get("proposal_id","")
+            proposal=Proposal.objects.filter(pk=proposal_id).first() if proposal_id.isdecimal() else None
+            if (not proposal or proposal.approval_status in {Proposal.Approval.PENDING,Proposal.Approval.REJECTED}
+                or proposal.status in {Proposal.Status.CONVERTED,Proposal.Status.EXPIRED,Proposal.Status.CANCELLED}
+                or proposal.expires_at and proposal.expires_at<=timezone.now()):
+                messages.error(request,"Escolha uma proposta válida e aprovada para enviar.")
+            else:
+                link=request.build_absolute_uri(reverse("commercial-public-proposal",args=[proposal.public_token]))
+                body=f"Sua proposta ApPlanner: {proposal.title}\n{link}"
+                try:
+                    sent=_gateway("POST","/send",{"to":row.wa_id,"text":body})
+                    record_outbound_message(conversation=row,sent=sent,body=body,sent_by=request.user)
+                except (ValueError,KeyError) as exc:
+                    messages.error(request,str(exc))
+                else:
+                    if proposal.status==Proposal.Status.DRAFT:
+                        proposal.status=Proposal.Status.SENT
+                        proposal.save(update_fields=["status","updated_at"])
+                    row.human_handoff=True
+                    row.last_message_at=timezone.now()
+                    row.save(update_fields=["human_handoff","last_message_at","updated_at"])
+                    messages.success(request,"Link da proposta enviado por WhatsApp.")
         elif action=="handoff":
             row.human_handoff=request.POST.get("enabled")=="1"
             row.save(update_fields=["human_handoff","updated_at"])
@@ -231,6 +279,11 @@ def master_whatsapp_conversation(request,pk):
         "conversations":MasterWhatsAppConversation.objects.select_related("tenant")[:100],
         "tenants":Tenant.objects.filter(deleted_at__isnull=True).order_by("name")[:500],
         "flow_enabled":MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).exists(),
+        "lead":Lead.objects.filter(phone=row.wa_id.split("@")[0],anonymized_at__isnull=True).first()
+            if row.wa_id.endswith("@s.whatsapp.net") else None,
+        "proposals":Proposal.objects.exclude(status__in=[Proposal.Status.CONVERTED,Proposal.Status.EXPIRED,
+            Proposal.Status.CANCELLED]).exclude(approval_status__in=[Proposal.Approval.PENDING,
+            Proposal.Approval.REJECTED]).order_by("-created_at")[:50],
     })
 
 

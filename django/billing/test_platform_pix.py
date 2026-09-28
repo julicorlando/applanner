@@ -59,6 +59,25 @@ class PlatformPixTests(TestCase):
         self.assertEqual(self.subscription.status,Subscription.Status.PAST_DUE)
         self.assertEqual(self.client.post("/billing/assinatura/pagar/").url,"/billing/assinatura/pix/")
 
+    def test_separate_payer_email_is_sent_to_mercado_pago(self):
+        self.client.force_login(self.owner)
+        with patch("billing.payment_services.platform_provider") as provider:
+            provider.return_value.create_pix_order.return_value={
+                "order_id":"order-pix-1","payment_id":"pay-pix-1",
+                "qr_code":"000201PIX-VALIDO","qr_code_base64":"","status":"action_required",
+            }
+            response=self.client.post("/billing/assinatura/pix/",{"payment_email":"buyer@testuser.com"})
+        self.assertEqual(response.status_code,302)
+        self.assertEqual(provider.return_value.create_pix_order.call_args.kwargs["payer_email"],"buyer@testuser.com")
+
+    def test_invalid_payer_email_does_not_call_provider(self):
+        self.client.force_login(self.owner)
+        with patch("billing.payment_services.platform_provider") as provider:
+            response=self.client.post("/billing/assinatura/pix/",{"payment_email":"invalido"})
+        self.assertEqual(response.status_code,302)
+        self.assertFalse(PixCharge.objects.exists())
+        provider.assert_not_called()
+
     def test_only_verified_matching_order_activates_subscription(self):
         charge=self._charge()
         event=self._event()

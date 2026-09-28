@@ -8,6 +8,11 @@ import QRCode from 'qrcode';
 
 const secret = process.env.MASTER_WHATSAPP_GATEWAY_TOKEN || '';
 const callback = process.env.MASTER_WHATSAPP_CALLBACK_URL || '';
+// Django validates the public hostname and redirects insecure requests. The
+// callback still travels over the private Compose network to the web service.
+const publicUrl = process.env.MASTER_WHATSAPP_CALLBACK_HOST || '';
+let callbackHost = '';
+try { callbackHost = new URL(publicUrl).host; } catch { /* reported in status */ }
 const directory = '/app/session/auth';
 const pendingFile = '/app/session/pending.json';
 let socket;
@@ -15,22 +20,44 @@ let state = 'disconnected';
 let qr = null;
 let reconnect;
 let pending = [];
+let callbackError = '';
+let flushing = false;
 const logger = pino({ level: 'warn' });
 const contactJid = /^\d{10,20}@(s\.whatsapp\.net|lid)$/;
 
+function inboundText(message) {
+  const content = message?.ephemeralMessage?.message || message?.viewOnceMessageV2?.message || message || {};
+  return content.conversation || content.extendedTextMessage?.text ||
+    content.imageMessage?.caption || content.videoMessage?.caption ||
+    content.documentMessage?.caption || content.documentWithCaptionMessage?.message?.documentMessage?.caption ||
+    (content.imageMessage ? '[Imagem recebida no WhatsApp]' : '') ||
+    (content.audioMessage ? '[Áudio recebido no WhatsApp]' : '') ||
+    (content.documentMessage ? '[Documento recebido no WhatsApp]' : '') ||
+    (content.videoMessage ? '[Vídeo recebido no WhatsApp]' : '');
+}
+
 async function flush() {
-  if (!callback || !secret || !pending.length) return;
-  while (pending.length) {
+  if (flushing || !callback || !secret || !callbackHost || !pending.length) return;
+  flushing = true;
+  try { while (pending.length) {
     try {
       const response = await fetch(callback, {
-        method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${secret}`},
+        method: 'POST', redirect: 'manual', headers: {
+          'Content-Type': 'application/json', Authorization: `Bearer ${secret}`,
+          Host: callbackHost, 'X-Forwarded-Proto': 'https',
+        },
         body: JSON.stringify(pending[0]), signal: AbortSignal.timeout(8000),
       });
-      if (!response.ok) break;
+      if (!response.ok) {
+        callbackError = `O Django recusou a resposta recebida (HTTP ${response.status}).`;
+        logger.warn({ status: response.status }, 'Master WhatsApp callback rejected');
+        break;
+      }
       pending.shift();
       await fs.writeFile(pendingFile, JSON.stringify(pending), { mode: 0o600 });
-    } catch { break; }
-  }
+      callbackError = '';
+    } catch (error) { callbackError = 'Sem conexão com o Django para receber respostas.'; logger.warn({ error }, 'Master WhatsApp callback failed'); break; }
+  } } finally { flushing = false; }
 }
 
 async function connect() {
@@ -64,7 +91,7 @@ async function connect() {
       const from = [msg.key?.remoteJidAlt, msg.key?.remoteJid].find(jid => contactJid.test(jid || '') && jid.endsWith('@s.whatsapp.net'))
         || msg.key?.remoteJid;
       if (msg.key?.fromMe || !contactJid.test(from || '') || !msg.key?.id) continue;
-      pending.push({ from, id: msg.key.id, name: msg.pushName || '', text: msg.message?.conversation || msg.message?.extendedTextMessage?.text || '' });
+      pending.push({ from, id: msg.key.id, name: msg.pushName || '', text: inboundText(msg.message) });
       await fs.writeFile(pendingFile, JSON.stringify(pending), { mode: 0o600 });
     }
     await flush();
@@ -93,7 +120,10 @@ http.createServer(async (req, res) => {
     return reply(res, 403, { error: 'Acesso negado.' });
   }
   try {
-    if (req.method === 'GET' && req.url === '/status') return reply(res, 200, { state, qr });
+    if (req.method === 'GET' && req.url === '/status') return reply(res, 200, {
+      state, qr, pending: pending.length,
+      callbackError: callbackHost ? callbackError : 'Configure PUBLIC_BASE_URL com a URL pública HTTPS do ApPlanner.',
+    });
     if (req.method === 'POST' && req.url === '/connect') {
       await connect();
       return reply(res, 200, { state });

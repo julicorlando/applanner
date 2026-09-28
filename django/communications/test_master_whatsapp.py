@@ -11,6 +11,9 @@ from PIL import Image
 
 from accounts.models import User
 from tenants.models import Tenant
+from commercial.models import Lead
+from commercial.models import Proposal
+from billing.models import Plan
 from .models import MasterWhatsAppConversation,MasterWhatsAppMessage,MasterWhatsAppFlow
 
 
@@ -46,6 +49,67 @@ class MasterWhatsAppTests(TestCase):
         )
         self.assertEqual(response.status_code,200)
         self.assertEqual(MasterWhatsAppConversation.objects.get().wa_id,payload["from"])
+
+    @override_settings(ALLOWED_HOSTS=["applanner.example.test"],SECURE_SSL_REDIRECT=True)
+    def test_internal_gateway_callback_passes_host_and_https_validation(self):
+        event={"from":"5581999999999@s.whatsapp.net","id":"gateway-inbound-1","text":"Quero contratar"}
+        response=self.client.post(
+            reverse("master-whatsapp-receive"),data=json.dumps(event),content_type="application/json",
+            HTTP_HOST="applanner.example.test",HTTP_X_FORWARDED_PROTO="https",
+            HTTP_AUTHORIZATION="Bearer test-gateway-secret",
+        )
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(MasterWhatsAppMessage.objects.get(direction="in").body,"Quero contratar")
+
+    def test_master_can_create_lead_from_incoming_conversation_once(self):
+        row=MasterWhatsAppConversation.objects.create(
+            wa_id="5581999999999@s.whatsapp.net",contact_name="Barbearia Nova",last_message_at=timezone.now(),
+        )
+        self.client.force_login(self.master)
+        url=reverse("master-whatsapp-conversation",args=[row.pk])
+        self.assertContains(self.client.get(url),"Adicionar ao Comercial")
+        first=self.client.post(url,{"action":"create_lead"})
+        self.assertEqual(first.status_code,302)
+        lead=Lead.objects.get(phone="5581999999999")
+        self.assertEqual(first.url,reverse("commercial-lead-detail",args=[lead.pk]))
+        self.assertFalse(lead.consent_granted)
+        self.assertEqual(lead.status,Lead.Status.IN_SERVICE)
+        self.assertEqual(self.client.post(url,{"action":"create_lead"}).url,first.url)
+        self.assertEqual(Lead.objects.count(),1)
+        self.assertContains(self.client.get(url),"Abrir funil")
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.post(url,{"action":"create_lead"}).status_code,403)
+
+    def test_lid_contact_requires_phone_for_commercial_lead(self):
+        row=MasterWhatsAppConversation.objects.create(wa_id="123456789012345@lid",last_message_at=timezone.now())
+        self.client.force_login(self.master)
+        url=reverse("master-whatsapp-conversation",args=[row.pk])
+        self.client.post(url,{"action":"create_lead"})
+        self.assertFalse(Lead.objects.exists())
+        self.client.post(url,{"action":"create_lead","phone":"5581999999999"})
+        self.assertEqual(Lead.objects.get().phone,"5581999999999")
+
+    def test_master_sends_only_valid_approved_proposal_to_contact(self):
+        row=MasterWhatsAppConversation.objects.create(wa_id="5581999999999@s.whatsapp.net",last_message_at=timezone.now())
+        plan=Plan.objects.create(name="Plano Barbeiro",slug="barbeiro-proposal",monthly_price="90")
+        proposal=Proposal.objects.create(commercial_user=self.master,plan=plan,title="Plano para barbearia",
+            final_price="90",public_token="proposal-whatsapp-test-1234567890",
+            approval_status=Proposal.Approval.PENDING)
+        self.client.force_login(self.master)
+        url=reverse("master-whatsapp-conversation",args=[row.pk])
+        with patch("communications.master_whatsapp._gateway") as gateway:
+            self.client.post(url,{"action":"send_proposal","proposal_id":proposal.pk})
+            self.client.post(url,{"action":"send_proposal","proposal_id":"invalid"})
+            gateway.assert_not_called()
+        proposal.approval_status=Proposal.Approval.APPROVED
+        proposal.save(update_fields=["approval_status"])
+        with patch("communications.master_whatsapp._gateway",return_value={"id":"proposal-message-1","to":row.wa_id}) as gateway:
+            self.assertEqual(self.client.post(url,{"action":"send_proposal","proposal_id":proposal.pk}).status_code,302)
+        body=gateway.call_args.args[2]["text"]
+        self.assertIn(proposal.public_token,body)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.status,Proposal.Status.SENT)
+        self.assertEqual(row.messages.get().body,body)
 
     @patch("communications.master_whatsapp._gateway",side_effect=ValueError("Número não encontrado no WhatsApp"))
     def test_failed_send_does_not_claim_delivery_or_save_message(self,_):
