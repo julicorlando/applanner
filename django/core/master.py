@@ -114,7 +114,7 @@ MASTER_RESOURCES={
     "login-audit":{"model":"accounts.LoginAudit","title":"Auditoria de login","fields":[],"columns":["user","email_attempted","event_type","result","ip_address","created_at"],"order":"-created_at","create":False,"edit":False},
     "eventos-seguranca":{"model":"accounts.SecurityEvent","title":"Eventos de segurança","fields":[],"columns":["tenant","user","event_type","severity","ip_address","created_at"],"order":"-created_at","create":False,"edit":False},
     "bloqueios-usuarios":{"model":"accounts.UserBlock","title":"Bloqueios de usuários","fields":[],"columns":["user","reason_code","reason_text","blocked_at","expires_at","unblocked_at"],"order":"-blocked_at","create":False,"edit":False},
-    "onboarding":{"model":"tenants.TenantOnboarding","title":"Onboarding das empresas","fields":[],"columns":["tenant","company_done","branding_done","unit_done","professional_done","service_done","schedule_done","payment_done","public_page_done","completed_at"],"order":"tenant__name","create":False,"edit":False},
+    "onboarding":{"model":"tenants.TenantOnboarding","title":"Onboarding das empresas","fields":[],"columns":["tenant","company_done","branding_done","unit_done","professional_done","service_done","schedule_done","email_verification_waived_at","completed_at"],"order":"tenant__name","create":False,"edit":False},
     "historico-empresas":{"model":"tenants.TenantStatusHistory","title":"Histórico das empresas","fields":[],"columns":["tenant","from_status","to_status","reason","changed_by","created_at"],"order":"-created_at","create":False,"edit":False},
     "acessos-suporte":{"model":"operations.SupportAccessSession","title":"Acessos remotos de suporte","fields":[],"columns":["ticket","tenant","master_user","started_at","ended_at"],"order":"-started_at","create":False,"edit":False},
     "verificacoes-backup":{"model":"operations.BackupVerification","title":"Verificações de backup","fields":[],"columns":["backup","status","verification_type","verified_at"],"order":"-verified_at","create":False,"edit":False},
@@ -168,8 +168,10 @@ def platform_payment_gateway(request):
             messages.success(request,"Mercado Pago da plataforma validado e ativado.")
             return redirect("master-platform-payment")
     rows=PaymentGateway.objects.filter(provider="mercadopago").order_by("environment")
+    connected=rows.filter(active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED).exists()
     return render(request,"master/platform_payment.html",{
         "form":form,"gateways":rows,"webhook_url":webhook_url,
+        "connected":connected,"show_form":not connected or request.GET.get("alterar")=="1" or bool(form.errors),
     })
 
 

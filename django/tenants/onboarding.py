@@ -229,14 +229,16 @@ def onboarding(request):
         form=None
 
     if request.method=="POST" and step=="verification":
-        if not request.user.email_verified_at:
-            messages.error(request,"Confirme seu e-mail para concluir o cadastro.")
+        if not (request.user.email_verified_at or row.email_verification_waived_at):
+            messages.error(request,"Confirme seu e-mail ou solicite ao suporte a dispensa pelo Master para concluir o cadastro.")
         elif not (unit and service and professional and ProfessionalAvailability.objects.filter(tenant=tenant,professional=professional,active=True).exists()):
             messages.error(request,"Faltam dados de unidade, serviço, profissional ou horários. Contate o suporte.")
         else:
             with transaction.atomic():
                 row=TenantOnboarding.objects.select_for_update().get(tenant=tenant)
-                if all(getattr(row,flag) for flag,_ in STEPS):
+                if all(getattr(row,flag) for flag,_ in STEPS) and (
+                    request.user.email_verified_at or row.email_verification_waived_at
+                ):
                     tenant.public_enabled=request.POST.get("publish")=="on"
                     tenant.save(update_fields=["public_enabled","updated_at"])
                     row.public_page_done=True
@@ -292,4 +294,5 @@ def onboarding(request):
         "tenant":tenant,"step":step,"label":label,"form":form,
         "progress":sum(bool(getattr(row,flag)) for flag,_ in STEPS),
         "total":len(STEPS)+1,"verified":bool(request.user.email_verified_at),
+        "email_waived":bool(row.email_verification_waived_at),
     })

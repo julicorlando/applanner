@@ -234,6 +234,21 @@ class PlatformSetting(models.Model):
         indexes=[models.Index(fields=["key"],name="ops_setting_key_idx")]
 
 
+class PlatformSMTPSettings(models.Model):
+    """One encrypted platform-wide mail configuration, editable only by Master."""
+    id=models.PositiveSmallIntegerField(primary_key=True,default=1,editable=False)
+    host=models.CharField(max_length=255)
+    port=models.PositiveIntegerField(default=587)
+    username=models.CharField(max_length=255,blank=True)
+    password_encrypted=models.TextField(blank=True)
+    from_email=models.EmailField()
+    use_tls=models.BooleanField(default=True)
+    use_ssl=models.BooleanField(default=False)
+    enabled=models.BooleanField(default=False)
+    updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,on_delete=models.SET_NULL,related_name="+")
+    updated_at=models.DateTimeField(auto_now=True)
+
+
 class LegacyRuntimeJob(models.Model):
     """Snapshot da fila PHP antiga. Nunca é executado pelo Celery."""
     tenant=models.ForeignKey(

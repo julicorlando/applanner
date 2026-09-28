@@ -117,7 +117,6 @@ services:
     environment:
       MASTER_WHATSAPP_GATEWAY_TOKEN: ${MASTER_WHATSAPP_GATEWAY_TOKEN:-}
       MASTER_WHATSAPP_CALLBACK_URL: http://web:8000/master/whatsapp/receber/
-      MASTER_WHATSAPP_CALLBACK_HOST: ${PUBLIC_BASE_URL:-}
     volumes:
       - master_whatsapp_session:/app/session
     expose:

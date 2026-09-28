@@ -11,7 +11,7 @@ from scheduling.public_views import appointment_page
 from scheduling.public_api import (
     CustomerAppointmentAPIView,
     PublicAvailabilityAPIView,
-    PublicBookingAPIView,
+    PublicBookingAPIView, PublicWaitlistAPIView,
 )
 
 urlpatterns = [
@@ -51,6 +51,7 @@ urlpatterns = [
     path("api/scheduling/", include("scheduling.urls")),
     path("api/public/<slug:slug>/availability/", PublicAvailabilityAPIView.as_view(), name="public-availability"),
     path("api/public/<slug:slug>/book/", PublicBookingAPIView.as_view(), name="public-booking"),
+    path("api/public/<slug:slug>/waitlist/", PublicWaitlistAPIView.as_view(), name="public-waitlist"),
     path("api/public/appointments/<str:token>/", CustomerAppointmentAPIView.as_view(), name="public-appointment-manage"),
     path("webhooks/mercadopago/", mercadopago_platform_webhook, name="mercadopago-platform-webhook"),
     path("webhooks/tenant/mercadopago/<slug:slug>/", mercadopago_tenant_webhook, name="mercadopago-tenant-webhook"),

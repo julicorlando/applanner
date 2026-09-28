@@ -8,11 +8,12 @@ import QRCode from 'qrcode';
 
 const secret = process.env.MASTER_WHATSAPP_GATEWAY_TOKEN || '';
 const callback = process.env.MASTER_WHATSAPP_CALLBACK_URL || '';
-// Django validates the public hostname and redirects insecure requests. The
-// callback still travels over the private Compose network to the web service.
-const publicUrl = process.env.MASTER_WHATSAPP_CALLBACK_HOST || '';
 let callbackHost = '';
-try { callbackHost = new URL(publicUrl).host; } catch { /* reported in status */ }
+try {
+  const target = new URL(callback);
+  // Prevent posting the internal bearer token to a public or unexpected host.
+  if (target.protocol === 'http:' && target.hostname === 'web' && target.port === '8000') callbackHost = target.host;
+} catch { /* reported in status */ }
 const directory = '/app/session/auth';
 const pendingFile = '/app/session/pending.json';
 let socket;
@@ -129,7 +130,7 @@ http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && req.url === '/status') return reply(res, 200, {
       state, qr, pending: pending.length,
-      callbackError: callbackHost ? callbackError : 'Configure PUBLIC_BASE_URL com a URL pública HTTPS do ApPlanner.',
+      callbackError: callbackHost ? callbackError : 'O callback interno precisa apontar para web:8000 no Compose.',
     });
     if (req.method === 'POST' && req.url === '/connect') {
       await connect();

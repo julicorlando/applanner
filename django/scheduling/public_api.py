@@ -21,6 +21,56 @@ class PublicBookingThrottle(throttling.AnonRateThrottle):
     rate="20/min"
 
 
+class PublicWaitlistAPIView(APIView):
+    permission_classes=[permissions.AllowAny]
+    throttle_classes=[PublicBookingThrottle]
+
+    @transaction.atomic
+    def post(self,request,slug):
+        from engagement.models import WaitlistEntry
+        from billing.segment_access import require_feature
+        from django.core.exceptions import PermissionDenied
+        tenant=_tenant(slug)
+        if not tenant:
+            return Response({"detail":"Página não encontrada."},status=404)
+        try:
+            require_feature(tenant,"waitlist")
+        except PermissionDenied:
+            return Response({"detail":"A lista de espera não está disponível neste plano."},status=403)
+        try:
+            service=Service.objects.get(tenant=tenant,pk=int(request.data["service_id"]),active=True)
+            day=date.fromisoformat(str(request.data["date"]))
+            professional_id=str(request.data.get("professional_id") or "").strip()
+            professional=(Professional.objects.get(tenant=tenant,pk=int(professional_id),active=True)
+                          if professional_id else None)
+        except (KeyError,ValueError,TypeError,Service.DoesNotExist,Professional.DoesNotExist):
+            return Response({"detail":"Serviço, profissional ou data inválidos."},status=400)
+        if day<timezone.localdate() or day>timezone.localdate()+timedelta(days=90):
+            return Response({"detail":"Escolha uma data entre hoje e os próximos 90 dias."},status=400)
+        availability=AvailabilityService()
+        candidates=[professional] if professional else _candidate_professionals(tenant,service)
+        if any(availability.professional_offers(tenant,item.pk,service.pk) and availability.slots(
+            tenant=tenant,service_id=service.pk,professional_id=item.pk,day=day,public_rules=True,
+        ) for item in candidates):
+            return Response({"detail":"Ainda há horários disponíveis nesta data. Escolha um horário para agendar."},status=409)
+        name=str(request.data.get("name") or "").strip()[:150]
+        phone=str(request.data.get("phone") or "").strip()[:32]
+        email=str(request.data.get("email") or "").strip().lower()[:254]
+        if len(name)<2 or not (phone or email):
+            return Response({"detail":"Informe nome e pelo menos telefone ou e-mail."},status=400)
+        # Lock tenant so concurrent submissions cannot create duplicate waiting entries.
+        Tenant.objects.select_for_update().get(pk=tenant.pk)
+        customer=(Customer.objects.filter(tenant=tenant,email=email).first() if email else None)
+        if not customer and phone:
+            customer=Customer.objects.filter(tenant=tenant,phone=phone).first()
+        if not customer:
+            customer=Customer.objects.create(tenant=tenant,name=name,email=email,phone=phone)
+        entry,created=WaitlistEntry.objects.get_or_create(tenant=tenant,customer=customer,service=service,
+            professional=professional,preferred_date=day,status=WaitlistEntry.Status.WAITING)
+        return Response({"detail":"Você entrou na lista de espera. O estabelecimento entrará em contato se surgir um horário.",
+            "id":entry.pk},status=201 if created else 200)
+
+
 def _tenant(slug):
     from django.db.models import Q
     return Tenant.objects.filter(

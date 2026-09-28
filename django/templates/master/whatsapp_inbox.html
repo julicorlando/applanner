@@ -14,6 +14,10 @@
       <form method="post" action="{% url 'master-whatsapp-disconnect' %}" style="display:inline" onsubmit="return confirm('Desvincular o WhatsApp do Master?')">{% csrf_token %}<button class="button ghost">Desvincular</button></form>
     {% else %}<p>Defina <code>MASTER_WHATSAPP_GATEWAY_TOKEN</code> nas variáveis do Coolify e publique novamente para ativar o pareamento.</p>{% endif %}
   </div>
+  <div class="panel" style="margin:16px"><h2>Contatos cadastrados</h2><p>Empresas e leads que autorizaram contato. Escolha um contato para abrir o atendimento.</p>
+    <h3>Empresas</h3>{% for contact in companies %}<form method="post" class="module-row">{% csrf_token %}<input type="hidden" name="tenant_id" value="{{ contact.pk }}"><strong>{{ contact.name }}</strong><small>{{ contact.phone }}</small><button class="button ghost" type="submit">Conversar</button></form>{% empty %}<p class="empty">Nenhuma empresa com telefone.</p>{% endfor %}
+    <h3>Leads com consentimento</h3>{% for contact in leads %}<form method="post" class="module-row">{% csrf_token %}<input type="hidden" name="lead_id" value="{{ contact.pk }}"><strong>{{ contact.name }}</strong><small>{{ contact.phone }}</small><button class="button ghost" type="submit">Conversar</button></form>{% empty %}<p class="empty">Nenhum lead apto para contato.</p>{% endfor %}
+  </div>
   <div class="panel" style="margin:16px"><h2>Iniciar conversa</h2><p>Use o número com código do país e DDD. Exemplo: 5581999999999.</p><form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="start-phone">WhatsApp</label><input id="start-phone" name="phone" type="tel" required></div><div class="form-field"><label for="start-name">Nome (opcional)</label><input id="start-name" name="name"></div><div class="form-actions"><button class="button primary">Abrir atendimento</button></div></form></div>
 </div></div>
 </section>

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}E-mail SMTP — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">COMUNICAÇÃO DA PLATAFORMA</span><h1>E-mail e SMTP</h1><p>Configure o envio de confirmações, recuperação de conta e mensagens da plataforma.</p></div></div>
+  {% if not backend_supported %}<p class="panel">O backend de e-mail definido no Coolify não usa o SMTP do painel. Selecione o backend SMTP padrão ou <code>applanner.email_backend.PlatformEmailBackend</code> em <code>EMAIL_BACKEND</code>.</p>{% endif %}
+  <article class="panel" style="margin-bottom:18px"><h2>Estado</h2><p>{% if configured and configured.enabled %}Configuração SMTP ativa{% else %}Configuração SMTP inativa{% endif %}{% if configured %} · atualizada em {{ configured.updated_at|date:'d/m/Y H:i' }}{% endif %}</p><p>A senha é armazenada criptografada e nunca volta ao formulário. Para mantê-la, deixe o campo de senha vazio. Para trocá-la, digite uma nova.</p></article>
+  <article class="panel"><h2>Servidor de envio</h2><form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="save">
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}<div class="form-field {% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}">{{ field.label_tag }}{{ field }}{% if field.name == 'password' and has_password %}<small>Senha cadastrada. Deixe vazio para manter.</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    <p class="payment-hint">Para a porta 587, marque STARTTLS. Para a porta 465, marque SSL direto. O endereço remetente deve ser autorizado pelo seu provedor.</p><button type="submit" class="button primary">Salvar configuração</button>
+  </form></article>
+  {% if configured and configured.enabled %}<article class="panel" style="margin-top:18px"><h2>Testar entrega</h2><p>Envie uma mensagem de teste ao seu e-mail Master: <strong>{{ request.user.email }}</strong>.</p><form method="post">{% csrf_token %}<input type="hidden" name="action" value="test"><button class="button ghost" type="submit">Enviar e-mail de teste</button></form></article>{% endif %}
+</section>
+{% endblock %}

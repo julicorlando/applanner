@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}ApPlanner — seu negócio, no ritmo certo{% endblock %}
+{% block title %}ApPlanner — mais agendamentos, menos horários vazios{% endblock %}
 {% block content %}
 <section class="marketing-hero shell">
   <div class="hero-copy">
-    <span class="eyebrow">AGENDA · OPERAÇÃO · RELACIONAMENTO</span>
+    <span class="eyebrow">PARA QUEM QUER VENDER MAIS E ATENDER MELHOR</span>
     <h1>{{ platform_branding.hero_title|default:"Transforme horários livres em clientes." }}</h1>
     <p class="lead">{{ platform_branding.hero_description|default:"Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar." }} Experimente grátis pelo período indicado no plano escolhido.</p>
     <div class="actions">
-      <a class="button primary" href="{% url 'billing-plans' %}">Conhecer os planos</a>
+      <a class="button primary" href="#planos">Ver planos e começar</a>
       <a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
       <a class="button ghost" href="/account/login/">Já tenho conta</a>
     </div>
@@ -15,11 +15,11 @@
       <span>Multiempresa</span><span>Pagamentos integrados</span><span>Automação</span><span>LGPD</span>
     </div>
   </div>
-  <div class="product-window" aria-label="Resumo visual do ApPlanner">
+    <div class="product-window" aria-label="Exemplo ilustrativo do painel ApPlanner">
     <div class="window-head"><span></span><span></span><span></span><b>Hoje</b></div>
     <div class="window-stats">
-      <div><small>Agenda</small><strong>12</strong><span>atendimentos</span></div>
-      <div><small>Ocupação</small><strong>84%</strong><span>da equipe</span></div>
+      <div><small>Agenda</small><strong>✓</strong><span>horários online</span></div>
+      <div><small>Ocupação</small><strong>↗</strong><span>visão da equipe</span></div>
       <div><small>Receita</small><strong>↑</strong><span>visão em tempo real</span></div>
     </div>
     <div class="agenda-preview">

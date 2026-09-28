@@ -1,6 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 import hashlib
+from secrets import token_hex
 
 from django import forms
 from django.contrib import messages
@@ -10,13 +11,14 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404,redirect,render
+from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.utils.text import slugify
 
 from accounts.models import PlatformRole,UserRole
 from tenants.models import Tenant,Unit,TenantOnboarding
-from .models import Module,ModuleRequest,Plan,Subscription,TenantModuleAddon,PixCharge,Payment
-from .payment_services import create_platform_subscription,create_platform_pix_charge
+from .models import Module,ModuleRequest,Plan,Subscription,SubscriptionHistory,TenantModuleAddon,PixCharge,Payment,PaymentGateway
+from .payment_services import create_platform_subscription,create_platform_pix_charge,platform_provider
 from .module_services import cancel_module_addon,request_module
 from commercial.models import Proposal
 
@@ -263,7 +265,79 @@ def subscription_status(request):
         subscription=subscription,payment__status=Payment.Status.PENDING,
         expires_at__gt=timezone.now(),
     ).order_by("-created_at").first() if subscription else None)
-    return render(request,"billing/subscription_status.html",{"subscription":subscription,"pix_charge":pix_charge})
+    from operations.models import SupportTicket
+    pending_deletion=(SupportTicket.objects.filter(tenant_id=request.user.tenant_id,
+        category="account_deletion").exclude(status__in=[SupportTicket.Status.CLOSED,SupportTicket.Status.RESOLVED])
+        .order_by("-created_at").first() if request.user.tenant_id else None)
+    return render(request,"billing/subscription_status.html",{"subscription":subscription,"pix_charge":pix_charge,
+        "pending_deletion":pending_deletion,"can_manage":request.user.tenant_id and request.user.role=="owner"})
+
+
+@login_required
+@require_POST
+def cancel_platform_subscription(request):
+    if not request.user.tenant_id or request.user.role!="owner":
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Somente o titular pode cancelar a assinatura.")
+    if not request.user.check_password(request.POST.get("password", "")):
+        messages.error(request,"Senha incorreta. A assinatura não foi alterada.")
+        return redirect("billing-subscription-status")
+    with transaction.atomic():
+        subscription=(Subscription.objects.select_for_update().filter(tenant_id=request.user.tenant_id)
+                      .order_by("-started_at").first())
+        if not subscription or subscription.status==Subscription.Status.CANCELLED:
+            messages.info(request,"Esta assinatura já está cancelada.")
+            return redirect("billing-subscription-status")
+        if subscription.provider_subscription_id:
+            gateway=PaymentGateway.objects.filter(provider="mercadopago",active=True,
+                last_test_status=PaymentGateway.TestStatus.VALIDATED).first()
+            if not gateway:
+                messages.error(request,"Conexão do Mercado Pago indisponível. Abra um chamado antes de cancelar.")
+                return redirect("billing-subscription-status")
+            try:
+                remote=platform_provider(gateway).cancel_subscription(subscription.provider_subscription_id)
+                if remote.get("status") not in {"canceled","cancelled"}:
+                    raise RuntimeError("Cancelamento não confirmado pelo Mercado Pago.")
+            except (RuntimeError,ValueError):
+                messages.error(request,"O Mercado Pago não confirmou o cancelamento. Sua assinatura não foi alterada; contate o suporte.")
+                return redirect("billing-subscription-status")
+        previous=subscription.status
+        subscription.status=Subscription.Status.CANCELLED
+        subscription.cancelled_at=timezone.now()
+        subscription.next_billing_at=None
+        subscription.provider_checkout_url=""
+        subscription.save(update_fields=["status","cancelled_at","next_billing_at","provider_checkout_url","updated_at"])
+        SubscriptionHistory.objects.create(subscription=subscription,tenant=subscription.tenant,
+            from_plan=subscription.plan,to_plan=subscription.plan,from_status=previous,
+            to_status=subscription.status,reason="Cancelamento solicitado pelo titular")
+    messages.success(request,"Assinatura cancelada. Os pagamentos anteriores e seus dados permanecem registrados.")
+    return redirect("billing-subscription-status")
+
+
+@login_required
+@require_POST
+def request_account_deletion(request):
+    if not request.user.tenant_id or request.user.role!="owner":
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Somente o titular pode solicitar a exclusão da conta da empresa.")
+    if not request.user.check_password(request.POST.get("password", "")):
+        messages.error(request,"Senha incorreta. Nenhuma solicitação foi criada.")
+        return redirect("billing-subscription-status")
+    from operations.models import SupportTicket
+    from operations.triage import classify_priority
+    with transaction.atomic():
+        pending=SupportTicket.objects.select_for_update().filter(tenant_id=request.user.tenant_id,
+            category="account_deletion").exclude(status__in=[SupportTicket.Status.CLOSED,SupportTicket.Status.RESOLVED]).first()
+        if pending:
+            messages.info(request,f"Solicitação em análise: {pending.protocol}.")
+        else:
+            ticket=SupportTicket.objects.create(protocol="EX-"+token_hex(8).upper(),
+                tenant=request.user.tenant,user=request.user,category="account_deletion",
+                subject="Solicitação de exclusão de conta e dados",
+                description=(request.POST.get("reason") or "Titular solicitou exclusão da conta.")[:2000],
+                priority=classify_priority("privacidade","Solicitação de exclusão de conta",""))
+            messages.success(request,f"Pedido {ticket.protocol} recebido. A equipe analisará dados, pagamentos e obrigações de conservação antes de concluir a exclusão.")
+    return redirect("billing-subscription-status")
 
 
 @login_required

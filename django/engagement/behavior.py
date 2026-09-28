@@ -54,12 +54,13 @@ def _defaults(stats):
 
 @transaction.atomic
 def refresh_behavior_for_tenant(tenant):
+    scheduled=Appointment.objects.filter(tenant=tenant).exclude(status=Appointment.Status.CANCELLED)
     completed=(
         Appointment.objects.filter(tenant=tenant,status=Appointment.Status.COMPLETED)
         .select_related("customer","service").order_by("customer_id","starts_at")
     )
-    customer_ids=set(completed.values_list("customer_id",flat=True))
-    service_pairs=set(completed.values_list("customer_id","service_id"))
+    customer_ids=set(scheduled.values_list("customer_id",flat=True))
+    service_pairs=set(scheduled.values_list("customer_id","service_id"))
 
     updated=0
     for customer_id in customer_ids:
@@ -78,7 +79,7 @@ def refresh_behavior_for_tenant(tenant):
         updated+=1
 
     BehaviorProfile.objects.filter(tenant=tenant).exclude(customer_id__in=customer_ids).delete()
-    BehaviorServiceProfile.objects.filter(tenant=tenant).exclude(
-        customer_id__in=customer_ids
-    ).delete()
+    for profile in BehaviorServiceProfile.objects.filter(tenant=tenant).iterator():
+        if (profile.customer_id,profile.service_id) not in service_pairs:
+            profile.delete()
     return updated

@@ -90,7 +90,7 @@ No Coolify, defina `MASTER_WHATSAPP_GATEWAY_TOKEN` com um segredo aleatório lon
 
 Esta conexão usa a biblioteca Baileys para vincular um dispositivo do WhatsApp Web. Ela é independente da integração oficial Cloud API dos estabelecimentos e depende da disponibilidade e do protocolo do WhatsApp Web; mudanças no protocolo podem exigir atualização do gateway. O chatbot por estabelecimento continua na integração Cloud API existente. Para testar a integração real, é preciso publicar o Compose, ler o QR code com um número do Master e trocar mensagens de teste.
 
-Para receber respostas no Coolify, configure `PUBLIC_BASE_URL=https://applanner.axionwebdigital.com.br`. O Django inclui automaticamente esse domínio HTTPS entre os hosts aceitos para o callback interno, inclusive quando `DJANGO_ALLOWED_HOSTS` omitir o domínio. O gateway faz o callback para `web:8000` na rede privada com o Host público e indica na caixa de entrada quantas mensagens aguardam e se o Django recusou o callback. Após o deploy, envie uma mensagem **de outro número para o número pareado** e confira Master → WhatsApp do Master. Conversas de novos contatos podem virar leads no funil por meio de **Adicionar ao Comercial**. Para contato `@lid`, informe o telefone antes de registrar o lead.
+Para receber respostas no Coolify, configure `PUBLIC_BASE_URL=https://applanner.axionwebdigital.com.br`. O gateway chama `web:8000` na rede privada com o Host interno `web`, autorizado pelo Django quando o token do gateway está configurado. Inclua o domínio público em `DJANGO_ALLOWED_HOSTS` para acesso pelo navegador e indica na caixa de entrada quantas mensagens aguardam e se o Django recusou o callback. Após o deploy, envie uma mensagem **de outro número para o número pareado** e confira Master → WhatsApp do Master. Conversas de novos contatos podem virar leads no funil por meio de **Adicionar ao Comercial**. Para contato `@lid`, informe o telefone antes de registrar o lead.
 
 Se o Mercado Pago recusar uma compra porque pagador e recebedor são a mesma conta, informe outro **e-mail do pagador** no cadastro ou em **Meu plano e pagamento**. Na homologação, configure as credenciais da conta vendedora e pague com uma conta compradora de teste diferente. A conta já criada pode continuar pelo link de **Meu plano e pagamento**; nenhum pagamento é confirmado sem retorno do provedor e verificação do webhook.
 
@@ -163,3 +163,11 @@ volume persistente `media` e a rota de download requer superusuário. O fluxo é
 executado pelo Celery e retomado pelo beat quando a fila estiver disponível.
 Valide envio, entrega, leitura e transferência com o número real pareado antes
 de assumir esses estados como homologados em produção.
+
+## Gestão de conta e comunicação
+
+O proprietário gerencia o plano em `/billing/assinatura/`: pode cancelar a assinatura com confirmação de senha ou solicitar exclusão da conta. A exclusão abre um chamado para análise; não elimina automaticamente dados financeiros, uploads nem cancela a assinatura. O Master acompanha o pedido nos chamados. Para assinatura por cartão, o cancelamento só é registrado após a confirmação do Mercado Pago; pagamentos via Pix continuam no histórico.
+
+O Master pode dispensar a confirmação de e-mail no cadastro de uma empresa pelo recurso **Onboarding → Verificação e publicação**. A dispensa não valida o endereço informado. SMTP pode ser configurado e testado em **Master → E-mail e SMTP** sem revelar a senha; a configuração ativa do painel tem prioridade sobre as variáveis `EMAIL_*` do Coolify.
+
+A lista de espera no agendamento público aparece após a consulta retornar zero horários e só aceita pedidos para uma data sem disponibilidade, respeitando o módulo contratado. A inteligência de retorno cria perfil no primeiro agendamento, sem contar visita ou disparar marketing antes de atendimento concluído e consentimento.

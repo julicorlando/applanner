@@ -17,12 +17,15 @@ PUBLIC_BASE_URL = env("PUBLIC_BASE_URL",default="")
 _public_host = public_allowed_host(PUBLIC_BASE_URL)
 if _public_host and _public_host not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(_public_host)
+if MASTER_WHATSAPP_GATEWAY_TOKEN and "web" not in ALLOWED_HOSTS:
+    # The gateway calls the web service over the private Compose network.
+    ALLOWED_HOSTS.append("web")
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 
 INSTALLED_APPS = [
     "django.contrib.admin","django.contrib.auth","django.contrib.contenttypes",
     "django.contrib.sessions","django.contrib.messages","django.contrib.staticfiles",
-    "rest_framework","django_celery_beat","core","tenants","accounts","scheduling","billing",
+    "rest_framework","django_celery_beat","core","tenants","accounts","scheduling.apps.SchedulingConfig","billing",
     "finance","communications","barber","arena","engagement","auto","commercial","healthcare","legal","operations","growth","contenthub",
 ]
 MIDDLEWARE = [
@@ -118,6 +121,8 @@ CELERY_WORKER_PREFETCH_MULTIPLIER=1
 CELERY_BEAT_SCHEDULER="django_celery_beat.schedulers:DatabaseScheduler"
 
 EMAIL_BACKEND=env("EMAIL_BACKEND",default="django.core.mail.backends.smtp.EmailBackend")
+if EMAIL_BACKEND=="django.core.mail.backends.smtp.EmailBackend":
+    EMAIL_BACKEND="applanner.email_backend.PlatformEmailBackend"
 EMAIL_HOST=env("EMAIL_HOST",default="")
 EMAIL_PORT=env.int("EMAIL_PORT",default=587)
 EMAIL_HOST_USER=env("EMAIL_HOST_USER",default="")

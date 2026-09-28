@@ -100,7 +100,7 @@ class MercadoPagoProvider:
         })
 
     def cancel_subscription(self,reference):
-        return self._request("PUT",f"/preapproval/{reference}",{"status":"cancelled"})
+        return self._request("PUT",f"/preapproval/{reference}",{"status":"canceled"})
 
     def get_payment(self,reference):
         return self._request("GET",f"/v1/payments/{reference}")

@@ -18,6 +18,7 @@ from django.db.models import Q
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
+from applanner.email_backend import active_smtp_settings
 
 from .models import EmailVerificationToken, LoginAudit, LoginHistory, PasswordResetToken, SecurityEvent
 from .security import (
@@ -279,12 +280,16 @@ def send_verification(request):
     if request.user.email_verified_at:
         messages.info(request,"Seu e-mail já está verificado.")
         return redirect(settings.LOGIN_REDIRECT_URL)
-    if settings.EMAIL_BACKEND=="django.core.mail.backends.smtp.EmailBackend":
-        if not settings.EMAIL_HOST or (bool(settings.EMAIL_HOST_USER)!=bool(settings.EMAIL_HOST_PASSWORD)):
+    if settings.EMAIL_BACKEND in {"django.core.mail.backends.smtp.EmailBackend","applanner.email_backend.PlatformEmailBackend"}:
+        smtp=active_smtp_settings() if settings.EMAIL_BACKEND=="applanner.email_backend.PlatformEmailBackend" else None
+        if not (smtp.host if smtp else settings.EMAIL_HOST) or (
+            bool(smtp.username if smtp else settings.EMAIL_HOST_USER)
+            !=bool(smtp.password_encrypted if smtp else settings.EMAIL_HOST_PASSWORD)
+        ):
             logger.error("SMTP incompleto: EMAIL_HOST e credenciais SMTP precisam ser configurados no Coolify")
             messages.error(request,"O envio de e-mails ainda não está configurado. Contate o suporte para ativar a confirmação.")
             return redirect("tenant-onboarding" if request.user.tenant_id else settings.LOGIN_REDIRECT_URL)
-        if settings.EMAIL_USE_TLS and settings.EMAIL_USE_SSL:
+        if (smtp.use_tls if smtp else settings.EMAIL_USE_TLS) and (smtp.use_ssl if smtp else settings.EMAIL_USE_SSL):
             logger.error("SMTP inválido: EMAIL_USE_TLS e EMAIL_USE_SSL não podem estar ativos ao mesmo tempo")
             messages.error(request,"A configuração de segurança do e-mail está inválida. Contate o suporte.")
             return redirect("tenant-onboarding" if request.user.tenant_id else settings.LOGIN_REDIRECT_URL)

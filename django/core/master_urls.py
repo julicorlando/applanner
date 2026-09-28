@@ -2,10 +2,13 @@ from django.urls import path
 from . import master
 from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment
+from .master_email import smtp_settings,waive_onboarding_email
 
 urlpatterns=[
     path("pagina-inicial/",platform_homepage,name="master-homepage"),
     path("pagamentos/mercado-pago/",master.platform_payment_gateway,name="master-platform-payment"),
+    path("email/smtp/",smtp_settings,name="master-smtp-settings"),
+    path("onboarding/<int:pk>/dispensa-email/",waive_onboarding_email,name="master-onboarding-waive-email"),
     path("whatsapp/",master.master_whatsapp_inbox,name="master-whatsapp"),
     path("whatsapp/estado/",master.master_whatsapp_status,name="master-whatsapp-status"),
     path("whatsapp/parear/",master.master_whatsapp_connect,name="master-whatsapp-connect"),

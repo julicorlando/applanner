@@ -133,21 +133,36 @@ def _gateway(method, path, payload=None):
 def master_whatsapp_inbox(request):
     _master(request)
     if request.method=="POST":
-        number=re.sub(r"\D","",request.POST.get("phone", ""))
+        lead_id=request.POST.get("lead_id","")
+        tenant_id=request.POST.get("tenant_id","")
+        lead=Lead.objects.filter(pk=lead_id,consent_granted=True,do_not_contact=False,
+            anonymized_at__isnull=True).first() if lead_id.isdecimal() else None
+        tenant=Tenant.objects.filter(pk=tenant_id,deleted_at__isnull=True).first() if tenant_id.isdecimal() else None
+        if (lead_id and not lead) or (tenant_id and not tenant) or (lead_id and tenant_id):
+            messages.error(request,"Contato indisponível para atendimento.")
+            return redirect("master-whatsapp")
+        number=re.sub(r"\D","",lead.phone if lead else tenant.phone if tenant else request.POST.get("phone", ""))
         if not 10<=len(number)<=15:
             messages.error(request,"Informe um telefone com DDD e código do país, somente números.")
             return redirect("master-whatsapp")
         wa_id=number+"@s.whatsapp.net"
         row,_=MasterWhatsAppConversation.objects.get_or_create(
-            wa_id=wa_id,defaults={"contact_name":(request.POST.get("name") or "")[:150],"last_message_at":timezone.now()},
+            wa_id=wa_id,defaults={"contact_name":(lead.name if lead else tenant.name if tenant else request.POST.get("name") or "")[:150],
+                "tenant":tenant,"last_message_at":timezone.now()},
         )
         return redirect("master-whatsapp-conversation",pk=row.pk)
     q=(request.GET.get("q") or "").strip()[:80]
     rows=MasterWhatsAppConversation.objects.select_related("tenant")
     if q:
         rows=rows.filter(Q(contact_name__icontains=q)|Q(wa_id__icontains=q)|Q(tenant__name__icontains=q))
+    leads=Lead.objects.filter(consent_granted=True,do_not_contact=False,anonymized_at__isnull=True)
+    companies=Tenant.objects.filter(deleted_at__isnull=True).exclude(phone="")
+    if q:
+        leads=leads.filter(Q(name__icontains=q)|Q(phone__icontains=q))
+        companies=companies.filter(Q(name__icontains=q)|Q(phone__icontains=q))
     return render(request,"master/whatsapp_inbox.html",{
         "rows":rows[:200],"q":q,
+        "leads":leads.order_by("-created_at")[:50],"companies":companies.order_by("name")[:50],
         "configured":bool(settings.MASTER_WHATSAPP_GATEWAY_TOKEN and settings.MASTER_WHATSAPP_GATEWAY_URL),
     })
 

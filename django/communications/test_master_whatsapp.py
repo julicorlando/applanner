@@ -59,12 +59,12 @@ class MasterWhatsAppTests(TestCase):
         self.assertIn("identificador do contato",response.json()["error"])
         self.assertFalse(MasterWhatsAppMessage.objects.exists())
 
-    @override_settings(ALLOWED_HOSTS=["applanner.example.test"],SECURE_SSL_REDIRECT=True)
+    @override_settings(ALLOWED_HOSTS=["web"],SECURE_SSL_REDIRECT=True)
     def test_internal_gateway_callback_passes_host_and_https_validation(self):
         event={"from":"5581999999999@s.whatsapp.net","id":"gateway-inbound-1","text":"Quero contratar"}
         response=self.client.post(
             reverse("master-whatsapp-receive"),data=json.dumps(event),content_type="application/json",
-            HTTP_HOST="applanner.example.test",HTTP_X_FORWARDED_PROTO="https",
+            HTTP_HOST="web:8000",HTTP_X_FORWARDED_PROTO="https",
             HTTP_AUTHORIZATION="Bearer test-gateway-secret",
         )
         self.assertEqual(response.status_code,200)

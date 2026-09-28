@@ -1,4 +1,4 @@
-window.createBookingSlotPicker = ({container, input, status, onChange = () => {}}) => {
+window.createBookingSlotPicker = ({container, input, status, onChange = () => {}, onAvailability = () => {}}) => {
   let requestId = 0;
 
   function reset(message) {
@@ -7,6 +7,7 @@ window.createBookingSlotPicker = ({container, input, status, onChange = () => {}
     container.replaceChildren();
     status.textContent = message;
     onChange(false);
+    onAvailability(null);
   }
 
   async function load(url) {
@@ -18,6 +19,7 @@ window.createBookingSlotPicker = ({container, input, status, onChange = () => {}
       const data = await response.json();
       if (currentRequest !== requestId) return;
       const slots = data.slots || [];
+      onAvailability(slots.length);
       if (!slots.length) {
         status.textContent = 'Não há horários disponíveis nessa data.';
         return;

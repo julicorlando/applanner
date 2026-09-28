@@ -24,5 +24,11 @@
     {% else %}<p>Nenhuma assinatura encontrada.</p>{% endif %}
   <div class="form-actions" style="margin-top:18px"><a class="button primary" href="{% url 'billing-subscription-modules' %}">Gerenciar módulos adicionais</a></div>
   </article>
+  {% if can_manage %}<article class="panel" style="margin-top:16px"><h2>Gerenciar conta</h2>
+    {% if subscription and subscription.status != 'cancelled' %}<form method="post" action="{% url 'billing-subscription-cancel' %}" onsubmit="return confirm('Cancelar a assinatura agora? A cobrança recorrente será encerrada e o acesso ao plano será afetado.')">{% csrf_token %}<label for="cancel-password">Confirme sua senha para cancelar a assinatura</label><input id="cancel-password" name="password" type="password" required autocomplete="current-password"><button class="button" type="submit">Cancelar assinatura</button></form>{% endif %}
+    <h3>Solicitar exclusão da conta</h3><p>O pedido será analisado pela equipe, incluindo dados de clientes, histórico financeiro e obrigações de conservação. Esta ação não cancela a assinatura automaticamente; cancele-a acima se desejar interromper cobranças.</p>
+    {% if pending_deletion %}<p>Pedido {{ pending_deletion.protocol }} · {{ pending_deletion.get_status_display }}. <a href="{% url 'support-ticket-detail' pending_deletion.pk %}">Acompanhar solicitação</a></p>{% else %}
+    <form method="post" action="{% url 'billing-account-deletion' %}" onsubmit="return confirm('Enviar pedido de exclusão da conta para análise?')">{% csrf_token %}<label for="delete-reason">Motivo (opcional)</label><textarea id="delete-reason" name="reason" maxlength="2000" rows="2"></textarea><label for="delete-password">Confirme sua senha</label><input id="delete-password" name="password" type="password" required autocomplete="current-password"><button class="button" type="submit">Solicitar exclusão da conta</button></form>{% endif %}
+  </article>{% endif %}
 </section>
 {% endblock %}

@@ -39,6 +39,7 @@
         <div class="form-field"><label>Observações</label><input id="booking-notes"></div>
       </div>
       <div id="booking-feedback" style="margin-top:12px"></div>
+      <div id="booking-waitlist" class="panel" hidden><h3>Sem horários? Entre na lista de espera</h3><p>Usaremos o nome e o contato informados acima para avisar se surgir uma vaga nesta data.</p><button type="button" class="button" id="booking-waitlist-submit">Entrar na lista de espera</button></div>
       <div class="form-actions"><button class="button primary" type="submit">Confirmar agendamento</button></div>
     </form>
   </div>
@@ -86,7 +87,18 @@
   const feedback=document.getElementById('booking-feedback');
   const csrf=form.querySelector('[name=csrfmiddlewaretoken]').value;
   const today=new Date(); date.min=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
-  const picker=createBookingSlotPicker({container:document.getElementById('booking-slots'),input:slot,status:document.getElementById('booking-slot-status')});
+  const waitlist=document.getElementById('booking-waitlist');
+  const picker=createBookingSlotPicker({container:document.getElementById('booking-slots'),input:slot,status:document.getElementById('booking-slot-status'),onAvailability:count=>{waitlist.hidden=count!==0;}});
+  document.getElementById('booking-waitlist-submit').addEventListener('click',async()=>{
+    const name=document.getElementById('booking-name').value.trim(),phone=document.getElementById('booking-phone').value.trim(),email=document.getElementById('booking-email').value.trim();
+    if(!name || !(phone||email)){feedback.textContent='Informe seu nome e telefone ou e-mail para entrar na lista.';return;}
+    const button=document.getElementById('booking-waitlist-submit');button.disabled=true;
+    try{
+      const response=await fetch('/api/public/{{ public_slug }}/waitlist/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf},body:JSON.stringify({service_id:service.value,professional_id:professional.value,date:date.value,name,phone,email})});
+      const data=await response.json();feedback.textContent=data.detail||'Não foi possível entrar na lista de espera.';
+      if(!response.ok)button.disabled=false;else waitlist.hidden=true;
+    }catch{feedback.textContent='Não foi possível enviar o pedido. Tente novamente.';button.disabled=false;}
+  });
 
   function loadSlots(){
     if(!service.value || !date.value){picker.reset('Escolha o serviço e a data para ver os horários.');return;}

@@ -65,6 +65,7 @@ def _subscription_status(value):
         "pending":Subscription.Status.TRIAL,
         "paused":Subscription.Status.SUSPENDED,
         "cancelled":Subscription.Status.CANCELLED,
+        "canceled":Subscription.Status.CANCELLED,
     }.get(str(value or "").lower(),Subscription.Status.PAST_DUE)
 
 
@@ -74,6 +75,7 @@ def _recurring_status(value):
         "pending":TenantRecurringSubscription.Status.PENDING,
         "paused":TenantRecurringSubscription.Status.PAUSED,
         "cancelled":TenantRecurringSubscription.Status.CANCELLED,
+        "canceled":TenantRecurringSubscription.Status.CANCELLED,
     }.get(str(value or "").lower(),TenantRecurringSubscription.Status.ERROR)
 
 

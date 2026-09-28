@@ -101,6 +101,8 @@ class Unit(TimeStampedModel):
 class TenantOnboarding(models.Model):
     tenant=models.OneToOneField(Tenant,primary_key=True,on_delete=models.CASCADE,related_name="onboarding")
     required=models.BooleanField(default=False)
+    email_verification_waived_at=models.DateTimeField(null=True,blank=True)
+    email_verification_waived_by=models.ForeignKey("accounts.User",null=True,blank=True,on_delete=models.SET_NULL,related_name="onboarding_email_waivers")
     company_done=models.BooleanField(default=False)
     branding_done=models.BooleanField(default=False)
     unit_done=models.BooleanField(default=False)
