@@ -7,8 +7,11 @@ from django.db.models import Q
 from django.forms import modelform_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from requests.exceptions import RequestException
 
 from billing.models import Module, Plan, PlanModule
+from billing.models import PaymentGateway
+from billing.payment_services import configure_mercadopago_gateway
 
 
 FIELD_LABELS={
@@ -135,6 +138,39 @@ MASTER_RESOURCES={
 def _guard(user):
     if not user.is_superuser:
         raise PermissionDenied("Acesso restrito ao Master.")
+
+
+class PlatformPaymentForm(forms.Form):
+    environment=forms.ChoiceField(choices=PaymentGateway.Environment.choices,label="Ambiente")
+    public_key=forms.CharField(max_length=190,required=False,label="Public Key")
+    access_token=forms.CharField(label="Access Token",widget=forms.PasswordInput(attrs={"autocomplete":"new-password"}))
+    webhook_secret=forms.CharField(min_length=16,label="Chave secreta do webhook",widget=forms.PasswordInput(attrs={"autocomplete":"new-password"}))
+
+
+@login_required
+def platform_payment_gateway(request):
+    _guard(request.user)
+    webhook_url=request.build_absolute_uri("/webhooks/mercadopago/")
+    form=PlatformPaymentForm(request.POST or None)
+    if request.method=="POST" and form.is_valid():
+        try:
+            configure_mercadopago_gateway(
+                environment=form.cleaned_data["environment"],
+                public_key=form.cleaned_data["public_key"],
+                access_token=form.cleaned_data["access_token"],
+                webhook_secret=form.cleaned_data["webhook_secret"],
+                webhook_url=webhook_url,
+            )
+        except (ValueError,RuntimeError,RequestException):
+            # Do not echo secrets or provider responses in the Master interface.
+            form.add_error(None,"Não foi possível validar a conexão. Confira o ambiente, as credenciais, a chave do webhook e o HTTPS.")
+        else:
+            messages.success(request,"Mercado Pago da plataforma validado e ativado.")
+            return redirect("master-platform-payment")
+    rows=PaymentGateway.objects.filter(provider="mercadopago").order_by("environment")
+    return render(request,"master/platform_payment.html",{
+        "form":form,"gateways":rows,"webhook_url":webhook_url,
+    })
 
 
 from communications.master_whatsapp import (  # noqa: E402

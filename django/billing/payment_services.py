@@ -18,8 +18,8 @@ def configure_mercadopago_gateway(*,environment,public_key,access_token,webhook_
         raise ValueError("Ambiente inválido.")
     if not webhook_url.startswith("https://"):
         raise ValueError("O webhook precisa usar HTTPS.")
-    if environment==PaymentGateway.Environment.SANDBOX and not access_token.startswith("TEST-"):
-        raise ValueError("Use credencial TEST- no ambiente sandbox.")
+    if environment==PaymentGateway.Environment.SANDBOX and not access_token.startswith(("TEST-","APP_USR-")):
+        raise ValueError("Use uma credencial de teste válida no ambiente de testes.")
     if environment==PaymentGateway.Environment.PRODUCTION and access_token.startswith("TEST-"):
         raise ValueError("Credencial TEST- não pode ser usada em produção.")
     if len(webhook_secret)<16:
@@ -39,11 +39,7 @@ def configure_mercadopago_gateway(*,environment,public_key,access_token,webhook_
             "last_test_status":PaymentGateway.TestStatus.VALIDATED,
         },
     )
-    if environment==PaymentGateway.Environment.PRODUCTION:
-        PaymentGateway.objects.filter(
-            provider="mercadopago",
-            environment=PaymentGateway.Environment.SANDBOX,
-        ).update(active=False)
+    PaymentGateway.objects.filter(provider="mercadopago").exclude(pk=gateway.pk).update(active=False)
     return gateway,identity
 
 

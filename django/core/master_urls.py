@@ -2,6 +2,7 @@ from django.urls import path
 from . import master
 
 urlpatterns=[
+    path("pagamentos/mercado-pago/",master.platform_payment_gateway,name="master-platform-payment"),
     path("whatsapp/",master.master_whatsapp_inbox,name="master-whatsapp"),
     path("whatsapp/estado/",master.master_whatsapp_status,name="master-whatsapp-status"),
     path("whatsapp/parear/",master.master_whatsapp_connect,name="master-whatsapp-connect"),
