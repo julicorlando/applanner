@@ -85,3 +85,17 @@ body{background:linear-gradient(180deg,#f5f7ff 0,#f8fafc 380px)}
 .chat-composer textarea{min-height:50px;max-height:170px}.chat-composer :is(textarea,.chat-attach-label,.button):focus-visible,.pix-checkout :is(textarea,.button):focus-visible{outline:3px solid #549bdb;outline-offset:2px}
 @media(max-width:700px){.chat-contact:hover{transform:none}.pix-checkout-header{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){.chat-contact{transition:none}}
+
+/* Sistema visual compartilhado pelas páginas públicas, Master e empresa. */
+.topbar{box-shadow:0 2px 16px #18263a0a}.brand{letter-spacing:-.04em;font-size:1.07rem}
+.nav a:not(.nav-cta),.nav-link{border-radius:9px;padding:8px 4px}.nav a:not(.nav-cta):hover,.nav-link:hover{color:var(--accent)}
+.portal-module-card,.segment-grid article,.table-card{box-shadow:0 8px 28px #14243f0a}
+.portal-module-card{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.portal-module-card:hover{transform:translateY(-3px);border-color:#c5cff1;box-shadow:0 18px 36px #14243f17}
+.panel,.table-card{border-color:#dce4ef}.portal-table tbody tr:hover{background:#f7f9ff}
+.button:active{transform:translateY(0);box-shadow:none}.button.primary{background:#263577;border-color:#263577}.button.primary:hover{background:#344bb1;border-color:#344bb1}
+.form-field :is(input:not([type=checkbox]),select,textarea),.portal-search input{border-color:#ccd6e4;transition:border-color .18s ease,box-shadow .18s ease}
+.form-field :is(input:not([type=checkbox]),select,textarea):focus,.portal-search input:focus{border-color:#7184df;box-shadow:0 0 0 4px #6479db1c;outline:none}
+.flash{border-radius:14px;box-shadow:0 16px 40px #17263b1b}.footer{background:#fff}
+@media(max-width:700px){.portal-page{padding-top:30px}.portal-heading h1{font-size:clamp(2rem,9vw,3rem)}.portal-module-card{min-height:auto}.topbar{height:auto;min-height:68px}}
+@media(prefers-reduced-motion:reduce){.portal-module-card,.form-field :is(input,select,textarea),.portal-search input{transition:none}.portal-module-card:hover{transform:none}}
