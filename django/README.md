@@ -90,7 +90,7 @@ No Coolify, defina `MASTER_WHATSAPP_GATEWAY_TOKEN` com um segredo aleatório lon
 
 Esta conexão usa a biblioteca Baileys para vincular um dispositivo do WhatsApp Web. Ela é independente da integração oficial Cloud API dos estabelecimentos e depende da disponibilidade e do protocolo do WhatsApp Web; mudanças no protocolo podem exigir atualização do gateway. O chatbot por estabelecimento continua na integração Cloud API existente. Para testar a integração real, é preciso publicar o Compose, ler o QR code com um número do Master e trocar mensagens de teste.
 
-Para receber respostas no Coolify, configure `PUBLIC_BASE_URL=https://applanner.axionwebdigital.com.br`, mantendo o domínio em `DJANGO_ALLOWED_HOSTS`. O gateway faz o callback para `web:8000` na rede privada com o Host público e indica na caixa de entrada quantas mensagens aguardam e se o Django recusou o callback. Após o deploy, envie uma mensagem **de outro número para o número pareado** e confira Master → WhatsApp do Master. Conversas de novos contatos podem virar leads no funil por meio de **Adicionar ao Comercial**. Para contato `@lid`, informe o telefone antes de registrar o lead.
+Para receber respostas no Coolify, configure `PUBLIC_BASE_URL=https://applanner.axionwebdigital.com.br`. O Django inclui automaticamente esse domínio HTTPS entre os hosts aceitos para o callback interno, inclusive quando `DJANGO_ALLOWED_HOSTS` omitir o domínio. O gateway faz o callback para `web:8000` na rede privada com o Host público e indica na caixa de entrada quantas mensagens aguardam e se o Django recusou o callback. Após o deploy, envie uma mensagem **de outro número para o número pareado** e confira Master → WhatsApp do Master. Conversas de novos contatos podem virar leads no funil por meio de **Adicionar ao Comercial**. Para contato `@lid`, informe o telefone antes de registrar o lead.
 
 Se o Mercado Pago recusar uma compra porque pagador e recebedor são a mesma conta, informe outro **e-mail do pagador** no cadastro ou em **Meu plano e pagamento**. Na homologação, configure as credenciais da conta vendedora e pague com uma conta compradora de teste diferente. A conta já criada pode continuar pelo link de **Meu plano e pagamento**; nenhum pagamento é confirmado sem retorno do provedor e verificação do webhook.
 
@@ -141,13 +141,15 @@ e verifique as credenciais da conta vendedora em Master → Mercado Pago.
 
 ## Fluxo e recibos do WhatsApp Master
 
-Se o painel mostrar “O Django recusou o callback (HTTP 400)”, confira
-`PUBLIC_BASE_URL=https://applanner.axionwebdigital.com.br` e a presença de
-`applanner.axionwebdigital.com.br` em `DJANGO_ALLOWED_HOSTS`, salvando e
-redeployando os serviços. Um evento com formato inválido mostra um motivo
-específico; eventos recusados permanecem na fila persistente do gateway para
-nova tentativa. Confira `web` e `master-whatsapp` nos logs do Coolify para
-identificar se a recusa vem do host ou do formato do evento.
+Se o painel mostrar HTTP 400, confirme
+`PUBLIC_BASE_URL=https://applanner.axionwebdigital.com.br`, salve e
+redeploye todos os serviços. O Django adiciona o host dessa URL HTTPS aos
+hosts permitidos, mas um URL vazio ou inválido continua bloqueando o callback.
+Um evento com formato inválido mostra um motivo específico; eventos recusados
+permanecem na fila persistente do gateway para nova tentativa. Se o erro
+continuar após o deploy, confira o horário do 400 nos logs do serviço `web`
+e do `master-whatsapp` no Coolify para distinguir rejeição do Host, da
+segurança ou do formato do evento.
 
 Em **Master → WhatsApp do Master → Configurar fluxo**, o Master pode criar etapas
 com a sintaxe `etapa | palavra;sinônimo | resposta | próxima etapa | sim/não`.

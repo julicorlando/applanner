@@ -55,7 +55,7 @@ async function flush() {
           try { detail = String((await response.json()).error || '').slice(0, 180); } catch { /* status still available */ }
         }
         callbackError = response.status === 400 && !detail
-          ? 'O Django recusou o callback (HTTP 400). Confira DJANGO_ALLOWED_HOSTS e PUBLIC_BASE_URL no Coolify.'
+          ? `O Django respondeu HTTP 400 antes de processar o callback (${callbackHost}). Confira os logs do serviço web no Coolify para identificar a recusa.`
           : `O Django recusou o callback (HTTP ${response.status}). ${detail}`.trim();
         logger.warn({ status: response.status, detail, event: pending[0]?.event || 'message' }, 'Master WhatsApp callback rejected');
         break;

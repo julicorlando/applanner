@@ -1,5 +1,6 @@
 from pathlib import Path
 import environ
+from .hostnames import public_allowed_host
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(DJANGO_DEBUG=(bool, False), SECURE_SSL_REDIRECT=(bool, True), EMAIL_USE_TLS=(bool, True))
@@ -12,6 +13,10 @@ FIELD_ENCRYPTION_KEY = env("DJANGO_FIELD_ENCRYPTION_KEY")
 TRUSTED_DEVICE_DAYS = env.int("TRUSTED_DEVICE_DAYS", default=30)
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost","127.0.0.1"])
+PUBLIC_BASE_URL = env("PUBLIC_BASE_URL",default="")
+_public_host = public_allowed_host(PUBLIC_BASE_URL)
+if _public_host and _public_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_public_host)
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 
 INSTALLED_APPS = [
@@ -127,7 +132,6 @@ WHATSAPP_ACCESS_TOKEN=env("WHATSAPP_ACCESS_TOKEN",default="")
 WHATSAPP_PHONE_NUMBER_ID=env("WHATSAPP_PHONE_NUMBER_ID",default="")
 WHATSAPP_VERIFY_TOKEN=env("WHATSAPP_VERIFY_TOKEN",default="")
 WHATSAPP_APP_SECRET=env("WHATSAPP_APP_SECRET",default="")
-PUBLIC_BASE_URL=env("PUBLIC_BASE_URL",default="")
 META_GRAPH_BASE_URL=env("META_GRAPH_BASE_URL",default="")
 META_PIXEL_ID=env("META_PIXEL_ID",default="")
 META_CONVERSION_ACCESS_TOKEN=env("META_CONVERSION_ACCESS_TOKEN",default="")
