@@ -6,8 +6,10 @@ from core.views import healthz, home, professional_public, tenant_public
 from core.branding import public_platform_logo, public_tenant_image, public_professional_image, public_blog_image
 from tenants.onboarding import onboarding
 from communications.views import marketing_click, marketing_open, marketing_unsubscribe, whatsapp_webhook
+from communications.tenant_whatsapp import tenant_whatsapp_receive
 from contenthub.views import blog_post, landing, public_directory, public_directory_page
 from scheduling.public_views import appointment_page
+from scheduling.ratings import public_rating
 from scheduling.public_api import (
     CustomerAppointmentAPIView,
     PublicAvailabilityAPIView,
@@ -43,12 +45,14 @@ urlpatterns = [
     path("p/<slug:slug>/profissional/<slug:professional_slug>/", professional_public, name="professional-public"),
     path("p/<slug:slug>/", tenant_public, name="tenant-public"),
     path("agendamento/<str:token>/", appointment_page, name="public-appointment-page"),
+    path("avaliar/<str:token>/", public_rating, name="public-appointment-rating"),
     path("blog/<slug:slug>/", blog_post, name="blog-post"),
     path("landing/<slug:slug>/", landing, name="landing"),
     path("tracking/email/<uuid:token>/open.gif", marketing_open, name="marketing-open"),
     path("tracking/email/unsubscribe/<str:token>/", marketing_unsubscribe, name="marketing-unsubscribe"),
     path("tracking/email/<uuid:token>/click/", marketing_click, name="marketing-click"),
     path("webhooks/whatsapp/", whatsapp_webhook, name="whatsapp-webhook"),
+    path("webhooks/tenant-whatsapp/", tenant_whatsapp_receive, name="tenant-whatsapp-receive"),
     path("api/scheduling/", include("scheduling.urls")),
     path("api/public/<slug:slug>/availability/", PublicAvailabilityAPIView.as_view(), name="public-availability"),
     path("api/public/<slug:slug>/book/", PublicBookingAPIView.as_view(), name="public-booking"),

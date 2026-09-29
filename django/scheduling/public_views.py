@@ -3,6 +3,7 @@ from datetime import datetime,timedelta
 from zoneinfo import ZoneInfo
 
 from django.contrib import messages
+from django.core.signing import dumps
 from django.db import transaction
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
@@ -118,4 +119,6 @@ def appointment_page(request,token):
     return render(request,"scheduling/public_appointment.html",{
         "appointment":row,"token":token,"capabilities":_caps(row),
         "professionals":_candidates(row),
+        "rating_token":dumps({"appointment":row.pk},salt="appointment-rating")
+            if row.status==Appointment.Status.COMPLETED else None,
     })

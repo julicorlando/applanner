@@ -105,6 +105,7 @@ class PublicBookingFlowTests(TestCase):
         self.assertIn("/agendamento/",payload["manage_url"])
         appointment=Appointment.objects.get(pk=payload["id"])
         self.assertIsNotNone(appointment.professional_id)
+        self.assertEqual(appointment.status,Appointment.Status.CONFIRMED)
 
     def test_professional_public_page_exists(self):
         response=self.client.get(

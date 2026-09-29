@@ -2,10 +2,13 @@ from django.urls import path
 from . import portal
 from .branding import tenant_branding
 from billing.tenant_gateway import tenant_gateway
-from .professional_area import professional_area, professional_access
+from .professional_area import professional_area, professional_access, professional_appointment
+from scheduling.ratings import tenant_ratings
 
 urlpatterns = [
     path("profissional/",professional_area,name="professional-area"),
+    path("profissional/agendamento/<int:pk>/",professional_appointment,name="professional-appointment"),
+    path("avaliacoes/",tenant_ratings,name="tenant-ratings"),
     path("profissionais/<int:pk>/acesso/",professional_access,name="professional-access"),
     path("pagamentos/mercado-pago/",tenant_gateway,name="tenant-payment-gateway"),
     path("minha-pagina/",tenant_branding,name="tenant-branding"),

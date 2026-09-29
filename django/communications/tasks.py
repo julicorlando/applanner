@@ -52,11 +52,17 @@ def send_notification(self,notification_id):
                 message.attach_alternative(html,"text/html")
             message.send(fail_silently=False)
         elif notification.channel==Notification.Channel.WHATSAPP:
-            from .whatsapp import send_text
-            provider_id=send_text(
-                notification.destination,
-                notification.payload.get("text") or notification.payload.get("message") or "",
-            )
+            if notification.template_key in {"appointment_confirmation","appointment_reminder","appointment_feedback"}:
+                from .tenant_whatsapp import send_appointment_notification
+                provider_id=send_appointment_notification(notification)
+                if notification.status==Notification.Status.SKIPPED:
+                    return
+            else:
+                from .whatsapp import send_text
+                provider_id=send_text(
+                    notification.destination,
+                    notification.payload.get("text") or notification.payload.get("message") or "",
+                )
             notification.provider_reference=provider_id
         else:
             raise RuntimeError(f"Canal ainda sem provider ativo: {notification.channel}")
@@ -161,8 +167,13 @@ def process_marketing_deliveries(limit=100):
 def send_chatbot_reply(conversation_id, body):
     from .models import WhatsAppConversation, WhatsAppMessage
     from .whatsapp import send_text
+    from scheduling.models import Appointment
 
-    conversation=WhatsAppConversation.objects.get(pk=conversation_id)
+    conversation=WhatsAppConversation.objects.select_related("appointment").get(pk=conversation_id)
+    if conversation.appointment_id and (conversation.appointment.status in {
+        Appointment.Status.COMPLETED,Appointment.Status.CANCELLED,Appointment.Status.NO_SHOW,
+    } or conversation.context.get("cancel_requested_appointment_id")==conversation.appointment_id):
+        return
     provider_id=send_text(conversation.wa_id,body)
     WhatsAppMessage.objects.create(
         conversation=conversation,tenant=conversation.tenant,

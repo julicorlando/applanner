@@ -64,6 +64,9 @@ def whatsapp_webhook(request):
                 )
                 if not created:
                     continue
+                from .tenant_whatsapp import mark_inbound_appointment
+                if mark_inbound_appointment(conversation,body):
+                    continue
                 reply=None
                 if flow and message.get("type")=="text" and phone_number_id==settings.WHATSAPP_PHONE_NUMBER_ID:
                     reply,conversation.status=next_reply(flow,conversation,body,first_message=first_message)

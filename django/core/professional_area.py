@@ -11,8 +11,10 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from finance.models import ProfessionalCommission
+from finance.models import Product,ProfessionalCommission
 from scheduling.models import Appointment, Professional
+from scheduling.settlement import settle_appointment
+from communications.tenant_whatsapp import send_prepared_message
 
 
 class ProfessionalAccessForm(forms.Form):
@@ -111,9 +113,10 @@ def professional_area(request):
     local_now=timezone.localtime(now)
     month_start=local_now.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
     appointments=Appointment.objects.filter(tenant=professional.tenant,professional=professional)
-    upcoming=appointments.filter(starts_at__gte=now,status__in=[
-        Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
-    ]).select_related("customer","service").order_by("starts_at")
+    actionable=appointments.filter(status__in=[Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
+        Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS]).select_related("customer","service")
+    upcoming=actionable.filter(starts_at__gte=now).order_by("starts_at")
+    current=actionable.filter(starts_at__lt=now).order_by("-starts_at")[:20]
     month_commissions=ProfessionalCommission.objects.filter(
         tenant=professional.tenant,professional=professional,created_at__gte=month_start
     ).exclude(status=ProfessionalCommission.Status.REVERSED)
@@ -127,9 +130,67 @@ def professional_area(request):
             projected+=(item.service_price_snapshot if item.service_price_snapshot is not None
                         else item.service.price)*professional.commission_percent/Decimal("100")
     return render(request,"portal/professional_area.html",{
-        "professional":professional,"upcoming":upcoming[:15],"upcoming_count":upcoming.count(),
+        "professional":professional,"upcoming":upcoming[:15],"current":current,"upcoming_count":upcoming.count(),
         "completed_month":appointments.filter(starts_at__gte=month_start,starts_at__lt=now,
                                                status=Appointment.Status.COMPLETED).count(),
         "pending_commission":pending,"paid_commission":paid,
         "projected_commission":projected,"has_projection":professional.commission_percent is not None,
+    })
+
+
+class SettlementForm(forms.Form):
+    outcome=forms.ChoiceField(label="Resultado",choices=[("completed","Atendeu"),("no_show","Não atendeu")])
+    payment_method=forms.ChoiceField(label="Forma de pagamento",required=False,choices=[
+        ("","Selecione"),("pix","Pix"),("card","Cartão"),("cash","Dinheiro"),
+        ("transfer","Transferência"),("other","Outra"),
+    ])
+    product=forms.ModelChoiceField(label="Produto vendido (opcional)",required=False,queryset=Product.objects.none())
+    quantity=forms.DecimalField(label="Quantidade",min_value=Decimal("0.001"),max_digits=12,
+                                decimal_places=3,initial=1)
+
+    def __init__(self,*args,tenant,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fields["product"].queryset=Product.objects.filter(tenant=tenant,active=True,stock__gt=0)
+
+    def clean(self):
+        data=super().clean()
+        if data.get("outcome")=="completed" and not data.get("payment_method"):
+            self.add_error("payment_method","Informe como o atendimento foi pago.")
+        if data.get("outcome")=="no_show" and data.get("product"):
+            self.add_error("product","Não há venda em atendimento não realizado.")
+        return data
+
+
+@login_required
+def professional_appointment(request,pk):
+    if request.user.role!="professional" or not request.user.tenant_id:
+        raise PermissionDenied("Área exclusiva do profissional.")
+    professional=get_object_or_404(Professional,tenant_id=request.user.tenant_id,user=request.user,active=True)
+    appointment=get_object_or_404(Appointment.objects.select_related("customer","service"),
+                                  pk=pk,tenant=professional.tenant,professional=professional)
+    if request.method=="POST" and request.POST.get("action")=="message":
+        try:
+            send_prepared_message(appointment,request.POST.get("kind",""),request.user)
+        except ValueError as exc:
+            messages.error(request,str(exc))
+        else:
+            messages.success(request,"Mensagem pronta enviada ao WhatsApp do cliente.")
+        return redirect("professional-appointment",pk=appointment.pk)
+    form=SettlementForm(request.POST or None,tenant=professional.tenant)
+    if request.method=="POST" and form.is_valid():
+        try:
+            settle_appointment(appointment_id=appointment.pk,professional=professional,user=request.user,
+                attended=form.cleaned_data["outcome"]=="completed",
+                payment_method=form.cleaned_data["payment_method"],
+                product_id=form.cleaned_data["product"].pk if form.cleaned_data["product"] else None,
+                quantity=form.cleaned_data["quantity"])
+        except (ValidationError,Appointment.DoesNotExist) as exc:
+            form.add_error(None,exc)
+        else:
+            messages.success(request,"Atendimento registrado. A venda e as comissões foram lançadas quando aplicáveis.")
+            return redirect("professional-area")
+    return render(request,"portal/professional_appointment.html",{
+        "professional":professional,"appointment":appointment,"form":form,
+        "can_settle":appointment.status in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
+            Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS} and appointment.starts_at<=timezone.now(),
     })

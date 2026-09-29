@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
 
@@ -9,6 +10,8 @@ from billing.segment_access import require_feature
 from tenants.models import Tenant
 from .models import UserNotification,WhatsAppConversation,WhatsAppMessage
 from .whatsapp import WhatsAppProviderError,send_text
+from .tenant_whatsapp import send_prepared_message
+from scheduling.models import Appointment
 
 
 def _tenant(request):
@@ -46,6 +49,11 @@ def conversation(request,pk):
     thread=row.messages.select_related("user").order_by("id")[:1000]
     return render(request,"communications/conversation.html",{
         "tenant":tenant,"conversation":row,"thread":thread,
+        "appointment":row.appointment,
+        "can_message":bool(row.appointment_id and row.appointment.status in {
+            Appointment.Status.PENDING,Appointment.Status.CONFIRMED,Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
+        }),
+        "cancel_requested":row.appointment_id and row.context.get("cancel_requested_appointment_id")==row.appointment_id,
     })
 
 
@@ -55,8 +63,38 @@ def conversation_action(request,pk):
     if request.method!="POST":
         raise PermissionDenied
     tenant=_tenant(request)
-    row=get_object_or_404(WhatsAppConversation,pk=pk,tenant=tenant)
+    row=get_object_or_404(WhatsAppConversation.objects.select_related("appointment","customer"),pk=pk,tenant=tenant)
     action=request.POST.get("action","")
+    if action=="cancel_appointment":
+        with transaction.atomic():
+            row=WhatsAppConversation.objects.select_for_update().get(pk=row.pk,tenant=tenant)
+            appointment=Appointment.objects.select_for_update().filter(pk=row.appointment_id,tenant=tenant).first()
+            if not appointment or row.context.get("cancel_requested_appointment_id")!=appointment.pk or appointment.status not in {
+                Appointment.Status.PENDING,Appointment.Status.CONFIRMED,Appointment.Status.WAITING,
+            }:
+                messages.error(request,"Este horário não pode mais ser liberado.")
+            else:
+                appointment.status=Appointment.Status.CANCELLED
+                appointment.save(update_fields=["status","updated_at"])
+                row.status=WhatsAppConversation.Status.CLOSED
+                row.context={key:value for key,value in row.context.items() if key!="cancel_requested_appointment_id"}
+                row.save(update_fields=["status","context","updated_at"])
+                messages.success(request,"Agendamento cancelado e horário liberado. Atendimento WhatsApp encerrado.")
+        return redirect("communications-conversation",pk=row.pk)
+    if row.appointment_id and action in {"reply","bot","human"}:
+        messages.error(request,"Esta conversa de agendamento aceita apenas mensagens prontas; após o encerramento não há novos envios.")
+        return redirect("communications-conversation",pk=row.pk)
+    if action=="prepared":
+        appointment=row.appointment
+        if not appointment or row.context.get("cancel_requested_appointment_id")==appointment.pk:
+            messages.error(request,"Este atendimento não aceita novas mensagens.")
+        else:
+            try:
+                send_prepared_message(appointment,request.POST.get("kind",""),request.user)
+                messages.success(request,"Mensagem pronta enviada.")
+            except (ValueError,KeyError) as exc:
+                messages.error(request,str(exc))
+        return redirect("communications-conversation",pk=row.pk)
     if action=="reply":
         body=(request.POST.get("body") or "").strip()
         if not body:

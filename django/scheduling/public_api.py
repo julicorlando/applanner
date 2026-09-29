@@ -253,11 +253,13 @@ class PublicBookingAPIView(APIView):
         appointment=Appointment.objects.create(
             tenant=tenant,customer=customer,professional=professional,service=service,
             service_price_snapshot=service.price,starts_at=starts_at,ends_at=ends_at,
-            status=Appointment.Status.PENDING,source=source,
+            status=Appointment.Status.CONFIRMED,source=source,
             notes=str(data.get("notes") or "")[:2000],
             customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest(),
         )
         manage_path=reverse("public-appointment-page",args=[token])
+        from communications.tenant_whatsapp import queue_appointment_whatsapp
+        queue_appointment_whatsapp(appointment,"confirmation")
         return Response(
             {
                 "id":appointment.pk,"status":appointment.status,

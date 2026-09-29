@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Atendimento · {{ appointment.customer.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'professional-area' %}">← Minha agenda</a><span class="eyebrow">ATENDIMENTO</span><h1>{{ appointment.customer.name }}</h1><p>{{ appointment.service.name }} · {{ appointment.starts_at|date:"d/m/Y H:i" }} · {{ appointment.get_status_display }}</p></div></div>
+  <article class="panel"><p>Valor do serviço: R$ {{ appointment.service_price_snapshot|default:appointment.service.price|floatformat:2 }}</p>
+  {% if appointment.status == 'confirmed' or appointment.status == 'pending' or appointment.status == 'waiting' or appointment.status == 'in_progress' %}
+    <form method="post" class="form-actions">{% csrf_token %}<input type="hidden" name="action" value="message"><button class="button" name="kind" value="confirmation">Enviar confirmação pronta</button><button class="button" name="kind" value="reminder">Enviar lembrete pronto</button></form>
+  {% endif %}
+  {% if can_settle %}<form method="post" class="portal-form">{% csrf_token %}{{ form.non_field_errors }}
+    {% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+    <p>Ao registrar presença, o serviço entra no financeiro. Se vender um produto, o estoque e a comissão do produto são lançados automaticamente.</p>
+    <button class="button primary" type="submit">Encerrar atendimento</button>
+  </form>{% else %}<p>O atendimento pode ser encerrado após o início do horário, enquanto estiver aberto.</p>{% endif %}</article>
+</section>
+{% endblock %}

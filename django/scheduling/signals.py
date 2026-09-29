@@ -30,6 +30,13 @@ def notify_confirmed_appointment(sender,instance,created,**kwargs):
     },customer=instance.customer)
 
 
+@receiver(post_save,sender=Appointment)
+def close_finished_appointment_conversation(sender,instance,**kwargs):
+    if instance.status in {Appointment.Status.COMPLETED,Appointment.Status.CANCELLED,Appointment.Status.NO_SHOW}:
+        from communications.models import WhatsAppConversation
+        WhatsAppConversation.objects.filter(appointment=instance).update(status=WhatsAppConversation.Status.CLOSED)
+
+
 @receiver(post_save, sender=Appointment)
 def start_return_intelligence(sender, instance, created, **kwargs):
     if not created or instance.status == Appointment.Status.CANCELLED:

@@ -36,6 +36,9 @@ def _queue_reminder(appointment,key,channel,destination):
         },
         status=Notification.Status.QUEUED,
     )
+    if channel==Notification.Channel.EMAIL and key=="2h":
+        from communications.tenant_whatsapp import queue_appointment_whatsapp
+        queue_appointment_whatsapp(appointment,"reminder")
     return True
 
 
@@ -69,5 +72,18 @@ def queue_appointment_reminders():
             if appointment.customer.email:
                 with transaction.atomic():
                     queued+=int(_queue_reminder(appointment,"2h",Notification.Channel.EMAIL,appointment.customer.email))
+            elif appointment.customer.phone:
+                # Log the reminder once even when the customer has only a phone.
+                with transaction.atomic():
+                    log,created=AppointmentReminderLog.objects.get_or_create(tenant=appointment.tenant,
+                        appointment=appointment,reminder_key="2h",channel=AppointmentReminderLog.Channel.WHATSAPP,
+                        defaults={"status":AppointmentReminderLog.Status.QUEUED})
+                    if created:
+                        from communications.tenant_whatsapp import queue_appointment_whatsapp
+                        notification=queue_appointment_whatsapp(appointment,"reminder")
+                        if notification:
+                            queued+=1
+                        else:
+                            log.delete()
 
     return queued

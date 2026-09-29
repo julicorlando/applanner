@@ -38,6 +38,7 @@ x-app-environment: &app-environment
   BACKUP_DIR: ${BACKUP_DIR:-/app/media/backups}
   MASTER_WHATSAPP_GATEWAY_URL: http://master-whatsapp:3100
   MASTER_WHATSAPP_GATEWAY_TOKEN: ${MASTER_WHATSAPP_GATEWAY_TOKEN:-}
+  TENANT_WHATSAPP_GATEWAY_URL: http://tenant-whatsapp:3100
 
 services:
   web:
@@ -122,8 +123,20 @@ services:
     expose:
       - "3100"
 
+  tenant-whatsapp:
+    build: ./master-whatsapp
+    restart: unless-stopped
+    command: ["node","tenant-server.js"]
+    environment:
+      MASTER_WHATSAPP_GATEWAY_TOKEN: ${MASTER_WHATSAPP_GATEWAY_TOKEN:-}
+    volumes:
+      - tenant_whatsapp_session:/app/session
+    expose:
+      - "3100"
+
 volumes:
   postgres_data:
   redis_data:
   media:
   master_whatsapp_session:
+  tenant_whatsapp_session:

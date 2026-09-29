@@ -9,8 +9,11 @@
     <article><span>Comissões do mês</span><strong>R$ {{ paid_commission|floatformat:2 }}</strong><small>pagas · R$ {{ pending_commission|floatformat:2 }} pendentes</small></article>
     <article><span>Projeção futura</span><strong>{% if has_projection %}R$ {{ projected_commission|floatformat:2 }}{% else %}—{% endif %}</strong><small>{% if has_projection %}estimativa dos agendamentos futuros; não é pagamento garantido{% else %}defina o percentual de comissão no cadastro{% endif %}</small></article>
   </section>
+  <section class="panel professional-schedule"><div class="panel-head"><h2>Atendimentos para encerrar</h2><span>Registre presença, pagamento e venda</span></div><div class="appointment-list">
+    {% for item in current %}<div class="appointment-row"><time datetime="{{ item.starts_at|date:'c' }}">{{ item.starts_at|date:"d/m H:i" }}</time><div><strong>{{ item.customer.name }}</strong><span>{{ item.service.name }}</span></div><a class="button" href="{% url 'professional-appointment' item.pk %}">Registrar atendimento</a></div>{% empty %}<p class="empty">Nenhum atendimento pendente de fechamento.</p>{% endfor %}
+  </div></section>
   <section class="panel professional-schedule"><div class="panel-head"><h2>Minha agenda</h2><span>Próximos 15 horários</span></div><div class="appointment-list">
-    {% for item in upcoming %}<div class="appointment-row"><time datetime="{{ item.starts_at|date:'c' }}">{{ item.starts_at|date:"d/m H:i" }}</time><div><strong>{{ item.customer.name }}</strong><span>{{ item.service.name }}</span></div><em>{{ item.get_status_display }}</em></div>{% empty %}<p class="empty">Você não tem agendamentos futuros.</p>{% endfor %}
+    {% for item in upcoming %}<div class="appointment-row"><time datetime="{{ item.starts_at|date:'c' }}">{{ item.starts_at|date:"d/m H:i" }}</time><div><strong>{{ item.customer.name }}</strong><span>{{ item.service.name }}</span></div><a class="button ghost" href="{% url 'professional-appointment' item.pk %}">Ver detalhes</a></div>{% empty %}<p class="empty">Você não tem agendamentos futuros.</p>{% endfor %}
   </div></section>
 </section>
 {% endblock %}

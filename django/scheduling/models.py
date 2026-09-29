@@ -200,6 +200,29 @@ class Appointment(TimeStampedModel):
         ]
 
 
+class AppointmentSettlement(models.Model):
+    appointment=models.OneToOneField(Appointment,on_delete=models.PROTECT,related_name="settlement")
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE)
+    professional=models.ForeignKey(Professional,on_delete=models.PROTECT)
+    attended=models.BooleanField()
+    payment_method=models.CharField(max_length=40,blank=True)
+    sale=models.OneToOneField("finance.Sale",null=True,blank=True,on_delete=models.PROTECT)
+    settled_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+
+class AppointmentRating(models.Model):
+    appointment=models.OneToOneField(Appointment,on_delete=models.CASCADE,related_name="rating")
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE)
+    professional=models.ForeignKey(Professional,on_delete=models.PROTECT)
+    score=models.PositiveSmallIntegerField()
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints=[models.CheckConstraint(condition=models.Q(score__gte=1,score__lte=5),name="appointment_rating_1_5")]
+        indexes=[models.Index(fields=["tenant","professional","created_at"])]
+
+
 class AppointmentRescheduleHistory(models.Model):
     class ActorType(models.TextChoices):
         CUSTOMER="customer","Cliente"

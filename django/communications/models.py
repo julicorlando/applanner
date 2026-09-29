@@ -195,6 +195,7 @@ class WhatsAppConversation(TimeStampedModel):
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="whatsapp_conversations")
     customer=models.ForeignKey("scheduling.Customer",null=True,blank=True,on_delete=models.SET_NULL,related_name="whatsapp_conversations")
+    appointment=models.ForeignKey("scheduling.Appointment",null=True,blank=True,on_delete=models.SET_NULL,related_name="whatsapp_conversations")
     wa_id=models.CharField(max_length=32)
     contact_name=models.CharField(max_length=150,blank=True)
     status=models.CharField(max_length=20,choices=Status.choices,default=Status.BOT,db_index=True)
@@ -206,6 +207,12 @@ class WhatsAppConversation(TimeStampedModel):
     class Meta:
         constraints=[models.UniqueConstraint(fields=["tenant","wa_id"],name="uq_wa_conversation")]
         indexes=[models.Index(fields=["tenant","status","last_message_at"],name="comm_wa_inbox_idx")]
+
+
+class TenantWhatsAppConnection(models.Model):
+    tenant=models.OneToOneField("tenants.Tenant",on_delete=models.CASCADE,related_name="whatsapp_qr_connection")
+    enabled=models.BooleanField(default=False)
+    updated_at=models.DateTimeField(auto_now=True)
 
 
 class ChatbotFlow(TimeStampedModel):

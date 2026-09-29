@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block title %}Avalie seu atendimento{% endblock %}
+{% block content %}<section class="shell portal-page narrow"><div class="portal-heading"><div><span class="eyebrow">SUA OPINIÃO</span><h1>Como foi o atendimento?</h1><p>{{ appointment.tenant.name }} · {{ appointment.service.name }} · {{ appointment.professional.name }}</p></div></div>
+<article class="panel">{% if rating %}<h2>Obrigado! Sua nota foi {{ rating.score }} de 5.</h2>{% else %}<form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="score">Sua nota de 1 a 5</label><select id="score" name="score" required><option value="">Escolha uma nota</option>{% for n in "12345" %}<option value="{{ n }}">{{ n }}</option>{% endfor %}</select></div><button class="button primary">Enviar avaliação</button></form>{% endif %}</article></section>{% endblock %}
