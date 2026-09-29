@@ -78,7 +78,7 @@ MASTER_RESOURCES={
     "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","logo","cover","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","public_enabled","created_at"],"order":"-created_at"},
     "planos":{"model":"billing.Plan","title":"Planos","fields":["name","slug","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","public_visible","is_custom","featured","sort_order"],"columns":["name","monthly_price","trial_days","active","public_visible","is_custom","featured"],"order":"sort_order,name","special":"plan"},
     "modulos":{"model":"billing.Module","title":"Módulos","fields":["name","slug","description","addon_monthly_price","addon_sellable","sort_order","active"],"columns":["name","slug","addon_monthly_price","addon_sellable","active"],"order":"sort_order,name"},
-    "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":["tenant","module","quoted_monthly_price","status","tenant_note","master_note"],"columns":["tenant","module","quoted_monthly_price","status","created_at"],"order":"-created_at"},
+    "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":[],"columns":["tenant","module","quoted_monthly_price","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "equipe-comercial":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":["commercial_user","tenant","base_amount","commission_percent","commission_amount","status","hold_until"],"columns":["commercial_user","tenant","commission_amount","status","created_at"],"order":"-created_at"},
     "assinaturas":{"model":"billing.Subscription","title":"Assinaturas","fields":["tenant","plan","billing_cycle","contracted_price","status","started_at","trial_ends_at","next_billing_at","provider_customer_id","provider_subscription_id"],"columns":["tenant","plan","billing_cycle","status","next_billing_at"],"order":"-started_at"},
@@ -345,6 +345,7 @@ def resource_list(request,slug):
     help_text={
         "planos":"Para publicar um plano, marque Ativo e Visível ao público. Use Módulos em cada plano para escolher as funções; preços e dias de teste são editados no próprio plano.",
         "empresas":"Para aparecer no diretório, a empresa precisa estar ativa ou em teste, com Página pública ligada. Informe cidade e latitude/longitude da unidade para ordenar por proximidade.",
+        "solicitacoes-modulos":"Solicitações de contratação são abertas pela empresa e analisadas aqui. Para liberar o WhatsApp de uma empresa, selecione-a no painel Operação e use Conectar WhatsApp da empresa.",
     }
     return render(request,"master/list.html",{"slug":slug,"resource":config,"headers":headers,"rows":rows,"q":q,"help_text":help_text.get(slug)})
 
@@ -353,6 +354,14 @@ def resource_list(request,slug):
 def resource_form(request,slug,pk=None):
     _guard(request.user)
     config,model=_config(slug)
+    if slug=="solicitacoes-modulos" and pk is None:
+        messages.info(request,"Para liberar o WhatsApp, selecione a empresa em Operação e abra Conectar WhatsApp da empresa. Solicitações de contratação são abertas pela própria empresa.")
+        from django.urls import reverse
+        from tenants.models import Tenant
+        selected=request.session.get("portal_tenant_id")
+        if selected and Tenant.objects.filter(pk=selected).exists():
+            return redirect("tenant-whatsapp-settings")
+        return redirect("portal-home")
     if pk is None and not config.get("create",True): raise PermissionDenied
     if pk is not None and not config.get("edit",True): raise PermissionDenied
     obj=get_object_or_404(model,pk=pk) if pk else None
@@ -383,7 +392,14 @@ def resource_form(request,slug,pk=None):
             messages.success(request,"Registro salvo.")
             return redirect("master-resource-list",slug=slug)
         except ValidationError as exc:
-            form.add_error(None,exc)
+            # Some model constraints involve fields intentionally absent from
+            # the Master form. Report them instead of raising a second error.
+            if hasattr(exc,"message_dict"):
+                for field,errors in exc.message_dict.items():
+                    for error in errors:
+                        form.add_error(field if field in form.fields else None,error)
+            else:
+                form.add_error(None,exc)
     return render(request,"master/form.html",{"slug":slug,"resource":config,"form":form,"title":("Editar" if obj else "Novo")+" — "+config["title"]})
 
 
