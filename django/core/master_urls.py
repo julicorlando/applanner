@@ -3,8 +3,13 @@ from . import master
 from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment
 from .master_email import smtp_settings,waive_onboarding_email
+from communications.master_marketing import campaigns,create_campaign,cancel_campaign,import_contacts
 
 urlpatterns=[
+    path("marketing/",campaigns,name="master-marketing"),
+    path("marketing/criar/",create_campaign,name="master-marketing-create"),
+    path("marketing/importar/",import_contacts,name="master-marketing-import"),
+    path("marketing/<int:pk>/cancelar/",cancel_campaign,name="master-marketing-cancel"),
     path("pagina-inicial/",platform_homepage,name="master-homepage"),
     path("pagamentos/mercado-pago/",master.platform_payment_gateway,name="master-platform-payment"),
     path("email/smtp/",smtp_settings,name="master-smtp-settings"),

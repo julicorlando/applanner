@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.utils import timezone
+from django.utils.html import escape
 
 from .models import MarketingDelivery, Notification
 
@@ -98,23 +99,31 @@ def send_marketing_delivery(self,delivery_id):
         )
         if not delivery or delivery.status!=MarketingDelivery.Status.QUEUED:
             return
-        if delivery.lead.status!="active" or not delivery.campaign.active:
+        if (delivery.lead.status!="active" or not delivery.lead.consent_at
+                or not delivery.campaign.active):
             delivery.status=MarketingDelivery.Status.SKIPPED
             delivery.save(update_fields=["status","updated_at"])
+            if delivery.campaign.active and not delivery.campaign.deliveries.filter(status=MarketingDelivery.Status.QUEUED).exists():
+                delivery.campaign.status=delivery.campaign.Status.COMPLETED
+                delivery.campaign.completed_at=timezone.now()
+                delivery.campaign.save(update_fields=["status","completed_at","updated_at"])
             return
 
         from django.conf import settings
         base=settings.PUBLIC_BASE_URL.rstrip("/")
-        html=delivery.campaign.body
-        if base:
-            pixel=f'<img src="{base}/tracking/email/{delivery.tracking_token}/open.gif" width="1" height="1" alt="" />'
-            html=html+pixel
-            if delivery.campaign.card_link_url:
-                tracked=f"{base}/tracking/email/{delivery.tracking_token}/click/"
-                html=html.replace(delivery.campaign.card_link_url,tracked)
+        if not base.startswith("https://"):
+            raise RuntimeError("PUBLIC_BASE_URL HTTPS é obrigatório para o descadastro de campanhas.")
+        html=delivery.campaign.body if "<" in delivery.campaign.body else escape(delivery.campaign.body).replace("\n","<br>")
+        unsubscribe_url=f"{base}/tracking/email/unsubscribe/{delivery.lead.unsubscribe_token}/"
+        html+=f'<p><a href="{escape(unsubscribe_url)}">Cancelar recebimento de e-mails</a></p>'
+        pixel=f'<img src="{base}/tracking/email/{delivery.tracking_token}/open.gif" width="1" height="1" alt="" />'
+        html=html+pixel
+        if delivery.campaign.card_link_url:
+            tracked=f"{base}/tracking/email/{delivery.tracking_token}/click/"
+            html=html.replace(delivery.campaign.card_link_url,tracked)
         message=EmailMultiAlternatives(
             subject=delivery.campaign.subject,
-            body=delivery.campaign.body,
+            body=delivery.campaign.body+f"\n\nCancelar recebimento: {unsubscribe_url}",
             to=[delivery.lead.email],
         )
         message.attach_alternative(html,"text/html")

@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from tenants.models import Tenant
-from .models import ChatbotFlow, MarketingDelivery, WhatsAppConversation, WhatsAppMessage
+from .models import ChatbotFlow, MarketingDelivery, MarketingLead, WhatsAppConversation, WhatsAppMessage
 from .chatbot import next_reply
 from .tasks import send_chatbot_reply
 from .whatsapp import verify_webhook_signature
@@ -83,6 +83,18 @@ def marketing_open(request,token):
         delivery.save(update_fields=["opened_at","updated_at"])
     pixel=bytes.fromhex("47494638396101000100800000ffffff00000021f90401000000002c00000000010001000002024401003b")
     return HttpResponse(pixel,content_type="image/gif")
+
+
+def marketing_unsubscribe(request,token):
+    from django.shortcuts import render
+    lead=MarketingLead.objects.filter(unsubscribe_token=token).first()
+    if not lead:
+        return HttpResponse(status=404)
+    if request.method=="POST" and lead.status!=MarketingLead.Status.UNSUBSCRIBED:
+        lead.status=MarketingLead.Status.UNSUBSCRIBED
+        lead.unsubscribed_at=timezone.now()
+        lead.save(update_fields=["status","unsubscribed_at","updated_at"])
+    return render(request,"communications/unsubscribe.html",{"unsubscribed":lead.status==MarketingLead.Status.UNSUBSCRIBED})
 
 
 def marketing_click(request,token):

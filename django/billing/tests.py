@@ -127,6 +127,8 @@ class PublicSignupTests(TestCase):
         self.assertContains(response,"49,90")
 
     def test_signup_creates_tenant_owner_unit_and_subscription(self):
+        from growth.models import AcquisitionEvent
+        self.client.get("/cadastro/?utm_source=busca&utm_campaign=teste")
         response=self.client.post("/cadastro/",{
             "plan":self.plan.pk,
             "billing_cycle":Subscription.BillingCycle.MONTHLY,
@@ -147,6 +149,9 @@ class PublicSignupTests(TestCase):
         subscription=Subscription.objects.get(tenant=tenant)
         self.assertEqual(subscription.plan,self.plan)
         self.assertEqual(subscription.status,Subscription.Status.TRIAL)
+        event=AcquisitionEvent.objects.get(tenant=tenant,event_name="CompleteRegistration")
+        self.assertEqual((event.source,event.campaign),("busca","teste"))
+        self.assertFalse(event.marketing_consent)
 
     def test_accepted_proposal_preserves_agreed_price_and_is_single_use(self):
         from commercial.models import Proposal

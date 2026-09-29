@@ -1,8 +1,10 @@
 from django.urls import path
 from . import portal
 from .branding import tenant_branding
+from billing.tenant_gateway import tenant_gateway
 
 urlpatterns = [
+    path("pagamentos/mercado-pago/",tenant_gateway,name="tenant-payment-gateway"),
     path("minha-pagina/",tenant_branding,name="tenant-branding"),
     path("", portal.home, name="portal-home"),
     path("tenant/<int:tenant_id>/", portal.select_tenant, name="portal-select-tenant"),

@@ -44,6 +44,10 @@ O cliente acompanha a assinatura e escolhe **cartão recorrente** ou **Pix por c
 
 O Master configura um fluxo simples por empresa em `/master/chatbot/`, com mensagens, palavras-chave e transferência para humano. A automação por estabelecimento só pode ser ativada quando o número Cloud API e as credenciais de WhatsApp estiverem configurados. O WhatsApp separado da plataforma, com QR code e caixa de entrada exclusiva do Master, está em `/master/whatsapp/`; veja a seção específica abaixo.
 
+Em **Master → Campanhas de e-mail** (`/master/marketing/`), importe CSV UTF-8 com `nome,email` somente após confirmar o consentimento registrado na origem. Contatos já descadastrados não são reativados. A campanha entra na fila do Celery Beat apenas para contatos ativos com `consent_at`; o link público permite descadastro, e o Master pode interromper os envios pendentes. Configure e teste o SMTP antes do disparo. `PUBLIC_BASE_URL` com HTTPS é obrigatório para permitir o descadastro em todos os e-mails.
+
+O proprietário conecta seu próprio Mercado Pago em **Operação → Recebimentos da empresa** (`/app/pagamentos/mercado-pago/`). A tela mostra a URL de webhook por empresa, valida as credenciais e não revela os segredos armazenados. Esta conexão não configura o gateway da plataforma usado para cobrar assinaturas do ApPlanner.
+
 ## Estado
 
 Esta branch é de migração/homologação e ainda não substitui a produção PHP. Veja `MIGRATION_CHECKLIST.md`, `ARCHITECTURE.md` e `SECURITY.md`.

@@ -149,7 +149,9 @@ class CustomPlanForm(forms.Form):
 
 def custom_plan(request):
     from commercial.models import Lead
+    from growth.attribution import capture_attribution,record_acquisition
 
+    capture_attribution(request)
     form=CustomPlanForm(request.POST or None)
     if request.method=="POST" and form.is_valid():
         data=form.cleaned_data
@@ -161,12 +163,15 @@ def custom_plan(request):
             consent_purpose="Contato comercial para proposta de plano personalizado",
             notes="Módulos solicitados: "+", ".join(module.name for module in data["modules"]),
         )
+        record_acquisition(request,"Lead",segment=data["business_type"])
         messages.success(request,"Recebemos sua seleção. Nossa equipe entrará em contato para montar sua proposta.")
         return redirect("billing-custom-plan")
     return render(request,"billing/custom_plan.html",{"form":form})
 
 
 def signup(request):
+    from growth.attribution import capture_attribution,record_acquisition
+    capture_attribution(request)
     plan_id=request.GET.get("plan") or request.POST.get("plan")
     selected=Plan.objects.filter(
         pk=plan_id,active=True,public_visible=True,is_custom=False
@@ -225,6 +230,7 @@ def signup(request):
             if proposal:
                 proposal.tenant=tenant
                 proposal.save(update_fields=["tenant","updated_at"])
+            record_acquisition(request,"CompleteRegistration",tenant=tenant,user=user,segment=data["category"])
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version
 

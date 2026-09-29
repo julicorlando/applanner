@@ -15,6 +15,7 @@
       {% endfor %}
     {% else %}<p>Sua página pública está desativada. Peça ao Master para ativar “Página pública” no cadastro da empresa.</p>{% endif %}
   </section>
+  {% if request.user.is_superuser or request.user.role == 'owner' %}<section class="panel" style="margin-bottom:20px"><h2>Recebimentos da empresa</h2><p>Conecte sua conta Mercado Pago para receber cobranças de clientes por Pix ou cartão. Esta conta é independente da assinatura paga ao ApPlanner.</p><a class="button" href="{% url 'tenant-payment-gateway' %}">Configurar Mercado Pago</a></section>{% endif %}
   <div class="portal-module-grid">
     {% for item in modules %}
       <article class="portal-module-card">

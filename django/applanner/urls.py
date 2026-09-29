@@ -5,7 +5,7 @@ from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_we
 from core.views import healthz, home, professional_public, tenant_public
 from core.branding import public_platform_logo, public_tenant_image, public_professional_image, public_blog_image
 from tenants.onboarding import onboarding
-from communications.views import marketing_click, marketing_open, whatsapp_webhook
+from communications.views import marketing_click, marketing_open, marketing_unsubscribe, whatsapp_webhook
 from contenthub.views import blog_post, landing, public_directory, public_directory_page
 from scheduling.public_views import appointment_page
 from scheduling.public_api import (
@@ -46,6 +46,7 @@ urlpatterns = [
     path("blog/<slug:slug>/", blog_post, name="blog-post"),
     path("landing/<slug:slug>/", landing, name="landing"),
     path("tracking/email/<uuid:token>/open.gif", marketing_open, name="marketing-open"),
+    path("tracking/email/unsubscribe/<str:token>/", marketing_unsubscribe, name="marketing-unsubscribe"),
     path("tracking/email/<uuid:token>/click/", marketing_click, name="marketing-click"),
     path("webhooks/whatsapp/", whatsapp_webhook, name="whatsapp-webhook"),
     path("api/scheduling/", include("scheduling.urls")),

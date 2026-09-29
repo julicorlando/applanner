@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Pagamentos da empresa — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">RECEBIMENTOS</span><h1>Mercado Pago de {{ tenant.name }}</h1><p>Conecte a conta que receberá os pagamentos dos seus clientes. A cobrança da sua assinatura ApPlanner é separada.</p></div></div>
+  <article class="panel"><h2>Situação da conta</h2>
+    {% for connection in connections %}<p><strong>{{ connection.get_environment_display }}</strong>: {{ connection.get_status_display }}{% if connection.last_tested_at %} · validado em {{ connection.last_tested_at|date:'d/m/Y H:i' }}{% endif %}</p>
+    {% empty %}<p>Nenhuma conta conectada.</p>{% endfor %}
+    <p>Webhook para cadastrar nas notificações da sua aplicação Mercado Pago: <code>{{ webhook_url }}</code></p>
+  </article>
+  {% if connected and not show_form %}<article class="panel"><h2>Como funciona</h2><ol><li>O cliente escolhe Pix ou cartão no pagamento da empresa.</li><li>O Mercado Pago gera a cobrança na sua conta.</li><li>O webhook confirma o pagamento na plataforma.</li></ol><a class="button" href="?alterar=1">Alterar conta ou credenciais</a></article>
+  {% else %}<article class="panel"><h2>Conectar ou substituir credenciais</h2><p>Copie as credenciais da sua aplicação Mercado Pago. Para testes, use Access Token iniciado por TEST-. Cadastre o webhook acima na mesma aplicação.</p>
+    <form method="post" class="portal-form">{% csrf_token %}{{ form.non_field_errors }}
+      {% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
+      <p>As chaves são criptografadas e não aparecem novamente nesta página.</p><button class="button primary" type="submit">Testar e conectar</button>
+    </form></article>{% endif %}
+</section>
+{% endblock %}
