@@ -26,6 +26,7 @@
         {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Mercado Pago</a><a href="/commercial/">Comercial</a>{% endif %}
         {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
         <a href="/account/2fa/setup/">Segurança</a>
+        <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
         <form method="post" action="/account/logout/" class="nav-form">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form>
       {% else %}
         <a href="/directory/">Explorar</a>
@@ -40,6 +41,7 @@
       {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Mercado Pago</a><a href="/commercial/">Comercial</a>{% endif %}
       {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
       <a href="/account/2fa/setup/">Segurança</a>
+      <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
       <form method="post" action="/account/logout/">{% csrf_token %}<button type="submit">Sair</button></form>
       {% else %}
       <a href="/directory/">Explorar estabelecimentos</a>

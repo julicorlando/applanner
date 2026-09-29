@@ -1,4 +1,5 @@
 from django.contrib import admin
+from accounts.api_access import api_resource
 from django.urls import include, path
 
 from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_webhook
@@ -17,6 +18,8 @@ from scheduling.public_api import (
 )
 
 urlpatterns = [
+    path("api/v1/<slug:key>/",api_resource,name="personal-api-list"),
+    path("api/v1/<slug:key>/<int:pk>/",api_resource,name="personal-api-detail"),
     path("inicio/",onboarding,name="tenant-onboarding"),
     path("healthz/", healthz, name="healthz"),
     path("imagens/logo/",public_platform_logo,name="public-platform-logo"),

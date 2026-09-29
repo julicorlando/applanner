@@ -1,5 +1,7 @@
 # ApPlanner Django
 
+Documentação operacional e API pessoal de consulta: [DOCUMENTACAO_USUARIOS_API.md](DOCUMENTACAO_USUARIOS_API.md). No sistema, cada usuário acessa **Documentação & API** em `/account/documentacao-api/`; o Master vê o catálogo completo. Execute as migrations antes de gerar tokens.
+
 Replatform do ApPlanner para Python/Django, mantendo o PHP legado como referência até concluir a paridade funcional.
 
 ## Stack

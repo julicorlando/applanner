@@ -198,3 +198,20 @@ class PasswordResetToken(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["user","expires_at"])]
+
+
+class PersonalAPIToken(models.Model):
+    user=models.ForeignKey(User,on_delete=models.CASCADE,related_name="api_tokens")
+    name=models.CharField(max_length=100)
+    prefix=models.CharField(max_length=16)
+    secret_hash=models.CharField(max_length=64,unique=True)
+    scopes=models.JSONField(default=list)
+    tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.CASCADE)
+    session_version=models.PositiveIntegerField()
+    created_at=models.DateTimeField(auto_now_add=True)
+    expires_at=models.DateTimeField()
+    last_used_at=models.DateTimeField(null=True,blank=True)
+    revoked_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        ordering=["-created_at"]

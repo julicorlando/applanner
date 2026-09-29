@@ -1,9 +1,12 @@
 from django.urls import path
 from . import views
+from . import api_access
 
 app_name="accounts"
 
 urlpatterns=[
+    path("documentacao-api/",api_access.documentation,name="documentation"),
+    path("documentacao-api/tokens/<int:pk>/revogar/",api_access.revoke_token,name="api-token-revoke"),
     path("login/",views.login_view,name="login"),
     path("2fa/challenge/",views.two_factor_challenge,name="two-factor-challenge"),
     path("2fa/setup/",views.two_factor_setup,name="two-factor-setup"),
