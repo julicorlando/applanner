@@ -1,0 +1,125 @@
+/* ApPlanner visual layer. Shared across public pages, Master and tenant portals. */
+:root {
+  --ink: #111a33;
+  --muted: #5c6880;
+  --line: #dfe5f0;
+  --paper: #ffffff;
+  --accent: #3c47d9;
+  --soft: #eef0ff;
+  --surface: #f6f8fc;
+  --ring: #5865e7;
+}
+html {scroll-padding-top: 90px}
+body {background: radial-gradient(circle at 85% 0%, #e9ecff 0, transparent 31rem), var(--surface); color: var(--ink)}
+main {min-height: calc(100vh - 160px)}
+.skip-link {position: fixed; top: -80px; left: 18px; z-index: 100; padding: 12px 18px; border-radius: 12px; background: var(--ink); color: #fff; font-weight: 800}
+.skip-link:focus {top: 12px}
+:where(a,button,input,select,textarea,summary):focus-visible {outline: 3px solid var(--ring); outline-offset: 3px}
+.topbar {height: 76px; background: #ffffffee; border-bottom: 1px solid #dce2ee; box-shadow: 0 7px 26px #1d31570b}
+.brand {gap: 11px; font-size: 1.16rem; color: var(--ink)}
+.brand-mark {width: 37px; height: 37px; border-radius: 12px; background: linear-gradient(145deg,#5964ef,#293392); box-shadow: 0 7px 18px #4654c850}
+.nav {gap: clamp(10px,1.6vw,22px)}
+.nav a:not(.nav-cta), .nav-link {color: #46516a; font-size: .86rem}
+.nav a:not(.nav-cta):hover,.nav-link:hover {color: var(--accent)}
+.nav-cta,.button.primary {background: var(--accent)!important; border-color: var(--accent)!important; color: #fff!important; box-shadow: 0 7px 16px #3647bb28}
+.nav-cta:hover,.button.primary:hover {background: #2834b5!important; border-color: #2834b5!important}
+.button {gap: 9px; min-height: 44px; padding: 11px 17px; border-radius: 12px; color: #243153; border-color: #cfd8e8; box-shadow: 0 2px 5px #172c5008}
+.button:hover {border-color: #aab8e6; box-shadow: 0 10px 24px #192b5519}
+.button.light {background: #fff!important; border-color: #fff!important; color: #223076!important}
+.eyebrow {color: #4654cf; letter-spacing: .14em}
+.panel,.table-card,.master-group {background: #fff; border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 12px 32px #1d31550c}
+.panel {padding: clamp(18px,2.5vw,28px)}
+.panel h2 {letter-spacing: -.035em}
+.portal-page {padding-top: clamp(30px,5vw,62px); padding-bottom: 96px}
+.portal-heading {display: flex; align-items: end; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); padding-bottom: 25px; margin-bottom: 28px}
+.portal-heading h1 {font-size: clamp(2.2rem,4.6vw,3.8rem); line-height: 1.02; margin: 9px 0 10px; letter-spacing: -.055em}
+.portal-heading p {color: var(--muted); line-height: 1.6; max-width: 690px; margin: 0}
+.portal-heading .button {flex: none}
+.portal-module-card {border: 1px solid #e0e6f2; border-radius: 20px; background: #fff; box-shadow: 0 12px 30px #1d31550b}
+.portal-module-card:hover {border-color: #a9b5ec; box-shadow: 0 20px 44px #1d31551c}
+.portal-resource-links a {border-radius: 9px; transition: background .16s ease, color .16s ease}
+.portal-resource-links a:hover {background: var(--soft); color: #2735a4}
+.metric-grid article {border-radius: 18px; background: linear-gradient(155deg,#fff,#f8faff); border: 1px solid #dee5f3; box-shadow: 0 10px 25px #1d315509}
+.metric-grid strong {color: #2634a5}
+.master-group {padding: 0; overflow: clip; margin: 14px 0}
+.master-group>summary {padding: 20px 24px; display: flex; align-items: center; gap: 12px; list-style: none; background: #fff; letter-spacing: -.025em}
+.master-group>summary::-webkit-details-marker {display: none}
+.master-group>summary::after {content: '⌄'; margin-left: auto; color: #596683; font-size: 1.3rem; line-height: 1}
+.master-group[open]>summary {border-bottom: 1px solid var(--line); background: #f9faff}
+.master-group[open]>summary::after {transform: rotate(180deg)}
+.master-group .portal-module-grid {margin: 0; padding: 18px; background: #fbfcff}
+.section-heading h2 {margin: 6px 0 18px; font-size: clamp(1.5rem,2.6vw,2rem); letter-spacing: -.04em}
+.master-shortcuts {margin: 30px 0 34px}
+.shortcut-grid {display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px}
+.shortcut-grid>a {position: relative; min-height: 170px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px; background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 25px #1d315509; text-decoration: none; transition: transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.shortcut-grid>a:hover {transform: translateY(-3px); border-color: #aab7eb; box-shadow: 0 18px 40px #1d315519}
+.shortcut-icon {width: 37px; height: 37px; display: grid; place-items: center; border-radius: 11px; background: #eef0ff; color: #3541bd; font-size: 1.25rem; font-weight: 800}
+.shortcut-grid strong {font-size: .96rem; letter-spacing: -.02em}
+.shortcut-grid small {font-size: .77rem; line-height: 1.4; color: var(--muted); padding-right: 12px}
+.shortcut-arrow {position: absolute; top: 21px; right: 20px; color: #6470aa}
+.portal-table {border-collapse: separate; border-spacing: 0; width: 100%}
+.portal-table thead {background: #f2f5fb}
+.portal-table th {font-size: .73rem; text-transform: uppercase; letter-spacing: .055em; color: #526079}
+.portal-table tbody tr:hover {background: #f5f7ff}
+.portal-form {gap: 18px}
+.form-field label {color: #26334e; font-weight: 750}
+.form-field :is(input:not([type=checkbox]),select,textarea),.portal-search input {min-height: 45px; border: 1px solid #cbd5e5; border-radius: 11px; background: #fff; font: inherit; color: var(--ink)}
+.form-field :is(input:not([type=checkbox]),select,textarea):focus,.portal-search input:focus {border-color: var(--ring); box-shadow: 0 0 0 4px #5865e724; outline: none}
+.flash {border-radius: 14px; border: 1px solid #cfd8eb; box-shadow: 0 12px 32px #1b2c4b1c}
+.footer {background: #fff; border-top-color: #dfe5f0}
+
+/* Public conversion and sign-in. */
+.marketing-hero {min-height: 650px; gap: clamp(28px,5vw,70px)}
+.hero-copy h1 {color: #131c36; max-width: 700px}
+.hero-copy .lead {max-width: 610px}
+.hero-copy .actions .button.primary {font-size: .98rem; padding: 14px 20px}
+.product-window {transform: none; border: 1px solid #ffffff2a; background: linear-gradient(145deg,#131e41,#11182d); box-shadow: 0 35px 80px #17295842}
+.event.accent {background: #394acf}
+.proof-strip {background: #fff}
+.section {padding-top: clamp(70px,9vw,110px); padding-bottom: clamp(70px,9vw,110px)}
+.segment-grid article,.pricing-card {border: 1px solid #dfe5f0; border-radius: 22px; box-shadow: 0 13px 35px #1d31550d}
+.segment-grid article:hover,.pricing-card:hover {border-color: #b7c2ea; box-shadow: 0 20px 45px #1d315519}
+.pricing-card {min-height: 420px}
+.pricing-card.featured {border: 2px solid #5260db; box-shadow: 0 20px 48px #4354b72c}
+.trial-highlight {background: #e8f5ed; color: #165c3a}
+.closing {background: linear-gradient(125deg,#172650,#303eb1); box-shadow: 0 26px 56px #223b9840}
+.login-layout {min-height: 75vh}
+.login-intro h1 {max-width: 600px}
+.login-card {border-radius: 24px; box-shadow: 0 28px 65px #1a2b5124}
+.login-card .button {width: 100%}
+
+@media(max-width: 1080px) {
+  .shortcut-grid {grid-template-columns: repeat(2,minmax(0,1fr))}
+}
+@media(max-width: 900px) {
+  .topbar .nav {display: none}
+  .mobile-nav {display: block}
+  .mobile-nav>summary {padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; background: #fff}
+  .mobile-nav-links {top: 68px; z-index: 25; border-radius: 16px; box-shadow: 0 22px 48px #1b2d5340}
+  .marketing-hero {grid-template-columns: 1fr; min-height: auto; padding-top: 64px}
+  .product-window {width: min(620px,100%); margin: 0 auto}
+  .proof-grid {grid-template-columns: repeat(2,1fr); gap: 18px}
+}
+@media(max-width: 620px) {
+  .shell {width: min(100% - 32px,1180px)}
+  .topbar {height: 68px; padding: 0 16px}
+  .portal-heading {align-items: flex-start; flex-direction: column}
+  .portal-heading .button {width: 100%}
+  .shortcut-grid {grid-template-columns: 1fr}
+  .shortcut-grid>a {min-height: 132px}
+  .marketing-hero {padding-top: 48px; padding-bottom: 64px}
+  .hero-copy h1 {font-size: clamp(2.9rem,12vw,4.2rem); line-height: .98}
+  .hero-copy .actions .button {width: 100%}
+  .product-window {padding: 15px; border-radius: 20px}
+  .window-stats {gap: 6px}
+  .window-stats div {padding: 11px}
+  .proof-grid {grid-template-columns: 1fr 1fr}
+  .proof-grid div {padding: 0; border: 0}
+  .feature-band {grid-template-columns: 1fr; gap: 18px}
+  .closing {border-radius: 20px; padding: 48px 18px}
+  .footer {flex-direction: column}
+}
+@media(prefers-reduced-motion: reduce) {
+  .shortcut-grid>a,.segment-grid article,.pricing-card {transition: none}
+  .shortcut-grid>a:hover {transform: none}
+}

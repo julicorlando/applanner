@@ -8,8 +8,10 @@
   <title>{% block title %}ApPlanner{% endblock %}</title>
   <meta name="description" content="{% block description %}Agenda, operação, pagamentos e relacionamento em uma plataforma preparada para o seu negócio.{% endblock %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/refresh.css' %}">
 </head>
 <body>
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="ApPlanner início">
       {% if platform_branding.logo %}<img class="platform-logo" src="{% url 'public-platform-logo' %}" alt="">{% else %}<span class="brand-mark">A</span>{% endif %}<span>ApPlanner</span>
@@ -30,16 +32,22 @@
         <a class="nav-cta" href="/account/login/">Entrar</a>
       {% endif %}
     </nav>
-    {% if request.user.is_authenticated %}
     <details class="mobile-nav"><summary>Menu</summary><div class="mobile-nav-links">
+      {% if request.user.is_authenticated %}
       <a href="/">Painel</a><a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a>{% endif %}
       {% if request.user.tenant_id %}<a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}
       {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Mercado Pago</a><a href="/commercial/">Comercial</a>{% endif %}
       {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
       <a href="/account/2fa/setup/">Segurança</a>
       <form method="post" action="/account/logout/">{% csrf_token %}<button type="submit">Sair</button></form>
+      {% else %}
+      <a href="/directory/">Explorar estabelecimentos</a>
+      <a href="/planos/">Ver planos</a>
+      <a href="/#segmentos">Segmentos</a>
+      <a href="/account/login/">Entrar</a>
+      <a href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
+      {% endif %}
     </div></details>
-    {% endif %}
   </header>
   {% if request.support_actor %}
     <div class="panel" role="status" style="margin:12px auto;max-width:1100px;padding:14px">
@@ -52,7 +60,7 @@
   {% if messages %}
   <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
   {% endif %}
-  <main>{% block content %}{% endblock %}</main>
+  <main id="conteudo">{% block content %}{% endblock %}</main>
   <footer class="footer">
     <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>
     <span>© {% now "Y" %} ApPlanner</span>

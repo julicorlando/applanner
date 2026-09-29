@@ -1,16 +1,25 @@
 {% extends "base.html" %}
 {% block title %}Master — ApPlanner{% endblock %}
 {% block content %}
-<section class="shell" style="padding-top:20px"><a class="button primary" href="{% url 'master-homepage' %}">Editar página inicial e logo →</a> <a class="button ghost" href="{% url 'master-resource-list' 'blog' %}">Publicar notícias →</a></section>
-<section class="shell" style="padding-top:20px"><a class="button" href="{% url 'master-platform-payment' %}">Configurar Mercado Pago da plataforma →</a></section>
-<section class="shell" style="padding-top:20px"><a class="button" href="{% url 'master-smtp-settings' %}">Configurar e testar SMTP →</a> <a class="button ghost" href="{% url 'master-resource-list' 'onboarding' %}">Verificação e publicação das empresas →</a></section>
-<section class="shell" style="padding-top:20px"><a class="button" href="{% url 'master-whatsapp' %}">WhatsApp do Master · QR code e atendimento às empresas →</a> <a class="button ghost" href="{% url 'master-whatsapp-flow' %}">Montar fluxo do WhatsApp Master →</a></section>
 <section class="shell portal-page">
-  <div class="portal-heading"><div><span class="eyebrow">MASTER</span><h1>Central da plataforma</h1><p>Gerencie os estabelecimentos, publique planos e acompanhe as solicitações comerciais e de suporte.</p></div></div>
+  <div class="portal-heading"><div><span class="eyebrow">VISÃO GERAL · MASTER</span><h1>Central da plataforma</h1><p>Planos, empresas, comunicação e operação em um único lugar.</p></div><a class="button primary" href="{% url 'master-resource-list' 'planos' %}">Gerenciar planos <span aria-hidden="true">↗</span></a></div>
   <div class="metric-grid" style="margin-bottom:22px">
     <article><span>Planos à venda</span><strong>{{ public_plans }}</strong><small>Ativos e visíveis para novos clientes</small></article>
     <article><span>Funções disponíveis</span><strong>{{ active_modules }}</strong><small>Módulos ativos no catálogo</small></article>
   </div>
+  <section class="master-shortcuts" aria-labelledby="master-shortcuts-title">
+    <div class="section-heading"><div><span class="eyebrow">ACESSO RÁPIDO</span><h2 id="master-shortcuts-title">O que você quer fazer?</h2></div></div>
+    <div class="shortcut-grid">
+      <a href="{% url 'master-homepage' %}"><span class="shortcut-icon" aria-hidden="true">✦</span><strong>Editar página inicial</strong><small>Logo, textos e apresentação pública</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-resource-list' 'blog' %}"><span class="shortcut-icon" aria-hidden="true">▤</span><strong>Publicar notícia</strong><small>Conteúdo para o blog da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-platform-payment' %}"><span class="shortcut-icon" aria-hidden="true">◈</span><strong>Receber assinaturas</strong><small>Mercado Pago da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-smtp-settings' %}"><span class="shortcut-icon" aria-hidden="true">✉</span><strong>Configurar e-mail</strong><small>SMTP e teste de envio</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-marketing' %}"><span class="shortcut-icon" aria-hidden="true">◎</span><strong>Criar campanha</strong><small>Contatos autorizados e entregas</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-whatsapp' %}"><span class="shortcut-icon" aria-hidden="true">◌</span><strong>Atender no WhatsApp</strong><small>Caixa de entrada e QR code</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-whatsapp-flow' %}"><span class="shortcut-icon" aria-hidden="true">◇</span><strong>Editar fluxo</strong><small>Automação do WhatsApp Master</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-resource-list' 'onboarding' %}"><span class="shortcut-icon" aria-hidden="true">✓</span><strong>Verificar empresas</strong><small>Cadastro e publicação</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+    </div>
+  </section>
   <div class="panel" style="margin-bottom:22px"><h2>Primeiros passos</h2><p><a href="{% url 'master-resource-list' 'planos' %}">1. Configure preços, teste grátis e visibilidade dos planos</a> · <a href="{% url 'master-resource-list' 'modulos' %}">2. Revise os módulos</a> · <a href="{% url 'master-resource-list' 'empresas' %}">3. Ative a página pública dos estabelecimentos</a> · <a href="{% url 'master-resource-list' 'conexoes-pagamento' %}">4. Verifique as integrações de pagamento</a>.</p><p>Em cada plano, use <strong>Módulos</strong> para marcar as funções disponíveis. <a href="{% url 'billing-plans' %}" target="_blank" rel="noopener">Ver página de vendas →</a></p><p><a class="button ghost" href="{% url 'master-chatbot' %}">Configurar fluxo do chatbot →</a></p></div>
   {% for group in groups %}<details class="master-group" {% if forloop.first %}open{% endif %}>
     <summary>{{ group.title }} <small>{{ group.cards|length }} áreas</small></summary>
