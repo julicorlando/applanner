@@ -64,7 +64,8 @@ def professional_access(request,pk):
     form=ProfessionalAccessForm(request.POST or None,professional=professional,initial=initial)
     if request.method=="POST" and form.is_valid():
         with transaction.atomic():
-            professional=Professional.objects.select_for_update().select_related("user").get(pk=professional.pk)
+            # The linked user is optional; avoid an outer join in FOR UPDATE.
+            professional=Professional.objects.select_for_update().get(pk=professional.pk)
             data=form.cleaned_data
             if professional.user_id:
                 user=professional.user

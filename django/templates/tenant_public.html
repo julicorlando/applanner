@@ -31,7 +31,7 @@
         <div class="form-field"><label>Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
         <div class="form-field"><label>Data</label><input id="booking-date" type="date" required></div>
       </div>
-      <div class="form-field"><label id="booking-slot-label">Horários disponíveis</label><input type="hidden" id="booking-slot"><div id="booking-slots" class="booking-slots" role="group" aria-labelledby="booking-slot-label"></div><small id="booking-slot-status" role="status" aria-live="polite">Escolha o serviço e a data para ver os horários.</small></div>
+      <div class="form-field booking-times"><label id="booking-slot-label">Horários disponíveis</label><p class="booking-times-hint">Toque em um horário para selecioná-lo. Os horários disponíveis aparecem após escolher serviço e data.</p><input type="hidden" id="booking-slot"><div id="booking-slots" class="booking-slots" role="group" aria-labelledby="booking-slot-label"></div><small id="booking-slot-status" role="status" aria-live="polite">Escolha o serviço e a data para ver os horários.</small></div>
       <div class="portal-module-grid" style="margin-top:14px">
         <div class="form-field"><label>Seu nome</label><input id="booking-name" required minlength="2"></div>
         <div class="form-field"><label>Telefone</label><input id="booking-phone" autocomplete="tel"></div>

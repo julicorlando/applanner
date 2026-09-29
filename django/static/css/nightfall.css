@@ -66,3 +66,18 @@ input::placeholder,textarea::placeholder{color:#8c9cba}
 @media(max-width:900px){.sales-steps .segment-grid{grid-template-columns:1fr}.platform-extra-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.platform-extra-metrics{grid-template-columns:1fr}.professional-schedule .appointment-row{grid-template-columns:100px 1fr}.marketing-hero{min-height:0}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+/* Public booking: readable time choices on desktop and small phones. */
+#agendar .section-head h2{max-width:780px;line-height:1.08}
+#public-booking .form-field>label{font-size:.95rem;font-weight:750}
+#public-booking .form-field>select,#public-booking .form-field>input:not([type=hidden]){font-size:1rem;min-height:52px}
+.booking-times{margin-top:10px}
+.booking-times-hint{margin:0;color:#b7c8df;font-size:.91rem;line-height:1.55}
+.booking-times .booking-slots{grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:12px}
+.booking-times .booking-slot{min-height:64px;padding:10px 12px;border:1px solid #3e5575;border-radius:14px;background:#172642;color:#f5fbff;font-size:1.18rem;font-weight:800;line-height:1.2;letter-spacing:.01em;box-shadow:0 8px 22px #050c1c50}
+.booking-times .booking-slot small{display:block;color:#b8ccdf;font-size:.76rem;font-weight:550;line-height:1.3}
+.booking-times .booking-slot:hover,.booking-times .booking-slot:focus-visible{background:#24405f;border-color:#71e1ed;outline:2px solid #43c8dc;outline-offset:2px}
+.booking-times .booking-slot[aria-pressed=true]{background:linear-gradient(110deg,#127f9b,#1b6eb6);border-color:#9beaf3;color:#fff;box-shadow:0 0 0 3px #50d9e04d}
+.booking-times .booking-slot[aria-pressed=true] small{color:#fff}
+#booking-slot-status{font-size:.88rem;color:#b8c8dd}
+@media(max-width:560px){.booking-times .booking-slots{grid-template-columns:repeat(2,minmax(0,1fr))}.booking-times .booking-slot{font-size:1.15rem}}
