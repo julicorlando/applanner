@@ -32,11 +32,15 @@ def healthz(request):
 
 
 def _tenant_dashboard(request):
+    if request.user.role=="professional" and not request.user.is_superuser:
+        from django.shortcuts import redirect
+        return redirect("professional-area")
     from billing.entitlements import active_subscription
     from billing.models import TenantModule
     from finance.models import FinancialTransaction
     from scheduling.models import Appointment,Customer,Professional
     from .portal import available_modules
+    from accounts.permissions import has_capability
 
     tenant=request.user.tenant
     now=timezone.localtime()
@@ -84,13 +88,15 @@ def _tenant_dashboard(request):
         "modules":modules,
         "available_modules":available_modules(request.user,tenant),
         "subscription":subscription,
+        "can_manage_agenda":has_capability(request.user,"agenda.manage"),
+        "can_manage_finance":has_capability(request.user,"finance.manage"),
     })
 
 
 def _platform_dashboard(request):
-    from billing.models import Subscription
+    from billing.models import Plan, Subscription
     from commercial.models import Lead
-    from operations.models import OperationalIncident
+    from operations.models import OperationalIncident, SupportTicket
     from tenants.models import Tenant
 
     return render(request,"platform_dashboard.html",{
@@ -104,6 +110,10 @@ def _platform_dashboard(request):
             status__in=[OperationalIncident.Status.OPEN,OperationalIncident.Status.ACKNOWLEDGED],
             severity=OperationalIncident.Severity.CRITICAL,
         ).count(),
+        "plans_available":Plan.objects.filter(active=True,public_visible=True).count(),
+        "tickets_open":SupportTicket.objects.exclude(status__in=[SupportTicket.Status.RESOLVED,SupportTicket.Status.CLOSED]).count(),
+        "recent_leads":Lead.objects.order_by("-created_at")[:5],
+        "recent_tenants":Tenant.objects.order_by("-created_at")[:5],
     })
 
 

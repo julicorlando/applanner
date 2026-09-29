@@ -2,12 +2,36 @@
 {% block title %}Master · ApPlanner{% endblock %}
 {% block content %}
 <div class="shell dashboard">
-  <div class="dashboard-head"><div><span class="eyebrow">PLATAFORMA</span><h1>Central de operações</h1><p>Visão consolidada do ApPlanner.</p></div><a class="button" href="/master/">Abrir painel Master</a></div>
+  <div class="dashboard-head"><div><span class="eyebrow">PLATAFORMA · VISÃO GERAL</span><h1>Central de operações</h1><p>Vendas, empresas, atendimento e publicação em uma única visão.</p></div><a class="button primary" href="/master/">Todas as funções Master ↗</a></div>
   <section class="metric-grid">
     <article><span>Estabelecimentos</span><strong>{{ tenants_total }}</strong><small>{{ tenants_active }} ativos</small></article>
     <article><span>Assinaturas</span><strong>{{ subscriptions_active }}</strong><small>ativas</small></article>
     <article><span>Oportunidades</span><strong>{{ open_leads }}</strong><small>em aberto</small></article>
     <article><span>Incidentes críticos</span><strong>{{ critical_incidents }}</strong><small>requerem atenção</small></article>
   </section>
+  <section class="metric-grid platform-extra-metrics" aria-label="Mais indicadores">
+    <article><span>Planos publicados</span><strong>{{ plans_available }}</strong><small>disponíveis para venda</small></article>
+    <article><span>Chamados em aberto</span><strong>{{ tickets_open }}</strong><small>acompanhe o suporte</small></article>
+  </section>
+  <section class="module-launcher"><div class="panel-head module-launcher-head"><div><span class="eyebrow">ACESSO RÁPIDO</span><h2>O que você quer fazer agora?</h2></div><a href="/master/">Explorar todas as áreas →</a></div>
+    <div class="module-launcher-grid">
+      <a href="{% url 'master-resource-list' 'empresas' %}"><span>01 · EMPRESAS</span><strong>Gerenciar estabelecimentos</strong><small>Cadastros, publicação e situação.</small></a>
+      <a href="{% url 'master-resource-list' 'planos' %}"><span>02 · CATÁLOGO</span><strong>Planos e módulos</strong><small>Preços, benefícios e teste grátis.</small></a>
+      <a href="{% url 'commercial-dashboard' %}"><span>03 · VENDAS</span><strong>Leads e funil comercial</strong><small>Prospecção e oportunidades abertas.</small></a>
+      <a href="{% url 'master-whatsapp' %}"><span>04 · ATENDIMENTO</span><strong>WhatsApp Master</strong><small>Conversas com novas empresas.</small></a>
+      <a href="{% url 'master-resource-list' 'suporte' %}"><span>05 · SUPORTE</span><strong>Chamados</strong><small>Prioridades e acompanhamento.</small></a>
+      <a href="{% url 'master-platform-payment' %}"><span>06 · RECEBIMENTOS</span><strong>Pagamentos</strong><small>Configuração e conciliação.</small></a>
+      <a href="{% url 'master-homepage' %}"><span>07 · SITE</span><strong>Página de vendas</strong><small>Marca, textos e publicação.</small></a>
+      <a href="{% url 'master-smtp-settings' %}"><span>08 · COMUNICAÇÃO</span><strong>E-mails</strong><small>SMTP e modelos de mensagens.</small></a>
+    </div>
+  </section>
+  <div class="dashboard-grid platform-recent">
+    <section class="panel"><div class="panel-head"><h2>Leads recentes</h2><a href="{% url 'commercial-dashboard' %}">Abrir Comercial →</a></div>
+      {% for lead in recent_leads %}<div class="dashboard-list-row"><div><strong>{{ lead.name }}</strong><small>{{ lead.business_type }} · {{ lead.created_at|date:"d/m H:i" }}</small></div><span>{{ lead.get_status_display }}</span></div>{% empty %}<p class="empty">Nenhum lead recebido ainda.</p>{% endfor %}
+    </section>
+    <section class="panel"><div class="panel-head"><h2>Empresas recentes</h2><a href="{% url 'master-resource-list' 'empresas' %}">Ver empresas →</a></div>
+      {% for company in recent_tenants %}<div class="dashboard-list-row"><div><strong>{{ company.name }}</strong><small>{{ company.created_at|date:"d/m H:i" }}</small></div><span>{{ company.get_status_display }}</span></div>{% empty %}<p class="empty">Nenhuma empresa cadastrada ainda.</p>{% endfor %}
+    </section>
+  </div>
 </div>
 {% endblock %}

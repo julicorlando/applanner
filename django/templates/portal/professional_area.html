@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Minha área · {{ professional.name }}{% endblock %}
+{% block content %}
+<section class="shell dashboard professional-dashboard">
+  <header class="dashboard-head"><div><span class="eyebrow">ÁREA DO PROFISSIONAL</span><h1>Olá, {{ professional.name }}</h1><p>Sua agenda e seus ganhos em {{ professional.tenant.name }}.</p></div>{% if professional.public_slug and professional.tenant.public_enabled %}<a class="button" href="{% url 'professional-public' professional.tenant.public_slug|default:professional.tenant.slug professional.public_slug %}" target="_blank" rel="noopener">Minha página pública ↗</a>{% endif %}</header>
+  <section class="metric-grid" aria-label="Resumo pessoal">
+    <article><span>Próximos agendamentos</span><strong>{{ upcoming_count }}</strong><small>pendentes ou confirmados</small></article>
+    <article><span>Atendidos no mês</span><strong>{{ completed_month }}</strong><small>agendamentos concluídos</small></article>
+    <article><span>Comissões do mês</span><strong>R$ {{ paid_commission|floatformat:2 }}</strong><small>pagas · R$ {{ pending_commission|floatformat:2 }} pendentes</small></article>
+    <article><span>Projeção futura</span><strong>{% if has_projection %}R$ {{ projected_commission|floatformat:2 }}{% else %}—{% endif %}</strong><small>{% if has_projection %}estimativa dos agendamentos futuros; não é pagamento garantido{% else %}defina o percentual de comissão no cadastro{% endif %}</small></article>
+  </section>
+  <section class="panel professional-schedule"><div class="panel-head"><h2>Minha agenda</h2><span>Próximos 15 horários</span></div><div class="appointment-list">
+    {% for item in upcoming %}<div class="appointment-row"><time datetime="{{ item.starts_at|date:'c' }}">{{ item.starts_at|date:"d/m H:i" }}</time><div><strong>{{ item.customer.name }}</strong><span>{{ item.service.name }}</span></div><em>{{ item.get_status_display }}</em></div>{% empty %}<p class="empty">Você não tem agendamentos futuros.</p>{% endfor %}
+  </div></section>
+</section>
+{% endblock %}

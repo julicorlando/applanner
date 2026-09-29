@@ -12,6 +12,7 @@ class IncompleteOnboardingMiddleware:
     def __call__(self,request):
         user=getattr(request,"user",None)
         if (user and user.is_authenticated and user.tenant_id and not user.is_superuser
+            and user.role!="professional"
             and (request.path=="/" or request.path.startswith(("/app/","/api/scheduling/")))):
             if TenantOnboarding.objects.filter(tenant_id=user.tenant_id,required=True,completed_at__isnull=True).exists():
                 return redirect("tenant-onboarding")

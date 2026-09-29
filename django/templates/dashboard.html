@@ -20,6 +20,11 @@
     <article><span>Equipe</span><strong>{{ professionals }}</strong><small>profissionais ativos</small></article>
     <article><span>Receita do mês</span><strong>R$ {{ revenue|floatformat:2 }}</strong><small>transações pagas</small></article>
   </section>
+  <section class="dashboard-actions" aria-label="Ações frequentes">
+    {% if can_manage_agenda %}<a class="button primary" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">+ Novo agendamento</a><a class="button" href="{% url 'portal-resource-list' 'agenda' 'agendamentos' %}">Abrir agenda</a><a class="button" href="{% url 'portal-resource-create' 'agenda' 'clientes' %}">Cadastrar cliente</a><a class="button" href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}">Equipe e acessos</a>{% endif %}
+    {% if can_manage_finance %}<a class="button" href="{% url 'finance-pos' %}">Abrir PDV</a>{% endif %}
+    <a class="button" href="{% url 'tenant-branding' %}">Minha página pública</a>
+  </section>
 
   <section class="module-launcher">
     <div class="panel-head module-launcher-head">

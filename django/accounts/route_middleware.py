@@ -25,6 +25,9 @@ class CapabilityRouteMiddleware:
 
     def __call__(self,request):
         user=getattr(request,"user",None)
+        if user and user.is_authenticated and user.role=="professional" and not user.is_superuser:
+            if request.path.startswith("/app/") and not request.path.startswith("/app/profissional/"):
+                raise PermissionDenied("A conta profissional acessa apenas sua própria área.")
         if user and user.is_authenticated and not user.is_superuser and user.role_links.exists():
             path=request.path
             required=None

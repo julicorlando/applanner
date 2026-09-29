@@ -767,6 +767,8 @@ def _headers(model, columns):
 
 @login_required
 def home(request):
+    if request.user.role=="professional" and not request.user.is_superuser:
+        return redirect("professional-area")
     if request.user.is_superuser and request.GET.get("trocar")=="1":
         request.session.pop("portal_tenant_id",None)
     tenant=_require_tenant(request)
@@ -864,6 +866,9 @@ def resource_list(request,module_slug,resource_slug):
         "headers":_headers(model,columns),"rows":rows,"q":q,
         "can_create":resource.get("create",True) or bool(resource.get("custom_create")),
         "can_edit":resource.get("edit",True),
+        "can_manage_professionals":request.user.is_superuser or request.user.role in {
+            "owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager"
+        },
     })
 
 
