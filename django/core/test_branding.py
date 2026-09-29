@@ -2,6 +2,7 @@ from io import BytesIO
 from tempfile import TemporaryDirectory
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.contrib.staticfiles import finders
 from django.test import TestCase, override_settings
 from PIL import Image
 
@@ -43,6 +44,17 @@ class BrandingTests(TestCase):
         post.status=BlogPost.Status.DRAFT
         post.save()
         self.assertEqual(self.client.get(f"/imagens/noticia/{post.pk}/").status_code,404)
+
+    def test_official_logo_is_default_and_master_upload_can_override_it(self):
+        self.assertIsNotNone(finders.find("images/applanner-logo.png"))
+        self.assertContains(self.client.get("/"),'class="platform-logo platform-logo-official"')
+        self.client.force_login(self.master)
+        self.assertContains(self.client.get("/master/pagina-inicial/"),"Logo oficial do ApPlanner ativa")
+        self.client.post("/master/pagina-inicial/",{"logo":picture(),"hero_title":"Título",
+            "hero_description":"Descrição","closing_title":"Chamada"})
+        response=self.client.get("/")
+        self.assertContains(response,'class="platform-logo platform-logo-custom"')
+        self.assertContains(response,"/imagens/logo/")
 
     def test_private_unauthorized_branding_and_public_only_image(self):
         staff=User.objects.create_user(email="other-brand@example.com",password="StrongPassword!123")

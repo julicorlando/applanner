@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#0b1020">
   <title>{% block title %}ApPlanner{% endblock %}</title>
   <meta name="description" content="{% block description %}Agenda, operação, pagamentos e relacionamento em uma plataforma preparada para o seu negócio.{% endblock %}">
+  <link rel="icon" type="image/png" href="{% static 'images/applanner-logo.png' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <link rel="stylesheet" href="{% static 'css/refresh.css' %}">
 </head>
@@ -14,7 +15,7 @@
   <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="ApPlanner início">
-      {% if platform_branding.logo %}<img class="platform-logo" src="{% url 'public-platform-logo' %}" alt="">{% else %}<span class="brand-mark">A</span>{% endif %}<span>ApPlanner</span>
+      {% if platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="ApPlanner">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="ApPlanner">{% endif %}
     </a>
     <nav class="nav">
       {% if request.user.is_authenticated %}

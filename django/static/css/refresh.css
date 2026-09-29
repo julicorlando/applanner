@@ -15,8 +15,10 @@ main {min-height: calc(100vh - 160px)}
 .skip-link {position: fixed; top: -80px; left: 18px; z-index: 100; padding: 12px 18px; border-radius: 12px; background: var(--ink); color: #fff; font-weight: 800}
 .skip-link:focus {top: 12px}
 :where(a,button,input,select,textarea,summary):focus-visible {outline: 3px solid var(--ring); outline-offset: 3px}
-.topbar {height: 76px; background: #ffffffee; border-bottom: 1px solid #dce2ee; box-shadow: 0 7px 26px #1d31570b}
+.topbar {height: 88px; background: #ffffffee; border-bottom: 1px solid #dce2ee; box-shadow: 0 7px 26px #1d31570b}
 .brand {gap: 11px; font-size: 1.16rem; color: var(--ink)}
+.brand .platform-logo {width: auto; height: 76px; max-width: 120px; object-fit: contain; border-radius: 0; display: block}
+.brand .platform-logo-custom {height: 50px; max-width: 190px}
 .brand-mark {width: 37px; height: 37px; border-radius: 12px; background: linear-gradient(145deg,#5964ef,#293392); box-shadow: 0 7px 18px #4654c850}
 .nav {gap: clamp(10px,1.6vw,22px)}
 .nav a:not(.nav-cta), .nav-link {color: #46516a; font-size: .86rem}
@@ -102,7 +104,9 @@ main {min-height: calc(100vh - 160px)}
 }
 @media(max-width: 620px) {
   .shell {width: min(100% - 32px,1180px)}
-  .topbar {height: 68px; padding: 0 16px}
+  .topbar {height: 80px; padding: 0 16px}
+  .brand .platform-logo {height: 68px}
+  .brand .platform-logo-custom {height: 45px}
   .portal-heading {align-items: flex-start; flex-direction: column}
   .portal-heading .button {width: 100%}
   .shortcut-grid {grid-template-columns: 1fr}
@@ -191,4 +195,40 @@ main {min-height: calc(100vh - 160px)}
   .operation-share-actions {width: 100%}
   .operation-share-actions .button {flex: 1}
   .operation-section-heading {align-items: start; flex-direction: column}
+}
+
+/* Master: first steps and searchable function catalog. */
+.master-start {margin: 0 0 48px}
+.master-start .section-heading {margin-bottom: 18px}
+.master-start .section-heading h2,.master-catalog-heading h2 {font-size: clamp(1.7rem,3vw,2.3rem); margin: 6px 0 5px; letter-spacing: -.04em}
+.master-start .section-heading p,.master-catalog-heading p {color: var(--muted); margin: 0; font-size: .9rem}
+.master-start-grid>a {min-height: 145px}
+.master-start-grid .shortcut-icon {font-size: .8rem}
+.master-start-actions {display: flex; flex-wrap: wrap; gap: 10px 24px; margin-top: 16px}
+.master-start-actions a {font-size: .82rem; font-weight: 750; color: #3544b8; text-decoration: none}
+.master-start-actions a:hover {text-decoration: underline}
+.master-catalog-heading {margin-bottom: 21px}
+.master-search {max-width: 700px; margin-bottom: 28px}
+.master-search label {display: block; margin-bottom: 9px; color: #28354e; font-size: .8rem; font-weight: 800}
+.master-search-field {display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 15px; border: 1px solid #ccd5e6; border-radius: 15px; background: #fff; box-shadow: 0 9px 24px #1d31550b}
+.master-search-field:focus-within {border-color: var(--ring); box-shadow: 0 0 0 4px #5865e720}
+.master-search-field>span {font-size: 1.5rem; color: #6c7892; line-height: 1}
+.master-search-field input {flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink)}
+.master-search-field button {border: 0; background: transparent; color: #3a49bc; font-size: .78rem; font-weight: 750; cursor: pointer}
+#master-search-status {min-height: 18px; margin: 7px 0 0; color: var(--muted); font-size: .77rem}
+.master-category-grid {margin-bottom: 38px}
+.master-category-grid>a {min-height: 145px}
+.master-category-grid .shortcut-icon {font-size: .8rem}
+.master-function-group {scroll-margin-top: 112px; margin: 0 0 34px}
+.master-function-heading {display: flex; align-items: end; justify-content: space-between; gap: 15px; padding: 0 0 15px; margin-bottom: 16px; border-bottom: 1px solid var(--line)}
+.master-function-heading h3 {font-size: 1.45rem; letter-spacing: -.035em; margin: 5px 0 0}
+.master-function-heading>span {color: var(--muted); font-size: .77rem; white-space: nowrap}
+.master-function-grid>a {min-height: 138px}
+.master-function-grid .shortcut-icon {font-size: 1rem}
+.master-search-empty {color: var(--muted)}
+.master-catalog [hidden] {display: none!important}
+@media(max-width: 620px) {
+  .master-search-field {padding: 0 10px}
+  .master-search-field input {font-size: .83rem}
+  .master-function-heading {align-items: start; flex-direction: column; gap: 5px}
 }

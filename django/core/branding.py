@@ -24,7 +24,7 @@ class PlatformHomepageForm(ImageSizeForm):
     class Meta:
         model=PlatformHomepage
         fields=["logo","hero_title","hero_description","closing_title"]
-        labels={"logo":"Logo do ApPlanner (opcional)","hero_title":"Título principal",
+        labels={"logo":"Logo personalizada (opcional)","hero_title":"Título principal",
                 "hero_description":"Descrição principal","closing_title":"Chamada final"}
 
 

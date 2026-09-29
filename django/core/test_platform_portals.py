@@ -17,6 +17,10 @@ class PlatformPortalAccessTests(TestCase):
         self.client.force_login(user)
         response=self.client.get(reverse("master-home"))
         self.assertEqual(response.status_code,200)
+        self.assertContains(response,'id="master-function-search"')
+        self.assertContains(response,'data-master-function')
+        self.assertContains(response,'class="shortcut-grid master-category-grid"')
+        self.assertContains(response,'js/master-functions')
 
     def test_commercial_profile_can_open_queue(self):
         user=User.objects.create_user(email="sales@example.com",password="StrongPassword123!")
