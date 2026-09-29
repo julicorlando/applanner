@@ -20,7 +20,8 @@ from django.views.decorators.http import require_POST
 from accounts.models import User
 from core.crypto import encrypt_text
 from core.models import AuditLog
-from operations.models import PlatformSMTPSettings
+from operations.models import PlatformEmailTemplate,PlatformSMTPSettings
+from applanner.transactional_email import TEMPLATES,render_email,validate_copy
 from tenants.models import TenantOnboarding
 
 logger=logging.getLogger(__name__)
@@ -125,6 +126,62 @@ def smtp_settings(request):
     return render(request,"master/smtp_settings.html",{
         "form":form,"configured":row,"has_password":bool(row and row.password_encrypted),
         "backend_supported":settings.EMAIL_BACKEND=="applanner.email_backend.PlatformEmailBackend",
+    })
+
+
+class MasterEmailTemplateForm(forms.Form):
+    subject=forms.CharField(max_length=180,label="Assunto")
+    body=forms.CharField(max_length=10000,label="Mensagem",widget=forms.Textarea(attrs={"rows":13}))
+
+    def __init__(self,*args,key,**kwargs):
+        self.key=key
+        super().__init__(*args,**kwargs)
+
+    def clean(self):
+        values=super().clean()
+        if values.get("subject") and values.get("body"):
+            try:
+                validate_copy(self.key,values["subject"],values["body"])
+            except ValueError as exc:
+                raise forms.ValidationError(str(exc)) from exc
+        return values
+
+
+@login_required
+@never_cache
+def email_templates(request,key=None):
+    if not request.user.is_superuser:
+        raise PermissionDenied("Acesso restrito ao Master.")
+    if key is None:
+        rows={row.key:row for row in PlatformEmailTemplate.objects.all()}
+        return render(request,"master/email_templates.html",{
+            "templates":[{"key":name,"label":spec["label"],"edited":name in rows}
+                for name,spec in TEMPLATES.items()],
+        })
+    if key not in TEMPLATES:
+        from django.http import Http404
+        raise Http404
+    spec=TEMPLATES[key]
+    row=PlatformEmailTemplate.objects.filter(pk=key).first()
+    if request.method=="POST" and request.POST.get("action")=="reset":
+        if row:
+            row.delete()
+            AuditLog.objects.create(user=request.user,action="MASTER_EMAIL_TEMPLATE_RESET",
+                entity_type="platform_email_template",entity_id=0,after={"key":key})
+        messages.success(request,"Modelo padrão restaurado.")
+        return redirect("master-email-template-edit",key=key)
+    initial={"subject":row.subject if row else spec["subject"],"body":row.body if row else spec["body"]}
+    form=MasterEmailTemplateForm(request.POST if request.method=="POST" else None,key=key,initial=initial)
+    if request.method=="POST" and form.is_valid():
+        row,_=PlatformEmailTemplate.objects.update_or_create(key=key,defaults={
+            "subject":form.cleaned_data["subject"],"body":form.cleaned_data["body"],"updated_by":request.user,
+        })
+        AuditLog.objects.create(user=request.user,action="MASTER_EMAIL_TEMPLATE_UPDATED",
+            entity_type="platform_email_template",entity_id=0,after={"key":key})
+        messages.success(request,"Modelo de e-mail salvo.")
+        return redirect("master-email-template-edit",key=key)
+    return render(request,"master/email_template_edit.html",{
+        "form":form,"key":key,"spec":spec,"customized":bool(row),
     })
 
 

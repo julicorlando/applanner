@@ -21,6 +21,7 @@ from .models import Module,ModuleRequest,Plan,Subscription,SubscriptionHistory,T
 from .payment_services import create_platform_subscription,create_platform_pix_charge,platform_provider
 from .module_services import cancel_module_addon,request_module
 from commercial.models import Proposal
+from applanner.transactional_email import account_values,queue_email
 
 User=get_user_model()
 
@@ -216,6 +217,8 @@ def signup(request):
                 email=data["email"],password=data["password"],tenant=tenant,
                 first_name=data["owner_name"],role="owner",is_active=True,
             )
+            queue_email(tenant,user.email,"account_created",
+                account_values(user,base_url=request.build_absolute_uri("/")))
             tenant_admin=PlatformRole.objects.filter(slug="tenant-admin").first()
             if tenant_admin:
                 UserRole.objects.get_or_create(user=user,role=tenant_admin)

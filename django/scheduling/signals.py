@@ -1,7 +1,33 @@
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save,pre_save
 from django.dispatch import receiver
+from django.utils import timezone
+
+from applanner.transactional_email import queue_email
 
 from .models import Appointment
+
+
+@receiver(pre_save,sender=Appointment)
+def remember_confirmation_state(sender,instance,**kwargs):
+    instance._previous_status=(sender.objects.filter(pk=instance.pk).values_list("status",flat=True).first()
+        if instance.pk else None)
+
+
+@receiver(post_save,sender=Appointment)
+def notify_confirmed_appointment(sender,instance,created,**kwargs):
+    if instance.status!=Appointment.Status.CONFIRMED or (
+        not created and getattr(instance,"_previous_status",None)==Appointment.Status.CONFIRMED
+    ):
+        return
+    if not instance.customer.email:
+        return
+    queue_email(instance.tenant,instance.customer.email,"booking_confirmation",{
+        "nome":instance.customer.name,
+        "empresa":instance.tenant.name,
+        "servico":instance.service.name,
+        "profissional":instance.professional.name if instance.professional_id else "A definir",
+        "data_hora":timezone.localtime(instance.starts_at).strftime("%d/%m/%Y às %H:%M"),
+    },customer=instance.customer)
 
 
 @receiver(post_save, sender=Appointment)

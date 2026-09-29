@@ -249,6 +249,15 @@ class PlatformSMTPSettings(models.Model):
     updated_at=models.DateTimeField(auto_now=True)
 
 
+class PlatformEmailTemplate(models.Model):
+    """Master-maintained transactional copy; empty rows use application defaults."""
+    key=models.CharField(max_length=50,primary_key=True)
+    subject=models.CharField(max_length=180)
+    body=models.TextField(max_length=10000)
+    updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,on_delete=models.SET_NULL,related_name="+")
+    updated_at=models.DateTimeField(auto_now=True)
+
+
 class LegacyRuntimeJob(models.Model):
     """Snapshot da fila PHP antiga. Nunca é executado pelo Celery."""
     tenant=models.ForeignKey(

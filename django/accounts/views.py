@@ -19,6 +19,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
 from applanner.email_backend import active_smtp_settings
+from applanner.transactional_email import account_values,queue_email,render_email
 
 from .models import EmailVerificationToken, LoginAudit, LoginHistory, PasswordResetToken, SecurityEvent
 from .security import (
@@ -223,7 +224,7 @@ def password_reset_request(request):
         if user:
             PasswordResetToken.objects.filter(user=user,used_at__isnull=True).update(used_at=timezone.now())
             raw=secrets.token_urlsafe(32)
-            PasswordResetToken.objects.create(
+            reset_token=PasswordResetToken.objects.create(
                 user=user,
                 token_hash=hashlib.sha256(raw.encode()).hexdigest(),
                 expires_at=timezone.now()+timedelta(hours=1),
@@ -231,13 +232,17 @@ def password_reset_request(request):
             url=request.build_absolute_uri(
                 f"/account/password-reset/{raw}/"
             )
-            send_mail(
-                "Redefinição de senha — ApPlanner",
-                f"Use este link em até 1 hora para redefinir sua senha: {url}",
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-            )
+            subject,text,html=render_email("password_reset",{
+                **account_values(user,base_url=request.build_absolute_uri("/")),"url_redefinicao":url,
+            })
+            try:
+                delivered=send_mail(subject,text,settings.DEFAULT_FROM_EMAIL,[user.email],
+                    html_message=html,fail_silently=False)
+                if delivered!=1:
+                    raise RuntimeError("SMTP não confirmou o envio")
+            except (OSError,smtplib.SMTPException,RuntimeError,ValueError) as exc:
+                reset_token.delete()
+                logger.warning("Falha no e-mail de redefinição de senha (%s)",type(exc).__name__)
         messages.success(request,"Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação.")
         return redirect("accounts:password-reset-request")
     return render(request,"accounts/password_reset_request.html")
@@ -308,13 +313,12 @@ def send_verification(request):
     )
     url=request.build_absolute_uri(f"/account/verify-email/{raw}/")
     try:
-        delivered=send_mail(
-            "Verifique seu e-mail — ApPlanner",
-            f"Confirme seu e-mail usando este link em até 24 horas: {url}",
-            settings.DEFAULT_FROM_EMAIL,
-            [request.user.email],
-            fail_silently=False,
-        )
+        subject,text,html=render_email("email_verification",{
+            **account_values(request.user,base_url=request.build_absolute_uri("/")),
+            "url_confirmacao":url,
+        })
+        delivered=send_mail(subject,text,settings.DEFAULT_FROM_EMAIL,[request.user.email],
+            html_message=html,fail_silently=False)
         if delivered!=1:
             raise RuntimeError("SMTP não confirmou o envio")
     except (OSError,smtplib.SMTPException,RuntimeError,ValueError) as exc:
@@ -340,6 +344,9 @@ def verify_email(request,token):
     row.save(update_fields=["used_at"])
     row.user.email_verified_at=now
     row.user.save(update_fields=["email_verified_at"])
+    if row.user.tenant_id:
+        queue_email(row.user.tenant,row.user.email,"account_confirmed",
+            account_values(row.user,base_url=request.build_absolute_uri("/")))
     messages.success(request,"E-mail verificado com sucesso.")
     return redirect("accounts:login")
 
