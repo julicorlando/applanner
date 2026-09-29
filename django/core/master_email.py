@@ -2,6 +2,8 @@
 
 import logging
 import smtplib
+import socket
+import ssl
 
 from django import forms
 from django.conf import settings
@@ -22,6 +24,25 @@ from operations.models import PlatformSMTPSettings
 from tenants.models import TenantOnboarding
 
 logger=logging.getLogger(__name__)
+
+
+def smtp_failure_reason(exc):
+    """Return a useful diagnosis without exposing server responses or credentials."""
+    if isinstance(exc,smtplib.SMTPAuthenticationError):
+        return "Autenticação SMTP recusada. Confira o usuário completo e a senha da caixa postal."
+    if isinstance(exc,ssl.SSLError):
+        return "Falha na negociação SSL/TLS. Confira a porta e o modo de segurança."
+    if isinstance(exc,socket.gaierror):
+        return "Servidor SMTP não encontrado. Confira o endereço do servidor e o DNS."
+    if isinstance(exc,(TimeoutError,ConnectionRefusedError,ConnectionResetError)):
+        return "Não foi possível conectar ao servidor SMTP. Confira a porta e a liberação da conexão de saída."
+    if isinstance(exc,smtplib.SMTPResponseException):
+        if exc.smtp_code in (550,553):
+            return f"Remetente ou destinatário recusado pelo servidor SMTP (código {exc.smtp_code})."
+        return f"O servidor SMTP recusou o envio (código {exc.smtp_code})."
+    if isinstance(exc,OSError):
+        return "Falha de conexão com o servidor SMTP. Confira o host, a porta e a rede."
+    return "O servidor SMTP não confirmou o envio. Confira as configurações e os logs do web."
 
 
 class MasterSMTPForm(forms.Form):
@@ -58,11 +79,14 @@ def smtp_settings(request):
     if not request.user.is_superuser:
         raise PermissionDenied("Acesso restrito ao Master.")
     row=PlatformSMTPSettings.objects.filter(pk=1).first()
-    form=MasterSMTPForm(request.POST if request.method=="POST" else None,existing=row)
+    form=(MasterSMTPForm(request.POST,existing=row) if request.method=="POST"
+          else MasterSMTPForm(existing=row))
     if request.method=="POST":
         if request.POST.get("action")=="test":
             if not row or not row.enabled:
                 messages.error(request,"Salve e ative as configurações SMTP antes do teste.")
+            elif settings.EMAIL_BACKEND!="applanner.email_backend.PlatformEmailBackend":
+                messages.error(request,"O backend de e-mail do Coolify não usa a configuração SMTP do painel. Ajuste EMAIL_BACKEND e publique novamente.")
             else:
                 try:
                     sent=send_mail("Teste de e-mail — ApPlanner","O envio SMTP da plataforma está funcionando.",
@@ -70,8 +94,10 @@ def smtp_settings(request):
                     if sent!=1:
                         raise RuntimeError("SMTP não confirmou o envio")
                 except (OSError,smtplib.SMTPException,RuntimeError,ValueError) as exc:
-                    logger.warning("Teste SMTP do Master falhou (%s)",type(exc).__name__)
-                    messages.error(request,"O teste falhou. Confira host, porta, credenciais, segurança e autorização do remetente nos logs do web.")
+                    reason=smtp_failure_reason(exc)
+                    logger.warning("Teste SMTP do Master falhou: %s; tipo=%s; host=%s; porta=%s; ssl=%s; starttls=%s",
+                        reason,type(exc).__name__,row.host,row.port,row.use_ssl,row.use_tls)
+                    messages.error(request,f"O teste falhou. {reason}")
                 else:
                     messages.success(request,f"E-mail de teste enviado para {request.user.email}.")
             return redirect("master-smtp-settings")
