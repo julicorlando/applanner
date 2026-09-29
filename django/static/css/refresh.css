@@ -123,3 +123,72 @@ main {min-height: calc(100vh - 160px)}
   .shortcut-grid>a,.segment-grid article,.pricing-card {transition: none}
   .shortcut-grid>a:hover {transform: none}
 }
+
+/* Empresa: painel de operação, compartilhamento e módulos. */
+.operation-dashboard {width: min(1340px,calc(100% - 48px))}
+.operation-heading {align-items: center; margin-bottom: 30px}
+.operation-heading-actions {display: flex; align-items: center; flex-wrap: wrap; gap: 10px}
+.operation-utilities {display: grid; grid-template-columns: minmax(0,1.25fr) minmax(280px,.75fr); gap: 16px; align-items: start; margin-bottom: 46px}
+.operation-utilities>.panel {height: 100%; padding: clamp(20px,2.2vw,30px)}
+.operation-panel-heading {display: flex; align-items: center; gap: 14px; margin-bottom: 22px}
+.operation-panel-heading .eyebrow {font-size: .65rem}
+.operation-panel-heading h2 {font-size: 1.25rem; line-height: 1.2; margin: 5px 0 0}
+.operation-panel-icon {width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 14px; background: #eaf0ff; color: #3948ba; font-size: 1.35rem; font-weight: 800}
+.operation-payments .operation-panel-icon {background: #e6f6ee; color: #168053}
+.operation-payments>p {color: var(--muted); line-height: 1.55; font-size: .91rem; margin: 0 0 18px}
+.operation-payments>a {width: 100%}
+.operation-share-row {display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px 0; border-top: 1px solid var(--line)}
+.operation-share-row>div:first-child {display: grid; gap: 5px; min-width: 0}
+.operation-share-row strong {font-size: .91rem}
+.operation-share-row span {color: var(--muted); font-size: .78rem; line-height: 1.4}
+.operation-share-actions {display: flex; gap: 7px; flex: none}
+.operation-share-actions .button {min-height: 38px; padding: 8px 11px; font-size: .74rem; white-space: nowrap}
+.operation-share-actions .operation-copy {background: #edf0ff; color: #3040af; border-color: #dbe0ff; cursor: pointer}
+.operation-share-actions .operation-copy:hover {background: #e2e7ff}
+.operation-professionals {border-top: 1px solid var(--line)}
+.operation-professionals>summary {cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 15px 0 0; font-size: .86rem; font-weight: 750; color: #3040a6; list-style: none}
+.operation-professionals>summary::-webkit-details-marker {display: none}
+.operation-professionals[open]>summary span {transform: rotate(180deg)}
+.operation-professional-list {margin-top: 14px; border-bottom: 1px solid var(--line)}
+.operation-muted {color: var(--muted); line-height: 1.55; margin-bottom: 0}
+.operation-section-heading {display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 20px}
+.operation-section-heading h2 {font-size: clamp(1.8rem,3vw,2.35rem); letter-spacing: -.045em; margin: 5px 0 4px}
+.operation-section-heading p {color: var(--muted); margin: 0; font-size: .9rem}
+.operation-module-count {flex: none; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: #586479; font-size: .75rem; font-weight: 700}
+.operation-dashboard .portal-module-grid {grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; align-items: start}
+.operation-dashboard .operation-module {min-height: 0; align-self: start; padding: 22px}
+.operation-module-agenda {grid-column: span 2}
+.operation-module-top {display: flex; align-items: center; justify-content: space-between; gap: 10px}
+.operation-module .portal-module-kicker {width: 36px; height: 36px; display: grid; place-items: center; border-radius: 11px; background: #edf0ff; color: #3340b8; font-size: .76rem; font-weight: 850}
+.operation-module-financeiro .portal-module-kicker {background: #e5f6ee; color: #0f7b50}
+.operation-module-barbearia .portal-module-kicker {background: #fef0e6; color: #b15d23}
+.operation-module-relacionamento .portal-module-kicker {background: #fdeef1; color: #a94565}
+.operation-module-comunicacao .portal-module-kicker {background: #e8f4fb; color: #207199}
+.operation-module-label {font-size: .72rem; font-weight: 750; color: #647086}
+.operation-module h3 {font-size: 1.18rem; margin: 16px 0 5px; letter-spacing: -.03em}
+.operation-module>p {min-height: 0; margin: 0 0 17px; color: var(--muted); font-size: .85rem; line-height: 1.5}
+.operation-module .portal-resource-links {margin: 0; border-top: 1px solid var(--line)}
+.operation-module .portal-resource-links a {align-items: center; padding: 10px 7px; font-size: .8rem; border-radius: 8px; border-bottom-color: #e8edf5}
+.operation-module .portal-resource-links a:last-child {border-bottom: 0}
+.operation-module-agenda .portal-resource-links {display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 14px}
+.operation-module .portal-resource-links a span {color: #4654cf; font-size: 1rem}
+.operation-empty {grid-column: 1/-1}
+@media(max-width: 960px) {
+  .operation-dashboard .portal-module-grid {grid-template-columns: repeat(2,minmax(0,1fr))}
+  .operation-utilities {grid-template-columns: 1fr 1fr}
+}
+@media(max-width: 740px) {
+  .operation-utilities {grid-template-columns: 1fr}
+  .operation-utilities>.panel {height: auto}
+}
+@media(max-width: 620px) {
+  .operation-dashboard {width: min(100% - 32px,1340px)}
+  .operation-heading-actions,.operation-heading-actions .button {width: 100%}
+  .operation-dashboard .portal-module-grid {grid-template-columns: 1fr}
+  .operation-module-agenda {grid-column: auto}
+  .operation-module-agenda .portal-resource-links {grid-template-columns: 1fr}
+  .operation-share-row {align-items: stretch; flex-direction: column; gap: 10px}
+  .operation-share-actions {width: 100%}
+  .operation-share-actions .button {flex: 1}
+  .operation-section-heading {align-items: start; flex-direction: column}
+}

@@ -775,7 +775,11 @@ def home(request):
         return render(request,"portal/select_tenant.html",{"tenants":Tenant.objects.order_by("name")})
 
     modules=available_modules(request.user,tenant)
-    return render(request,"portal/home.html",{"tenant":tenant,"modules":modules})
+    public_professionals=(tenant.professionals.filter(active=True,public_slug__isnull=False)
+                          .exclude(public_slug="").order_by("name") if tenant.public_enabled else [])
+    return render(request,"portal/home.html",{
+        "tenant":tenant,"modules":modules,"public_professionals":public_professionals,
+    })
 
 
 def available_modules(user,tenant):

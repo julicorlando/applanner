@@ -23,6 +23,18 @@ class PortalTenantIsolationTests(TestCase):
         self.assertContains(response,"Tenant A")
         self.assertContains(response,"Agenda")
 
+    def test_dashboard_shares_only_active_public_professionals(self):
+        self.tenant.public_enabled=True
+        self.tenant.save(update_fields=["public_enabled"])
+        Professional.objects.create(tenant=self.tenant,name="Ana",public_slug="ana",active=True)
+        Professional.objects.create(tenant=self.tenant,name="Inativo",public_slug="inativo",active=False)
+        response=self.client.get(reverse("portal-home"))
+        self.assertContains(response,"Links dos profissionais")
+        self.assertContains(response,"Copiar link de Ana")
+        self.assertNotContains(response,"Copiar link de Inativo")
+        self.assertContains(response,"Novo agendamento")
+        self.assertNotContains(response,"Gerenciar Mercado Pago")
+
     def test_customer_list_is_tenant_scoped(self):
         Customer.objects.create(tenant=self.tenant,name="Cliente A")
         Customer.objects.create(tenant=self.other,name="Cliente B")

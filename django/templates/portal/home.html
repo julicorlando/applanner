@@ -1,34 +1,50 @@
 {% extends "base.html" %}
-{% block title %}Operação — ApPlanner{% endblock %}
+{% load static %}
+{% block title %}Operação — {{ tenant.name }} · ApPlanner{% endblock %}
 {% block content %}
-<section class="shell portal-page">
-  <div class="portal-heading">
-    <div><span class="eyebrow">ÁREA OPERACIONAL</span><h1>{{ tenant.name }}</h1><p>Escolha um módulo para gerenciar a operação.</p></div>
-    {% if request.user.is_superuser %}<a class="button ghost" href="{% url 'portal-home' %}?trocar=1">Empresa atual</a>{% endif %}
+<section class="shell portal-page operation-dashboard">
+  <header class="portal-heading operation-heading">
+    <div><span class="eyebrow">PAINEL DA EMPRESA</span><h1>{{ tenant.name }}</h1><p>Encontre rapidamente o que precisa para atender seus clientes.</p></div>
+    <div class="operation-heading-actions">
+      {% for item in modules %}{% if item.slug == 'agenda' %}<a class="button primary" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">Novo agendamento <span aria-hidden="true">＋</span></a>{% endif %}{% endfor %}
+      {% if request.user.is_superuser %}<a class="button ghost" href="{% url 'portal-home' %}?trocar=1">Trocar empresa</a>{% endif %}
+    </div>
+  </header>
+
+  <div class="operation-utilities">
+    <section class="panel operation-share" aria-labelledby="operation-share-title">
+      <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">↗</span><div><span class="eyebrow">PRESENÇA ONLINE</span><h2 id="operation-share-title">Links para compartilhar</h2></div></div>
+      {% if tenant.public_enabled %}
+        <div class="operation-share-row"><div><strong>Página do estabelecimento</strong><span>Envie para o cliente conhecer seus serviços e agendar.</span></div><div class="operation-share-actions"><a class="button" href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">Abrir página</a><button class="button operation-copy" type="button" data-copy-url="{{ request.scheme }}://{{ request.get_host }}{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" aria-label="Copiar link do estabelecimento">Copiar link</button></div></div>
+        {% if public_professionals %}<details class="operation-professionals"><summary>Links dos profissionais <span aria-hidden="true">⌄</span></summary><div class="operation-professional-list">
+          {% for professional in public_professionals %}<div class="operation-share-row"><div><strong>{{ professional.name }}</strong><span>Página individual para agendamento</span></div><div class="operation-share-actions"><a class="button" href="{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" target="_blank" rel="noopener">Abrir</a><button class="button operation-copy" type="button" data-copy-url="{{ request.scheme }}://{{ request.get_host }}{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" aria-label="Copiar link de {{ professional.name }}">Copiar link</button></div></div>{% endfor %}
+        </div></details>{% endif %}
+      {% else %}<p class="operation-muted">A página pública ainda está desativada. Peça ao Master para ativar “Página pública” no cadastro da empresa.</p>{% endif %}
+    </section>
+    {% if request.user.is_superuser or request.user.role == 'owner' %}
+    <section class="panel operation-payments" aria-labelledby="operation-payments-title">
+      <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">◈</span><div><span class="eyebrow">RECEBIMENTOS</span><h2 id="operation-payments-title">Pagamentos da empresa</h2></div></div>
+      <p>Conecte sua conta Mercado Pago para receber cobranças de clientes por Pix ou cartão. A assinatura do ApPlanner é separada.</p>
+      <a class="button" href="{% url 'tenant-payment-gateway' %}">Gerenciar Mercado Pago <span aria-hidden="true">→</span></a>
+    </section>
+    {% endif %}
   </div>
-  <section class="panel" style="margin-bottom:20px">
-    <h2>Links para compartilhar</h2>
-    {% if tenant.public_enabled %}
-      <p>Página do estabelecimento: <a href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}</a></p>
-      {% for professional in tenant.professionals.all %}
-        {% if professional.active and professional.public_slug %}<p>{{ professional.name }}: <a href="{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}</a></p>{% endif %}
-      {% endfor %}
-    {% else %}<p>Sua página pública está desativada. Peça ao Master para ativar “Página pública” no cadastro da empresa.</p>{% endif %}
+
+  <section class="operation-modules" aria-labelledby="operation-modules-title">
+    <div class="operation-section-heading"><div><span class="eyebrow">OPERAÇÃO</span><h2 id="operation-modules-title">Suas ferramentas</h2><p>As áreas disponíveis seguem as permissões da sua equipe e os módulos do seu plano.</p></div><span class="operation-module-count">{{ modules|length }} módulos</span></div>
+    <div class="portal-module-grid">
+      {% for item in modules %}
+        <article class="portal-module-card operation-module operation-module-{{ item.slug }}">
+          <div class="operation-module-top"><span class="portal-module-kicker">{{ forloop.counter|stringformat:"02d" }}</span><span class="operation-module-label">{{ item.resources|length }} funções</span></div>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.description }}</p>
+          <div class="portal-resource-links">
+            {% for resource in item.resources %}<a href="{% url 'portal-resource-list' item.slug resource.slug %}">{{ resource.title }} <span aria-hidden="true">→</span></a>{% endfor %}
+          </div>
+        </article>
+      {% empty %}<div class="panel operation-empty"><h3>Nenhum módulo disponível</h3><p>Peça ao responsável da empresa para revisar seu acesso.</p></div>{% endfor %}
+    </div>
   </section>
-  {% if request.user.is_superuser or request.user.role == 'owner' %}<section class="panel" style="margin-bottom:20px"><h2>Recebimentos da empresa</h2><p>Conecte sua conta Mercado Pago para receber cobranças de clientes por Pix ou cartão. Esta conta é independente da assinatura paga ao ApPlanner.</p><a class="button" href="{% url 'tenant-payment-gateway' %}">Configurar Mercado Pago</a></section>{% endif %}
-  <div class="portal-module-grid">
-    {% for item in modules %}
-      <article class="portal-module-card">
-        <span class="portal-module-kicker">{{ forloop.counter|stringformat:"02d" }}</span>
-        <h2>{{ item.title }}</h2>
-        <p>{{ item.description }}</p>
-        <div class="portal-resource-links">
-          {% for resource in item.resources %}
-            <a href="{% url 'portal-resource-list' item.slug resource.slug %}">{{ resource.title }} <span>→</span></a>
-          {% endfor %}
-        </div>
-      </article>
-    {% endfor %}
-  </div>
 </section>
+<script src="{% static 'js/portal-dashboard.js' %}" defer></script>
 {% endblock %}
