@@ -25,7 +25,7 @@ MODULES={
         "description":"Convites de retorno e relacionamento com os clientes.",
         "active":True,"sort_order":0,"addon_monthly_price":"89.90","addon_sellable":True,
     },
-    "whatsapp":{"name":"WhatsApp","description":"Comunicação por WhatsApp.","active":False,"sort_order":41},
+    "whatsapp":{"name":"WhatsApp","description":"Comunicação por WhatsApp e QR da empresa.","active":True,"sort_order":41},
     "multiunit":{
         "name":"Multiunidade",
         "description":"Gestão de mais de uma unidade no mesmo estabelecimento.",

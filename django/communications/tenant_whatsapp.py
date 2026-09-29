@@ -17,20 +17,21 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from billing.segment_access import require_feature
+from billing.entitlements import active_subscription,module_enabled
 from scheduling.models import Appointment,Customer
 from tenants.models import Tenant
 from .models import Notification,TenantWhatsAppConnection,WhatsAppConversation,WhatsAppMessage
 
 
 def _management(request):
-    if not request.user.tenant_id or (not request.user.is_superuser and request.user.role not in {
+    if not request.user.is_superuser and (not request.user.tenant_id or request.user.role not in {
         "owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager",
     }):
         raise PermissionDenied("Somente a gestão da empresa pode conectar o WhatsApp.")
-    tenant=request.user.tenant
-    require_feature(tenant,"whatsapp")
-    return tenant
+    if request.user.is_superuser:
+        selected=request.session.get("portal_tenant_id")
+        return Tenant.objects.filter(pk=selected).first() if selected else None
+    return request.user.tenant
 
 
 def gateway(tenant,method,path,payload=None):
@@ -45,6 +46,8 @@ def gateway(tenant,method,path,payload=None):
     except (requests.RequestException,ValueError) as exc:
         raise ValueError("O serviço de WhatsApp da empresa está indisponível.") from exc
     if not response.ok:
+        if response.status_code==403:
+            raise ValueError("O gateway recusou a autenticação (403). Confira o mesmo MASTER_WHATSAPP_GATEWAY_TOKEN nos serviços web e tenant-whatsapp e faça o redeploy.")
         raise ValueError(data.get("error") or "Não foi possível concluir a ação no WhatsApp.")
     return data
 
@@ -52,6 +55,22 @@ def gateway(tenant,method,path,payload=None):
 @login_required
 def tenant_whatsapp_settings(request):
     tenant=_management(request)
+    if tenant is None:
+        messages.info(request,"Selecione uma empresa no painel antes de configurar o WhatsApp.")
+        return redirect("portal-home")
+    available=not active_subscription(tenant) or module_enabled(tenant,"whatsapp")
+    if request.method=="POST" and request.POST.get("action")=="grant" and request.user.is_superuser:
+        from billing.models import Module,TenantModule
+        module=Module.objects.filter(slug="whatsapp",active=True).first()
+        if not module:
+            messages.error(request,"O módulo WhatsApp ainda está inativo no catálogo. Execute seed_modules após o deploy.")
+        else:
+            TenantModule.objects.update_or_create(tenant=tenant,module=module,defaults={"enabled":True})
+            messages.success(request,f"WhatsApp liberado para {tenant.name}. Agora você pode conectar o QR.")
+        return redirect("tenant-whatsapp-settings")
+    if request.method=="POST" and not available:
+        messages.error(request,"O WhatsApp ainda não foi incluído no plano desta empresa. O Master pode liberá-lo aqui.")
+        return redirect("tenant-whatsapp-settings")
     connection,_=TenantWhatsAppConnection.objects.get_or_create(tenant=tenant)
     if request.method=="POST":
         action=request.POST.get("action")
@@ -65,11 +84,11 @@ def tenant_whatsapp_settings(request):
                 messages.error(request,str(exc))
         return redirect("tenant-whatsapp-settings")
     try:
-        state=gateway(tenant,"GET","status") if connection.enabled else {"state":"disconnected"}
+        state=gateway(tenant,"GET","status") if connection.enabled and available else {"state":"disconnected"}
     except ValueError as exc:
         state={"state":"error","callbackError":str(exc)}
     return render(request,"communications/tenant_whatsapp_settings.html",{
-        "tenant":tenant,"state":state,"connection":connection,
+        "tenant":tenant,"state":state,"connection":connection,"available":available,
     })
 
 
@@ -89,7 +108,8 @@ def appointment_text(appointment,kind):
 
 def queue_appointment_whatsapp(appointment,kind):
     number=re.sub(r"\D","",appointment.customer.phone or "")
-    if not 10<=len(number)<=15 or not TenantWhatsAppConnection.objects.filter(tenant=appointment.tenant,enabled=True).exists():
+    if (not 10<=len(number)<=15 or (active_subscription(appointment.tenant) and not module_enabled(appointment.tenant,"whatsapp"))
+            or not TenantWhatsAppConnection.objects.filter(tenant=appointment.tenant,enabled=True).exists()):
         return None
     return Notification.objects.create(tenant=appointment.tenant,customer=appointment.customer,
         channel=Notification.Channel.WHATSAPP,template_key=f"appointment_{kind}",destination=number,
@@ -105,6 +125,8 @@ def send_prepared_message(appointment,kind,user):
     number=re.sub(r"\D","",appointment.customer.phone or "")
     if not 10<=len(number)<=15:
         raise ValueError("O cliente não possui telefone com DDD e código do país.")
+    if active_subscription(appointment.tenant) and not module_enabled(appointment.tenant,"whatsapp"):
+        raise ValueError("O módulo WhatsApp não está liberado para esta empresa.")
     if not TenantWhatsAppConnection.objects.filter(tenant=appointment.tenant,enabled=True).exists():
         raise ValueError("Conecte o WhatsApp da empresa antes de enviar.")
     body=appointment_text(appointment,kind)
@@ -137,7 +159,8 @@ def send_appointment_notification(notification):
         notification.save(update_fields=["status"])
         return ""
     number=re.sub(r"\D","",appointment.customer.phone or "")
-    if notification.destination!=number or not TenantWhatsAppConnection.objects.filter(tenant=appointment.tenant,enabled=True).exists():
+    if (notification.destination!=number or (active_subscription(appointment.tenant) and not module_enabled(appointment.tenant,"whatsapp"))
+            or not TenantWhatsAppConnection.objects.filter(tenant=appointment.tenant,enabled=True).exists()):
         notification.status=Notification.Status.SKIPPED
         notification.save(update_fields=["status"])
         return ""
