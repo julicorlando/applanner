@@ -109,7 +109,8 @@ class ArenaPublicBookingTests(TestCase):
         self.client.force_login(owner)
         dashboard=self.client.get(reverse("home"))
         self.assertContains(dashboard,"Próximas reservas")
-        self.assertContains(dashboard,"live-agenda.js")
+        self.assertContains(dashboard,'data-live-agenda="painel-hoje"')
+        self.assertContains(dashboard,"/static/js/live-agenda")
         other=Tenant.objects.create(name="Salão",slug="salao",category="barbearia",status=Tenant.Status.ACTIVE)
         self.client.force_login(user)
         session=self.client.session
@@ -117,4 +118,4 @@ class ArenaPublicBookingTests(TestCase):
         session.save()
         page=self.client.get(reverse("portal-resource-list",args=["agenda","agendamentos"]))
         self.assertContains(page,'data-live-agenda="agendamentos"')
-        self.assertContains(page,"live-agenda.js")
+        self.assertContains(page,"/static/js/live-agenda")
