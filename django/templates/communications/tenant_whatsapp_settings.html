@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}WhatsApp da empresa · {{ tenant.name }}{% endblock %}
 {% block content %}<section class="shell portal-page narrow"><div class="portal-heading"><div><span class="eyebrow">COMUNICAÇÃO DA EMPRESA</span><h1>Conectar WhatsApp</h1><p>Use o WhatsApp da empresa para confirmar agendamentos e enviar lembretes prontos aos clientes.</p></div></div>
-<article class="panel"><h2>Conexão: {{ state.state }}</h2>
+<article class="panel"><h2>Conexão: {{ connection_label }}</h2>
 {% if not available %}<p role="status">O módulo WhatsApp não está liberado no plano desta empresa. A conexão por QR fica disponível após o Master incluí-lo no plano ou liberar esta empresa.</p>
 {% if request.user.is_superuser %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="grant"><button class="button primary">Liberar WhatsApp para {{ tenant.name }}</button></form>{% endif %}{% endif %}
 {% if state.callbackError %}<p role="alert">{{ state.callbackError }}</p>{% endif %}

@@ -181,6 +181,7 @@ class Appointment(TimeStampedModel):
     professional=models.ForeignKey(Professional,null=True,blank=True,on_delete=models.SET_NULL,related_name="appointments")
     service=models.ForeignKey(Service,on_delete=models.PROTECT,related_name="appointments")
     service_price_snapshot=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    customer_name_snapshot=models.CharField(max_length=160,blank=True,editable=False)
     starts_at=models.DateTimeField(db_index=True)
     ends_at=models.DateTimeField()
     status=models.CharField(max_length=20,choices=Status.choices,default=Status.PENDING,db_index=True)
@@ -200,11 +201,20 @@ class Appointment(TimeStampedModel):
     reminder_2h_sent_at=models.DateTimeField(null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
 
+    @property
+    def customer_display_name(self):
+        return self.customer_name_snapshot or (self.customer.name if self.customer_id else "Cliente a definir")
+
+    def save(self,*args,**kwargs):
+        if self._state.adding and not self.customer_name_snapshot and self.customer_id:
+            self.customer_name_snapshot=self.customer.name
+        super().save(*args,**kwargs)
+
     def __str__(self):
         if not self.customer_id or not self.starts_at:
             return "Novo agendamento"
         starts_at=timezone.localtime(self.starts_at) if timezone.is_aware(self.starts_at) else self.starts_at
-        return f"{self.customer.name} — {starts_at:%d/%m/%Y %H:%M}"
+        return f"{self.customer_display_name} — {starts_at:%d/%m/%Y %H:%M}"
 
     def clean(self):
         super().clean()

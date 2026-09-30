@@ -99,3 +99,11 @@ body{background:linear-gradient(180deg,#f5f7ff 0,#f8fafc 380px)}
 .flash{border-radius:14px;box-shadow:0 16px 40px #17263b1b}.footer{background:#fff}
 @media(max-width:700px){.portal-page{padding-top:30px}.portal-heading h1{font-size:clamp(2rem,9vw,3rem)}.portal-module-card{min-height:auto}.topbar{height:auto;min-height:68px}}
 @media(prefers-reduced-motion:reduce){.portal-module-card,.form-field :is(input,select,textarea),.portal-search input{transition:none}.portal-module-card:hover{transform:none}}
+
+/* Agenda filters use the same form language and remain usable on mobile. */
+.portal-search:has(select){flex-wrap:wrap;align-items:end}
+.portal-search:has(select)>input{min-width:180px}
+.portal-search>label{display:grid;gap:6px;font-size:.78rem;font-weight:750;color:var(--muted)}
+.portal-search select{min-height:44px;border:1px solid #ccd6e4;border-radius:12px;background:#fff;padding:10px 12px;font:inherit;color:var(--ink)}
+.portal-search select:focus{border-color:#7184df;box-shadow:0 0 0 4px #6479db1c;outline:none}
+@media(max-width:560px){.portal-search:has(select){align-items:stretch}.portal-search select{width:100%}}

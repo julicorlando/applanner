@@ -37,9 +37,10 @@ def _start(tenant,value):
 
 
 def _candidates(row):
-    return Professional.objects.filter(
+    availability=AvailabilityService()
+    return [professional for professional in Professional.objects.filter(
         tenant=row.tenant,active=True
-    ).order_by("name","pk")
+    ).order_by("name","pk") if availability.professional_offers(row.tenant,professional.pk,row.service_id)]
 
 
 @transaction.atomic

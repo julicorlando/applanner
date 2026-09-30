@@ -13,6 +13,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404,redirect,render
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.utils.formats import number_format
 from django.utils.text import slugify
 
 from accounts.models import PlatformRole,UserRole
@@ -44,6 +45,15 @@ def _unique_slug(name):
         slug=(base[:120-len(suffix)]+suffix)
         index+=1
     return slug
+
+
+SEGMENT_CATEGORIES={"barbearia":{"barbearia","salao"},"arena":{"arena"},"auto":{"auto"},"saude":{"clinica"}}
+
+
+def plan_categories(plan,choices):
+    segments=(plan.features or {}).get("segments")
+    allowed=None if segments is None else set().union(*(SEGMENT_CATEGORIES.get(segment,set()) for segment in segments))
+    return [(key,label) for key,label in choices if not key or allowed is None or key in allowed]
 
 
 class SignupForm(forms.Form):
@@ -81,17 +91,10 @@ class SignupForm(forms.Form):
         self.fields["plan"].queryset=Plan.objects.filter(
             active=True,public_visible=True,is_custom=False
         ).order_by("sort_order","name")
+        self.category_options=list(self.fields["category"].widget.choices)
         if selected_plan:
             self.fields["plan"].initial=selected_plan
-            segments=(selected_plan.features or {}).get("segments")
-            if segments is not None:
-                categories={"barbearia":{"barbearia","salao"},"arena":{"arena"},
-                            "auto":{"auto"},"saude":{"clinica"}}
-                allowed=set().union(*(categories.get(segment,set()) for segment in segments))
-                self.fields["category"].widget.choices=[
-                    (key,label) for key,label in self.fields["category"].widget.choices
-                    if not key or key in allowed
-                ]
+            self.fields["category"].widget.choices=plan_categories(selected_plan,self.category_options)
 
     def clean_email(self):
         email=self.cleaned_data["email"].strip().lower()
@@ -155,7 +158,11 @@ def plans(request):
     comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
                 for module in sorted(catalog.values(),key=lambda item:(item.sort_order,item.name))]
     features=sorted({str(item) for card in cards for item in (card["plan"].features or {}).get("included_features",[])})
-    comparison.extend({"label":feature,"values":["Incluído" if feature in (card["plan"].features or {}).get("included_features",[]) else "Não incluído" for card in cards]} for feature in features)
+    comparison.extend({"label":feature,"values":["Declarado no plano" if feature in (card["plan"].features or {}).get("included_features",[]) else "Não informado" for card in cards]} for feature in features)
+    for key,label in (("professionals","Profissionais"),("units","Unidades")):
+        comparison.append({"label":label,"values":[str((card["plan"].features or {}).get(key,"Não informado")) for card in cards]})
+    for cycle,label in (("quarterly","Trimestral"),("semiannual","Semestral"),("annual","Anual")):
+        comparison.append({"label":f"Ciclo {label.lower()}","values":[f"R$ {number_format(_price(card['plan'],cycle),decimal_pos=2)}" for card in cards]})
     return render(request,"billing/plans.html",{"cards":cards,"medical_plan":medical,"comparison":comparison})
 
 
@@ -197,13 +204,18 @@ def custom_plan(request):
 def signup(request):
     from growth.attribution import capture_attribution,record_acquisition
     capture_attribution(request)
-    plan_id=request.GET.get("plan") or request.POST.get("plan")
+    plan_id=request.POST.get("plan") if request.method=="POST" else request.GET.get("plan")
+    plan_id=plan_id if plan_id and plan_id.isascii() and plan_id.isdigit() and len(plan_id)<=19 and int(plan_id)<=2**63-1 else None
     selected=Plan.objects.filter(
         pk=plan_id,active=True,public_visible=True,is_custom=False
     ).first() if plan_id else None
     proposal=Proposal.objects.filter(public_token=request.GET.get("proposal", "")[:32],
         status=Proposal.Status.CONVERTED,tenant__isnull=True).first() if request.GET.get("proposal") else None
     form=SignupForm(request.POST or None,selected_plan=selected)
+    plan_conditions=[{"id":str(plan.pk),"name":plan.name,"days":plan.trial_days,"withoutCard":plan.trial_without_card,
+        "categories":[{"value":value,"label":label} for value,label in plan_categories(plan,form.category_options)],
+        "prices":{cycle:number_format(_price(plan,cycle),decimal_pos=2) for cycle,_ in Subscription.BillingCycle.choices}}
+        for plan in form.fields["plan"].queryset]
     if request.method!="POST" and request.GET.get("proposal"):
         form.fields["proposal_token"].initial=request.GET["proposal"][:32]
     if request.method=="POST" and form.is_valid():
@@ -223,7 +235,7 @@ def signup(request):
                 ).first()
                 if not proposal:
                     form.add_error("plan","Esta proposta já foi contratada ou expirou.")
-                    return render(request,"billing/signup.html",{"form":form,"selected_plan":selected})
+                    return render(request,"billing/signup.html",{"form":form,"selected_plan":selected,"plan_conditions":plan_conditions})
                 contracted=proposal.final_price
             slug=_unique_slug(data["business_name"])
             tenant=Tenant.objects.create(
@@ -284,7 +296,7 @@ def signup(request):
                 )
         messages.success(request,"Conta criada. Bem-vindo ao ApPlanner.")
         return redirect("tenant-onboarding")
-    return render(request,"billing/signup.html",{"form":form,"selected_plan":selected,"proposal":proposal})
+    return render(request,"billing/signup.html",{"form":form,"selected_plan":selected,"proposal":proposal,"plan_conditions":plan_conditions})
 
 
 @login_required

@@ -225,9 +225,9 @@ class PublicBookingAPIView(APIView):
         name=str(data.get("name") or "").strip()
         email=str(data.get("email") or "").strip().lower()
         phone=str(data.get("phone") or "").strip()
-        if len(name)<2 or (not email and not phone):
+        if not 2<=len(name)<=150 or (not email and not phone):
             return Response(
-                {"detail":"Informe nome e pelo menos e-mail ou telefone."},
+                {"detail":"Informe um nome entre 2 e 150 caracteres e pelo menos e-mail ou telefone."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -274,17 +274,6 @@ class PublicBookingAPIView(APIView):
             customer=Customer.objects.create(
                 tenant=tenant,name=name,email=email,phone=phone,active=True
             )
-        else:
-            changed=[]
-            if name and customer.name!=name:
-                customer.name=name; changed.append("name")
-            if email and customer.email!=email:
-                customer.email=email; changed.append("email")
-            if phone and customer.phone!=phone:
-                customer.phone=phone; changed.append("phone")
-            if changed:
-                changed.append("updated_at")
-                customer.save(update_fields=changed)
 
         if vehicle_plate:
             if vehicle is None:
@@ -293,6 +282,7 @@ class PublicBookingAPIView(APIView):
         token=secrets.token_urlsafe(32)
         appointment=Appointment.objects.create(
             tenant=tenant,customer=customer,professional=professional,service=service,
+            customer_name_snapshot=name,
             vehicle=vehicle,
             service_price_snapshot=service.price,starts_at=starts_at,ends_at=ends_at,
             status=Appointment.Status.CONFIRMED,source=source,

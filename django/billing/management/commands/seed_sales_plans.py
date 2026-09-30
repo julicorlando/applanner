@@ -50,6 +50,19 @@ class Command(BaseCommand):
                 PlanModule.objects.get_or_create(plan=plan, module=module, defaults={"enabled": True})
         hidden=Plan.objects.filter(slug__in=("sales-pro","sales-start","sales-business"),
                                    public_visible=True).update(public_visible=False)
+        # Restore the explicitly named legacy Arena offer only when it has no
+        # configuration at all. Disabled links remain a deliberate Master choice.
+        arena_module=Module.objects.filter(slug="sports_courts",active=True).first()
+        repaired=0
+        if arena_module:
+            for plan in Plan.objects.select_for_update().filter(name__iexact="Arena Sports",is_custom=False):
+                if not plan.module_links.exists():
+                    PlanModule.objects.create(plan=plan,module=arena_module,enabled=True)
+                    if not (plan.features or {}).get("segments"):
+                        plan.features={**(plan.features or {}),"segments":["arena"]}
+                        plan.save(update_fields=["features"])
+                    repaired+=1
+        self.stdout.write(f"{repaired} planos Arena Sports sem vínculos receberam o módulo Arena.")
         self.stdout.write(self.style.SUCCESS(
             f"{created} planos por segmento criados; {hidden} planos genéricos retirados da vitrine."
         ))

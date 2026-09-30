@@ -1,6 +1,7 @@
 from datetime import timedelta,datetime,date,time
 from decimal import Decimal
 import secrets
+from zoneinfo import ZoneInfo
 
 from django import forms
 from django.apps import apps
@@ -767,6 +768,8 @@ def _save_special(obj, *, resource, request, tenant, is_new):
 
 
 def _value(obj, name):
+    if name=="customer" and obj._meta.label_lower=="scheduling.appointment":
+        return obj.customer_display_name
     from core.operation_forms import WEEKDAYS
     if name=="weekday":
         return dict(WEEKDAYS).get(getattr(obj,name,None),"Todos os dias")
@@ -843,9 +846,51 @@ def setup_checklist(request):
                 reverse("tenant-branding") if can_publish else reverse("portal-home"),
          "action":"Abrir página" if tenant.public_enabled else "Configurar publicação"},
     ])
+    # A service and an unrelated timetable do not make an operational schedule.
+    if not arena:
+        from scheduling.availability import AvailabilityService
+        from scheduling.models import Service,ProfessionalAvailability
+        services=list(Service.objects.filter(tenant=tenant,active=True))
+        hours=ProfessionalAvailability.objects.filter(tenant=tenant,active=True,professional__active=True,
+            professional__tenant=tenant).select_related("professional")
+        usable=any(AvailabilityService().professional_offers(tenant,h.professional_id,s.pk)
+                   and s.duration_minutes <= (datetime.combine(date.today(),h.end_time)-datetime.combine(date.today(),h.start_time)).total_seconds()/60
+                   for h in hours for s in services)
+        steps[2]["done"]=usable
+        steps[2]["title"]="Defina horários de atendimento compatíveis com os serviços"
+    else:
+        from arena.models import CourtHours,PriceRule
+        rules=list(PriceRule.objects.filter(tenant=tenant,active=True,court__active=True,court__tenant=tenant))
+        hours=CourtHours.objects.filter(tenant=tenant,active=True,court__active=True,court__tenant=tenant).select_related("court")
+        def compatible(hour,rule):
+            if hour.court_id!=rule.court_id or (rule.weekday and rule.weekday!=hour.weekday):
+                return False
+            if rule.valid_to and rule.valid_to<timezone.localdate():
+                return False
+            if rule.specific_date and (rule.specific_date<timezone.localdate() or rule.specific_date.isoweekday()!=hour.weekday):
+                return False
+            start=max(hour.start_time,rule.start_time or hour.start_time)
+            end=min(hour.end_time,rule.end_time or hour.end_time)
+            duration=max(hour.court.minimum_minutes,rule.minimum_duration_minutes or 0)
+            maximum=min(hour.court.maximum_minutes,rule.maximum_duration_minutes or hour.court.maximum_minutes)
+            window=(datetime.combine(date.today(),end)-datetime.combine(date.today(),start)).total_seconds()/60
+            return duration<=maximum and window>=duration and (not rule.modality_id or hour.court.modalities.filter(pk=rule.modality_id,active=True).exists())
+        steps[2]["done"]=any(compatible(hour,rule) for hour in hours for rule in rules)
+        steps[2]["title"]="Defina horários nas quadras com preço cadastrado"
+    blockers=[step for index,step in enumerate(steps) if index!=3 and not step["done"]]
+    if not arena:
+        from scheduling.models import TenantScheduleSettings
+        from billing.payment_services import has_connected_tenant_gateway
+        settings=TenantScheduleSettings.objects.filter(tenant=tenant).first()
+        if settings and not settings.allow_pay_on_site and not (
+            settings.online_booking_payments_enabled and (settings.allow_partial_payment or settings.allow_full_payment)
+            and has_connected_tenant_gateway(tenant)
+        ):
+            blockers.append({"title":"Configure uma forma de pagamento ou permita pagar na unidade",
+                "url":reverse("tenant-payment-gateway"),"action":"Configurar pagamento"})
     completed=sum(step["done"] for step in steps)
     return render(request,"portal/setup.html",{"tenant":tenant,"steps":steps,"completed":completed,
-                  "progress":round(completed*100/len(steps)),"arena_mode":arena})
+                  "progress":round(completed*100/len(steps)),"arena_mode":arena,"blockers":blockers})
 
 
 @login_required
@@ -959,6 +1004,24 @@ def resource_list(request,module_slug,resource_slug):
                 lookup |= Q(**{f"{field.name}__icontains":q})
         if lookup:
             qs=qs.filter(lookup)
+    agenda_filters=(module_slug,resource_slug) in {("agenda","agendamentos"),("arena","reservas")}
+    period=request.GET.get("period","") if agenda_filters else ""
+    status=request.GET.get("status","") if agenda_filters else ""
+    status_choices=model._meta.get_field("status").choices if agenda_filters else []
+    if agenda_filters:
+        if period=="today":
+            tz=ZoneInfo(tenant.timezone or "America/Recife")
+            local_today=timezone.now().astimezone(tz).date()
+            start=datetime.combine(local_today,time.min,tzinfo=tz)
+            qs=qs.filter(starts_at__gte=start,starts_at__lt=start+timedelta(days=1))
+        elif period=="upcoming":
+            qs=qs.filter(starts_at__gte=timezone.now())
+        else:
+            period=""
+        if status in dict(status_choices):
+            qs=qs.filter(status=status)
+        else:
+            status=""
     qs=_apply_order(qs,resource.get("order"))[:300]
     columns=list(resource["columns"])
     if not segment_enabled(tenant,"auto") and "vehicle" in columns:
@@ -968,6 +1031,7 @@ def resource_list(request,module_slug,resource_slug):
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,
         "headers":_headers(model,columns),"rows":rows,"q":q,
+        "agenda_filters":agenda_filters,"period":period,"status_filter":status,"status_choices":status_choices,
         "can_create":resource.get("create",True) or bool(resource.get("custom_create")),
         "can_edit":resource.get("edit",True),
         "can_manage_professionals":request.user.is_superuser or request.user.role in {

@@ -15,8 +15,12 @@ window.createBookingSlotPicker = ({container, input, status, onChange = () => {}
     const currentRequest = requestId;
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Consulta indisponível');
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error();
+        error.userMessage = response.status === 400 && typeof data.detail === 'string' ? data.detail : 'Não foi possível consultar os horários. Tente novamente.';
+        throw error;
+      }
       if (currentRequest !== requestId) return;
       const slots = data.slots || [];
       onAvailability(slots.length);
@@ -47,7 +51,7 @@ window.createBookingSlotPicker = ({container, input, status, onChange = () => {}
         container.appendChild(button);
       });
     } catch (error) {
-      if (currentRequest === requestId) status.textContent = 'Não foi possível consultar os horários. Tente novamente.';
+      if (currentRequest === requestId) status.textContent = error.userMessage || 'Não foi possível consultar os horários. Tente novamente.';
     }
   }
 

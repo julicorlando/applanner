@@ -93,11 +93,14 @@ def tenant_whatsapp_settings(request):
         state={"state":"error","callbackError":str(exc)}
     return render(request,"communications/tenant_whatsapp_settings.html",{
         "tenant":tenant,"state":state,"connection":connection,"available":available,
+        "connection_label":{"connected":"Conectado","disconnected":"Desconectado","connecting":"Conectando",
+            "qr":"Aguardando leitura do QR","error":"Erro de conexão","starting":"Iniciando",
+            "reconnecting":"Reconectando","close":"Desconectado","open":"Conectado"}.get(state.get("state"),"Aguardando conexão"),
     })
 
 
 def appointment_text(appointment,kind):
-    name=appointment.customer.name.split()[0]
+    name=appointment.customer_display_name.split()[0]
     local=timezone.localtime(appointment.starts_at)
     if kind=="confirmation":
         return f"Olá, {name}, recebemos o seu agendamento em {appointment.tenant.name} para {local:%d/%m às %H:%M}. Estamos esperando você!"
@@ -149,7 +152,7 @@ def send_prepared_message(appointment,kind,user):
         raise ValueError("Conecte o WhatsApp da empresa antes de enviar.")
     body=appointment_text(appointment,kind)
     conversation,_=WhatsAppConversation.objects.get_or_create(tenant=appointment.tenant,wa_id=number,
-        defaults={"customer":appointment.customer,"contact_name":appointment.customer.name,
+        defaults={"customer":appointment.customer,"contact_name":appointment.customer_display_name,
                   "last_message_at":timezone.now()})
     if conversation.context.get("cancel_requested_appointment_id")==appointment.pk:
         raise ValueError("O cliente pediu cancelamento. Resolva o pedido antes de enviar outra mensagem.")
@@ -185,7 +188,7 @@ def send_appointment_notification(notification):
     body=appointment_text(appointment,kind)
     sent=gateway(appointment.tenant,"POST","send",{"to":number,"text":body})
     conversation,_=WhatsAppConversation.objects.get_or_create(tenant=appointment.tenant,wa_id=number,
-        defaults={"customer":appointment.customer,"contact_name":appointment.customer.name,
+        defaults={"customer":appointment.customer,"contact_name":appointment.customer_display_name,
                   "last_message_at":timezone.now()})
     conversation.customer=appointment.customer
     conversation.appointment=appointment
