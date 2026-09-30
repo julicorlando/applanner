@@ -33,6 +33,11 @@
     {% endif %}
   </div>
 
+  <section class="panel operation-diagnostics" aria-labelledby="diagnostics-title">
+    <div class="operation-section-heading"><div><span class="eyebrow">SAÚDE DA OPERAÇÃO</span><h2 id="diagnostics-title">Diagnóstico rápido</h2><p>Veja o que está pronto para receber clientes e o que precisa de atenção.</p></div><a class="button" href="{% url 'portal-diagnostics' %}">Abrir diagnóstico completo →</a></div>
+    <div class="diagnostic-strip">{% for check in operation_health %}<a class="diagnostic-item {% if check.ok %}is-ok{% else %}is-pending{% endif %}" href="{{ check.url }}"><span aria-hidden="true">{% if check.ok %}✓{% else %}!{% endif %}</span><strong>{{ check.label }}</strong><small>{% if check.ok %}Pronto{% else %}Atenção{% endif %}</small></a>{% endfor %}</div>
+  </section>
+
   <section class="operation-modules" aria-labelledby="operation-modules-title">
     <div class="operation-section-heading"><div><span class="eyebrow">OPERAÇÃO</span><h2 id="operation-modules-title">Suas ferramentas</h2><p>As áreas disponíveis seguem as permissões da sua equipe e os módulos do seu plano.</p></div><span class="operation-module-count">{{ modules|length }} módulos</span></div>
     <div class="portal-module-grid">

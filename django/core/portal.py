@@ -928,7 +928,44 @@ def home(request):
         "tenant":tenant,"modules":modules,"contracted_modules":contracted,
         "public_professionals":public_professionals,
         "arena_mode":segment_enabled(tenant,"arena"),
+        "operation_health":operation_health(tenant),
     })
+
+
+def operation_health(tenant):
+    """Read-only readiness summary for the owner; never calls external providers."""
+    from scheduling.models import Professional,Service,ProfessionalAvailability,TenantScheduleSettings
+    from communications.models import TenantWhatsAppConnection
+    from billing.payment_services import has_connected_tenant_gateway
+    settings=TenantScheduleSettings.objects.filter(tenant=tenant).first()
+    checks=[]
+    checks.append({"key":"public","label":"Página pública","ok":bool(tenant.public_enabled and tenant.public_booking_enabled),
+        "detail":"Ativa e pronta para receber agendamentos." if tenant.public_enabled and tenant.public_booking_enabled else "Ative a página e o agendamento público.","url":reverse("tenant-branding")})
+    checks.append({"key":"team","label":"Equipe","ok":Professional.objects.filter(tenant=tenant,active=True).exists(),
+        "detail":"Há profissional ativo." if Professional.objects.filter(tenant=tenant,active=True).exists() else "Cadastre pelo menos um profissional.","url":reverse("portal-resource-list",args=["agenda","profissionais"])})
+    checks.append({"key":"services","label":"Serviços","ok":Service.objects.filter(tenant=tenant,active=True).exists(),
+        "detail":"Há serviço ativo." if Service.objects.filter(tenant=tenant,active=True).exists() else "Cadastre pelo menos um serviço.","url":reverse("portal-resource-list",args=["agenda","servicos"])})
+    checks.append({"key":"hours","label":"Horários","ok":ProfessionalAvailability.objects.filter(tenant=tenant,active=True,professional__active=True).exists(),
+        "detail":"Existe horário de atendimento." if ProfessionalAvailability.objects.filter(tenant=tenant,active=True,professional__active=True).exists() else "Defina os horários da equipe.","url":reverse("portal-resource-list",args=["agenda","expedientes"])})
+    payment_ok=bool(settings and settings.allow_pay_on_site) or has_connected_tenant_gateway(tenant)
+    checks.append({"key":"payments","label":"Recebimentos","ok":payment_ok,
+        "detail":"Pagamento na unidade ou Mercado Pago configurado." if payment_ok else "Permita pagar na unidade ou conecte o Mercado Pago.","url":reverse("tenant-payment-gateway")})
+    whatsapp=TenantWhatsAppConnection.objects.filter(tenant=tenant,enabled=True).exists()
+    checks.append({"key":"whatsapp","label":"WhatsApp","ok":whatsapp,
+        "detail":"Conexão habilitada." if whatsapp else "Opcional: conecte o WhatsApp para confirmações.","url":reverse("tenant-whatsapp-settings")})
+    return checks
+
+
+@login_required
+def operation_diagnostics(request):
+    tenant=_require_tenant(request)
+    if tenant is None:
+        return redirect("portal-home")
+    require_any_capability(request.user,"agenda.manage")
+    checks=operation_health(tenant)
+    blocking=[item for item in checks if not item["ok"] and item["key"]!="whatsapp"]
+    return render(request,"portal/diagnostics.html",{"tenant":tenant,"checks":checks,
+        "blocking_count":len(blocking),"ready":not blocking})
 
 
 def available_modules(user,tenant):

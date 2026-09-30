@@ -144,6 +144,14 @@ class PostDeployFixesTests(TestCase):
         self.assertContains(response,"Desconectado")
         self.assertNotContains(response,"disconnected")
 
+    def test_operation_diagnostics_is_read_only_and_explains_optional_whatsapp(self):
+        response=self.client.get(reverse("portal-diagnostics"))
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,"Diagnóstico da operação")
+        self.assertContains(response,"WhatsApp é opcional")
+        self.assertContains(response,"Página pública")
+        self.assertEqual(response.context["checks"][-1]["key"],"whatsapp")
+
     def test_arena_setup_requires_compatible_court_price_and_hours(self):
         from arena.models import Court,CourtHours,PriceRule
         self.tenant.category="arena"
