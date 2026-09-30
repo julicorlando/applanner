@@ -184,6 +184,8 @@ O proprietário gerencia o plano em `/billing/assinatura/`: pode cancelar a assi
 
 O Master pode dispensar a confirmação de e-mail no cadastro de uma empresa pelo recurso **Onboarding → Verificação e publicação**. A dispensa não valida o endereço informado. SMTP pode ser configurado e testado em **Master → E-mail e SMTP** sem revelar a senha; a configuração ativa do painel tem prioridade sobre as variáveis `EMAIL_*` do Coolify.
 
+Em **Master → Usuários → Excluir acesso**, o superusuário confirma digitando o e-mail da conta. A ação desativa e anonimiza a identidade, revoga tokens e sessões e permite reutilizar o e-mail em um novo cadastro. O Master não pode excluir a própria conta. O identificador e o vínculo histórico permanecem para manter registros protegidos de financeiro, saúde, suporte e auditoria; isso não equivale à eliminação integral de dados pessoais em outras tabelas. A exclusão integral por solicitação LGPD requer análise dos dados relacionados e da retenção legal.
+
 Depois do cadastro, em **Master → Empresas → Acessos e termos**, publique os Termos de Uso em **Documentos legais** e clique **Convidar responsáveis pendentes por e-mail**. A tela mostra a versão atual, o aceite de cada responsável e a situação do último convite dessa versão. O envio fica inicialmente na fila de notificações; requer worker, beat e SMTP funcional. O responsável autenticado aceita os documentos em `/legal/aceite/`, com versão, data, IP e usuário registrados. Uma nova versão publicada exige novo aceite.
 
 Os seletores de plano e a lista pública exibem o nome gravado em **Master → Planos**. A publicação de um plano exige que ele esteja ativo e visível ao público; a descrição e o preço também vêm do cadastro, sem substituir nomes importados do legado.

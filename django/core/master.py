@@ -237,7 +237,10 @@ def _value(obj,name):
 @login_required
 def home(request):
     _guard(request.user)
-    cards=[{"slug":slug,"title":cfg["title"],"count":apps.get_model(cfg["model"]).objects.count()} for slug,cfg in MASTER_RESOURCES.items()]
+    cards=[{"slug":slug,"title":cfg["title"],"count":(
+        apps.get_model(cfg["model"]).objects.filter(deleted_at__isnull=True).count()
+        if slug=="usuarios" else apps.get_model(cfg["model"]).objects.count()
+    )} for slug,cfg in MASTER_RESOURCES.items()]
     sections=[
         ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
@@ -408,7 +411,7 @@ def chatbot_flow(request):
 def resource_list(request,slug):
     _guard(request.user)
     config,model=_config(slug)
-    qs=model.objects.all()
+    qs=model.objects.filter(deleted_at__isnull=True) if slug=="usuarios" else model.objects.all()
     q=(request.GET.get("q") or "").strip()
     if q:
         lookup=Q()
@@ -443,7 +446,7 @@ def resource_form(request,slug,pk=None):
         return redirect("portal-home")
     if pk is None and not config.get("create",True): raise PermissionDenied
     if pk is not None and not config.get("edit",True): raise PermissionDenied
-    obj=get_object_or_404(model,pk=pk) if pk else None
+    obj=get_object_or_404(model,pk=pk,deleted_at__isnull=True) if pk and slug=="usuarios" else (get_object_or_404(model,pk=pk) if pk else None)
     Form=PlanMasterForm if config.get("special")=="plan" else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"]))
     form=Form(request.POST or None,request.FILES or None,instance=obj)
     for name,field in form.fields.items():
@@ -480,6 +483,55 @@ def resource_form(request,slug,pk=None):
             else:
                 form.add_error(None,exc)
     return render(request,"master/form.html",{"slug":slug,"resource":config,"form":form,"title":("Editar" if obj else "Novo")+" — "+config["title"]})
+
+
+@login_required
+def remove_user(request,pk):
+    """Revoga o acesso sem apagar registros financeiros, clínicos ou de auditoria."""
+    _guard(request.user)
+    from accounts.models import SecurityEvent,User
+
+    user=get_object_or_404(User.objects.select_related("tenant"),pk=pk,deleted_at__isnull=True)
+    if user.pk==request.user.pk:
+        raise PermissionDenied("Você não pode excluir sua própria conta Master.")
+    if request.method=="POST":
+        if request.POST.get("confirm_email","").strip().lower()!=user.email.lower():
+            messages.error(request,"Digite o e-mail exato do usuário para confirmar a exclusão.")
+        else:
+            with transaction.atomic():
+                user=User.objects.select_for_update().get(pk=pk,deleted_at__isnull=True)
+                old_role=user.role
+                user.is_active=False
+                user.is_staff=False
+                user.is_superuser=False
+                user.role="deleted"
+                user.email=f"excluido-{user.pk}@users.invalid"
+                user.first_name=""
+                user.last_name=""
+                user.email_verified_at=None
+                user.two_factor_secret_encrypted=""
+                user.two_factor_enabled_at=None
+                user.must_change_password=False
+                user.session_version+=1
+                user.deleted_at=timezone.now()
+                user.set_unusable_password()
+                user.save()
+                user.groups.clear()
+                user.user_permissions.clear()
+                user.role_links.all().delete()
+                user.api_tokens.all().delete()
+                user.trusted_devices.all().delete()
+                user.recovery_codes.all().delete()
+                user.email_verification_tokens.all().delete()
+                user.password_reset_tokens.all().delete()
+                SecurityEvent.objects.create(
+                    user=request.user,tenant=user.tenant,event_type="master_user_removed",
+                    severity=SecurityEvent.Severity.HIGH,
+                    metadata={"removed_user_id":user.pk,"previous_role":old_role},
+                )
+            messages.success(request,"Acesso excluído. O histórico operacional foi preservado.")
+            return redirect("master-resource-list",slug="usuarios")
+    return render(request,"master/user_remove.html",{"target":user})
 
 
 @login_required

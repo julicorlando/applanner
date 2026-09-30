@@ -8,6 +8,7 @@ from communications.master_marketing import campaigns,create_campaign,cancel_cam
 urlpatterns=[
     path("empresas/<int:pk>/acessos/",master.tenant_access,name="master-tenant-access"),
     path("empresas/<int:pk>/enviar-termos/",master.send_tenant_terms,name="master-send-tenant-terms"),
+    path("usuarios/<int:pk>/excluir/",master.remove_user,name="master-user-remove"),
     path("marketing/",campaigns,name="master-marketing"),
     path("marketing/criar/",create_campaign,name="master-marketing-create"),
     path("marketing/importar/",import_contacts,name="master-marketing-import"),

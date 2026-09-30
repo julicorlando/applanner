@@ -35,6 +35,7 @@ class User(AbstractUser):
     two_factor_secret_encrypted=models.TextField(blank=True)
     two_factor_enabled_at=models.DateTimeField(null=True,blank=True)
     two_factor_last_step=models.BigIntegerField(default=0)
+    deleted_at=models.DateTimeField(null=True,blank=True,db_index=True)
 
     USERNAME_FIELD="email"
     REQUIRED_FIELDS=[]
