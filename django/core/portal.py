@@ -64,6 +64,10 @@ CATALOG_LINKS={
 
 
 def _feature_allowed(user,tenant,module_slug,resource_slug):
+    if tenant and segment_enabled(tenant,"arena") and module_slug=="agenda" and resource_slug in {
+        "agendamentos","profissionais","servicos","expedientes","intervalos","folgas",
+    }:
+        return False
     if user.is_superuser or not tenant or not active_subscription(tenant):
         return True
     entitlement=RESOURCE_ENTITLEMENTS.get((module_slug,resource_slug))
@@ -819,6 +823,7 @@ def home(request):
     return render(request,"portal/home.html",{
         "tenant":tenant,"modules":modules,"contracted_modules":contracted,
         "public_professionals":public_professionals,
+        "arena_mode":segment_enabled(tenant,"arena"),
     })
 
 

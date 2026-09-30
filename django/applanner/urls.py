@@ -16,6 +16,7 @@ from scheduling.public_api import (
     PublicAvailabilityAPIView,
     PublicBookingAPIView, PublicWaitlistAPIView,
 )
+from arena.public import CourtSlotsAPIView, CourtBookingAPIView, court_reservation_page
 
 urlpatterns = [
     path("api/v1/<slug:key>/",api_resource,name="personal-api-list"),
@@ -48,6 +49,7 @@ urlpatterns = [
     path("p/<slug:slug>/profissional/<slug:professional_slug>/", professional_public, name="professional-public"),
     path("p/<slug:slug>/", tenant_public, name="tenant-public"),
     path("agendamento/<str:token>/", appointment_page, name="public-appointment-page"),
+    path("arena/reserva/<str:token>/",court_reservation_page,name="public-arena-reservation"),
     path("avaliar/<str:token>/", public_rating, name="public-appointment-rating"),
     path("blog/<slug:slug>/", blog_post, name="blog-post"),
     path("landing/<slug:slug>/", landing, name="landing"),
@@ -58,6 +60,8 @@ urlpatterns = [
     path("webhooks/tenant-whatsapp/", tenant_whatsapp_receive, name="tenant-whatsapp-receive"),
     path("api/scheduling/", include("scheduling.urls")),
     path("api/public/<slug:slug>/availability/", PublicAvailabilityAPIView.as_view(), name="public-availability"),
+    path("api/public/<slug:slug>/arena/slots/",CourtSlotsAPIView.as_view(),name="public-arena-slots"),
+    path("api/public/<slug:slug>/arena/book/",CourtBookingAPIView.as_view(),name="public-arena-book"),
     path("api/public/<slug:slug>/book/", PublicBookingAPIView.as_view(), name="public-booking"),
     path("api/public/<slug:slug>/waitlist/", PublicWaitlistAPIView.as_view(), name="public-waitlist"),
     path("api/public/appointments/<str:token>/", CustomerAppointmentAPIView.as_view(), name="public-appointment-manage"),

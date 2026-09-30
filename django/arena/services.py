@@ -275,13 +275,13 @@ class ArenaReservationService:
         quote=self.quote(tenant,court,start,end,modality)
         settings_obj=self.sports_settings(tenant)
         deposit=Decimal("0")
-        if settings_obj.require_deposit:
+        if settings_obj.require_deposit and payment_method=="pix":
             if settings_obj.deposit_type==SportsSettings.DepositType.FIXED:
                 deposit=min(quote["total"],_money(settings_obj.deposit_value))
             else:
                 deposit=_money(quote["total"]*settings_obj.deposit_value/Decimal("100"))
 
-        pending=settings_obj.require_deposit and deposit>0
+        pending=payment_method=="pix" and deposit>0
         token=secrets.token_urlsafe(32)
         public_id=secrets.token_hex(16)
         minutes=int((end-start).total_seconds()//60)

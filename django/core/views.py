@@ -36,6 +36,7 @@ def _tenant_dashboard(request):
         from django.shortcuts import redirect
         return redirect("professional-area")
     from billing.entitlements import active_subscription,module_enabled
+    from billing.segment_access import segment_enabled
     from billing.models import TenantModule
     from finance.models import FinancialTransaction
     from scheduling.models import Appointment,Customer,Professional
@@ -73,6 +74,21 @@ def _tenant_dashboard(request):
 
     available=available_modules(request.user,tenant)
     segment_module=next((item for item in available if item["slug"] in {"auto","saude","arena","barbearia"}),None)
+    arena_mode=segment_enabled(tenant,"arena")
+    if arena_mode:
+        from arena.models import Court,Reservation
+        arena_today=Reservation.objects.filter(tenant=tenant,starts_at__gte=start,starts_at__lt=end)
+        arena_today_total=arena_today.count()
+        arena_today_pending=arena_today.filter(status__in=[
+            Reservation.Status.CONFIRMED,Reservation.Status.PENDING_PAYMENT,
+        ]).count()
+        courts_count=Court.objects.filter(tenant=tenant,active=True).count()
+        arena_upcoming=Reservation.objects.filter(tenant=tenant,starts_at__gte=timezone.now(),
+            status__in=[Reservation.Status.CONFIRMED,Reservation.Status.PENDING_PAYMENT]
+        ).select_related("court").order_by("starts_at")[:8]
+    else:
+        arena_upcoming=[]
+        arena_today_total=arena_today_pending=courts_count=0
     return render(request,"dashboard.html",{
         "tenant":tenant,
         "today_total":today_qs.count(),
@@ -90,6 +106,9 @@ def _tenant_dashboard(request):
         "subscription":subscription,
         "can_manage_agenda":has_capability(request.user,"agenda.manage"),
         "can_manage_finance":has_capability(request.user,"finance.manage"),
+        "arena_mode":arena_mode,"arena_upcoming":arena_upcoming,
+        "arena_today_total":arena_today_total,"arena_today_pending":arena_today_pending,
+        "courts_count":courts_count,
     })
 
 
@@ -141,6 +160,11 @@ def _public_tenant_context(tenant,professional=None):
     from billing.segment_access import segment_enabled
     segment=next((item for item in ("auto","saude","arena","barbearia") if segment_enabled(tenant,item)),None)
     courts=tenant.sports_courts.filter(active=True).order_by("sort_order","name")[:24] if segment=="arena" else []
+    if segment=="arena":
+        from arena.public import _deposit_available
+        arena_deposit_available=_deposit_available(tenant)
+    else:
+        arena_deposit_available=False
     wording={"auto":("AGENDAMENTO AUTOMOTIVO","Escolha o serviço para seu veículo e um horário disponível.","Veículo e serviço"),
         "saude":("AGENDAMENTO DE SAÚDE","Escolha seu atendimento e um profissional disponível.","Atendimento"),
         "arena":("RESERVA NA ARENA","Escolha a atividade e um horário disponível.","Atividade"),
@@ -153,6 +177,7 @@ def _public_tenant_context(tenant,professional=None):
         "payment_settings":payment_settings,"online_payment_available":gateway_connected,
         "segment":segment,"booking_wording":wording.get(segment,("AGENDAMENTO ONLINE","Escolha serviço, profissional e horário.","Serviço")),
         "courts":courts,
+        "arena_deposit_available":arena_deposit_available,
     }
 
 

@@ -17,11 +17,32 @@
       <h1>{{ tenant.public_headline|default:tenant.name }}</h1>
       <p>{{ tenant.public_subheadline|default:tenant.description }}</p>
     {% endif %}
-    <div class="actions"><a class="button primary" href="#agendar">{{ tenant.public_cta_label|default:"Agendar agora" }}</a><a class="button ghost" href="#servicos">Ver serviços</a></div>
+    <div class="actions"><a class="button primary" href="#agendar">{{ tenant.public_cta_label|default:"Agendar agora" }}</a><a class="button ghost" href="{% if segment == 'arena' %}#quadras{% else %}#servicos{% endif %}">{% if segment == 'arena' %}Ver quadras{% else %}Ver serviços{% endif %}</a></div>
   </div>
 </section>
 
 {% if tenant.public_booking_enabled %}
+{% if segment == 'arena' %}
+<section class="shell section" id="agendar">
+  <div class="section-head"><span class="eyebrow">RESERVA NA ARENA</span><h2>Escolha quadra, data e horário.</h2></div>
+  <div class="panel"><form id="arena-booking" class="portal-form" data-public-slug="{{ public_slug }}">{% csrf_token %}
+    <div class="portal-module-grid">
+      <div class="form-field"><label for="arena-court">Quadra</label><select id="arena-court" required><option value="">Selecione uma quadra</option>{% for court in courts %}<option value="{{ court.pk }}" data-min="{{ court.minimum_minutes }}" data-max="{{ court.maximum_minutes }}">{{ court.name }}</option>{% endfor %}</select></div>
+      <div class="form-field"><label for="arena-date">Data</label><input id="arena-date" type="date" required></div>
+      <div class="form-field"><label for="arena-duration">Duração</label><select id="arena-duration" required></select></div>
+    </div>
+    <div class="form-field booking-times"><label id="arena-slot-label">Horários disponíveis</label><input type="hidden" id="arena-slot"><div id="arena-slots" class="booking-slots" role="group" aria-labelledby="arena-slot-label"></div><small id="arena-slot-status" role="status" aria-live="polite">Escolha quadra e data para ver os horários.</small></div>
+    <div class="portal-module-grid">
+      <div class="form-field"><label for="arena-name">Seu nome</label><input id="arena-name" required minlength="2"></div>
+      <div class="form-field"><label for="arena-phone">Telefone</label><input id="arena-phone" autocomplete="tel"></div>
+      <div class="form-field"><label for="arena-email">E-mail</label><input id="arena-email" type="email" autocomplete="email"></div>
+    </div>
+    <div class="form-field"><label for="arena-notes">Observações</label><input id="arena-notes"></div>
+    {% if arena_deposit_available %}<fieldset class="form-field"><legend>Pagamento</legend><label><input type="radio" name="arena-payment" value="onsite" checked> Pagar na unidade</label> <label><input type="radio" name="arena-payment" value="pix"> Sinal por Pix (exige e-mail)</label></fieldset>{% endif %}
+    <div id="arena-feedback" role="status" aria-live="polite"></div><div class="form-actions"><button class="button primary" type="submit">Confirmar reserva</button></div>
+  </form></div>
+</section>
+{% else %}
 <section class="shell section" id="agendar">
   <div class="section-head"><span class="eyebrow">{{ booking_wording.0 }}</span><h2>{{ booking_wording.1 }}</h2></div>
   <div class="panel">
@@ -51,19 +72,22 @@
   </div>
 </section>
 {% endif %}
+{% endif %}
 
+{% if segment != 'arena' %}
 <section class="shell section" id="servicos">
   <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2></div>
   <div class="segment-grid">{% for service in services %}<article><span>{{ service.duration_minutes }} min</span><h3>{{ service.name }}</h3><p>{{ service.description }}</p><strong>R$ {{ service.price }}</strong></article>{% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}</div>
 </section>
+{% endif %}
 
-{% if professionals and not selected_professional %}
+{% if segment != 'arena' and professionals and not selected_professional %}
 <section class="shell section"><div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2></div><div class="segment-grid">
 {% for professional in professionals %}<article>{% if professional.photo %}<img src="{% url 'public-professional-image' professional.pk %}" alt="{{ professional.name }}" style="width:72px;height:72px;object-fit:cover;border-radius:50%">{% endif %}<span>{{ professional.specialty|default:"Profissional" }}</span><h3>{{ professional.name }}</h3>{% if professional.public_slug %}<a href="{% url 'professional-public' public_slug professional.public_slug %}">Ver agenda exclusiva →</a>{% endif %}</article>{% endfor %}
 </div></section>
 {% endif %}
 
-{% if courts %}<section class="shell section" id="quadras"><div class="section-head"><span class="eyebrow">ARENA</span><h2>Quadras e espaços</h2></div><div class="segment-grid">{% for court in courts %}<article><h3>{{ court.name }}</h3><p>{{ court.description }}</p><span>{% if court.indoor %}Coberta{% else %}Ao ar livre{% endif %}{% if court.lighting %} · Iluminação{% endif %}{% if court.surface %} · {{ court.surface }}{% endif %}</span></article>{% endfor %}</div></section>{% endif %}
+{% if courts %}<section class="shell section" id="quadras"><div class="section-head"><span class="eyebrow">ARENA</span><h2>Quadras e espaços</h2></div><div class="segment-grid">{% for court in courts %}<article><h3>{{ court.name }}</h3><p>{{ court.description }}</p><span>{% if court.indoor %}Coberta{% else %}Ao ar livre{% endif %}{% if court.lighting %} · Iluminação{% endif %}{% if court.surface %} · {{ court.surface }}{% endif %}</span>{% if tenant.public_booking_enabled %}<p><a href="#agendar" data-select-court="{{ court.pk }}">Ver horários e reservar →</a></p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
 
 {% if segment == 'saude' %}<section class="shell section"><article class="panel"><span class="eyebrow">ATENDIMENTO DE SAÚDE</span><h2>Suas informações de saúde são protegidas</h2><p>Agende sua consulta com um profissional. O prontuário clínico só pode ser acessado por pessoas autorizadas do estabelecimento.</p></article></section>{% endif %}
 
@@ -87,6 +111,9 @@
 
 {% if tenant.public_booking_enabled %}
 <script src="{% static 'js/booking-slots.js' %}"></script>
+{% if segment == 'arena' %}
+<script src="{% static 'js/arena-booking.js' %}" defer></script>
+{% else %}
 <script>
 (() => {
   const form=document.getElementById('public-booking');
@@ -143,5 +170,6 @@
   });
 })();
 </script>
+{% endif %}
 {% endif %}
 {% endblock %}
