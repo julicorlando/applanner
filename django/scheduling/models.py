@@ -48,6 +48,7 @@ class Professional(TimeStampedModel):
     commission_percent=models.DecimalField(max_digits=5,decimal_places=2,null=True,blank=True)
     active=models.BooleanField(default=True)
     services=models.ManyToManyField(Service,through="ProfessionalService",related_name="professionals",blank=True)
+    services_restricted=models.BooleanField(default=False)
 
     class Meta:
         constraints=[

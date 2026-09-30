@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Configurar operação — {{ tenant.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <header class="portal-heading"><div><span class="eyebrow">PRIMEIROS PASSOS</span><h1>Prepare {{ tenant.name }} para atender.</h1><p>{% if arena_mode %}Cadastre quadras, preços e horários antes de receber reservas.{% else %}Organize equipe, serviços e horários antes de receber agendamentos.{% endif %} Você pode voltar a este roteiro sempre que precisar.</p></div><a class="button ghost" href="{% url 'portal-home' %}">Voltar ao painel</a></header>
+  <div class="panel"><strong>{{ completed }} de {{ steps|length }} etapas configuradas</strong><progress value="{{ progress }}" max="100" aria-label="Progresso da configuração" style="width:100%">{{ progress }}%</progress><p>As marcas indicam configurações cadastradas. Abra a página pública e teste o fluxo completo antes de divulgar o link.</p></div>
+  <div class="portal-module-grid" style="margin-top:24px">{% for step in steps %}<article class="portal-module-card"><span class="status-pill">{% if step.done %}Configurado{% else %}Pendente{% endif %}</span><h2>{{ forloop.counter }}. {{ step.title }}</h2><a class="button" href="{{ step.url }}">{{ step.action }} →</a></article>{% endfor %}</div>
+</section>
+{% endblock %}

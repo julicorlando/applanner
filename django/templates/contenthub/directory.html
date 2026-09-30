@@ -7,7 +7,7 @@
     {% for card in cards %}
     <article>
       {% if card.tenant.logo %}<img class="professional-avatar" src="{% url 'public-tenant-image' card.tenant.pk 'logo' %}" alt="Logo de {{ card.tenant.name }}" loading="lazy">{% endif %}
-      <span>{{ card.tenant.category|default:"Estabelecimento" }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
+      <span>{{ card.tenant.category_label }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
       <h3>{{ card.tenant.name }}</h3>
       <p>{{ card.tenant.description|truncatechars:180 }}</p>
       {% with unit=card.nearest_unit %}{% if unit %}<p>{{ unit.city }}{% if unit.state %}/{{ unit.state }}{% endif %}{% if unit.district %} · {{ unit.district }}{% endif %}</p>{% endif %}{% endwith %}

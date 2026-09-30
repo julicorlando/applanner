@@ -34,6 +34,8 @@ class TenantBrandingForm(ImageSizeForm):
         fields=["logo","cover","description","public_headline","public_subheadline",
                 "public_enabled","public_booking_enabled"]
         labels={"logo":"Logo da empresa","cover":"Foto de capa da página pública",
+                "description":"Descrição da empresa","public_headline":"Título da página pública",
+                "public_subheadline":"Descrição da página pública",
                 "public_enabled":"Mostrar empresa no diretório e abrir página pública",
                 "public_booking_enabled":"Permitir agendamento na página pública"}
 

@@ -53,6 +53,13 @@ class Tenant(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    @property
+    def category_label(self):
+        labels={"barbearia":"Barbearia","salao":"Salão de beleza","salão":"Salão de beleza",
+                "arena":"Arena esportiva","auto":"Automotivo","automotivo":"Automotivo",
+                "medico":"Médico","médico":"Médico","saude":"Saúde","saúde":"Saúde"}
+        return labels.get((self.category or "").strip().lower(),self.category or "Estabelecimento")
+
 
 class Unit(TimeStampedModel):
     tenant=models.ForeignKey(Tenant,on_delete=models.CASCADE,related_name="units")

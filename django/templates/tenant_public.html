@@ -53,14 +53,14 @@
     <form id="public-booking" class="portal-form">{% csrf_token %}
       <div class="portal-module-grid">
         <div class="form-field"><label>{{ booking_wording.2 }}</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
-        <div class="form-field"><label>Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
+        <div class="form-field"><label>Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" data-all-services="{{ professional.public_all_services|yesno:'true,false' }}" data-service-ids="{{ professional.public_service_ids }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
         <div class="form-field"><label>Data</label><input id="booking-date" type="date" required></div>
       </div>
-      <fieldset class="form-field"><legend>Como deseja pagar?</legend><div class="booking-slots">
+      {% if online_payment_choices %}<fieldset class="form-field"><legend>Como deseja pagar?</legend><div class="booking-slots">
         {% if payment_settings.allow_pay_on_site %}<label class="button ghost"><input type="radio" name="payment_choice" value="on_site" checked> Pagar na unidade</label>{% endif %}
         {% if online_payment_available and payment_settings.allow_partial_payment %}<label class="button ghost"><input type="radio" name="payment_choice" value="partial" {% if not payment_settings.allow_pay_on_site %}checked{% endif %}> Sinal de {{ payment_settings.deposit_percent }}% por Pix</label>{% endif %}
         {% if online_payment_available and payment_settings.allow_full_payment %}<label class="button ghost"><input type="radio" name="payment_choice" value="full" {% if not payment_settings.allow_pay_on_site and not payment_settings.allow_partial_payment %}checked{% endif %}> Pagar o total por Pix</label>{% endif %}
-      </div><small>O agendamento é confirmado agora. O Pix só consta como pago após a confirmação do banco.</small></fieldset>
+      </div><small>O agendamento é confirmado agora. O Pix só consta como pago após a confirmação do banco.</small></fieldset>{% elif not booking_payment_available %}<p class="flash error">O estabelecimento ainda precisa configurar uma forma de pagamento para receber agendamentos online.</p>{% endif %}
       <div class="form-field booking-times"><label id="booking-slot-label">Horários disponíveis</label><p class="booking-times-hint">Toque em um horário para selecioná-lo. Os horários disponíveis aparecem após escolher serviço e data.</p><input type="hidden" id="booking-slot"><div id="booking-slots" class="booking-slots" role="group" aria-labelledby="booking-slot-label"></div><small id="booking-slot-status" role="status" aria-live="polite">Escolha o serviço e a data para ver os horários.</small></div>
       <div class="portal-module-grid" style="margin-top:14px">
         <div class="form-field"><label>Seu nome</label><input id="booking-name" required minlength="2"></div>
@@ -71,7 +71,7 @@
       {% if segment == 'auto' %}<div class="portal-module-grid"><div class="form-field"><label for="booking-plate">Placa do veículo</label><input id="booking-plate" autocomplete="off" maxlength="8" placeholder="ABC1D23" required></div><div class="form-field"><label for="booking-vehicle-model">Modelo do veículo</label><input id="booking-vehicle-model" maxlength="100" placeholder="Ex.: Onix" required></div></div>{% endif %}
       <div id="booking-feedback" style="margin-top:12px"></div>
       {% if waitlist_enabled %}<div id="booking-waitlist" class="panel" hidden><h3>Sem horários? Entre na lista de espera</h3><p>Usaremos o nome e o contato informados acima para avisar se surgir uma vaga nesta data.</p><button type="button" class="button" id="booking-waitlist-submit">Entrar na lista de espera</button></div>{% endif %}
-      <div class="form-actions"><button class="button primary" type="submit">Confirmar agendamento</button></div>
+      <div class="form-actions"><button class="button primary" type="submit" {% if not booking_payment_available %}disabled{% endif %}>Confirmar agendamento</button></div>
     </form>
   </div>
 </section>
@@ -147,7 +147,15 @@
     if(professional.value)query.set('professional_id',professional.value);
     picker.load('/api/public/{{ public_slug }}/availability/?'+query.toString());
   }
-  service.addEventListener('change',loadSlots); professional.addEventListener('change',loadSlots); date.addEventListener('change',loadSlots);
+  service.addEventListener('change',()=>{
+    for(const option of professional.options){
+      if(!option.value)continue;
+      const eligible=!service.value||option.dataset.allServices==='true'||option.dataset.serviceIds.split(',').includes(service.value);
+      option.hidden=!eligible;option.disabled=!eligible;
+      if(!eligible&&option.selected)professional.value='';
+    }
+    loadSlots();
+  }); professional.addEventListener('change',loadSlots); date.addEventListener('change',loadSlots);
 
   form.addEventListener('submit',async event=>{
     event.preventDefault(); feedback.textContent='Confirmando...';
@@ -164,13 +172,21 @@
       professional_link:{% if selected_professional %}true{% else %}false{% endif %}
     };
     if(!payload.phone && !payload.email){feedback.innerHTML='<div class="flash error">Informe telefone ou e-mail.</div>';return;}
+    const submit=form.querySelector('button[type=submit]');submit.disabled=true;
+    try {
     const response=await fetch('/api/public/{{ public_slug }}/book/',{
       method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf},body:JSON.stringify(payload)
     });
     const data=await response.json().catch(()=>({}));
-    if(!response.ok){feedback.innerHTML='<div class="flash error">'+(data.detail||'Não foi possível agendar.')+'</div>';return;}
-    feedback.innerHTML='<div class="flash success"><strong>Agendamento confirmado!</strong><br>Profissional: '+data.professional.name+'<br><a href="'+data.manage_url+'">'+(payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix')+'</a></div>';
-    form.querySelector('button[type=submit]').disabled=true;
+    if(!response.ok){feedback.textContent=data.detail||'Não foi possível agendar.';submit.disabled=false;return;}
+    feedback.replaceChildren();
+    const confirmation=document.createElement('div');confirmation.className='flash success';confirmation.setAttribute('role','status');
+    const title=document.createElement('strong');title.textContent='Agendamento confirmado!';confirmation.append(title);
+    const when=new Intl.DateTimeFormat('pt-BR',{timeZone:data.timezone,dateStyle:'full',timeStyle:'short'}).format(new Date(data.starts_at));
+    const price=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(data.service.price));
+    for(const text of [data.service.name+' · '+price,when,'Profissional: '+data.professional.name]){const line=document.createElement('p');line.textContent=text;confirmation.append(line);}
+    const link=document.createElement('a');link.href=data.manage_url;link.textContent=payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix';confirmation.append(link);feedback.append(confirmation);
+    } catch {feedback.textContent='Não foi possível confirmar o agendamento. Consulte seus agendamentos antes de tentar novamente.';submit.disabled=false;}
   });
 })();
 </script>

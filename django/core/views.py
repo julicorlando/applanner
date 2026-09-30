@@ -151,10 +151,14 @@ def _public_tenant_context(tenant,professional=None):
     from billing.payment_services import has_connected_tenant_gateway
 
     services=tenant.services.filter(active=True).order_by("name")[:100]
-    professionals=tenant.professionals.filter(active=True).order_by("name")[:100]
+    professionals=list(tenant.professionals.filter(active=True).prefetch_related("services").order_by("name")[:100])
+    for item in professionals:
+        offered=list(item.services.all())
+        item.public_all_services=not item.services_restricted and not offered
+        item.public_service_ids=",".join(str(service.pk) for service in offered if service.tenant_id==tenant.pk and service.active)
     if professional is not None:
-        offered=professional.services.filter(active=True)
-        if offered.exists():
+        offered=professional.services.filter(tenant=tenant,active=True)
+        if professional.services_restricted or professional.services.exists():
             services=offered.order_by("name")[:100]
     units=tenant.units.filter(active=True).order_by("-is_primary","name")
     products=Product.objects.filter(tenant=tenant,active=True).order_by("name")[:24]
@@ -186,6 +190,8 @@ def _public_tenant_context(tenant,professional=None):
         "public_slug":tenant.public_slug or tenant.slug,"selected_professional":professional,
         "waitlist_enabled":not active_subscription(tenant) or module_enabled(tenant,"waitlist"),
         "payment_settings":payment_settings,"online_payment_available":gateway_connected,
+        "online_payment_choices":gateway_connected and (payment_settings.allow_partial_payment or payment_settings.allow_full_payment),
+        "booking_payment_available":payment_settings.allow_pay_on_site or (gateway_connected and (payment_settings.allow_partial_payment or payment_settings.allow_full_payment)),
         "segment":segment,"booking_wording":wording.get(segment,("AGENDAMENTO ONLINE","Escolha serviço, profissional e horário.","Serviço")),
         "courts":courts,
         "arena_deposit_available":arena_deposit_available,

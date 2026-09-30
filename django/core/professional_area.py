@@ -142,7 +142,7 @@ def professional_area(request):
         customer__active=True,service__active=True).filter(
         Q(professional__isnull=True)|Q(professional=professional)
     ).select_related("customer","service").order_by("preferred_date","created_at") if waitlist_enabled else WaitlistEntry.objects.none())
-    if professional.services.exists():
+    if professional.services_restricted or professional.services.exists():
         waiting=waiting.filter(service__in=professional.services.filter(active=True))
     return render(request,"portal/professional_area.html",{
         "professional":professional,"upcoming":upcoming[:15],"current":current,"upcoming_count":upcoming.count(),

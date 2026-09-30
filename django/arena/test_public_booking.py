@@ -66,6 +66,10 @@ class ArenaPublicBookingTests(TestCase):
         response=self.client.post(self.book,data,content_type="application/json")
         self.assertEqual(response.status_code,201)
         manage_url=response.json()["manage_url"]
+        self.assertEqual(response.json()["court"],self.court.name)
+        self.assertEqual(response.json()["starts_at"],start["value"])
+        self.assertIn("total",response.json())
+        self.assertEqual(response.json()["timezone"],"America/Recife")
         reservation=Reservation.objects.get(tenant=self.tenant)
         self.assertEqual(reservation.status,Reservation.Status.CONFIRMED)
         self.assertEqual(reservation.deposit_amount,Decimal("0"))

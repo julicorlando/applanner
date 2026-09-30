@@ -23,6 +23,11 @@
       <p>{{ medical_plan.description }}</p><p>O cadastro para este segmento está temporariamente desativado.</p>
     </article>{% endif %}
   </div>
+  {% if cards %}<section class="panel" style="margin-top:24px"><h2>Compare o que está incluído</h2><p>Confira os recursos e as condições de cada plano antes de escolher.</p><div class="table-card" style="overflow-x:auto"><table class="portal-table"><caption>Catálogo atual de planos públicos</caption><thead><tr><th>Recurso ou condição</th>{% for card in cards %}<th scope="col">{{ card.plan.name }}</th>{% endfor %}</tr></thead><tbody>
+    <tr><th scope="row">Mensalidade</th>{% for card in cards %}<td>R$ {{ card.plan.monthly_price|floatformat:2 }}</td>{% endfor %}</tr>
+    <tr><th scope="row">Teste grátis</th>{% for card in cards %}<td>{% if card.plan.trial_days %}{{ card.plan.trial_days }} dias{% if card.plan.trial_without_card %}, sem cartão{% endif %}{% else %}Sem período de teste{% endif %}</td>{% endfor %}</tr>
+    {% for row in comparison %}<tr><th scope="row">{{ row.label }}</th>{% for value in row.values %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}
+    </tbody></table></div></section>{% endif %}
   <div class="panel" style="margin-top:24px"><h2>Precisa de outra combinação?</h2><p>Escolha as funções do seu negócio e receba uma proposta personalizada.</p><a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano →</a></div>
 </section>
 {% endblock %}

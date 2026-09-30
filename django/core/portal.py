@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import timedelta,datetime,date,time
+from decimal import Decimal
 import secrets
 
 from django import forms
@@ -7,9 +8,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db.models import Q
+from django.db import transaction
+from django.utils.formats import number_format
 from django.forms import modelform_factory
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from accounts.permissions import has_capability,require_any_capability
@@ -675,10 +679,15 @@ def _widgets_for(model, fields):
 
 def _model_form(model, resource, *args, tenant=None, **kwargs):
     from core.labels import field_label
-    Form=modelform_factory(model,fields=resource["fields"],widgets=_widgets_for(model,resource["fields"]))
-    form=Form(*args,**kwargs)
+    from core.operation_forms import OperationModelForm
+    fields=list(resource["fields"])
+    if tenant and not segment_enabled(tenant,"auto") and "vehicle" in fields:
+        fields.remove("vehicle")
+    Form=modelform_factory(model,form=OperationModelForm,fields=fields,widgets=_widgets_for(model,fields))
+    form=Form(*args,tenant=tenant,**kwargs)
     for name,field in form.fields.items():
-        field.label=field_label(model,name)
+        if _field(model,name):
+            field.label=field_label(model,name)
         model_field=_field(model,name)
         if model_field and model_field.get_internal_type()=="DateTimeField":
             field.input_formats=["%Y-%m-%dT%H:%M","%Y-%m-%d %H:%M:%S","%Y-%m-%d %H:%M"]
@@ -758,6 +767,9 @@ def _save_special(obj, *, resource, request, tenant, is_new):
 
 
 def _value(obj, name):
+    from core.operation_forms import WEEKDAYS
+    if name=="weekday":
+        return dict(WEEKDAYS).get(getattr(obj,name,None),"Todos os dias")
     getter=getattr(obj,f"get_{name}_display",None)
     if getter:
         try:
@@ -769,6 +781,15 @@ def _value(obj, name):
         return "—"
     if isinstance(value,bool):
         return "Sim" if value else "Não"
+    if isinstance(value,Decimal):
+        formatted=number_format(value,decimal_pos=2,use_l10n=True,force_grouping=True)
+        field=_field(obj.__class__,name)
+        money=field and field.decimal_places==2 and not any(part in name for part in ("quantity","percent","rate"))
+        return f"R$ {formatted}" if money else formatted
+    if isinstance(value,time):
+        return value.strftime("%H:%M")
+    if isinstance(value,date) and not isinstance(value,datetime):
+        return value.strftime("%d/%m/%Y")
     if hasattr(value,"strftime"):
         try:
             local=timezone.localtime(value) if timezone.is_aware(value) else value
@@ -787,6 +808,44 @@ def _headers(model, columns):
     for name in columns:
         result.append(field_label(model,name))
     return result
+
+
+@login_required
+def setup_checklist(request):
+    tenant=_require_tenant(request)
+    if tenant is None:
+        return redirect("portal-home")
+    arena=segment_enabled(tenant,"arena")
+    require_any_capability(request.user,"arena.manage" if arena else "agenda.manage")
+    module="arena" if arena else "agenda"
+    resources=PORTAL_MODULES[module]["resources"]
+    _require_module_access(request.user,PORTAL_MODULES[module],tenant,module,
+                           "quadras" if arena else "profissionais")
+    if arena:
+        definitions=[("Cadastre suas quadras","quadras",{"active":True}),
+                     ("Defina preços de reserva","precos",{"active":True,"court__active":True}),
+                     ("Defina horários das quadras","horarios-quadras",{"active":True,"court__active":True})]
+    else:
+        definitions=[("Cadastre sua equipe","profissionais",{"active":True}),
+                     ("Cadastre serviços e responsáveis","servicos",{"active":True}),
+                     ("Defina horários de atendimento","expedientes",{"active":True,"professional__active":True})]
+    steps=[]
+    for title,resource,filters in definitions:
+        model=apps.get_model(resources[resource]["model"])
+        steps.append({"title":title,"done":model.objects.filter(tenant=tenant,**filters).exists(),
+                      "url":reverse("portal-resource-list",args=[module,resource]),"action":"Configurar"})
+    can_publish=request.user.is_superuser or request.user.role=="owner"
+    steps.extend([
+        {"title":"Revise sua página pública","done":bool(tenant.description and tenant.public_headline),
+         "url":reverse("tenant-branding") if can_publish else reverse("portal-home"),"action":"Revisar cadastro"},
+        {"title":"Publique seu link de agendamento","done":tenant.public_enabled and tenant.public_booking_enabled,
+         "url":reverse("tenant-public",args=[tenant.public_slug or tenant.slug]) if tenant.public_enabled else
+                reverse("tenant-branding") if can_publish else reverse("portal-home"),
+         "action":"Abrir página" if tenant.public_enabled else "Configurar publicação"},
+    ])
+    completed=sum(step["done"] for step in steps)
+    return render(request,"portal/setup.html",{"tenant":tenant,"steps":steps,"completed":completed,
+                  "progress":round(completed*100/len(steps)),"arena_mode":arena})
 
 
 @login_required
@@ -901,7 +960,9 @@ def resource_list(request,module_slug,resource_slug):
         if lookup:
             qs=qs.filter(lookup)
     qs=_apply_order(qs,resource.get("order"))[:300]
-    columns=resource["columns"]
+    columns=list(resource["columns"])
+    if not segment_enabled(tenant,"auto") and "vehicle" in columns:
+        columns.remove("vehicle")
     rows=[{"obj":obj,"cells":[_value(obj,c) for c in columns]} for obj in qs]
     return render(request,"portal/list.html",{
         "tenant":tenant,"module_slug":module_slug,"module":module,
@@ -975,8 +1036,9 @@ def resource_create(request,module_slug,resource_slug):
             obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=True)
             try:
                 obj.full_clean()
-                obj.save()
-                form.save_m2m()
+                with transaction.atomic():
+                    obj.save()
+                    form.save_m2m()
                 messages.success(request,f"{resource['title']}: cadastro criado.")
                 return redirect("portal-resource-list",module_slug=module_slug,resource_slug=resource_slug)
             except ValidationError as exc:
@@ -1008,8 +1070,9 @@ def resource_edit(request,module_slug,resource_slug,pk):
         obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=False)
         try:
             obj.full_clean()
-            obj.save()
-            form.save_m2m()
+            with transaction.atomic():
+                obj.save()
+                form.save_m2m()
             messages.success(request,"Alterações salvas.")
             return redirect("portal-resource-list",module_slug=module_slug,resource_slug=resource_slug)
         except ValidationError as exc:

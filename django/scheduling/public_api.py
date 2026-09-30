@@ -307,6 +307,9 @@ class PublicBookingAPIView(APIView):
             {
                 "id":appointment.pk,"status":appointment.status,
                 "starts_at":appointment.starts_at.isoformat(),
+                "ends_at":appointment.ends_at.isoformat(),
+                "service":{"id":service.pk,"name":service.name,"price":str(service.price),"duration_minutes":service.duration_minutes},
+                "timezone":tenant.timezone or "America/Recife",
                 "professional":{"id":professional.pk,"name":professional.name},
                 "manage_token":token,
                 "manage_url":request.build_absolute_uri(manage_path),

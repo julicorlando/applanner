@@ -6,6 +6,7 @@ from .professional_area import professional_area, professional_access, professio
 from scheduling.ratings import tenant_ratings
 
 urlpatterns = [
+    path("primeiros-passos/",portal.setup_checklist,name="portal-setup"),
     path("profissional/",professional_area,name="professional-area"),
     path("profissional/espera/<int:pk>/",professional_waitlist,name="professional-waitlist"),
     path("profissional/agendamento/<int:pk>/",professional_appointment,name="professional-appointment"),

@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.formats import number_format
 from requests.exceptions import RequestException
 from rest_framework import permissions, status, throttling
 from rest_framework.response import Response
@@ -66,7 +67,7 @@ class CourtSlotsAPIView(APIView):
             return Response({"detail":"Data fora do período permitido."},status=400)
         slots=ArenaReservationService().slots(tenant,court,day,duration)
         return Response({"slots":[{
-            "value":item["value"],"label":f'{item["label"]} · R$ {item["total"]}',"ends_at":item["ends_at"],
+            "value":item["value"],"label":f'{item["label"]} · R$ {number_format(item["total"], decimal_pos=2, use_l10n=True)}',"ends_at":item["ends_at"],
             "total":str(item["total"]),
         } for item in slots]})
 
@@ -117,6 +118,9 @@ class CourtBookingAPIView(APIView):
                 return Response({"detail":"Não foi possível gerar o Pix. Escolha outro horário ou tente novamente."},status=502)
         return Response({
             "detail":"Reserva confirmada." if payment=="onsite" else "Reserva aguardando confirmação do Pix.",
+            "court":court.name,"starts_at":reservation.starts_at.isoformat(),
+            "ends_at":reservation.ends_at.isoformat(),"total":str(reservation.total_amount),
+            "timezone":tenant.timezone or "America/Recife",
             "manage_url":f"/arena/reserva/{token}/",
         },status=status.HTTP_201_CREATED)
 

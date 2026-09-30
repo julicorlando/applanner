@@ -74,12 +74,20 @@
         return;
       }
       feedback.replaceChildren(document.createTextNode(`${result.detail} `));
+      const when = new Intl.DateTimeFormat('pt-BR', {timeZone: result.timezone, dateStyle: 'full', timeStyle: 'short'}).format(new Date(result.starts_at));
+      const until = new Intl.DateTimeFormat('pt-BR', {timeZone: result.timezone, hour: '2-digit', minute: '2-digit'}).format(new Date(result.ends_at));
+      const total = new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL'}).format(Number(result.total));
+      for (const text of [result.court, `${when} até ${until}`, `Valor da reserva: ${total}`]) {
+        const line = document.createElement('p');
+        line.textContent = text;
+        feedback.appendChild(line);
+      }
       const link = document.createElement('a');
       link.href = result.manage_url;
       link.textContent = 'Ver minha reserva';
       feedback.appendChild(link);
     } catch {
-      feedback.textContent = 'Falha na conexão. Confira os horários e tente novamente.';
+      feedback.textContent = 'Não foi possível confirmar a reserva. Consulte suas reservas antes de tentar novamente.';
       loadSlots();
       button.disabled = false;
     }

@@ -26,7 +26,7 @@ class AvailabilityService:
         professional=Professional.objects.filter(pk=professional_id,tenant=tenant,active=True).first()
         if not professional:
             return False
-        if not professional.services.exists():
+        if not professional.services_restricted and not professional.services.exists():
             return True
         return professional.services.filter(pk=service_id,tenant=tenant,active=True).exists()
 

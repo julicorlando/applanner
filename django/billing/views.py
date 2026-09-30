@@ -151,7 +151,12 @@ def plans(request):
         ]
         cards.append({"plan":plan,"modules":modules})
     medical=Plan.objects.filter(slug="segment-medico",active=False).first()
-    return render(request,"billing/plans.html",{"cards":cards,"medical_plan":medical})
+    catalog={module.pk:module for card in cards for module in card["modules"]}
+    comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
+                for module in sorted(catalog.values(),key=lambda item:(item.sort_order,item.name))]
+    features=sorted({str(item) for card in cards for item in (card["plan"].features or {}).get("included_features",[])})
+    comparison.extend({"label":feature,"values":["Incluído" if feature in (card["plan"].features or {}).get("included_features",[]) else "Não incluído" for card in cards]} for feature in features)
+    return render(request,"billing/plans.html",{"cards":cards,"medical_plan":medical,"comparison":comparison})
 
 
 class CustomPlanForm(forms.Form):
