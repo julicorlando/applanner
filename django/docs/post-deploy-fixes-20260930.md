@@ -26,3 +26,7 @@ Testes de regressão cobrem preservação do cliente e do histórico, profission
 As alterações precisam ser homologadas no site após redeploy. Testes com provedores simulados não certificam entrega de e-mail/WhatsApp ou cobrança real de Pix/cartão. Esta entrega corrige os pontos da avaliação; não declara a migração inteira como 100% homologada.
 
 Verificação local concluída: 244 testes aprovados, `check` sem problemas, `makemigrations --check --dry-run` sem diferenças, migration 0014 aplicada e coleta de estáticos concluída. Os scripts foram verificados em sintaxe e em execução controlada para troca de plano/ciclo/segmento, mensagem de erro do backend e falha de rede.
+
+## Correção adicional encontrada pelo CI
+
+O teste de limite da API podia atravessar a virada do minuto e esperar incorretamente HTTP 429 no novo período. O teste agora fixa o relógio e verifica também a liberação no próximo minuto. O contador usa uma única chave por requisição, impedindo que a virada do minuto entre as operações de cache provoque erro. O limite continua sendo 60 requisições por minuto. Há regressão específica simulando essa virada.

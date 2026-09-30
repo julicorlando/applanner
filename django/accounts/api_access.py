@@ -211,8 +211,10 @@ def api_resource(request,key,pk=None):
         response=JsonResponse({"erro":"Token inválido ou expirado."},status=401)
         response["WWW-Authenticate"]="Bearer"
         return response
-    if not cache.add(f"api:limit:{token.pk}:{timezone.now().strftime('%Y%m%d%H%M')}",1,timeout=75):
-        count=cache.incr(f"api:limit:{token.pk}:{timezone.now().strftime('%Y%m%d%H%M')}")
+    # Read the minute once: add and incr must use the same key even at 00 seconds.
+    limit_key=f"api:limit:{token.pk}:{timezone.now().strftime('%Y%m%d%H%M')}"
+    if not cache.add(limit_key,1,timeout=75):
+        count=cache.incr(limit_key)
         if count>60:
             return JsonResponse({"erro":"Limite de 60 requisições por minuto."},status=429)
     if key=="meus-agendamentos":

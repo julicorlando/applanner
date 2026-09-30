@@ -1,12 +1,13 @@
 import re
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase,override_settings
+from django.test import RequestFactory,TestCase,override_settings
 from django.utils import timezone
 
-from accounts.api_access import allowed_scopes
+from accounts.api_access import allowed_scopes,api_resource
 from accounts.models import PersonalAPIToken,UserBlock
 from scheduling.models import Appointment,Customer,Professional,Service
 from tenants.models import Tenant
@@ -80,9 +81,25 @@ class PersonalAPITests(TestCase):
 
     def test_rate_limit(self):
         raw=self.issue()
-        for _ in range(60):
+        now=timezone.now()
+        with patch("accounts.api_access.timezone.now",return_value=now):
+            for _ in range(60):
+                self.assertEqual(self.get_api(raw,"/api/v1/clientes/").status_code,200)
+            self.assertEqual(self.get_api(raw,"/api/v1/clientes/").status_code,429)
+        with patch("accounts.api_access.timezone.now",return_value=now+timedelta(minutes=1)):
             self.assertEqual(self.get_api(raw,"/api/v1/clientes/").status_code,200)
-        self.assertEqual(self.get_api(raw,"/api/v1/clientes/").status_code,429)
+
+    def test_rate_limit_counter_remains_consistent_across_minute_boundary(self):
+        self.issue()
+        token=PersonalAPIToken.objects.get(user=self.user)
+        before=timezone.now().replace(second=59,microsecond=999999)
+        after=before+timedelta(microseconds=1)
+        cache.set(f"api:limit:{token.pk}:{before.strftime('%Y%m%d%H%M')}",60,timeout=75)
+        request=RequestFactory().get("/api/v1/clientes/")
+        with patch("accounts.api_access._authenticate",return_value=token), \
+             patch("accounts.api_access.timezone.now",side_effect=[before,after]):
+            response=api_resource(request,"clientes")
+        self.assertEqual(response.status_code,429)
 
     def test_blocked_user_loses_token_access(self):
         raw=self.issue()
