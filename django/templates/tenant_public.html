@@ -25,6 +25,8 @@
 {% if segment == 'arena' %}
 <section class="shell section" id="agendar">
   <div class="section-head"><span class="eyebrow">RESERVA NA ARENA</span><h2>Escolha quadra, data e horário.</h2></div>
+  {% if arena_access_enabled %}
+  {% if courts %}
   <div class="panel"><form id="arena-booking" class="portal-form" data-public-slug="{{ public_slug }}">{% csrf_token %}
     <div class="portal-module-grid">
       <div class="form-field"><label for="arena-court">Quadra</label><select id="arena-court" required><option value="">Selecione uma quadra</option>{% for court in courts %}<option value="{{ court.pk }}" data-min="{{ court.minimum_minutes }}" data-max="{{ court.maximum_minutes }}">{{ court.name }}</option>{% endfor %}</select></div>
@@ -41,6 +43,8 @@
     {% if arena_deposit_available %}<fieldset class="form-field"><legend>Pagamento</legend><label><input type="radio" name="arena-payment" value="onsite" checked> Pagar na unidade</label> <label><input type="radio" name="arena-payment" value="pix"> Sinal por Pix (exige e-mail)</label></fieldset>{% endif %}
     <div id="arena-feedback" role="status" aria-live="polite"></div><div class="form-actions"><button class="button primary" type="submit">Confirmar reserva</button></div>
   </form></div>
+  {% else %}<div class="panel"><p>As quadras ainda não foram cadastradas. Volte em breve para consultar horários.</p></div>{% endif %}
+  {% else %}<div class="panel"><p>As reservas online desta arena ainda não estão disponíveis. Entre em contato com o estabelecimento para consultar horários.</p></div>{% endif %}
 </section>
 {% else %}
 <section class="shell section" id="agendar">
@@ -87,7 +91,7 @@
 </div></section>
 {% endif %}
 
-{% if courts %}<section class="shell section" id="quadras"><div class="section-head"><span class="eyebrow">ARENA</span><h2>Quadras e espaços</h2></div><div class="segment-grid">{% for court in courts %}<article><h3>{{ court.name }}</h3><p>{{ court.description }}</p><span>{% if court.indoor %}Coberta{% else %}Ao ar livre{% endif %}{% if court.lighting %} · Iluminação{% endif %}{% if court.surface %} · {{ court.surface }}{% endif %}</span>{% if tenant.public_booking_enabled %}<p><a href="#agendar" data-select-court="{{ court.pk }}">Ver horários e reservar →</a></p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+{% if courts %}<section class="shell section" id="quadras"><div class="section-head"><span class="eyebrow">ARENA</span><h2>Quadras e espaços</h2></div><div class="segment-grid">{% for court in courts %}<article><h3>{{ court.name }}</h3><p>{{ court.description }}</p><span>{% if court.indoor %}Coberta{% else %}Ao ar livre{% endif %}{% if court.lighting %} · Iluminação{% endif %}{% if court.surface %} · {{ court.surface }}{% endif %}</span>{% if tenant.public_booking_enabled and arena_access_enabled %}<p><a href="#agendar" data-select-court="{{ court.pk }}">Ver horários e reservar →</a></p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
 
 {% if segment == 'saude' %}<section class="shell section"><article class="panel"><span class="eyebrow">ATENDIMENTO DE SAÚDE</span><h2>Suas informações de saúde são protegidas</h2><p>Agende sua consulta com um profissional. O prontuário clínico só pode ser acessado por pessoas autorizadas do estabelecimento.</p></article></section>{% endif %}
 
@@ -111,9 +115,9 @@
 
 {% if tenant.public_booking_enabled %}
 <script src="{% static 'js/booking-slots.js' %}"></script>
-{% if segment == 'arena' %}
+{% if segment == 'arena' and arena_access_enabled and courts %}
 <script src="{% static 'js/arena-booking.js' %}" defer></script>
-{% else %}
+{% elif segment != 'arena' %}
 <script>
 (() => {
   const form=document.getElementById('public-booking');

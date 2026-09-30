@@ -75,20 +75,24 @@ def _tenant_dashboard(request):
     available=available_modules(request.user,tenant)
     segment_module=next((item for item in available if item["slug"] in {"auto","saude","arena","barbearia"}),None)
     arena_mode=segment_enabled(tenant,"arena")
+    arena_category="arena" in (tenant.category or "").lower() or "quadra" in (tenant.category or "").lower()
     if arena_mode:
-        from arena.models import Court,Reservation
+        from arena.models import Court,CourtHours,PriceRule,Reservation
         arena_today=Reservation.objects.filter(tenant=tenant,starts_at__gte=start,starts_at__lt=end)
         arena_today_total=arena_today.count()
         arena_today_pending=arena_today.filter(status__in=[
             Reservation.Status.CONFIRMED,Reservation.Status.PENDING_PAYMENT,
         ]).count()
         courts_count=Court.objects.filter(tenant=tenant,active=True).count()
+        arena_has_hours=CourtHours.objects.filter(tenant=tenant,court__active=True,active=True).exists()
+        arena_has_prices=PriceRule.objects.filter(tenant=tenant,court__active=True,active=True).exists()
         arena_upcoming=Reservation.objects.filter(tenant=tenant,starts_at__gte=timezone.now(),
             status__in=[Reservation.Status.CONFIRMED,Reservation.Status.PENDING_PAYMENT]
         ).select_related("court").order_by("starts_at")[:8]
     else:
         arena_upcoming=[]
         arena_today_total=arena_today_pending=courts_count=0
+        arena_has_hours=arena_has_prices=False
     return render(request,"dashboard.html",{
         "tenant":tenant,
         "today_total":today_qs.count(),
@@ -106,7 +110,9 @@ def _tenant_dashboard(request):
         "subscription":subscription,
         "can_manage_agenda":has_capability(request.user,"agenda.manage"),
         "can_manage_finance":has_capability(request.user,"finance.manage"),
-        "arena_mode":arena_mode,"arena_upcoming":arena_upcoming,
+        "arena_mode":arena_mode,"arena_category":arena_category,
+        "arena_has_hours":arena_has_hours,"arena_has_prices":arena_has_prices,
+        "arena_upcoming":arena_upcoming,
         "arena_today_total":arena_today_total,"arena_today_pending":arena_today_pending,
         "courts_count":courts_count,
     })
@@ -159,8 +165,13 @@ def _public_tenant_context(tenant,professional=None):
     gateway_connected=payment_settings.online_booking_payments_enabled and has_connected_tenant_gateway(tenant)
     from billing.segment_access import segment_enabled
     segment=next((item for item in ("auto","saude","arena","barbearia") if segment_enabled(tenant,item)),None)
+    # O tipo de negócio determina o conteúdo público; o direito de reservar
+    # continua sujeito ao módulo contratado e é verificado também pela API.
+    if not segment and ("arena" in (tenant.category or "").lower() or "quadra" in (tenant.category or "").lower()):
+        segment="arena"
+    arena_access_enabled=segment=="arena" and segment_enabled(tenant,"arena")
     courts=tenant.sports_courts.filter(active=True).order_by("sort_order","name")[:24] if segment=="arena" else []
-    if segment=="arena":
+    if arena_access_enabled:
         from arena.public import _deposit_available
         arena_deposit_available=_deposit_available(tenant)
     else:
@@ -178,6 +189,7 @@ def _public_tenant_context(tenant,professional=None):
         "segment":segment,"booking_wording":wording.get(segment,("AGENDAMENTO ONLINE","Escolha serviço, profissional e horário.","Serviço")),
         "courts":courts,
         "arena_deposit_available":arena_deposit_available,
+        "arena_access_enabled":arena_access_enabled,
     }
 
 

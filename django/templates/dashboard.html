@@ -15,6 +15,21 @@
     </div>
   </div>
 
+  {% if arena_category and not arena_mode %}
+  <section class="panel" role="status"><h2>Reservas da Arena ainda não liberadas</h2><p>Peça ao Master para ativar o módulo Arena nos acessos desta empresa. A página pública não aceitará reservas até essa liberação.</p></section>
+  {% elif arena_mode %}
+  {% if not courts_count or not arena_has_hours or not arena_has_prices %}
+  <section class="panel" role="status"><h2>Prepare a Arena para receber reservas</h2>
+    <p>Para publicar horários, cadastre uma quadra ativa, os dias e horários de funcionamento e uma regra de preço.</p>
+    <div class="dashboard-actions">
+      {% if not courts_count %}<a class="button" href="{% url 'portal-resource-create' 'arena' 'quadras' %}">Cadastrar quadra</a>{% endif %}
+      {% if not arena_has_hours %}<a class="button" href="{% url 'portal-resource-create' 'arena' 'horarios-quadras' %}">Cadastrar horários</a>{% endif %}
+      {% if not arena_has_prices %}<a class="button" href="{% url 'portal-resource-create' 'arena' 'precos' %}">Cadastrar preço</a>{% endif %}
+    </div>
+  </section>
+  {% endif %}
+  {% endif %}
+
   <section class="metric-grid">
     <article><span>{% if arena_mode %}Reservas hoje{% else %}Agenda hoje{% endif %}</span><strong>{% if arena_mode %}{{ arena_today_total }}{% else %}{{ today_total }}{% endif %}</strong><small>{% if arena_mode %}{{ arena_today_pending }} confirmadas ou aguardando Pix{% else %}{{ today_pending }} próximos{% endif %}</small></article>
     <article><span>Clientes ativos</span><strong>{{ customers }}</strong><small>base do estabelecimento</small></article>

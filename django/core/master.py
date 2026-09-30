@@ -2,6 +2,7 @@ from django import forms
 from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -73,6 +74,54 @@ class PlanMasterForm(forms.ModelForm):
             if line.strip()
         ][:30]
         obj.features=features
+        if commit:
+            obj.save()
+        return obj
+
+
+class UserMasterForm(forms.ModelForm):
+    new_password=forms.CharField(
+        label="Senha inicial",widget=forms.PasswordInput(attrs={"autocomplete":"new-password"}),
+        help_text="O usuário deverá trocar esta senha no primeiro acesso.",
+    )
+    confirm_password=forms.CharField(
+        label="Confirmar senha",widget=forms.PasswordInput(attrs={"autocomplete":"new-password"}),
+    )
+
+    class Meta:
+        model=apps.get_model("accounts","User")
+        fields=["tenant","email","role","is_active","is_staff"]
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        if self.instance.pk:
+            self.fields["new_password"].required=False
+            self.fields["confirm_password"].required=False
+            self.fields["new_password"].help_text="Deixe vazio para manter a senha atual."
+
+    def clean(self):
+        data=super().clean()
+        password=data.get("new_password")
+        confirmation=data.get("confirm_password")
+        if password and password!=confirmation:
+            self.add_error("confirm_password","As senhas não conferem.")
+        elif confirmation and not password:
+            self.add_error("new_password","Informe a nova senha.")
+        if password:
+            try:
+                validate_password(password,self.instance)
+            except ValidationError as exc:
+                self.add_error("new_password",exc)
+        return data
+
+    def save(self,commit=True):
+        obj=super().save(commit=False)
+        password=self.cleaned_data.get("new_password")
+        if password:
+            obj.set_password(password)
+            obj.must_change_password=True
+            if obj.pk:
+                obj.session_version+=1
         if commit:
             obj.save()
         return obj
@@ -447,10 +496,12 @@ def resource_form(request,slug,pk=None):
     if pk is None and not config.get("create",True): raise PermissionDenied
     if pk is not None and not config.get("edit",True): raise PermissionDenied
     obj=get_object_or_404(model,pk=pk,deleted_at__isnull=True) if pk and slug=="usuarios" else (get_object_or_404(model,pk=pk) if pk else None)
-    Form=PlanMasterForm if config.get("special")=="plan" else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"]))
+    Form=(UserMasterForm if slug=="usuarios" else PlanMasterForm if config.get("special")=="plan"
+          else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"])))
     form=Form(request.POST or None,request.FILES or None,instance=obj)
     for name,field in form.fields.items():
-        field.label=FIELD_LABELS.get(name) or field_label(model,name)
+        if name not in {"new_password","confirm_password"}:
+            field.label=FIELD_LABELS.get(name) or field_label(model,name)
     for name,field in form.fields.items():
         mf=_field(model,name)
         if mf and mf.get_internal_type()=="DateTimeField":

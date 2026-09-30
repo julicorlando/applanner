@@ -3,6 +3,7 @@ import unicodedata
 from django.core.exceptions import PermissionDenied
 
 from .entitlements import active_subscription, module_enabled
+from .models import TenantModule
 
 
 def segment_enabled(tenant, segment):
@@ -18,7 +19,11 @@ def segment_enabled(tenant, segment):
     subscription=active_subscription(tenant)
     if subscription and "segments" in (subscription.plan.features or {}):
         if segment not in subscription.plan.features["segments"]:
-            return False
+            # Uma liberação explícita pelo Master prevalece sobre o catálogo do plano.
+            if segment!="arena" or not TenantModule.objects.filter(
+                tenant=tenant,module__slug="sports_courts",module__active=True,enabled=True
+            ).exists():
+                return False
     if segment=="arena" and subscription:
         return module_enabled(tenant,"sports_courts")
     return True

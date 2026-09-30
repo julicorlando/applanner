@@ -8,6 +8,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
+from billing.models import Module, Plan, Subscription, TenantModule
+from billing.segment_access import segment_enabled
 from arena.models import Court, CourtHours, PriceRule, Reservation, SportsSettings
 from scheduling.models import TenantScheduleSettings
 from tenants.models import Tenant
@@ -35,6 +37,23 @@ class ArenaPublicBookingTests(TestCase):
         self.assertNotContains(page,"booking-professional")
         self.assertNotContains(page,"booking-service")
         self.assertNotContains(page,"Sinal por Pix")
+
+    def test_unlicensed_arena_never_falls_back_to_professional_booking(self):
+        plan=Plan.objects.create(name="Básico",slug="basico-arena",features={"segments":["barbearia"]})
+        Subscription.objects.create(tenant=self.tenant,plan=plan,status=Subscription.Status.ACTIVE,
+            started_at=timezone.now())
+        page=self.client.get(reverse("tenant-public",args=[self.tenant.slug]))
+        self.assertContains(page,"reservas online desta arena ainda não estão disponíveis")
+        self.assertNotContains(page,"booking-professional")
+        self.assertNotContains(page,'id="arena-booking"')
+        self.assertEqual(self.client.get(self.slots,{"court_id":self.court.pk,"date":self.day}).status_code,404)
+
+        module=Module.objects.create(slug="sports_courts",name="Arena")
+        TenantModule.objects.create(tenant=self.tenant,module=module,enabled=True)
+        self.assertTrue(segment_enabled(self.tenant,"arena"))
+        page=self.client.get(reverse("tenant-public",args=[self.tenant.slug]))
+        self.assertContains(page,'id="arena-booking"')
+        self.assertEqual(self.client.get(self.slots,{"court_id":self.court.pk,"date":self.day}).status_code,200)
 
     def test_slots_booking_conflict_and_confirmation_page(self):
         response=self.client.get(self.slots,{"court_id":self.court.pk,"date":self.day.isoformat(),"duration":60})
