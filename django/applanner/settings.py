@@ -80,7 +80,7 @@ PASSWORD_HASHERS=[
     "django.contrib.auth.hashers.ScryptPasswordHasher",
 ]
 LANGUAGE_CODE="pt-br"
-LANGUAGES=[("pt-br","Português (Brasil)"),("pt","Português"),("en","English"),("es","Español")]
+LANGUAGES=[("pt-br","Português (Brasil)")]
 TIME_ZONE=env("TIME_ZONE",default="America/Recife")
 USE_I18N=True
 USE_TZ=True

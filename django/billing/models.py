@@ -89,6 +89,9 @@ class Subscription(TimeStampedModel):
     provider_plan_id=models.CharField(max_length=190,blank=True)
     provider_checkout_url=models.URLField(max_length=1000,blank=True)
 
+    def __str__(self):
+        return f"{self.plan.name} · {self.tenant.name}" if self.plan_id and self.tenant_id else "Nova assinatura"
+
 
 class CheckoutSession(TimeStampedModel):
     class Status(models.TextChoices):

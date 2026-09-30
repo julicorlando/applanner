@@ -460,6 +460,9 @@ class SportsClass(TimeStampedModel):
         indexes=[models.Index(fields=["tenant","status","weekday","start_time"],name="arena_class_schedule_idx")]
         constraints=[models.CheckConstraint(condition=models.Q(weekday__gte=1,weekday__lte=7),name="sports_class_weekday_iso")]
 
+    def __str__(self):
+        return self.name
+
 
 class ClassStudent(TimeStampedModel):
     class Status(models.TextChoices):
@@ -479,6 +482,11 @@ class ClassStudent(TimeStampedModel):
 
     class Meta:
         constraints=[models.UniqueConstraint(fields=["sports_class","customer"],name="uq_class_student")]
+
+    def __str__(self):
+        if not self.customer_id or not self.sports_class_id:
+            return "Aluno da turma"
+        return f"{self.customer.name} · {self.sports_class.name}"
 
 
 class ClassAttendance(models.Model):

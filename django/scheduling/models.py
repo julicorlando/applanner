@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from core.models import TimeStampedModel
 
 
@@ -197,6 +198,12 @@ class Appointment(TimeStampedModel):
     reminder_24h_sent_at=models.DateTimeField(null=True,blank=True)
     reminder_2h_sent_at=models.DateTimeField(null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
+
+    def __str__(self):
+        if not self.customer_id or not self.starts_at:
+            return "Novo agendamento"
+        starts_at=timezone.localtime(self.starts_at) if timezone.is_aware(self.starts_at) else self.starts_at
+        return f"{self.customer.name} — {starts_at:%d/%m/%Y %H:%M}"
 
     def clean(self):
         super().clean()

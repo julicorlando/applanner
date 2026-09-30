@@ -1,11 +1,11 @@
 {% extends "base.html" %}
+{% block title %}Verificação em duas etapas — ApPlanner{% endblock %}
 {% block content %}
-<main class="container" style="max-width:480px">
-  <h1>Verificação em duas etapas</h1>
-  {% for message in messages %}<p>{{ message }}</p>{% endfor %}
-  <form method="post">{% csrf_token %}
-    <p><label>Código do autenticador ou recuperação<br><input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus></label></p>
-    <button type="submit">Verificar</button>
+<section class="shell portal-page narrow security-page">
+  <header class="portal-heading"><div><span class="eyebrow">SEGURANÇA DA CONTA</span><h1>Verificação em duas etapas</h1><p>Informe o código do aplicativo autenticador ou um código de recuperação.</p></div></header>
+  <form method="post" class="portal-form panel">{% csrf_token %}
+    <div class="form-field"><label for="challenge-code">Código de verificação</label><input id="challenge-code" name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus aria-describedby="challenge-help"><small id="challenge-help">Cada código de recuperação funciona uma única vez.</small></div>
+    <div class="form-actions"><button class="button primary" type="submit">Verificar e entrar</button></div>
   </form>
-</main>
+</section>
 {% endblock %}

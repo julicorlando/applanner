@@ -18,6 +18,9 @@ class FinancialCategory(models.Model):
     class Meta:
         constraints=[models.UniqueConstraint(fields=["tenant","name"],name="uq_financial_category")]
 
+    def __str__(self):
+        return self.name
+
 
 class FinancialTransaction(TimeStampedModel):
     class Type(models.TextChoices):
@@ -89,6 +92,9 @@ class Product(TimeStampedModel):
             ),
         ]
         indexes=[models.Index(fields=["tenant","active"])]
+
+    def __str__(self):
+        return self.name
 
 
 class Sale(models.Model):
@@ -207,6 +213,9 @@ class PlatformFinanceCategory(TimeStampedModel):
     name=models.CharField(max_length=120,unique=True)
     type=models.CharField(max_length=12,choices=Type.choices,default=Type.BOTH)
     active=models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
 
 
 class PlatformFinancialTransaction(TimeStampedModel):

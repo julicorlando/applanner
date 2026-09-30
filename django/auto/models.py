@@ -83,6 +83,9 @@ class ServiceBay(TimeStampedModel):
         constraints=[models.UniqueConstraint(fields=["tenant","name"],name="uq_auto_bay_name")]
         indexes=[models.Index(fields=["tenant","active","sort_order"],name="auto_bay_active_idx")]
 
+    def __str__(self):
+        return self.name
+
 
 class BayHours(models.Model):
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="auto_bay_hours")
@@ -154,6 +157,9 @@ class Job(TimeStampedModel):
             models.Index(fields=["tenant","bay","status"],name="auto_job_bay_idx"),
             models.Index(fields=["tenant","vehicle","created_at"],name="auto_job_vehicle_idx"),
         ]
+
+    def __str__(self):
+        return f"OS #{self.pk} · {self.vehicle.plate}" if self.vehicle_id else "Nova ordem de serviço"
 
 
 class JobStatusHistory(models.Model):

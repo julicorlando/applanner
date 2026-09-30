@@ -63,6 +63,16 @@ input::placeholder,textarea::placeholder{color:#8c9cba}
 .chat-header small,.chat-contact small,.chat-bubble small,.appointment-row div span{color:#b5c7de}
 .onboarding-card .form-field li{border-color:#40516a}.onboarding-card .form-field input[type=file]{background:#111f37;border-color:#465e7a}
 .legal-invitations{margin-top:18px}.legal-invitations .table-card{margin-top:18px;overflow-x:auto}.legal-invitations .portal-table{width:100%}.legal-invitations .payment-hint{margin-top:14px;color:var(--muted)}
+.security-page .portal-form{max-width:650px}.security-page .form-field small{color:var(--muted)}
+.recovery-code-list{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0 26px;padding:0}
+.recovery-code-list li{padding:14px;border:1px solid var(--line);border-radius:12px;background:#0c1529;overflow-wrap:anywhere}
+.recovery-code-list code{color:#effaff;font-size:.95rem}
+.api-table{overflow-x:auto;margin:16px 0}.api-table .portal-table{width:100%;min-width:680px}
+.api-token-form{margin:20px 0 26px;max-width:720px}.api-token-form fieldset{min-width:0;border:1px solid var(--line);border-radius:12px;padding:14px}
+.api-token-form legend{font-weight:750;padding:0 6px}.api-token-form fieldset>div,.api-token-form fieldset ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;list-style:none;margin:0;padding:0}
+.api-token-form fieldset label{display:flex;gap:8px;align-items:center;cursor:pointer}
+@media(max-width:560px){.recovery-code-list{grid-template-columns:1fr}}
+@media(max-width:560px){.api-token-form fieldset>div,.api-token-form fieldset ul{grid-template-columns:1fr}}
 @media(max-width:1200px){.topbar .nav{display:none}.mobile-nav{display:block}}
 @media(max-width:900px){.sales-steps .segment-grid{grid-template-columns:1fr}.platform-extra-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.platform-extra-metrics{grid-template-columns:1fr}.professional-schedule .appointment-row{grid-template-columns:100px 1fr}.marketing-hero{min-height:0}}

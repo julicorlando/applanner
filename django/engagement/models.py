@@ -46,6 +46,9 @@ class CustomerPackage(TimeStampedModel):
     class Meta:
         indexes=[models.Index(fields=["tenant","customer","status"],name="eng_pkg_customer_idx")]
 
+    def __str__(self):
+        return f"{self.package.name} — {self.customer.name}" if self.package_id and self.customer_id else "Novo pacote do cliente"
+
 
 class CustomerPackageUsage(models.Model):
     customer_package=models.ForeignKey(CustomerPackage,on_delete=models.CASCADE,related_name="usages")
@@ -83,6 +86,9 @@ class CustomerMembership(TimeStampedModel):
 
     class Meta:
         indexes=[models.Index(fields=["tenant","status","next_due_at"],name="eng_membership_due_idx")]
+
+    def __str__(self):
+        return f"{self.package.name} — {self.customer.name}" if self.package_id and self.customer_id else "Nova mensalidade do cliente"
 
 
 class TenantLoyaltySettings(models.Model):
