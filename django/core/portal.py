@@ -670,9 +670,11 @@ def _widgets_for(model, fields):
 
 
 def _model_form(model, resource, *args, tenant=None, **kwargs):
+    from core.labels import field_label
     Form=modelform_factory(model,fields=resource["fields"],widgets=_widgets_for(model,resource["fields"]))
     form=Form(*args,**kwargs)
     for name,field in form.fields.items():
+        field.label=field_label(model,name)
         model_field=_field(model,name)
         if model_field and model_field.get_internal_type()=="DateTimeField":
             field.input_formats=["%Y-%m-%dT%H:%M","%Y-%m-%d %H:%M:%S","%Y-%m-%d %H:%M"]
@@ -776,10 +778,10 @@ def _value(obj, name):
 
 
 def _headers(model, columns):
+    from core.labels import field_label
     result=[]
     for name in columns:
-        field=_field(model,name)
-        result.append(str(field.verbose_name).title() if field else name.replace("_"," ").title())
+        result.append(field_label(model,name))
     return result
 
 

@@ -188,6 +188,8 @@ Depois do cadastro, em **Master → Empresas → Acessos e termos**, publique os
 
 Os seletores de plano e a lista pública exibem o nome gravado em **Master → Planos**. A publicação de um plano exige que ele esteja ativo e visível ao público; a descrição e o preço também vêm do cadastro, sem substituir nomes importados do legado.
 
+As tabelas e os formulários gerados pelos catálogos **Master** e **Operação** usam um vocabulário central em português para os campos do banco, sem renomear colunas ou alterar o ETL. As páginas compartilham o layout `base.html` e os estilos globais. Textos livres importados e integrações externas ainda precisam ser conferidos com dados reais durante a homologação linguística e visual.
+
 Em **Master → Modelos de e-mail** (`/master/email/modelos/`), personalize assunto e mensagem de conta criada, confirmação do e-mail, conta confirmada, redefinição de senha e agendamento confirmado. O formulário mostra as variáveis permitidas e exige os links de segurança e dados essenciais. A plataforma gera versões texto e HTML escapado. Mensagens de boas-vindas, conta confirmada e agendamento confirmado entram na fila de notificações, processada pelo Celery Beat; a verificação do e-mail e a redefinição de senha são enviadas no ato da solicitação. Revise a configuração SMTP e execute um teste real antes da homologação.
 
 A lista de espera no agendamento público aparece após a consulta retornar zero horários e só aceita pedidos para uma data sem disponibilidade, respeitando o módulo contratado. A inteligência de retorno cria perfil no primeiro agendamento, sem contar visita ou disparar marketing antes de atendimento concluído e consentimento.

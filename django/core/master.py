@@ -15,6 +15,7 @@ from requests.exceptions import RequestException
 from billing.models import Module, Plan, PlanModule
 from billing.models import PaymentGateway
 from billing.payment_services import configure_mercadopago_gateway
+from core.labels import field_label
 
 
 FIELD_LABELS={
@@ -215,6 +216,9 @@ def _widgets(model,fields):
 
 
 def _value(obj,name):
+    if name=="role" and obj._meta.label_lower=="accounts.user":
+        return {"owner":"Responsável","professional":"Profissional","user":"Usuário",
+                "master":"Master","manager":"Gestor","staff":"Equipe"}.get(obj.role,obj.role)
     getter=getattr(obj,f"get_{name}_display",None)
     if getter:
         try:return getter()
@@ -415,7 +419,7 @@ def resource_list(request,slug):
     order=config.get("order")
     if order: qs=qs.order_by(*[x.strip() for x in order.split(",")])
     columns=config["columns"]
-    headers=[FIELD_LABELS.get(c) or (str(_field(model,c).verbose_name).title() if _field(model,c) else c.replace("_"," ").title()) for c in columns]
+    headers=[FIELD_LABELS.get(c) or field_label(model,c) for c in columns]
     rows=[{"obj":obj,"cells":[_value(obj,c) for c in columns]} for obj in qs[:300]]
     help_text={
         "planos":"Para publicar um plano, marque Ativo e Visível ao público. Use Módulos em cada plano para escolher as funções; preços e dias de teste são editados no próprio plano.",
@@ -443,7 +447,7 @@ def resource_form(request,slug,pk=None):
     Form=PlanMasterForm if config.get("special")=="plan" else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"]))
     form=Form(request.POST or None,request.FILES or None,instance=obj)
     for name,field in form.fields.items():
-        if name in FIELD_LABELS:field.label=FIELD_LABELS[name]
+        field.label=FIELD_LABELS.get(name) or field_label(model,name)
     for name,field in form.fields.items():
         mf=_field(model,name)
         if mf and mf.get_internal_type()=="DateTimeField":
