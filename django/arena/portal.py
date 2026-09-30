@@ -5,7 +5,7 @@ from django.core.exceptions import PermissionDenied,ValidationError
 from django.shortcuts import get_object_or_404,redirect,render
 
 from accounts.permissions import require_any_capability
-from billing.segment_access import require_segment
+from billing.segment_access import require_segment,require_feature
 
 from finance.models import Product
 from scheduling.models import Customer
@@ -110,6 +110,8 @@ def game_detail(request,pk):
 def class_detail(request,pk):
     require_any_capability(request.user,"arena.manage")
     tenant=_tenant(request)
+    if not request.user.is_superuser:
+        require_feature(tenant,"sports_academy")
     sports_class=get_object_or_404(SportsClass.objects.prefetch_related("students__customer"),pk=pk,tenant=tenant)
     if request.method=="POST":
         student=get_object_or_404(ClassStudent,pk=request.POST.get("student"),sports_class=sports_class,tenant=tenant)
@@ -128,6 +130,8 @@ def class_detail(request,pk):
 def tournament_detail(request,pk):
     require_any_capability(request.user,"arena.manage")
     tenant=_tenant(request)
+    if not request.user.is_superuser:
+        require_feature(tenant,"sports_tournaments")
     tournament=get_object_or_404(Tournament.objects.prefetch_related("teams","matches__home_team","matches__away_team"),pk=pk,tenant=tenant)
     if request.method=="POST":
         action=request.POST.get("action")

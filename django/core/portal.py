@@ -44,6 +44,22 @@ RESOURCE_ENTITLEMENTS={
     ("relacionamento","espera"):"waitlist",
     ("relacionamento","dominios"):"custom-domain",
     ("comunicacao","whatsapp"):"whatsapp",
+    ("agenda","unidades"):"multiunit",
+    ("saude","prontuarios"):"medical_records",
+    ("arena","turmas"):"sports_academy",
+    ("arena","alunos"):"sports_academy",
+    ("arena","reposicoes"):"sports_academy",
+    ("arena","torneios"):"sports_tournaments",
+}
+
+CATALOG_LINKS={
+    "products":("financeiro","produtos"),"stock":("financeiro","produtos"),
+    "finance":("financeiro","lancamentos"),"behavior":("relacionamento","inteligencia"),
+    "whatsapp":("comunicacao","whatsapp"),"multiunit":("agenda","unidades"),
+    "medical_records":("saude","prontuarios"),"packages":("relacionamento","pacotes"),
+    "loyalty":("relacionamento","fidelidade"),"waitlist":("relacionamento","espera"),
+    "custom-domain":("relacionamento","dominios"),"sports_courts":("arena","quadras"),
+    "sports_academy":("arena","turmas"),"sports_tournaments":("arena","torneios"),
 }
 
 
@@ -51,6 +67,8 @@ def _feature_allowed(user,tenant,module_slug,resource_slug):
     if user.is_superuser or not tenant or not active_subscription(tenant):
         return True
     entitlement=RESOURCE_ENTITLEMENTS.get((module_slug,resource_slug))
+    if (module_slug,resource_slug)==("financeiro","produtos"):
+        return module_enabled(tenant,"products") or module_enabled(tenant,"stock")
     return not entitlement or module_enabled(tenant,entitlement)
 
 PORTAL_MODULES = {
@@ -777,10 +795,28 @@ def home(request):
         return render(request,"portal/select_tenant.html",{"tenants":Tenant.objects.order_by("name")})
 
     modules=available_modules(request.user,tenant)
+    from billing.models import Module,TenantModule
+    selected=set(TenantModule.objects.filter(tenant=tenant,enabled=True,module__active=True)
+        .values_list("module_id",flat=True))
+    subscription=active_subscription(tenant)
+    if subscription:
+        selected.update(subscription.plan.module_links.filter(enabled=True,module__active=True)
+            .values_list("module_id",flat=True))
+    routes={(item["slug"],res["slug"]) for item in modules for res in item["resources"]}
+    contracted=[]
+    for module in Module.objects.filter(pk__in=selected,active=True).order_by("sort_order","name"):
+        if not module_enabled(tenant,module.slug):
+            continue
+        route=CATALOG_LINKS.get(module.slug)
+        contracted.append({"name":module.name,"description":module.description,
+            "route":route if route in routes else None,"gateway":module.slug=="banking_integrations" and
+                (request.user.is_superuser or request.user.role=="owner"),
+            "documentation":module.slug=="api"})
     public_professionals=(tenant.professionals.filter(active=True,public_slug__isnull=False)
                           .exclude(public_slug="").order_by("name") if tenant.public_enabled else [])
     return render(request,"portal/home.html",{
-        "tenant":tenant,"modules":modules,"public_professionals":public_professionals,
+        "tenant":tenant,"modules":modules,"contracted_modules":contracted,
+        "public_professionals":public_professionals,
     })
 
 

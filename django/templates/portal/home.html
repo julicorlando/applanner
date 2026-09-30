@@ -47,6 +47,9 @@
       {% empty %}<div class="panel operation-empty"><h3>Nenhum módulo disponível</h3><p>Peça ao responsável da empresa para revisar seu acesso.</p></div>{% endfor %}
     </div>
   </section>
+  {% if contracted_modules %}<section class="operation-modules" aria-labelledby="contracted-title"><div class="operation-section-heading"><div><span class="eyebrow">SEU PLANO</span><h2 id="contracted-title">Módulos contratados</h2><p>Funções incluídas no plano e módulos adicionais liberados para {{ tenant.name }}.</p></div><span class="operation-module-count">{{ contracted_modules|length }} módulos</span></div>
+    <div class="portal-module-grid">{% for item in contracted_modules %}<article class="portal-module-card"><h3>{{ item.name }}</h3><p>{{ item.description }}</p>{% if item.route %}<a href="{% url 'portal-resource-list' item.route.0 item.route.1 %}">Abrir módulo →</a>{% elif item.gateway %}<a href="{% url 'tenant-payment-gateway' %}">Abrir integrações bancárias →</a>{% elif item.documentation %}<a href="{% url 'accounts:documentation' %}">Documentação e chaves da API →</a>{% else %}<span>Consulte as funções disponíveis para seu perfil acima.</span>{% endif %}</article>{% endfor %}</div>
+  </section>{% endif %}
 </section>
 <script src="{% static 'js/portal-dashboard.js' %}" defer></script>
 {% endblock %}

@@ -35,7 +35,7 @@ def _tenant_dashboard(request):
     if request.user.role=="professional" and not request.user.is_superuser:
         from django.shortcuts import redirect
         return redirect("professional-area")
-    from billing.entitlements import active_subscription
+    from billing.entitlements import active_subscription,module_enabled
     from billing.models import TenantModule
     from finance.models import FinancialTransaction
     from scheduling.models import Appointment,Customer,Professional
@@ -58,11 +58,8 @@ def _tenant_dashboard(request):
         paid_at__gte=month_start,
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
 
-    modules=list(
-        TenantModule.objects.filter(
-            tenant=tenant,enabled=True,module__active=True
-        ).select_related("module").order_by("module__sort_order","module__name")
-    )
+    modules=list(TenantModule.objects.filter(tenant=tenant,enabled=True,module__active=True)
+        .select_related("module").order_by("module__sort_order","module__name"))
     subscription=active_subscription(tenant)
     if subscription:
         plan_modules=list(
@@ -72,6 +69,7 @@ def _tenant_dashboard(request):
         )
         known={row.module_id for row in modules}
         modules.extend(row for row in plan_modules if row.module_id not in known)
+    modules=[row for row in modules if module_enabled(tenant,row.module.slug)]
 
     available=available_modules(request.user,tenant)
     segment_module=next((item for item in available if item["slug"] in {"auto","saude","arena","barbearia"}),None)
