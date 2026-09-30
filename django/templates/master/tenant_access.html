@@ -2,10 +2,19 @@
 {% block title %}Acessos e termos · {{ tenant.name }}{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
-  <header class="portal-heading"><div><a class="back-link" href="{% url 'master-resource-list' 'empresas' %}">← Empresas</a><span class="eyebrow">MASTER · EMPRESA</span><h1>{{ tenant.name }}</h1><p>Selecione os módulos liberados para esta empresa. Esta seleção substitui os módulos do plano apenas para este estabelecimento.</p></div></header>
-  <form method="post" class="panel">{% csrf_token %}<h2>Funções disponíveis</h2><div class="portal-module-grid">
+  <header class="portal-heading"><div><a class="back-link" href="{% url 'master-resource-list' 'empresas' %}">← Empresas</a><span class="eyebrow">MASTER · EMPRESA</span><h1>{{ tenant.name }}</h1><p>Defina os módulos disponíveis para esta empresa e acompanhe o aceite dos termos pelos responsáveis.</p></div></header>
+  <form method="post" class="panel portal-form">{% csrf_token %}<h2>Funções disponíveis</h2><p>Esta seleção substitui os módulos do plano apenas para esta empresa.</p><div class="portal-module-grid">
   {% for row in modules %}<label class="form-field" style="display:flex;align-items:start;gap:12px"><input type="checkbox" name="modules" value="{{ row.module.pk }}" {% if row.enabled %}checked{% endif %}><span><strong>{{ row.module.name }}</strong><br>{{ row.module.description }}</span></label>{% endfor %}</div>
   <button class="button primary" type="submit">Salvar acessos</button></form>
-  <article class="panel" style="margin-top:16px"><h2>Aceite dos termos</h2><p>Publique a versão atual em <a href="{% url 'master-resource-list' 'legais' %}">Documentos legais</a>. Os responsáveis deverão aceitar ao entrar. Você também pode enviar o convite por e-mail agora.</p><form method="post" action="{% url 'master-send-tenant-terms' tenant.pk %}">{% csrf_token %}<button class="button" type="submit">Enviar aceite aos responsáveis</button></form></article>
+  <article class="panel legal-invitations"><h2>Aceite dos termos</h2>
+    {% if terms %}
+      <p>Versão publicada: <strong>{{ terms.title }} · {{ terms.version }}</strong>. Ao entrar, cada responsável deve aceitar a versão atual para continuar usando a plataforma.</p>
+      <form method="post" action="{% url 'master-send-tenant-terms' tenant.pk %}">{% csrf_token %}<button class="button primary" type="submit">Convidar responsáveis pendentes por e-mail</button></form>
+      <p class="payment-hint">O convite entra na fila. Confira abaixo se o envio foi concluído e se o responsável aceitou. O e-mail depende da configuração SMTP.</p>
+    {% else %}<p>Publique os <a href="{% url 'master-resource-list' 'legais' %}">Termos de Uso em Documentos legais</a> para convidar os responsáveis.</p>{% endif %}
+    <div class="table-card"><table class="portal-table"><thead><tr><th>Responsável</th><th>Aceite da versão atual</th><th>Último convite</th></tr></thead><tbody>
+      {% for row in owner_terms %}<tr><td>{{ row.user.email }}</td><td>{% if row.accepted_at %}Aceito em {{ row.accepted_at|date:"d/m/Y H:i" }}{% else %}Pendente{% endif %}</td><td>{% if row.notice %}{{ row.notice.get_status_display }} · {{ row.notice.created_at|date:"d/m/Y H:i" }}{% else %}Nenhum convite desta versão{% endif %}</td></tr>{% empty %}<tr><td colspan="3">Nenhum responsável ativo com e-mail cadastrado.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </article>
 </section>
 {% endblock %}

@@ -184,6 +184,10 @@ O proprietário gerencia o plano em `/billing/assinatura/`: pode cancelar a assi
 
 O Master pode dispensar a confirmação de e-mail no cadastro de uma empresa pelo recurso **Onboarding → Verificação e publicação**. A dispensa não valida o endereço informado. SMTP pode ser configurado e testado em **Master → E-mail e SMTP** sem revelar a senha; a configuração ativa do painel tem prioridade sobre as variáveis `EMAIL_*` do Coolify.
 
+Depois do cadastro, em **Master → Empresas → Acessos e termos**, publique os Termos de Uso em **Documentos legais** e clique **Convidar responsáveis pendentes por e-mail**. A tela mostra a versão atual, o aceite de cada responsável e a situação do último convite dessa versão. O envio fica inicialmente na fila de notificações; requer worker, beat e SMTP funcional. O responsável autenticado aceita os documentos em `/legal/aceite/`, com versão, data, IP e usuário registrados. Uma nova versão publicada exige novo aceite.
+
+Os seletores de plano e a lista pública exibem o nome gravado em **Master → Planos**. A publicação de um plano exige que ele esteja ativo e visível ao público; a descrição e o preço também vêm do cadastro, sem substituir nomes importados do legado.
+
 Em **Master → Modelos de e-mail** (`/master/email/modelos/`), personalize assunto e mensagem de conta criada, confirmação do e-mail, conta confirmada, redefinição de senha e agendamento confirmado. O formulário mostra as variáveis permitidas e exige os links de segurança e dados essenciais. A plataforma gera versões texto e HTML escapado. Mensagens de boas-vindas, conta confirmada e agendamento confirmado entram na fila de notificações, processada pelo Celery Beat; a verificação do e-mail e a redefinição de senha são enviadas no ato da solicitação. Revise a configuração SMTP e execute um teste real antes da homologação.
 
 A lista de espera no agendamento público aparece após a consulta retornar zero horários e só aceita pedidos para uma data sem disponibilidade, respeitando o módulo contratado. A inteligência de retorno cria perfil no primeiro agendamento, sem contar visita ou disparar marketing antes de atendimento concluído e consentimento.

@@ -252,8 +252,12 @@ def home(request):
 
 @login_required
 def tenant_access(request,pk):
+    from accounts.models import User
     from billing.entitlements import module_enabled
     from billing.models import TenantModule
+    from communications.models import Notification
+    from legal.middleware import current_documents
+    from legal.models import LegalAcceptance,LegalDocument
     from tenants.models import Tenant
     _guard(request.user)
     tenant=get_object_or_404(Tenant,pk=pk,deleted_at__isnull=True)
@@ -266,8 +270,19 @@ def tenant_access(request,pk):
                     defaults={"enabled":item.pk in selected})
         messages.success(request,"Acessos da empresa atualizados pelo Master.")
         return redirect("master-tenant-access",pk=tenant.pk)
+    terms=next((doc for doc in current_documents() if doc.type==LegalDocument.Type.TERMS),None)
+    owners=list(User.objects.filter(tenant=tenant,role="owner",is_active=True).exclude(email="").order_by("email"))
+    accepted=dict(LegalAcceptance.objects.filter(document=terms,user__in=owners)
+        .values_list("user_id","accepted_at")) if terms else {}
+    notices={}
+    if terms:
+        for notice in Notification.objects.filter(tenant=tenant,channel=Notification.Channel.EMAIL,
+            template_key="tenant_terms_acceptance",payload__document_id=terms.pk).order_by("-created_at","-pk"):
+            notices.setdefault(notice.destination.lower(),notice)
     return render(request,"master/tenant_access.html",{"tenant":tenant,
-        "modules":[{"module":item,"enabled":module_enabled(tenant,item.slug)} for item in modules]})
+        "modules":[{"module":item,"enabled":module_enabled(tenant,item.slug)} for item in modules],
+        "terms":terms,"owner_terms":[{"user":owner,"accepted_at":accepted.get(owner.pk),
+            "notice":notices.get(owner.email.lower())} for owner in owners]})
 
 
 @login_required
@@ -276,23 +291,32 @@ def send_tenant_terms(request,pk):
     from accounts.models import User
     from communications.models import Notification
     from legal.middleware import current_documents
+    from legal.models import LegalAcceptance,LegalDocument
     from tenants.models import Tenant
     _guard(request.user)
     tenant=get_object_or_404(Tenant,pk=pk,deleted_at__isnull=True)
-    if not current_documents():
-        messages.error(request,"Publique os termos em Documentos legais antes de enviar o aceite.")
+    terms=next((doc for doc in current_documents() if doc.type==LegalDocument.Type.TERMS),None)
+    if not terms:
+        messages.error(request,"Publique os Termos em Documentos legais antes de enviar o convite.")
     else:
         owners=User.objects.filter(tenant=tenant,role="owner",is_active=True).exclude(email="")
+        accepted=set(LegalAcceptance.objects.filter(document=terms,user__in=owners)
+            .values_list("user_id",flat=True))
         link=request.build_absolute_uri(reverse("legal-accept"))
         count=0
         for owner in owners:
+            if owner.pk in accepted:
+                continue
             Notification.objects.create(tenant=tenant,channel=Notification.Channel.EMAIL,
                 destination=owner.email,template_key="tenant_terms_acceptance",
                 payload={"subject":"Aceite de termos do ApPlanner",
-                    "text":f"Olá! Os documentos legais do ApPlanner foram atualizados. Entre com sua conta e aceite os termos para continuar usando {tenant.name}: {link}"})
+                    "text":f"Olá! Os Termos de Uso do ApPlanner (versão {terms.version}) aguardam seu aceite. Entre com sua conta e aceite os documentos para continuar usando {tenant.name}: {link}",
+                    "document_id":terms.pk,"user_id":owner.pk})
             count+=1
         if count:
-            messages.success(request,f"Convite de aceite enviado para {count} responsável(is) da empresa.")
+            messages.success(request,f"{count} convite(s) colocado(s) na fila de e-mail. Acompanhe a situação abaixo.")
+        elif owners.exists():
+            messages.info(request,"Todos os responsáveis ativos já aceitaram a versão atual dos termos.")
         else:
             messages.error(request,"Cadastre um responsável ativo com e-mail antes de enviar os termos.")
     return redirect("master-tenant-access",pk=tenant.pk)

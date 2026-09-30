@@ -35,6 +35,9 @@ class Plan(TimeStampedModel):
     features=models.JSONField(default=dict,blank=True)
     modules=models.ManyToManyField(Module,through="PlanModule",related_name="plans",blank=True)
 
+    def __str__(self):
+        return self.name
+
 
 class PlanModule(models.Model):
     plan=models.ForeignKey(Plan,on_delete=models.CASCADE,related_name="module_links")

@@ -6,9 +6,9 @@
   <div class="panel" style="margin-bottom:20px">
     {% if whatsapp_configured %}<p>WhatsApp Cloud API configurada. Informe no formulário o ID do número configurado no servidor e vincule-o ao estabelecimento.</p>
     {% else %}<p>WhatsApp Cloud API ainda não configurada no servidor. Salve o fluxo agora e configure as credenciais antes de ativar o atendimento.</p>{% endif %}
-    <p>A integração atual usa a API oficial por token e webhook. Conexão por QR code requer outro provedor compatível e ainda não está disponível.</p>
+    <p>Este fluxo usa a API oficial por token e webhook. Para a conexão da empresa por QR code, <a href="{% url 'portal-home' %}?trocar=1">selecione a empresa</a> e abra <strong>Conectar WhatsApp da empresa</strong>.</p>
     <p>Webhook de recebimento: <code>{{ request.scheme }}://{{ request.get_host }}{% url 'whatsapp-webhook' %}</code>. Configure o token de verificação e a assinatura no provedor.</p>
-    <p>Para responder manualmente, <a href="{% url 'portal-home' %}?trocar=1">selecione a empresa no portal</a> e abra <strong>Comunicação → WhatsApp</strong>. Contatos de empresas ainda não cadastradas exigem uma caixa de entrada própria da plataforma.</p>
+    <p>Para responder manualmente, abra <strong>Comunicação → WhatsApp</strong> no portal da empresa. Contatos de empresas ainda não cadastradas podem ser atendidos no <a href="{% url 'master-whatsapp' %}">WhatsApp do Master</a>.</p>
   </div>
   <form method="get" class="portal-form panel" style="margin-bottom:20px"><div class="form-field"><label for="select-tenant">Editar fluxo do estabelecimento</label><select id="select-tenant" name="tenant">{% for choice in form.fields.tenant.queryset %}<option value="{{ choice.pk }}" {% if flow.tenant_id == choice.pk %}selected{% endif %}>{{ choice.name }}</option>{% endfor %}</select></div><button class="button ghost">Carregar fluxo</button></form>
   <form method="post" class="portal-form panel">{% csrf_token %}
