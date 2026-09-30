@@ -187,6 +187,7 @@ class WaitlistEntry(TimeStampedModel):
     customer=models.ForeignKey("scheduling.Customer",on_delete=models.CASCADE,related_name="waitlist_entries")
     service=models.ForeignKey("scheduling.Service",on_delete=models.CASCADE,related_name="waitlist_entries")
     professional=models.ForeignKey("scheduling.Professional",null=True,blank=True,on_delete=models.SET_NULL,related_name="waitlist_entries")
+    appointment=models.OneToOneField("scheduling.Appointment",null=True,blank=True,on_delete=models.SET_NULL,related_name="waitlist_entry")
     preferred_date=models.DateField(null=True,blank=True)
     period=models.CharField(max_length=16,choices=Period.choices,default=Period.ANY)
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.WAITING,db_index=True)

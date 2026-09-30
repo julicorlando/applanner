@@ -5,6 +5,7 @@ from django.urls import reverse
 
 from accounts.models import User
 from tenants.models import Tenant
+from scheduling.models import TenantScheduleSettings
 from .models import TenantPaymentConnection
 
 
@@ -41,3 +42,14 @@ class TenantGatewayTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertFalse(TenantPaymentConnection.objects.exists())
         self.assertNotContains(response,"secret provider failure")
+
+    @patch("billing.payment_services.MercadoPagoProvider.test_connection",return_value={"id":123})
+    def test_owner_explicitly_enables_booking_pix_after_connecting(self,_):
+        self.client.force_login(self.owner)
+        self.client.post(self.url,{"action":"booking_payments","enabled":"on"})
+        self.assertFalse(TenantScheduleSettings.objects.get(tenant=self.tenant).online_booking_payments_enabled)
+        self.client.post(self.url,self.data,secure=True)
+        self.client.post(self.url,{"action":"booking_payments","enabled":"on"})
+        self.assertTrue(TenantScheduleSettings.objects.get(tenant=self.tenant).online_booking_payments_enabled)
+        self.client.post(self.url,{"action":"booking_payments"})
+        self.assertFalse(TenantScheduleSettings.objects.get(tenant=self.tenant).online_booking_payments_enabled)

@@ -119,7 +119,7 @@ PORTAL_MODULES = {
             "configuracao": {
                 "model": "scheduling.TenantScheduleSettings",
                 "title": "Configuração da agenda",
-                "fields": ["minimum_notice_minutes","maximum_days_ahead","slot_interval_minutes","buffer_minutes","customer_can_cancel","customer_can_reschedule","cancel_notice_minutes","reminder_24h_enabled","reminder_2h_enabled"],
+                "fields": ["minimum_notice_minutes","maximum_days_ahead","slot_interval_minutes","buffer_minutes","customer_can_cancel","customer_can_reschedule","cancel_notice_minutes","reminder_24h_enabled","reminder_2h_enabled","allow_pay_on_site","allow_partial_payment","allow_full_payment","deposit_percent"],
                 "columns": ["minimum_notice_minutes","maximum_days_ahead","slot_interval_minutes","buffer_minutes","customer_can_cancel","customer_can_reschedule"],
                 "order": "tenant_id",
             },

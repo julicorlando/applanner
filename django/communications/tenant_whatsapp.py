@@ -1,6 +1,7 @@
 """Tenant-scoped QR gateway, appointment templates and authenticated callbacks."""
 import hmac
 import json
+import logging
 import re
 
 import requests
@@ -21,6 +22,9 @@ from billing.entitlements import active_subscription,module_enabled
 from scheduling.models import Appointment,Customer
 from tenants.models import Tenant
 from .models import Notification,TenantWhatsAppConnection,WhatsAppConversation,WhatsAppMessage
+from .phone import whatsapp_number
+
+logger=logging.getLogger(__name__)
 
 
 def _management(request):
@@ -98,7 +102,12 @@ def appointment_text(appointment,kind):
     if kind=="confirmation":
         return f"Olá, {name}, recebemos o seu agendamento em {appointment.tenant.name} para {local:%d/%m às %H:%M}. Estamos esperando você!"
     if kind=="reminder":
-        return f"Olá, {name}, lembramos do seu agendamento em {appointment.tenant.name} para {local:%d/%m às %H:%M}. Até breve!"
+        link=""
+        if appointment.customer_manage_token_encrypted:
+            from core.crypto import decrypt_text
+            token=decrypt_text(appointment.customer_manage_token_encrypted)
+            link=f" Para reagendar ou cancelar: {settings.PUBLIC_BASE_URL.rstrip('/')}{reverse('public-appointment-page',args=[token])}"
+        return f"Olá, {name}, lembramos do seu agendamento em {appointment.tenant.name} para {local:%d/%m às %H:%M}.{link} Até breve!"
     if kind=="feedback":
         token=dumps({"appointment":appointment.pk},salt="appointment-rating")
         url=settings.PUBLIC_BASE_URL.rstrip("/")+reverse("public-appointment-rating",args=[token])
@@ -107,13 +116,22 @@ def appointment_text(appointment,kind):
 
 
 def queue_appointment_whatsapp(appointment,kind):
-    number=re.sub(r"\D","",appointment.customer.phone or "")
+    number=whatsapp_number(appointment.customer.phone)
     if (not 10<=len(number)<=15 or (active_subscription(appointment.tenant) and not module_enabled(appointment.tenant,"whatsapp"))
             or not TenantWhatsAppConnection.objects.filter(tenant=appointment.tenant,enabled=True).exists()):
         return None
-    return Notification.objects.create(tenant=appointment.tenant,customer=appointment.customer,
+    notification=Notification.objects.create(tenant=appointment.tenant,customer=appointment.customer,
         channel=Notification.Channel.WHATSAPP,template_key=f"appointment_{kind}",destination=number,
         payload={"appointment_id":appointment.pk,"kind":kind,"text":appointment_text(appointment,kind)})
+    if kind=="confirmation":
+        def deliver():
+            from .tasks import send_notification
+            try:
+                send_notification.delay(notification.pk)
+            except Exception:
+                logger.exception("Não foi possível despachar a confirmação WhatsApp %s; a fila periódica tentará novamente.",notification.pk)
+        transaction.on_commit(deliver)
+    return notification
 
 
 @transaction.atomic
@@ -122,7 +140,7 @@ def send_prepared_message(appointment,kind,user):
     if appointment.status not in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
                                   Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS}:
         raise ValueError("Este atendimento já foi encerrado.")
-    number=re.sub(r"\D","",appointment.customer.phone or "")
+    number=whatsapp_number(appointment.customer.phone)
     if not 10<=len(number)<=15:
         raise ValueError("O cliente não possui telefone com DDD e código do país.")
     if active_subscription(appointment.tenant) and not module_enabled(appointment.tenant,"whatsapp"):
@@ -158,7 +176,7 @@ def send_appointment_notification(notification):
         notification.status=Notification.Status.SKIPPED
         notification.save(update_fields=["status"])
         return ""
-    number=re.sub(r"\D","",appointment.customer.phone or "")
+    number=whatsapp_number(appointment.customer.phone)
     if (notification.destination!=number or (active_subscription(appointment.tenant) and not module_enabled(appointment.tenant,"whatsapp"))
             or not TenantWhatsAppConnection.objects.filter(tenant=appointment.tenant,enabled=True).exists()):
         notification.status=Notification.Status.SKIPPED
@@ -224,7 +242,9 @@ def tenant_whatsapp_receive(request):
             status=WhatsAppMessage.Status.READ).update(status=WhatsAppMessage.Status.READ if status=="read" else WhatsAppMessage.Status.DELIVERED)
         return JsonResponse({"ok":True})
     body=str(data.get("text") or "")[:4096]
-    customer=Customer.objects.filter(tenant=tenant,phone__regex=r"\d+$").filter(phone__endswith=number).first()
+    customer=next((candidate for candidate in Customer.objects.filter(
+        tenant=tenant,phone__endswith=number[-4:]).only("id","phone").iterator()
+        if whatsapp_number(candidate.phone)==number),None)
     conversation,_=WhatsAppConversation.objects.get_or_create(tenant=tenant,wa_id=number,
         defaults={"customer":customer,"contact_name":str(data.get("name") or "")[:150],"last_message_at":timezone.now()})
     _,created=WhatsAppMessage.objects.get_or_create(provider_message_id=msg_id,

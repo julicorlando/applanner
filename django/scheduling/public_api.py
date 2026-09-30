@@ -1,7 +1,10 @@
 import hashlib
 import secrets
+import re
+from decimal import Decimal
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
+from core.crypto import encrypt_text
 
 from django.db import transaction
 from django.urls import reverse
@@ -228,11 +231,45 @@ class PublicBookingAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        config=availability.settings(tenant)
+        payment_choice=str(data.get("payment_choice") or Appointment.BookingPayment.ON_SITE)
+        allowed={
+            Appointment.BookingPayment.ON_SITE:config.allow_pay_on_site,
+            Appointment.BookingPayment.PARTIAL:config.allow_partial_payment,
+            Appointment.BookingPayment.FULL:config.allow_full_payment,
+        }
+        if not allowed.get(payment_choice):
+            return Response({"detail":"A forma de pagamento escolhida não está disponível."},status=400)
+        if payment_choice!=Appointment.BookingPayment.ON_SITE:
+            from billing.payment_services import has_connected_tenant_gateway
+            if not email or not config.online_booking_payments_enabled or not has_connected_tenant_gateway(tenant):
+                return Response({"detail":"Para pagar por Pix, informe seu e-mail e a empresa deve conectar o Mercado Pago."},status=400)
+            if payment_choice==Appointment.BookingPayment.PARTIAL and not 1<=config.deposit_percent<=99:
+                return Response({"detail":"O percentual de sinal da empresa deve estar entre 1 e 99."},status=400)
+        payment_amount=(service.price*Decimal(config.deposit_percent)/Decimal("100")).quantize(Decimal("0.01")) if payment_choice==Appointment.BookingPayment.PARTIAL else service.price
+        if payment_choice!=Appointment.BookingPayment.ON_SITE and payment_amount<Decimal("0.01"):
+            return Response({"detail":"O valor do Pix deve ser maior que zero."},status=400)
+
+        from billing.segment_access import segment_enabled
+        vehicle_plate=""
+        vehicle_model=""
+        if segment_enabled(tenant,"auto"):
+            vehicle_plate=re.sub(r"[^A-Z0-9]","",str(data.get("vehicle_plate") or "").upper())
+            vehicle_model=str(data.get("vehicle_model") or "").strip()[:100]
+            if not re.fullmatch(r"[A-Z]{3}[0-9][A-Z0-9][0-9]{2}",vehicle_plate) or not vehicle_model:
+                return Response({"detail":"Informe placa e modelo válidos do veículo."},status=400)
+
         customer=None
         if email:
             customer=Customer.objects.filter(tenant=tenant,email=email).first()
         if customer is None and phone:
             customer=Customer.objects.filter(tenant=tenant,phone=phone).first()
+        vehicle=None
+        if vehicle_plate:
+            from auto.models import Vehicle
+            vehicle=Vehicle.objects.select_for_update().filter(tenant=tenant,plate=vehicle_plate).first()
+            if vehicle and (customer is None or vehicle.customer_id!=customer.pk):
+                return Response({"detail":"Esta placa já está vinculada a outro cliente. Procure o estabelecimento."},status=409)
         if customer is None:
             customer=Customer.objects.create(
                 tenant=tenant,name=name,email=email,phone=phone,active=True
@@ -249,17 +286,23 @@ class PublicBookingAPIView(APIView):
                 changed.append("updated_at")
                 customer.save(update_fields=changed)
 
+        if vehicle_plate:
+            if vehicle is None:
+                vehicle=Vehicle.objects.create(tenant=tenant,customer=customer,plate=vehicle_plate,model=vehicle_model)
+
         token=secrets.token_urlsafe(32)
         appointment=Appointment.objects.create(
             tenant=tenant,customer=customer,professional=professional,service=service,
+            vehicle=vehicle,
             service_price_snapshot=service.price,starts_at=starts_at,ends_at=ends_at,
             status=Appointment.Status.CONFIRMED,source=source,
+            booking_payment=payment_choice,
+            booking_payment_amount=payment_amount if payment_choice!=Appointment.BookingPayment.ON_SITE else None,
             notes=str(data.get("notes") or "")[:2000],
             customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            customer_manage_token_encrypted=encrypt_text(token),
         )
         manage_path=reverse("public-appointment-page",args=[token])
-        from communications.tenant_whatsapp import queue_appointment_whatsapp
-        queue_appointment_whatsapp(appointment,"confirmation")
         return Response(
             {
                 "id":appointment.pk,"status":appointment.status,

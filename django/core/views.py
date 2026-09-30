@@ -73,6 +73,8 @@ def _tenant_dashboard(request):
         known={row.module_id for row in modules}
         modules.extend(row for row in plan_modules if row.module_id not in known)
 
+    available=available_modules(request.user,tenant)
+    segment_module=next((item for item in available if item["slug"] in {"auto","saude","arena","barbearia"}),None)
     return render(request,"dashboard.html",{
         "tenant":tenant,
         "today_total":today_qs.count(),
@@ -86,7 +88,7 @@ def _tenant_dashboard(request):
             "customer","service","professional"
         ).order_by("starts_at")[:8],
         "modules":modules,
-        "available_modules":available_modules(request.user,tenant),
+        "available_modules":available,"segment_module":segment_module,
         "subscription":subscription,
         "can_manage_agenda":has_capability(request.user,"agenda.manage"),
         "can_manage_finance":has_capability(request.user,"finance.manage"),
@@ -122,6 +124,8 @@ def _public_tenant_context(tenant,professional=None):
     from contenthub.models import PublicReview
     from engagement.models import ServicePackage,TenantLoyaltySettings
     from finance.models import Product
+    from scheduling.availability import AvailabilityService
+    from billing.payment_services import has_connected_tenant_gateway
 
     services=tenant.services.filter(active=True).order_by("name")[:100]
     professionals=tenant.professionals.filter(active=True).order_by("name")[:100]
@@ -134,11 +138,23 @@ def _public_tenant_context(tenant,professional=None):
     packages=ServicePackage.objects.filter(tenant=tenant,active=True).order_by("name")[:24]
     reviews=PublicReview.objects.filter(tenant=tenant,active=True).order_by("-created_at")[:12]
     loyalty=TenantLoyaltySettings.objects.filter(tenant=tenant,enabled=True).first()
+    payment_settings=AvailabilityService().settings(tenant)
+    gateway_connected=payment_settings.online_booking_payments_enabled and has_connected_tenant_gateway(tenant)
+    from billing.segment_access import segment_enabled
+    segment=next((item for item in ("auto","saude","arena","barbearia") if segment_enabled(tenant,item)),None)
+    courts=tenant.sports_courts.filter(active=True).order_by("sort_order","name")[:24] if segment=="arena" else []
+    wording={"auto":("AGENDAMENTO AUTOMOTIVO","Escolha o serviço para seu veículo e um horário disponível.","Veículo e serviço"),
+        "saude":("AGENDAMENTO DE SAÚDE","Escolha seu atendimento e um profissional disponível.","Atendimento"),
+        "arena":("RESERVA NA ARENA","Escolha a atividade e um horário disponível.","Atividade"),
+        "barbearia":("AGENDAMENTO NA BARBEARIA","Escolha o serviço e o profissional para seu atendimento.","Serviço")}
     return {
         "tenant":tenant,"services":services,"professionals":professionals,"units":units,
         "products":products,"packages":packages,"reviews":reviews,"loyalty":loyalty,
         "public_slug":tenant.public_slug or tenant.slug,"selected_professional":professional,
         "waitlist_enabled":not active_subscription(tenant) or module_enabled(tenant,"waitlist"),
+        "payment_settings":payment_settings,"online_payment_available":gateway_connected,
+        "segment":segment,"booking_wording":wording.get(segment,("AGENDAMENTO ONLINE","Escolha serviço, profissional e horário.","Serviço")),
+        "courts":courts,
     }
 
 

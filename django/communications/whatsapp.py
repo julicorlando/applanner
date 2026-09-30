@@ -3,6 +3,7 @@ import hmac
 import requests
 
 from django.conf import settings
+from .phone import whatsapp_number
 
 
 class WhatsAppProviderError(RuntimeError):
@@ -24,7 +25,7 @@ def send_text(to,text):
     response=requests.post(
         url,
         headers={"Authorization":f"Bearer {settings.WHATSAPP_ACCESS_TOKEN}","Content-Type":"application/json"},
-        json={"messaging_product":"whatsapp","to":to,"type":"text","text":{"body":text}},
+        json={"messaging_product":"whatsapp","to":whatsapp_number(to),"type":"text","text":{"body":text}},
         timeout=20,
     )
     try:

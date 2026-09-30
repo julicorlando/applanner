@@ -3,10 +3,13 @@ from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.forms import modelform_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 from requests.exceptions import RequestException
 
 from billing.models import Module, Plan, PlanModule
@@ -245,6 +248,54 @@ def home(request):
         "public_plans":Plan.objects.filter(active=True,public_visible=True,is_custom=False).count(),
         "active_modules":Module.objects.filter(active=True).count(),
     })
+
+
+@login_required
+def tenant_access(request,pk):
+    from billing.entitlements import module_enabled
+    from billing.models import TenantModule
+    from tenants.models import Tenant
+    _guard(request.user)
+    tenant=get_object_or_404(Tenant,pk=pk,deleted_at__isnull=True)
+    modules=list(Module.objects.filter(active=True).order_by("sort_order","name"))
+    if request.method=="POST":
+        selected={int(value) for value in request.POST.getlist("modules") if value.isdigit()}
+        with transaction.atomic():
+            for item in modules:
+                TenantModule.objects.update_or_create(tenant=tenant,module=item,
+                    defaults={"enabled":item.pk in selected})
+        messages.success(request,"Acessos da empresa atualizados pelo Master.")
+        return redirect("master-tenant-access",pk=tenant.pk)
+    return render(request,"master/tenant_access.html",{"tenant":tenant,
+        "modules":[{"module":item,"enabled":module_enabled(tenant,item.slug)} for item in modules]})
+
+
+@login_required
+@require_POST
+def send_tenant_terms(request,pk):
+    from accounts.models import User
+    from communications.models import Notification
+    from legal.middleware import current_documents
+    from tenants.models import Tenant
+    _guard(request.user)
+    tenant=get_object_or_404(Tenant,pk=pk,deleted_at__isnull=True)
+    if not current_documents():
+        messages.error(request,"Publique os termos em Documentos legais antes de enviar o aceite.")
+    else:
+        owners=User.objects.filter(tenant=tenant,role="owner",is_active=True).exclude(email="")
+        link=request.build_absolute_uri(reverse("legal-accept"))
+        count=0
+        for owner in owners:
+            Notification.objects.create(tenant=tenant,channel=Notification.Channel.EMAIL,
+                destination=owner.email,template_key="tenant_terms_acceptance",
+                payload={"subject":"Aceite de termos do ApPlanner",
+                    "text":f"Olá! Os documentos legais do ApPlanner foram atualizados. Entre com sua conta e aceite os termos para continuar usando {tenant.name}: {link}"})
+            count+=1
+        if count:
+            messages.success(request,f"Convite de aceite enviado para {count} responsável(is) da empresa.")
+        else:
+            messages.error(request,"Cadastre um responsável ativo com e-mail antes de enviar os termos.")
+    return redirect("master-tenant-access",pk=tenant.pk)
 
 
 class ChatbotMasterForm(forms.Form):

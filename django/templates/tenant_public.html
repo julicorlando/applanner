@@ -23,14 +23,19 @@
 
 {% if tenant.public_booking_enabled %}
 <section class="shell section" id="agendar">
-  <div class="section-head"><span class="eyebrow">AGENDAMENTO ONLINE</span><h2>Escolha serviço, profissional e horário.</h2></div>
+  <div class="section-head"><span class="eyebrow">{{ booking_wording.0 }}</span><h2>{{ booking_wording.1 }}</h2></div>
   <div class="panel">
     <form id="public-booking" class="portal-form">{% csrf_token %}
       <div class="portal-module-grid">
-        <div class="form-field"><label>Serviço</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
+        <div class="form-field"><label>{{ booking_wording.2 }}</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
         <div class="form-field"><label>Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
         <div class="form-field"><label>Data</label><input id="booking-date" type="date" required></div>
       </div>
+      <fieldset class="form-field"><legend>Como deseja pagar?</legend><div class="booking-slots">
+        {% if payment_settings.allow_pay_on_site %}<label class="button ghost"><input type="radio" name="payment_choice" value="on_site" checked> Pagar na unidade</label>{% endif %}
+        {% if online_payment_available and payment_settings.allow_partial_payment %}<label class="button ghost"><input type="radio" name="payment_choice" value="partial" {% if not payment_settings.allow_pay_on_site %}checked{% endif %}> Sinal de {{ payment_settings.deposit_percent }}% por Pix</label>{% endif %}
+        {% if online_payment_available and payment_settings.allow_full_payment %}<label class="button ghost"><input type="radio" name="payment_choice" value="full" {% if not payment_settings.allow_pay_on_site and not payment_settings.allow_partial_payment %}checked{% endif %}> Pagar o total por Pix</label>{% endif %}
+      </div><small>O agendamento é confirmado agora. O Pix só consta como pago após a confirmação do banco.</small></fieldset>
       <div class="form-field booking-times"><label id="booking-slot-label">Horários disponíveis</label><p class="booking-times-hint">Toque em um horário para selecioná-lo. Os horários disponíveis aparecem após escolher serviço e data.</p><input type="hidden" id="booking-slot"><div id="booking-slots" class="booking-slots" role="group" aria-labelledby="booking-slot-label"></div><small id="booking-slot-status" role="status" aria-live="polite">Escolha o serviço e a data para ver os horários.</small></div>
       <div class="portal-module-grid" style="margin-top:14px">
         <div class="form-field"><label>Seu nome</label><input id="booking-name" required minlength="2"></div>
@@ -38,6 +43,7 @@
         <div class="form-field"><label>E-mail</label><input id="booking-email" type="email" autocomplete="email"></div>
         <div class="form-field"><label>Observações</label><input id="booking-notes"></div>
       </div>
+      {% if segment == 'auto' %}<div class="portal-module-grid"><div class="form-field"><label for="booking-plate">Placa do veículo</label><input id="booking-plate" autocomplete="off" maxlength="8" placeholder="ABC1D23" required></div><div class="form-field"><label for="booking-vehicle-model">Modelo do veículo</label><input id="booking-vehicle-model" maxlength="100" placeholder="Ex.: Onix" required></div></div>{% endif %}
       <div id="booking-feedback" style="margin-top:12px"></div>
       {% if waitlist_enabled %}<div id="booking-waitlist" class="panel" hidden><h3>Sem horários? Entre na lista de espera</h3><p>Usaremos o nome e o contato informados acima para avisar se surgir uma vaga nesta data.</p><button type="button" class="button" id="booking-waitlist-submit">Entrar na lista de espera</button></div>{% endif %}
       <div class="form-actions"><button class="button primary" type="submit">Confirmar agendamento</button></div>
@@ -56,6 +62,10 @@
 {% for professional in professionals %}<article>{% if professional.photo %}<img src="{% url 'public-professional-image' professional.pk %}" alt="{{ professional.name }}" style="width:72px;height:72px;object-fit:cover;border-radius:50%">{% endif %}<span>{{ professional.specialty|default:"Profissional" }}</span><h3>{{ professional.name }}</h3>{% if professional.public_slug %}<a href="{% url 'professional-public' public_slug professional.public_slug %}">Ver agenda exclusiva →</a>{% endif %}</article>{% endfor %}
 </div></section>
 {% endif %}
+
+{% if courts %}<section class="shell section" id="quadras"><div class="section-head"><span class="eyebrow">ARENA</span><h2>Quadras e espaços</h2></div><div class="segment-grid">{% for court in courts %}<article><h3>{{ court.name }}</h3><p>{{ court.description }}</p><span>{% if court.indoor %}Coberta{% else %}Ao ar livre{% endif %}{% if court.lighting %} · Iluminação{% endif %}{% if court.surface %} · {{ court.surface }}{% endif %}</span></article>{% endfor %}</div></section>{% endif %}
+
+{% if segment == 'saude' %}<section class="shell section"><article class="panel"><span class="eyebrow">ATENDIMENTO DE SAÚDE</span><h2>Suas informações de saúde são protegidas</h2><p>Agende sua consulta com um profissional. O prontuário clínico só pode ser acessado por pessoas autorizadas do estabelecimento.</p></article></section>{% endif %}
 
 {% if products %}
 <section class="shell section"><div class="section-head"><span class="eyebrow">PRODUTOS</span><h2>Produtos disponíveis.</h2></div><div class="segment-grid">{% for product in products %}<article><span>{{ product.category|default:"Produto" }}</span><h3>{{ product.name }}</h3><p>{{ product.description }}</p><strong>R$ {{ product.sale_price }}</strong></article>{% endfor %}</div></section>
@@ -117,6 +127,9 @@
       phone:document.getElementById('booking-phone').value,
       email:document.getElementById('booking-email').value,
       notes:document.getElementById('booking-notes').value,
+      {% if segment == 'auto' %}vehicle_plate:document.getElementById('booking-plate').value,
+      vehicle_model:document.getElementById('booking-vehicle-model').value,{% endif %}
+      payment_choice:form.querySelector('input[name="payment_choice"]:checked')?.value||'on_site',
       professional_link:{% if selected_professional %}true{% else %}false{% endif %}
     };
     if(!payload.phone && !payload.email){feedback.innerHTML='<div class="flash error">Informe telefone ou e-mail.</div>';return;}
@@ -125,7 +138,7 @@
     });
     const data=await response.json().catch(()=>({}));
     if(!response.ok){feedback.innerHTML='<div class="flash error">'+(data.detail||'Não foi possível agendar.')+'</div>';return;}
-    feedback.innerHTML='<div class="flash success"><strong>Agendamento solicitado!</strong><br>Profissional: '+data.professional.name+'<br><a href="'+data.manage_url+'">Abrir meu agendamento</a></div>';
+    feedback.innerHTML='<div class="flash success"><strong>Agendamento confirmado!</strong><br>Profissional: '+data.professional.name+'<br><a href="'+data.manage_url+'">'+(payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix')+'</a></div>';
     form.querySelector('button[type=submit]').disabled=true;
   });
 })();

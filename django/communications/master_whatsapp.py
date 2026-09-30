@@ -141,7 +141,8 @@ def master_whatsapp_inbox(request):
         if (lead_id and not lead) or (tenant_id and not tenant) or (lead_id and tenant_id):
             messages.error(request,"Contato indisponível para atendimento.")
             return redirect("master-whatsapp")
-        number=re.sub(r"\D","",lead.phone if lead else tenant.phone if tenant else request.POST.get("phone", ""))
+        from .phone import whatsapp_number
+        number=whatsapp_number(lead.phone if lead else tenant.phone if tenant else request.POST.get("phone", ""))
         if not 10<=len(number)<=15:
             messages.error(request,"Informe um telefone com DDD e código do país, somente números.")
             return redirect("master-whatsapp")
@@ -222,7 +223,8 @@ def master_whatsapp_conversation(request,pk):
         elif action=="create_lead":
             phone=row.wa_id.split("@")[0] if row.wa_id.endswith("@s.whatsapp.net") else ""
             if not phone:
-                phone=re.sub(r"\D","",request.POST.get("phone", ""))
+                from .phone import whatsapp_number
+                phone=whatsapp_number(request.POST.get("phone", ""))
             if not 10<=len(phone)<=15:
                 messages.error(request,"Informe o telefone com país e DDD para adicionar o contato ao Comercial.")
             else:

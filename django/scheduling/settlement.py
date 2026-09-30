@@ -26,6 +26,12 @@ def settle_appointment(*,appointment_id,professional,user,attended,payment_metho
         raise ValidationError("O atendimento só pode ser encerrado depois do início do horário.")
     if attended and payment_method not in {"pix","card","cash","transfer","other"}:
         raise ValidationError("Escolha a forma de pagamento recebida.")
+    from billing.models import TenantPaymentTransaction
+    paid_online=TenantPaymentTransaction.objects.filter(tenant=appointment.tenant,
+        reference_type="appointment",reference_id=appointment.pk,
+        status=TenantPaymentTransaction.Status.PAID).exists()
+    finance_method=("pix+"+payment_method if attended and paid_online and
+        appointment.booking_payment==Appointment.BookingPayment.PARTIAL else payment_method)
     if not attended and product_id:
         raise ValidationError("Não é possível vender produtos em um atendimento não realizado.")
     if product_id:
@@ -49,7 +55,7 @@ def settle_appointment(*,appointment_id,professional,user,attended,payment_metho
                 tenant=appointment.tenant,idempotency_key=f"appointment:{appointment.pk}",
                 defaults={"appointment":appointment,"source_type":"appointment","source_id":appointment.pk,
                           "type":FinancialTransaction.Type.INCOME,"description":f"Atendimento #{appointment.pk}",
-                          "amount":price,"payment_method":payment_method,"competence_at":timezone.localdate(),
+                          "amount":price,"payment_method":finance_method,"competence_at":timezone.localdate(),
                           "status":FinancialTransaction.Status.PAID,"paid_at":now},
             )
             if professional.commission_percent:

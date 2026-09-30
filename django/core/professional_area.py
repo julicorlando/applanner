@@ -1,4 +1,6 @@
 from decimal import Decimal
+from datetime import date,datetime,timedelta
+from zoneinfo import ZoneInfo
 
 from django import forms
 from django.contrib import messages
@@ -8,6 +10,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Sum
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -15,6 +18,10 @@ from finance.models import Product,ProfessionalCommission
 from scheduling.models import Appointment, Professional
 from scheduling.settlement import settle_appointment
 from communications.tenant_whatsapp import send_prepared_message
+from billing.entitlements import active_subscription,module_enabled
+from engagement.models import WaitlistEntry
+from engagement.waitlist_booking import book_waitlist_for_professional
+from scheduling.availability import AvailabilityService
 
 
 class ProfessionalAccessForm(forms.Form):
@@ -129,12 +136,69 @@ def professional_area(request):
         for item in upcoming:
             projected+=(item.service_price_snapshot if item.service_price_snapshot is not None
                         else item.service.price)*professional.commission_percent/Decimal("100")
+    waitlist_enabled=not active_subscription(professional.tenant) or module_enabled(professional.tenant,"waitlist")
+    waiting=(WaitlistEntry.objects.filter(tenant=professional.tenant,
+        status__in=[WaitlistEntry.Status.WAITING,WaitlistEntry.Status.MATCHED],
+        customer__active=True,service__active=True).filter(
+        Q(professional__isnull=True)|Q(professional=professional)
+    ).select_related("customer","service").order_by("preferred_date","created_at") if waitlist_enabled else WaitlistEntry.objects.none())
     return render(request,"portal/professional_area.html",{
         "professional":professional,"upcoming":upcoming[:15],"current":current,"upcoming_count":upcoming.count(),
         "completed_month":appointments.filter(starts_at__gte=month_start,starts_at__lt=now,
                                                status=Appointment.Status.COMPLETED).count(),
         "pending_commission":pending,"paid_commission":paid,
         "projected_commission":projected,"has_projection":professional.commission_percent is not None,
+        "waitlist_enabled":waitlist_enabled,"waiting":waiting[:20],"waiting_count":waiting.count(),
+    })
+
+
+@login_required
+def professional_waitlist(request,pk):
+    if request.user.role!="professional" or not request.user.tenant_id:
+        raise PermissionDenied("Área exclusiva do profissional.")
+    professional=get_object_or_404(Professional,tenant_id=request.user.tenant_id,user=request.user,active=True)
+    if active_subscription(professional.tenant) and not module_enabled(professional.tenant,"waitlist"):
+        raise PermissionDenied("A lista de espera não está incluída no plano da empresa.")
+    entry=get_object_or_404(WaitlistEntry.objects.select_related("customer","service"),
+        pk=pk,tenant=professional.tenant,status__in=[WaitlistEntry.Status.WAITING,WaitlistEntry.Status.MATCHED],
+        customer__active=True,service__active=True,appointment__isnull=True)
+    if entry.professional_id and entry.professional_id!=professional.pk:
+        raise PermissionDenied("Este cliente escolheu outro profissional.")
+    availability=AvailabilityService()
+    if not availability.professional_offers(professional.tenant,professional.pk,entry.service_id):
+        raise PermissionDenied("Este serviço não está disponível para este profissional.")
+    tz=ZoneInfo(professional.tenant.timezone or "America/Recife")
+    today=timezone.localdate(timezone=tz)
+    raw_day=request.POST.get("day") if request.method=="POST" else request.GET.get("dia")
+    try:
+        day=date.fromisoformat(raw_day) if raw_day else (entry.preferred_date if entry.preferred_date and entry.preferred_date>=today else today)
+    except ValueError:
+        day=today
+    if day<today or day>today+timedelta(days=90):
+        day=today
+    error=None
+    if request.method=="POST":
+        instant=request.POST.get("action")=="instant"
+        if not instant and request.POST.get("action")!="schedule":
+            error="Escolha agendar ou iniciar um atendimento avulso."
+        else:
+            try:
+                selected=datetime.fromisoformat(request.POST.get("starts_at","")) if not instant else None
+                appointment=book_waitlist_for_professional(
+                    entry_id=entry.pk,professional=professional,user=request.user,
+                    instant=instant,starts_at=selected,
+                )
+            except (ValidationError,ValueError,WaitlistEntry.DoesNotExist,Professional.DoesNotExist) as exc:
+                error=" ".join(exc.messages) if isinstance(exc,ValidationError) else "Horário inválido ou cliente já atendido. Atualize a lista."
+            else:
+                messages.success(request,"Atendimento avulso iniciado. Registre o pagamento e produtos ao encerrar." if instant
+                                 else "Cliente da lista de espera agendado e removido da fila.")
+                return redirect("professional-appointment",pk=appointment.pk) if instant else redirect("professional-area")
+    now=timezone.now()
+    slots=[slot for slot in availability.slots(professional.tenant,entry.service_id,professional.pk,day,public_rules=False)
+           if datetime.fromisoformat(slot["value"])>=now]
+    return render(request,"portal/professional_waitlist.html",{
+        "professional":professional,"entry":entry,"day":day,"today":today,"slots":slots,"error":error,
     })
 
 
@@ -148,13 +212,14 @@ class SettlementForm(forms.Form):
     quantity=forms.DecimalField(label="Quantidade",min_value=Decimal("0.001"),max_digits=12,
                                 decimal_places=3,initial=1)
 
-    def __init__(self,*args,tenant,**kwargs):
+    def __init__(self,*args,tenant,prepaid_full=False,**kwargs):
         super().__init__(*args,**kwargs)
+        self.prepaid_full=prepaid_full
         self.fields["product"].queryset=Product.objects.filter(tenant=tenant,active=True,stock__gt=0)
 
     def clean(self):
         data=super().clean()
-        if data.get("outcome")=="completed" and not data.get("payment_method"):
+        if data.get("outcome")=="completed" and not data.get("payment_method") and (not self.prepaid_full or data.get("product")):
             self.add_error("payment_method","Informe como o atendimento foi pago.")
         if data.get("outcome")=="no_show" and data.get("product"):
             self.add_error("product","Não há venda em atendimento não realizado.")
@@ -168,6 +233,11 @@ def professional_appointment(request,pk):
     professional=get_object_or_404(Professional,tenant_id=request.user.tenant_id,user=request.user,active=True)
     appointment=get_object_or_404(Appointment.objects.select_related("customer","service"),
                                   pk=pk,tenant=professional.tenant,professional=professional)
+    from billing.models import TenantPaymentTransaction
+    paid=TenantPaymentTransaction.objects.filter(tenant=professional.tenant,
+        reference_type="appointment",reference_id=appointment.pk,
+        status=TenantPaymentTransaction.Status.PAID).order_by("-paid_at").first()
+    prepaid_full=bool(paid and appointment.booking_payment==Appointment.BookingPayment.FULL)
     if request.method=="POST" and request.POST.get("action")=="message":
         try:
             send_prepared_message(appointment,request.POST.get("kind",""),request.user)
@@ -176,12 +246,12 @@ def professional_appointment(request,pk):
         else:
             messages.success(request,"Mensagem pronta enviada ao WhatsApp do cliente.")
         return redirect("professional-appointment",pk=appointment.pk)
-    form=SettlementForm(request.POST or None,tenant=professional.tenant)
+    form=SettlementForm(request.POST or None,tenant=professional.tenant,prepaid_full=prepaid_full)
     if request.method=="POST" and form.is_valid():
         try:
             settle_appointment(appointment_id=appointment.pk,professional=professional,user=request.user,
                 attended=form.cleaned_data["outcome"]=="completed",
-                payment_method=form.cleaned_data["payment_method"],
+                payment_method=form.cleaned_data["payment_method"] or ("pix" if prepaid_full else ""),
                 product_id=form.cleaned_data["product"].pk if form.cleaned_data["product"] else None,
                 quantity=form.cleaned_data["quantity"])
         except (ValidationError,Appointment.DoesNotExist) as exc:
@@ -191,6 +261,7 @@ def professional_appointment(request,pk):
             return redirect("professional-area")
     return render(request,"portal/professional_appointment.html",{
         "professional":professional,"appointment":appointment,"form":form,
+        "paid_booking_payment":paid,"prepaid_full":prepaid_full,
         "can_settle":appointment.status in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
             Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS} and appointment.starts_at<=timezone.now(),
     })

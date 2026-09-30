@@ -230,6 +230,13 @@ def connected_tenant_gateway(tenant,provider="mercadopago"):
     return connection
 
 
+def has_connected_tenant_gateway(tenant):
+    try:
+        return bool(connected_tenant_gateway(tenant))
+    except RuntimeError:
+        return False
+
+
 def _tenant_tx_status(value):
     from .models import TenantPaymentTransaction
     return {
@@ -257,20 +264,21 @@ def create_tenant_pix(*,tenant,reference_type,reference_id,amount,payer_email,ex
     if "@" not in payer_email:
         raise ValueError("Informe um e-mail válido para o Pix.")
 
-    idempotency=(
+    base_idempotency=(
         "pix-"+__import__("hashlib").sha256(
             f"{tenant.pk}|{reference_type}|{reference_id}|{amount}".encode()
         ).hexdigest()[:64]
     )
-    existing=TenantPaymentTransaction.objects.filter(
-        tenant=tenant,idempotency_key=idempotency
-    ).first()
+    attempts=TenantPaymentTransaction.objects.filter(tenant=tenant,
+        reference_type=reference_type,reference_id=reference_id,gross_amount=amount,method="pix").order_by("-created_at")
+    existing=attempts.first()
     if existing and existing.status in {
         TenantPaymentTransaction.Status.CREATED,
         TenantPaymentTransaction.Status.PENDING,
         TenantPaymentTransaction.Status.PAID,
     }:
         return existing
+    idempotency=f"{base_idempotency[:75]}-{attempts.count()}"
 
     external=f"{reference_type[:12].upper()}-{reference_id}-{token_hex(4).upper()}"
     expires_at=timezone.now()+__import__("datetime").timedelta(minutes=max(1,int(expiration_minutes)))

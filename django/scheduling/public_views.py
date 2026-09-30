@@ -1,5 +1,6 @@
 import hashlib
 from datetime import datetime,timedelta
+from requests.exceptions import RequestException
 from zoneinfo import ZoneInfo
 
 from django.contrib import messages
@@ -44,8 +45,30 @@ def _candidates(row):
 @transaction.atomic
 def appointment_page(request,token):
     row=_appointment(token,lock=request.method=="POST")
+    from billing.models import TenantPaymentTransaction
+    from billing.payment_services import has_connected_tenant_gateway
+    amount=row.booking_payment_amount or (row.service_price_snapshot if row.service_price_snapshot is not None else row.service.price)
+    payments=TenantPaymentTransaction.objects.filter(tenant=row.tenant,reference_type="appointment",
+        reference_id=row.pk).order_by("-created_at")
+    payment=payments.first()
     if request.method=="POST":
         action=request.POST.get("action")
+        if action=="pay":
+            if (row.booking_payment==Appointment.BookingPayment.ON_SITE or row.status not in
+                {Appointment.Status.PENDING,Appointment.Status.CONFIRMED} or not row.customer.email or not has_connected_tenant_gateway(row.tenant)):
+                messages.error(request,"O pagamento online não está disponível para este agendamento.")
+            elif payment and payment.status==TenantPaymentTransaction.Status.PAID:
+                messages.info(request,"Este pagamento já foi confirmado.")
+            else:
+                from billing.payment_services import create_tenant_pix
+                try:
+                    create_tenant_pix(tenant=row.tenant,reference_type="appointment",reference_id=row.pk,
+                        amount=amount,payer_email=row.customer.email,expiration_minutes=60)
+                except (ValueError,RuntimeError,RequestException):
+                    messages.error(request,"Não foi possível gerar o Pix. Confira os dados de pagamento da empresa e tente novamente.")
+                else:
+                    messages.success(request,"Pix gerado. Copie o código e aguarde a confirmação do pagamento.")
+            return redirect("public-appointment-page",token=token)
         caps=_caps(row)
         if action=="cancel":
             if not caps["can_cancel"]:
@@ -118,6 +141,7 @@ def appointment_page(request,token):
 
     return render(request,"scheduling/public_appointment.html",{
         "appointment":row,"token":token,"capabilities":_caps(row),
+        "payment":payment,"payment_amount":amount,"payment_connected":has_connected_tenant_gateway(row.tenant),
         "professionals":_candidates(row),
         "rating_token":dumps({"appointment":row.pk},salt="appointment-rating")
             if row.status==Appointment.Status.COMPLETED else None,

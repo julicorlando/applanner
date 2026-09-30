@@ -139,7 +139,13 @@ class TenantScheduleSettings(models.Model):
     customer_can_reschedule=models.BooleanField(default=True)
     cancel_notice_minutes=models.PositiveIntegerField(default=120)
     reminder_24h_enabled=models.BooleanField(default=True)
-    reminder_2h_enabled=models.BooleanField(default=False)
+    reminder_2h_enabled=models.BooleanField(default=True)
+    allow_pay_on_site=models.BooleanField(default=True,verbose_name="Permitir pagamento na unidade")
+    allow_partial_payment=models.BooleanField(default=False,verbose_name="Permitir sinal por Pix no agendamento")
+    allow_full_payment=models.BooleanField(default=False,verbose_name="Permitir pagamento total por Pix no agendamento")
+    online_booking_payments_enabled=models.BooleanField(default=False,
+        verbose_name="Ativar cobrança online ao agendar")
+    deposit_percent=models.PositiveSmallIntegerField(default=30,verbose_name="Percentual do sinal")
     updated_at=models.DateTimeField(auto_now=True)
 
 
@@ -160,6 +166,12 @@ class Appointment(TimeStampedModel):
         WHATSAPP="whatsapp","WhatsApp"
         CAMPAIGN="campaign","Campanha"
         API="api","API"
+        WALK_IN="walk_in","Avulso"
+
+    class BookingPayment(models.TextChoices):
+        ON_SITE="on_site","Na unidade"
+        PARTIAL="partial","Sinal por Pix"
+        FULL="full","Total por Pix"
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="appointments")
     customer=models.ForeignKey(Customer,on_delete=models.PROTECT,related_name="appointments")
@@ -171,6 +183,10 @@ class Appointment(TimeStampedModel):
     ends_at=models.DateTimeField()
     status=models.CharField(max_length=20,choices=Status.choices,default=Status.PENDING,db_index=True)
     source=models.CharField(max_length=24,choices=Source.choices,default=Source.INTERNAL)
+    booking_payment=models.CharField(max_length=12,choices=BookingPayment.choices,
+        default=BookingPayment.ON_SITE,verbose_name="Pagamento do agendamento")
+    booking_payment_amount=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True,
+        verbose_name="Valor solicitado no agendamento")
     notes=models.TextField(blank=True)
     customer_manage_token_hash=models.CharField(max_length=64,null=True,blank=True,unique=True)
     customer_manage_token_encrypted=models.TextField(blank=True)

@@ -19,15 +19,16 @@ def notify_confirmed_appointment(sender,instance,created,**kwargs):
         not created and getattr(instance,"_previous_status",None)==Appointment.Status.CONFIRMED
     ):
         return
-    if not instance.customer.email:
-        return
-    queue_email(instance.tenant,instance.customer.email,"booking_confirmation",{
+    from communications.tenant_whatsapp import queue_appointment_whatsapp
+    queue_appointment_whatsapp(instance,"confirmation")
+    if instance.customer.email:
+        queue_email(instance.tenant,instance.customer.email,"booking_confirmation",{
         "nome":instance.customer.name,
         "empresa":instance.tenant.name,
         "servico":instance.service.name,
         "profissional":instance.professional.name if instance.professional_id else "A definir",
         "data_hora":timezone.localtime(instance.starts_at).strftime("%d/%m/%Y às %H:%M"),
-    },customer=instance.customer)
+        },customer=instance.customer)
 
 
 @receiver(post_save,sender=Appointment)

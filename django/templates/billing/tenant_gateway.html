@@ -8,8 +8,13 @@
     {% empty %}<p>Nenhuma conta conectada.</p>{% endfor %}
     <p>Webhook para cadastrar nas notificações da sua aplicação Mercado Pago: <code>{{ webhook_url }}</code></p>
   </article>
+  <article class="panel" style="margin-top:16px"><h2>Pix no agendamento público</h2><p>Ative somente se quiser oferecer sinal ou pagamento total antes da visita. Para definir o percentual e quais opções mostrar, abra a configuração da agenda.</p>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="booking_payments"><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="enabled" {% if schedule_settings.online_booking_payments_enabled %}checked{% endif %} {% if not connected %}disabled{% endif %}> Oferecer Pix ao agendar</label><p><button class="button primary" type="submit">Salvar opção</button></p></form>
+    {% if not connected %}<p>Conecte a conta primeiro para liberar esta função.</p>{% endif %}
+    <a class="button ghost" href="{% url 'portal-resource-list' 'agenda' 'configuracao' %}">Configurar sinal e formas de pagamento</a>
+  </article>
   {% if connected and not show_form %}<article class="panel"><h2>Como funciona</h2><ol><li>O cliente escolhe Pix ou cartão no pagamento da empresa.</li><li>O Mercado Pago gera a cobrança na sua conta.</li><li>O webhook confirma o pagamento na plataforma.</li></ol><a class="button" href="?alterar=1">Alterar conta ou credenciais</a></article>
-  {% else %}<article class="panel"><h2>Conectar ou substituir credenciais</h2><p>Copie as credenciais da sua aplicação Mercado Pago. Para testes, use Access Token iniciado por TEST-. Cadastre o webhook acima na mesma aplicação.</p>
+  {% else %}<article class="panel"><h2>Conectar ou substituir credenciais</h2><p>Copie as credenciais da sua aplicação Mercado Pago. Para testes, use um token de acesso iniciado por TEST-. Cadastre o endereço de notificações acima na mesma aplicação.</p>
     <form method="post" class="portal-form">{% csrf_token %}{{ form.non_field_errors }}
       {% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
       <p>As chaves são criptografadas e não aparecem novamente nesta página.</p><button class="button primary" type="submit">Testar e conectar</button>

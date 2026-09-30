@@ -8,6 +8,20 @@
     <div class="appointment-row"><time>{{ appointment.starts_at|date:"d/m H:i" }}</time><div><strong>{{ appointment.professional.name|default:"Profissional a definir" }}</strong><span>{{ appointment.customer.name }}</span></div><em>R$ {{ appointment.service_price_snapshot|default:appointment.service.price }}</em></div>
     {% if rating_token %}<p>Atendimento concluído. Conte como foi sua experiência.</p><a class="button primary" href="{% url 'public-appointment-rating' rating_token %}">Dar nota de 1 a 5</a>{% endif %}
   </article>
+  {% if appointment.booking_payment != 'on_site' %}
+  <article class="panel" style="margin-top:14px"><h2>Pagamento por Pix</h2>
+    <p>{% if appointment.booking_payment == 'partial' %}Sinal{% else %}Valor total{% endif %}: <strong>R$ {{ payment_amount|floatformat:2 }}</strong>. A confirmação do pagamento ocorre após o retorno do Mercado Pago.</p>
+    {% if payment.status == 'paid' %}<p class="flash success">Pagamento confirmado.</p>
+    {% elif payment and payment.status == 'pending' or payment and payment.status == 'created' %}
+      {% if payment.pix_copy_paste %}<label class="form-field">Código Pix copia e cola<textarea readonly rows="4" onclick="this.select()">{{ payment.pix_copy_paste }}</textarea></label>{% endif %}
+      {% if payment.pix_qr_code %}<img alt="QR code para pagamento Pix" style="width:220px;height:220px" src="data:image/png;base64,{{ payment.pix_qr_code }}">{% endif %}
+      {% if payment.checkout_url %}<p><a class="button" href="{{ payment.checkout_url }}" rel="noopener" target="_blank">Abrir pagamento</a></p>{% endif %}
+      <p>Status: {{ payment.get_status_display }}. Atualize esta página após pagar.</p>
+    {% elif appointment.status == 'confirmed' and payment_connected %}
+      <form method="post">{% csrf_token %}<button class="button primary" name="action" value="pay">Gerar Pix de R$ {{ payment_amount|floatformat:2 }}</button></form>
+    {% else %}<p>Pagamento indisponível no momento. Entre em contato com o estabelecimento.</p>{% endif %}
+  </article>
+  {% endif %}
   {% if capabilities.can_reschedule %}
   <article class="panel" style="margin-top:14px">
     <h2>Remarcar</h2>
