@@ -86,6 +86,7 @@ class Subscription(TimeStampedModel):
     cancelled_at=models.DateTimeField(null=True,blank=True)
     provider_customer_id=models.CharField(max_length=190,blank=True)
     provider_subscription_id=models.CharField(max_length=190,blank=True,db_index=True)
+    provider_environment=models.CharField(max_length=16,blank=True)
     provider_plan_id=models.CharField(max_length=190,blank=True)
     provider_checkout_url=models.URLField(max_length=1000,blank=True)
 

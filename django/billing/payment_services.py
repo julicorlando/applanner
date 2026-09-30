@@ -89,10 +89,11 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
         idempotency_key=idempotency_key,
     )
     subscription.provider_subscription_id=remote["reference"]
+    subscription.provider_environment=gateway.environment
     subscription.provider_plan_id=""
     checkout_url=remote.get("init_point") or ""
     subscription.provider_checkout_url=checkout_url if checkout_url.startswith("https://") else ""
-    subscription.save(update_fields=["provider_subscription_id","provider_plan_id","provider_checkout_url","updated_at"])
+    subscription.save(update_fields=["provider_subscription_id","provider_environment","provider_plan_id","provider_checkout_url","updated_at"])
     return remote
 
 

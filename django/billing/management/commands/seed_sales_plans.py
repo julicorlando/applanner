@@ -4,38 +4,52 @@ from django.db import transaction
 from billing.models import Module, Plan, PlanModule
 
 
-STARTER_PLANS = (
-    ("sales-pro", "Profissional", "29.90", 1, ("finance",), "Agenda, clientes e financeiro para começar."),
-    ("sales-start", "Inicial", "49.90", 2, ("products", "stock", "finance", "packages"), "Agenda, PDV, estoque e pacotes no mesmo lugar."),
-    ("sales-business", "Empresarial", "99.90", 5, ("products", "stock", "finance", "behavior", "multiunit", "packages", "loyalty", "waitlist", "custom-domain"), "Mais unidades, fidelidade e ferramentas para crescer."),
+SEGMENT_PLANS = (
+    {"slug":"segment-barbearia-salao","name":"Barbearia / Salão","price":"29.90",
+     "segment":"barbearia","modules":("finance","products","stock","packages","loyalty","waitlist"),
+     "description":"Agendamentos, equipe, vendas e fidelização para barbearias e salões.",
+     "features":("Agenda e página pública","Profissionais e comissões","Clientes e vendas")},
+    {"slug":"segment-arena","name":"Arena","price":"49.90",
+     "segment":"arena","modules":("sports_courts","finance","products","stock"),
+     "description":"Quadras, horários, reservas, mensalistas e operação esportiva.",
+     "features":("Reserva pública de quadras","Horários e preços","Mensalistas e financeiro")},
+    {"slug":"segment-automotivo","name":"Automotivo","price":"99.90",
+     "segment":"auto","modules":("finance","products","stock","packages","waitlist","behavior"),
+     "description":"Veículos, agendamentos, produtos, estoque e retorno de clientes.",
+     "features":("Cadastro de veículos","Agenda de serviços","Estoque, vendas e financeiro")},
+    {"slug":"segment-medico","name":"Médico / Clínica","price":"0.00",
+     "segment":"saude","modules":("medical_records",),
+     "description":"Atendimentos clínicos e prontuários. Em preparação.",
+     "features":("Agenda clínica","Prontuários e atendimento"),"active":False},
 )
 
 
 class Command(BaseCommand):
-    help = "Cria planos públicos de teste quando o catálogo de vendas ainda está vazio; preserva planos do legado e edições do Master."
+    help = "Cria planos por segmento sem alterar assinaturas nem ajustes do Master."
 
     @transaction.atomic
     def handle(self, *args, **options):
-        if Plan.objects.filter(active=True, public_visible=True, is_custom=False).exists():
-            self.stdout.write("Catálogo público já configurado; nenhum plano alterado.")
-            return
         created = 0
-        for order, (slug, name, price, professionals, modules, description) in enumerate(STARTER_PLANS, 1):
+        for order, item in enumerate(SEGMENT_PLANS, 1):
+            active=item.get("active",True)
             plan, new = Plan.objects.get_or_create(
-                slug=slug,
+                slug=item["slug"],
                 defaults={
-                    "name": name, "description": description, "monthly_price": price,
-                    "trial_days": 7, "trial_without_card": True,
-                    "active": True, "public_visible": True, "featured": order == 2,
-                    "sort_order": order,
-                    "features": {"professionals": professionals, "units": 1,
-                                 "segments": ["barbearia","auto","arena","saude"],
-                                 "included_features": ["Agenda online e gestão de clientes"]},
+                    "name":item["name"],"description":item["description"],"monthly_price":item["price"],
+                    "trial_days":7 if active else 0,"trial_without_card":True,
+                    "active":active,"public_visible":active,
+                    "featured":item["segment"]=="arena","sort_order":order,
+                    "features":{"professionals":3,"units":1,"segments":[item["segment"]],
+                                "included_features":list(item["features"])},
                 },
             )
             if not new:
                 continue
             created += 1
-            for module in Module.objects.filter(slug__in=modules, active=True):
+            for module in Module.objects.filter(slug__in=item["modules"]):
                 PlanModule.objects.get_or_create(plan=plan, module=module, defaults={"enabled": True})
-        self.stdout.write(self.style.SUCCESS(f"{created} planos públicos criados para homologação."))
+        hidden=Plan.objects.filter(slug__in=("sales-pro","sales-start","sales-business"),
+                                   public_visible=True).update(public_visible=False)
+        self.stdout.write(self.style.SUCCESS(
+            f"{created} planos por segmento criados; {hidden} planos genéricos retirados da vitrine."
+        ))

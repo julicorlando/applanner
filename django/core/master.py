@@ -27,6 +27,7 @@ FIELD_LABELS={
     "featured":"Em destaque","sort_order":"Ordem de exibição","public_enabled":"Página pública ativa",
     "public_booking_enabled":"Agendamento público ativo","email":"E-mail","phone":"Telefone",
     "status":"Situação","created_at":"Criado em","updated_at":"Atualizado em",
+    "provider_environment":"Ambiente da assinatura no Mercado Pago",
 }
 
 
@@ -134,7 +135,7 @@ MASTER_RESOURCES={
     "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":[],"columns":["tenant","module","quoted_monthly_price","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "equipe-comercial":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":["commercial_user","tenant","base_amount","commission_percent","commission_amount","status","hold_until"],"columns":["commercial_user","tenant","commission_amount","status","created_at"],"order":"-created_at"},
-    "assinaturas":{"model":"billing.Subscription","title":"Assinaturas","fields":["tenant","plan","billing_cycle","contracted_price","status","started_at","trial_ends_at","next_billing_at","provider_customer_id","provider_subscription_id"],"columns":["tenant","plan","billing_cycle","status","next_billing_at"],"order":"-started_at"},
+    "assinaturas":{"model":"billing.Subscription","title":"Assinaturas","fields":["tenant","plan","billing_cycle","contracted_price","status","started_at","trial_ends_at","next_billing_at","provider_customer_id","provider_subscription_id","provider_environment"],"columns":["tenant","plan","billing_cycle","status","next_billing_at"],"order":"-started_at"},
     "financeiro":{"model":"finance.PlatformFinancialTransaction","title":"Financeiro da plataforma","fields":["category","type","description","amount","status","due_at","paid_at","notes"],"columns":["type","description","amount","status","due_at"],"order":"-created_at","special":"platform_finance"},
     "suporte":{"model":"operations.SupportTicket","title":"Suporte","fields":["tenant","user","category","subject","description","priority","status","assigned_to"],"columns":["protocol","tenant","subject","priority","status","assigned_to"],"order":"-created_at","create":False},
     "incidentes":{"model":"operations.OperationalIncident","title":"Incidentes","fields":["category","severity","title","details","status"],"columns":["severity","title","status","occurrence_count","last_seen_at"],"order":"-last_seen_at","create":False},
@@ -502,6 +503,10 @@ def resource_form(request,slug,pk=None):
     for name,field in form.fields.items():
         if name not in {"new_password","confirm_password"}:
             field.label=FIELD_LABELS.get(name) or field_label(model,name)
+    if slug=="assinaturas":
+        form.fields["provider_environment"].widget=forms.Select(choices=[
+            ("","Não identificado"),("sandbox","Teste"),("production","Produção"),
+        ])
     for name,field in form.fields.items():
         mf=_field(model,name)
         if mf and mf.get_internal_type()=="DateTimeField":
@@ -612,13 +617,25 @@ def operational_action(request,action,pk=None):
         if action in {"module-request-approve","module-request-reject"}:
             row=get_object_or_404(ModuleRequest,pk=pk)
             approved=action=="module-request-approve"
-            review_module_request(
-                module_request=row,user=request.user,approved=approved,
-                note=request.POST.get("note",""),
-            )
+            if row.status==ModuleRequest.Status.PENDING:
+                review_module_request(
+                    module_request=row,user=request.user,approved=approved,
+                    note=request.POST.get("note",""),
+                )
+            elif not approved or row.status not in {
+                ModuleRequest.Status.APPROVED,ModuleRequest.Status.PAYMENT_FAILED,
+            }:
+                raise ValidationError("Esta solicitação não está disponível para aprovação.")
             if approved:
-                activate_module_request(module_request=row,user=request.user)
-                messages.success(request,"Módulo aprovado, ativado e incorporado à assinatura.")
+                adjustment=activate_module_request(module_request=row,user=request.user)
+                if adjustment.status==adjustment.Status.APPLIED:
+                    messages.success(request,
+                        f"Módulo ativado. Novo valor da assinatura: R$ {adjustment.new_amount:.2f} por ciclo.")
+                else:
+                    messages.error(request,
+                        "O Mercado Pago não confirmou a alteração. O módulo permanece bloqueado "
+                        "e o valor da assinatura não mudou. Confira a conexão e tente novamente. "
+                        +adjustment.error_code)
             else:
                 messages.success(request,"Solicitação de módulo rejeitada.")
             return redirect("master-resource-list",slug="solicitacoes-modulos")

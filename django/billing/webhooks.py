@@ -210,7 +210,9 @@ def _reconcile_platform(event,gateway,data,resource_id):
         ).first()
         if subscription:
             subscription.status=_subscription_status(remote.get("status"))
-            subscription.save(update_fields=["status","updated_at"])
+            if not subscription.provider_environment:
+                subscription.provider_environment=gateway.environment
+            subscription.save(update_fields=["status","provider_environment","updated_at"])
 
     event.status=WebhookEvent.Status.PROCESSED
     event.processed_at=timezone.now()

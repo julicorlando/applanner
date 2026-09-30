@@ -58,7 +58,7 @@ class SignupForm(forms.Form):
     category=forms.CharField(max_length=60,label="Segmento",widget=forms.Select(choices=[
         ("","Selecione"),("barbearia","Barbearia"),("salao","Salão de beleza"),
         ("estetica","Estética"),("auto","Lava-jato e automotivo"),
-        ("arena","Arena e quadras"),("clinica","Clínica e saúde"),
+        ("arena","Arena e quadras"),
         ("servicos","Outros serviços"),
     ]))
     owner_name=forms.CharField(max_length=150,label="Seu nome")
@@ -71,11 +71,27 @@ class SignupForm(forms.Form):
 
     def __init__(self,*args,selected_plan=None,**kwargs):
         super().__init__(*args,**kwargs)
+        medical_available=Plan.objects.filter(
+            slug="segment-medico",active=True,public_visible=True
+        ).exists()
+        if medical_available:
+            self.fields["category"].widget.choices=[
+                *self.fields["category"].widget.choices,("clinica","Clínica e saúde")
+            ]
         self.fields["plan"].queryset=Plan.objects.filter(
             active=True,public_visible=True,is_custom=False
         ).order_by("sort_order","name")
         if selected_plan:
             self.fields["plan"].initial=selected_plan
+            segments=(selected_plan.features or {}).get("segments")
+            if segments is not None:
+                categories={"barbearia":{"barbearia","salao"},"arena":{"arena"},
+                            "auto":{"auto"},"saude":{"clinica"}}
+                allowed=set().union(*(categories.get(segment,set()) for segment in segments))
+                self.fields["category"].widget.choices=[
+                    (key,label) for key,label in self.fields["category"].widget.choices
+                    if not key or key in allowed
+                ]
 
     def clean_email(self):
         email=self.cleaned_data["email"].strip().lower()
@@ -103,13 +119,15 @@ class SignupForm(forms.Form):
                 if current!=set(proposal.modules or []):
                     self.add_error("plan","O catálogo deste plano mudou. Solicite a atualização da proposta.")
         category=(data.get("category") or "").lower()
+        if category=="clinica" and not Plan.objects.filter(
+            slug="segment-medico",active=True,public_visible=True
+        ).exists():
+            self.add_error("category","O plano Médico / Clínica ainda não está disponível.")
         if plan and category:
             segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
                      "arena":"arena","clinica":"saude"}.get(category)
-            if segment and "segments" in (plan.features or {}) and segment not in plan.features["segments"]:
+            if "segments" in (plan.features or {}) and segment not in plan.features["segments"]:
                 self.add_error("plan","Este plano não inclui o segmento selecionado. Escolha outro plano ou solicite uma proposta personalizada.")
-            if segment=="arena" and not plan.module_links.filter(module__slug="sports_courts",enabled=True,module__active=True).exists():
-                self.add_error("plan","Arena requer um plano com o módulo Arena. Use Monte o seu para receber uma proposta.")
         password=data.get("password") or ""
         if password and password!=data.get("password_confirm"):
             self.add_error("password_confirm","As senhas não conferem.")
@@ -132,7 +150,8 @@ def plans(request):
             if link.enabled and link.module.active
         ]
         cards.append({"plan":plan,"modules":modules})
-    return render(request,"billing/plans.html",{"cards":cards})
+    medical=Plan.objects.filter(slug="segment-medico",active=False).first()
+    return render(request,"billing/plans.html",{"cards":cards,"medical_plan":medical})
 
 
 class CustomPlanForm(forms.Form):

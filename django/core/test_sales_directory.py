@@ -5,6 +5,8 @@ from django.utils import timezone
 
 from accounts.models import User
 from billing.models import Module, Plan, PlanModule, Subscription
+from billing.views import SignupForm
+from billing.segment_access import segment_enabled
 from core.master import PlanMasterForm
 from commercial.models import Lead
 from tenants.models import Tenant, Unit
@@ -19,18 +21,56 @@ class PublicSalesTests(TestCase):
         self.assertTrue(form.is_valid(),form.errors)
         self.assertEqual(form.save().features["segments"],["barbearia"])
 
-    def test_empty_catalog_is_seeded_once_and_master_changes_survive(self):
+    def test_segment_catalog_preserves_legacy_subscriptions_and_master_changes(self):
         call_command("seed_modules",verbosity=0)
+        old=Plan.objects.create(name="Inicial",slug="sales-start",monthly_price=49,public_visible=True)
+        tenant=Tenant.objects.create(name="Cliente antigo",slug="cliente-antigo",category="arena")
+        Subscription.objects.create(tenant=tenant,plan=old,started_at=timezone.now(),status=Subscription.Status.ACTIVE)
         call_command("seed_sales_plans",verbosity=0)
         self.assertEqual(Plan.objects.filter(public_visible=True).count(),3)
-        pro=Plan.objects.get(slug="sales-pro")
-        self.assertEqual(pro.trial_days,7)
-        pro.monthly_price=42
-        pro.save()
+        self.assertFalse(Plan.objects.get(pk=old.pk).public_visible)
+        self.assertEqual(Subscription.objects.get(tenant=tenant).plan_id,old.pk)
+        arena=Plan.objects.get(slug="segment-arena")
+        self.assertEqual(arena.features["segments"],["arena"])
+        self.assertTrue(arena.module_links.filter(module__slug="sports_courts",enabled=True).exists())
+        self.assertEqual(arena.trial_days,7)
+        self.assertEqual(Plan.objects.get(slug="segment-medico").active,False)
+        arena.monthly_price=42
+        arena.save()
         call_command("seed_sales_plans",verbosity=0)
-        pro.refresh_from_db()
-        self.assertEqual(pro.monthly_price,42)
+        arena.refresh_from_db()
+        self.assertEqual(arena.monthly_price,42)
+        self.assertEqual(Plan.objects.filter(slug__startswith="segment-").count(),4)
         self.assertContains(self.client.get(reverse("home")),"Começar teste grátis")
+        self.assertContains(self.client.get(reverse("billing-plans")),"Médico / Clínica")
+
+    def test_signup_respects_segment_and_medical_is_unavailable(self):
+        call_command("seed_modules",verbosity=0)
+        call_command("seed_sales_plans",verbosity=0)
+        arena=Plan.objects.get(slug="segment-arena")
+        form=SignupForm(selected_plan=arena)
+        choices=[key for key,_ in form.fields["category"].widget.choices]
+        self.assertEqual(choices,["","arena"])
+        data={"plan":arena.pk,"billing_cycle":"monthly","business_name":"Arena Nova",
+              "category":"barbearia","owner_name":"Titular","email":"titular@example.test",
+              "password":"SenhaSegura2026!","password_confirm":"SenhaSegura2026!"}
+        self.assertFalse(SignupForm(data,selected_plan=arena).is_valid())
+        legacy=Plan.objects.create(name="Legado",slug="legacy-arena",monthly_price=40,
+            features={"segments":["arena"]},public_visible=True,active=True)
+        legacy_data={**data,"plan":legacy.pk,"category":"arena"}
+        self.assertTrue(SignupForm(legacy_data).is_valid())
+        self.assertContains(self.client.get(reverse("billing-plans")),"Em preparação")
+        data["category"]="clinica"
+        self.assertFalse(SignupForm(data).is_valid())
+        self.assertFalse(Plan.objects.filter(slug="segment-medico",active=True).exists())
+
+        data.update(category="arena")
+        response=self.client.post(reverse("billing-signup"),data)
+        self.assertEqual(response.status_code,302)
+        tenant=Tenant.objects.get(name="Arena Nova")
+        self.assertTrue(segment_enabled(tenant,"arena"))
+        self.assertFalse(segment_enabled(tenant,"barbearia"))
+        self.assertEqual(Subscription.objects.get(tenant=tenant).plan,arena)
 
     def test_monte_o_seu_creates_a_lead_with_only_active_modules(self):
         module=Module.objects.create(slug="finance",name="Financeiro")

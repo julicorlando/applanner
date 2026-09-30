@@ -110,7 +110,7 @@ FIELD_LABELS = {
     "product": "Produto", "products_target": "Meta de produtos", "professional": "Profissional",
     "professional_done": "Profissional cadastrado", "protocol": "Protocolo",
     "processed_at": "Processado em", "provider": "Provedor", "provider_customer_id": "ID do cliente no provedor",
-    "provider_subscription_id": "ID da assinatura no provedor", "public_enabled": "Página pública ativa",
+    "provider_subscription_id": "ID da assinatura no provedor", "provider_environment": "Ambiente da assinatura no Mercado Pago", "public_enabled": "Página pública ativa",
     "public_id": "Identificador público", "public_notes": "Observações públicas",
     "public_rules": "Regras públicas", "public_slug": "Link público",
     "published_at": "Publicado em", "purchase_amount": "Valor da compra",

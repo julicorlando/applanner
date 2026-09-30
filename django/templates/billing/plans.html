@@ -18,6 +18,10 @@
       <a class="button primary" href="{% url 'billing-signup' %}?plan={{ card.plan.pk }}">{% if card.plan.trial_days %}Testar {{ card.plan.trial_days }} dias grátis{% else %}Escolher {{ card.plan.name }}{% endif %}</a>
     </article>
     {% empty %}<div class="panel"><p>Nenhum plano público disponível.</p></div>{% endfor %}
+    {% if medical_plan %}<article class="pricing-card" aria-label="{{ medical_plan.name }} indisponível">
+      <span class="status-pill">Em preparação</span><h2>{{ medical_plan.name }}</h2>
+      <p>{{ medical_plan.description }}</p><p>O cadastro para este segmento está temporariamente desativado.</p>
+    </article>{% endif %}
   </div>
   <div class="panel" style="margin-top:24px"><h2>Precisa de outra combinação?</h2><p>Escolha as funções do seu negócio e receba uma proposta personalizada.</p><a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano →</a></div>
 </section>

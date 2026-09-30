@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 from decimal import Decimal
 
@@ -11,6 +12,8 @@ from .models import (
     TenantModule, TenantModuleAddon,
 )
 from .payment_services import platform_provider
+
+logger=logging.getLogger(__name__)
 
 
 def _cycle_months(cycle):
@@ -30,7 +33,7 @@ def _subscription(tenant):
                 Subscription.Status.TRIAL,Subscription.Status.ACTIVE,
                 Subscription.Status.PAST_DUE,
             ],
-        ).select_related("plan").order_by("-started_at").first()
+        ).select_for_update().select_related("plan").order_by("-started_at").first()
     )
 
 
@@ -47,13 +50,15 @@ def _merged_monthly(tenant,exclude_addon_id=None):
 def request_module(*,tenant,module,user,note=""):
     if not module.active or not module.addon_sellable or module.addon_monthly_price is None:
         raise ValidationError("Este módulo não está disponível para contratação avulsa.")
-    if TenantModule.objects.filter(tenant=tenant,module=module,enabled=True).exists():
+    from .entitlements import module_enabled
+    if module_enabled(tenant,module.slug):
         raise ValidationError("Este módulo já está habilitado.")
     existing=ModuleRequest.objects.filter(
         tenant=tenant,module=module,
         status__in=[
             ModuleRequest.Status.PENDING,ModuleRequest.Status.APPROVED,
             ModuleRequest.Status.AWAITING_PAYMENT,ModuleRequest.Status.ACTIVE,
+            ModuleRequest.Status.PAYMENT_FAILED,
         ],
     ).order_by("-created_at").first()
     if existing:
@@ -81,11 +86,15 @@ def review_module_request(*,module_request,user,approved=True,note=""):
 def _gateway_for(subscription):
     if not subscription.provider_subscription_id:
         return None
-    gateway=PaymentGateway.objects.filter(
-        provider="mercadopago",active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED,
-    ).order_by("-environment").first()
+    gateways=PaymentGateway.objects.filter(
+        provider="mercadopago",last_test_status=PaymentGateway.TestStatus.VALIDATED,
+    )
+    if subscription.provider_environment:
+        gateway=gateways.filter(environment=subscription.provider_environment).first()
+    else:
+        gateway=gateways.filter(active=True).order_by("-environment").first()
     if not gateway:
-        raise ValidationError("Assinatura vinculada ao Mercado Pago, mas o gateway ativo não foi encontrado.")
+        raise ValidationError("A conexão Mercado Pago da assinatura não está disponível. Confira o ambiente e as credenciais.")
     return gateway
 
 
@@ -97,15 +106,18 @@ def activate_module_request(*,module_request,user):
     subscription=_subscription(row.tenant)
     if not subscription:
         raise ValidationError("A empresa não possui assinatura válida.")
+    if TenantModuleAddon.objects.filter(tenant=row.tenant,module=row.module,
+                                       status=TenantModuleAddon.Status.ACTIVE).exists():
+        raise ValidationError("Este módulo adicional já está ativo para a empresa.")
 
     months=_cycle_months(subscription.billing_cycle)
+    monthly_before=_merged_monthly(row.tenant)
+    previous=Decimal(subscription.contracted_price or Decimal("0.00")).quantize(Decimal("0.01"))
     base=subscription.base_contracted_price
     if base is None:
-        base=subscription.contracted_price or Decimal("0.00")
-    monthly_before=_merged_monthly(row.tenant)
-    previous=(Decimal(base)+monthly_before*months).quantize(Decimal("0.01"))
+        base=previous-monthly_before*months
     new_monthly=(monthly_before+row.quoted_monthly_price).quantize(Decimal("0.01"))
-    new_total=(Decimal(base)+new_monthly*months).quantize(Decimal("0.01"))
+    new_total=(previous+row.quoted_monthly_price*months).quantize(Decimal("0.01"))
     key=hashlib.sha256(
         f"add|{row.tenant_id}|{subscription.pk}|{row.pk}|{new_total}".encode()
     ).hexdigest()
@@ -121,9 +133,10 @@ def activate_module_request(*,module_request,user):
     if adjustment.status==SubscriptionModuleAdjustment.Status.APPLIED:
         return adjustment
 
-    gateway=_gateway_for(subscription)
+    gateway=None
     provider_changed=False
     try:
+        gateway=_gateway_for(subscription)
         if gateway:
             platform_provider(gateway).update_subscription_amount(
                 subscription.provider_subscription_id,new_total
@@ -132,37 +145,39 @@ def activate_module_request(*,module_request,user):
             adjustment.provider="mercadopago"
             adjustment.provider_reference=subscription.provider_subscription_id
 
-        addon,_=TenantModuleAddon.objects.update_or_create(
-            tenant=row.tenant,module=row.module,
-            defaults={
-                "module_request":row,"monthly_price":row.quoted_monthly_price,
-                "status":TenantModuleAddon.Status.ACTIVE,
-                "billing_mode":TenantModuleAddon.BillingMode.MERGED,
-                "provider":"mercadopago" if gateway else "",
-                "provider_reference":subscription.provider_subscription_id if gateway else "",
-                "started_at":timezone.now(),"next_billing_at":subscription.next_billing_at,
-                "cancelled_at":None,
-            },
-        )
-        TenantModule.objects.update_or_create(
-            tenant=row.tenant,module=row.module,defaults={"enabled":True}
-        )
-        row.status=ModuleRequest.Status.ACTIVE
-        row.provider_reference=subscription.provider_subscription_id if gateway else ""
-        row.save(update_fields=["status","provider_reference","updated_at"])
-        subscription.base_contracted_price=base
-        subscription.addon_contracted_price=(new_monthly*months).quantize(Decimal("0.01"))
-        subscription.contracted_price=new_total
-        subscription.save(update_fields=[
-            "base_contracted_price","addon_contracted_price","contracted_price","updated_at"
-        ])
-        adjustment.module_addon=addon
-        adjustment.status=SubscriptionModuleAdjustment.Status.APPLIED
-        adjustment.applied_at=timezone.now()
-        adjustment.error_code=""
-        adjustment.save()
+        with transaction.atomic():
+            addon,_=TenantModuleAddon.objects.update_or_create(
+                tenant=row.tenant,module=row.module,
+                defaults={
+                    "module_request":row,"monthly_price":row.quoted_monthly_price,
+                    "status":TenantModuleAddon.Status.ACTIVE,
+                    "billing_mode":TenantModuleAddon.BillingMode.MERGED,
+                    "provider":"mercadopago" if gateway else "",
+                    "provider_reference":subscription.provider_subscription_id if gateway else "",
+                    "started_at":timezone.now(),"next_billing_at":subscription.next_billing_at,
+                    "cancelled_at":None,
+                },
+            )
+            TenantModule.objects.update_or_create(
+                tenant=row.tenant,module=row.module,defaults={"enabled":True}
+            )
+            row.status=ModuleRequest.Status.ACTIVE
+            row.provider_reference=subscription.provider_subscription_id if gateway else ""
+            row.save(update_fields=["status","provider_reference","updated_at"])
+            subscription.base_contracted_price=base
+            subscription.addon_contracted_price=(new_monthly*months).quantize(Decimal("0.01"))
+            subscription.contracted_price=new_total
+            subscription.save(update_fields=[
+                "base_contracted_price","addon_contracted_price","contracted_price","updated_at"
+            ])
+            adjustment.module_addon=addon
+            adjustment.status=SubscriptionModuleAdjustment.Status.APPLIED
+            adjustment.applied_at=timezone.now()
+            adjustment.error_code=""
+            adjustment.save()
         return adjustment
     except Exception as exc:
+        logger.exception("Falha ao ativar módulo adicional para assinatura %s",subscription.pk)
         if provider_changed and gateway:
             try:
                 platform_provider(gateway).update_subscription_amount(
@@ -174,9 +189,11 @@ def activate_module_request(*,module_request,user):
                 adjustment.status=SubscriptionModuleAdjustment.Status.FAILED
         else:
             adjustment.status=SubscriptionModuleAdjustment.Status.FAILED
-        adjustment.error_code=exc.__class__.__name__[:120]
+        adjustment.error_code=f"{exc.__class__.__name__}: {exc}"[:120]
         adjustment.save(update_fields=["status","error_code","updated_at"])
-        raise
+        row.status=ModuleRequest.Status.PAYMENT_FAILED
+        row.save(update_fields=["status","updated_at"])
+        return adjustment
 
 
 @transaction.atomic
@@ -188,13 +205,13 @@ def cancel_module_addon(*,addon,user):
     if not subscription:
         raise ValidationError("Assinatura não encontrada.")
     months=_cycle_months(subscription.billing_cycle)
+    monthly_before=_merged_monthly(addon.tenant)
+    previous=Decimal(subscription.contracted_price or Decimal("0.00")).quantize(Decimal("0.01"))
     base=subscription.base_contracted_price
     if base is None:
-        base=subscription.contracted_price or Decimal("0.00")
-    monthly_before=_merged_monthly(addon.tenant)
-    previous=(Decimal(base)+monthly_before*months).quantize(Decimal("0.01"))
+        base=previous-monthly_before*months
     monthly_after=_merged_monthly(addon.tenant,exclude_addon_id=addon.pk)
-    new_total=(Decimal(base)+monthly_after*months).quantize(Decimal("0.01"))
+    new_total=(previous-addon.monthly_price*months).quantize(Decimal("0.01"))
     key=hashlib.sha256(
         f"remove|{addon.tenant_id}|{subscription.pk}|{addon.pk}|{new_total}".encode()
     ).hexdigest()

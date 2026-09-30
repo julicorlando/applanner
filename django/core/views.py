@@ -234,5 +234,6 @@ def home(request):
     from billing.models import Plan
     from contenthub.models import BlogPost
     plans=Plan.objects.filter(active=True,public_visible=True,is_custom=False).order_by("sort_order","name")[:4]
+    medical_plan=Plan.objects.filter(slug="segment-medico",active=False).first()
     posts=BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED).order_by("-featured","-published_at","-created_at")[:3]
-    return render(request,"home.html",{"plans":plans,"posts":posts})
+    return render(request,"home.html",{"plans":plans,"medical_plan":medical_plan,"posts":posts})
