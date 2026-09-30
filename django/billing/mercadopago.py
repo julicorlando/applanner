@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import re
 import time
 from decimal import Decimal
 
@@ -44,16 +45,28 @@ class MercadoPagoProvider:
         except ValueError as exc:
             raise MercadoPagoError("Resposta inválida do Mercado Pago.") from exc
 
+        if not isinstance(data,dict):
+            raise MercadoPagoError("Resposta inválida do Mercado Pago.")
         if not 200<=response.status_code<300:
-            message=str(data.get("message") or data.get("error") or "requisição recusada")[:300]
+            errors=data.get("errors") or data.get("cause") or []
+            if not isinstance(errors,list):
+                errors=[]
+            reasons=[]
+            for error in errors[:3]:
+                if isinstance(error,dict):
+                    code=str(error.get("code") or "")[:80]
+                    detail=str(error.get("message") or error.get("description") or "")[:200]
+                    if code=="invalid_email_for_sandbox":
+                        detail="Em testes, informe o e-mail da conta compradora de teste do Mercado Pago (@testuser.com)."
+                    if code or detail:
+                        reasons.append(f"{code}: {detail}" if code and detail else code or detail)
+            message=("; ".join(reasons) or str(data.get("message") or data.get("error") or "requisição recusada"))[:600]
             if "payer and collector cannot be the same user" in message.lower():
                 raise MercadoPagoError(
                     "O pagador não pode ser a mesma conta Mercado Pago que recebe a cobrança. "
                     "Informe um e-mail de comprador diferente e, em testes, entre no Mercado Pago com a conta compradora."
                 )
             raise MercadoPagoError(f"Mercado Pago HTTP {response.status_code}: {message}")
-        if not isinstance(data,dict):
-            raise MercadoPagoError("Resposta inválida do Mercado Pago.")
         return data
 
     def test_connection(self):
@@ -106,6 +119,10 @@ class MercadoPagoProvider:
         return self._request("GET",f"/v1/payments/{reference}")
 
     def create_pix_order(self,*,amount,external_reference,payer_email,expiration_hours=24,idempotency_key=""):
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}",external_reference or ""):
+            raise ValueError("Referência Pix inválida: use até 64 letras, números, hífens ou sublinhados.")
+        if not 1<=len(idempotency_key)<=128:
+            raise ValueError("Chave de idempotência Pix inválida.")
         amount=Decimal(str(amount)).quantize(Decimal("0.01"))
         if amount<=0:
             raise ValueError("Valor Pix inválido.")

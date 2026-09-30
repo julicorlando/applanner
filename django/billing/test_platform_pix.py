@@ -55,6 +55,10 @@ class PlatformPixTests(TestCase):
             self.assertContains(self.client.get("/billing/assinatura/pix/"),"000201PIX-VALIDO")
             self.client.post("/billing/assinatura/pix/")
             provider.return_value.create_pix_order.assert_called_once()
+            self.assertRegex(
+                provider.return_value.create_pix_order.call_args.kwargs["external_reference"],
+                r"^[A-Za-z0-9_-]{1,64}$",
+            )
         self.assertEqual(PixCharge.objects.count(),1)
         self.assertEqual(self.subscription.status,Subscription.Status.PAST_DUE)
         self.assertEqual(self.client.post("/billing/assinatura/pagar/").url,"/billing/assinatura/pix/")

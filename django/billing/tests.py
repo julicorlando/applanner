@@ -10,6 +10,30 @@ from .mercadopago import MercadoPagoProvider
 
 
 class MercadoPagoFailureTests(SimpleTestCase):
+    def test_orders_error_includes_provider_code(self):
+        from unittest.mock import Mock
+        response=Mock(status_code=400)
+        response.json.return_value={"errors":[{"code":"property_value","message":"Invalid external_reference"}]}
+        with patch("billing.mercadopago.requests.request",return_value=response):
+            with self.assertRaisesRegex(RuntimeError,"property_value: Invalid external_reference"):
+                MercadoPagoProvider("APP_USR-123456789012345").get_order("order-1")
+
+    def test_sandbox_email_error_explains_test_buyer(self):
+        from unittest.mock import Mock
+        response=Mock(status_code=400)
+        response.json.return_value={"errors":[{"code":"invalid_email_for_sandbox","message":"Invalid email"}]}
+        with patch("billing.mercadopago.requests.request",return_value=response):
+            with self.assertRaisesRegex(RuntimeError,"conta compradora de teste"):
+                MercadoPagoProvider("APP_USR-123456789012345").get_order("order-1")
+
+    def test_non_object_response_does_not_crash_error_parser(self):
+        from unittest.mock import Mock
+        response=Mock(status_code=400)
+        response.json.return_value=[]
+        with patch("billing.mercadopago.requests.request",return_value=response):
+            with self.assertRaisesRegex(RuntimeError,"Resposta inválida"):
+                MercadoPagoProvider("APP_USR-123456789012345").get_order("order-1")
+
     def test_same_payer_and_collector_explains_separate_buyer(self):
         from unittest.mock import Mock, patch
         response=Mock(status_code=400)
@@ -64,7 +88,7 @@ class MercadoPagoProviderTests(SimpleTestCase):
             }]}}
 
         result=MercadoPagoProvider("TEST-123456789012345",transport=transport).create_pix_order(
-            amount=Decimal("49.90"),external_reference="subscription:1",payer_email="buyer@testuser.com",
+            amount=Decimal("49.90"),external_reference="subscription-pix-1",payer_email="buyer@testuser.com",
             idempotency_key="pix-1",
         )
         method,path,body,key=calls[0]
@@ -73,6 +97,15 @@ class MercadoPagoProviderTests(SimpleTestCase):
         self.assertEqual(payment["expiration_time"],"PT24H")
         self.assertEqual(payment["payment_method"],{"id":"pix","type":"bank_transfer"})
         self.assertEqual(result["qr_code"],"000201PIX")
+
+    def test_pix_rejects_invalid_reference_before_calling_gateway(self):
+        with patch("billing.mercadopago.requests.request") as request:
+            with self.assertRaisesRegex(ValueError,"Referência Pix inválida"):
+                MercadoPagoProvider("APP_USR-123456789012345").create_pix_order(
+                    amount="49.90",external_reference="subscription-pix:1",
+                    payer_email="buyer@example.com",idempotency_key="pix-1",
+                )
+        request.assert_not_called()
 
     def test_subscription_payload_preserves_cycle_and_trial(self):
         calls=[]

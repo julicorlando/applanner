@@ -131,7 +131,7 @@ def create_platform_pix_charge(*,subscription,payer_email):
         status=CheckoutSession.Status.AWAITING_PAYMENT,
         idempotency_key="subscription-pix-"+public_id,expires_at=expiry,
     )
-    reference="subscription-pix:"+public_id
+    reference="subscription-pix-"+public_id
     payment=Payment.objects.create(
         tenant=subscription.tenant,subscription=subscription,purpose="subscription",
         reference_id=subscription.pk,provider="mercadopago",environment=gateway.environment,
