@@ -48,6 +48,7 @@ class Command(BaseCommand):
             created += 1
             for module in Module.objects.filter(slug__in=item["modules"]):
                 PlanModule.objects.get_or_create(plan=plan, module=module, defaults={"enabled": True})
+        Plan.objects.filter(name__iexact="Arena Sports").update(public_visible=False,featured=False)
         hidden=Plan.objects.filter(slug__in=("sales-pro","sales-start","sales-business"),
                                    public_visible=True).update(public_visible=False)
         # Restore the explicitly named legacy Arena offer only when it has no

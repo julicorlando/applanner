@@ -3,13 +3,16 @@
   const toggle = document.getElementById('portal-view-toggle');
   if (dashboard && toggle) {
     const key = 'applanner.portal.simplified-view';
-    const saved = window.localStorage.getItem(key);
+    let saved = null;
+    try { saved = window.localStorage.getItem(key); } catch (_) { /* Storage may be disabled. */ }
     const isMobile = window.matchMedia('(max-width: 700px)').matches;
     const setView = (simplified, persist = true) => {
       dashboard.classList.toggle('is-simplified', simplified);
       toggle.setAttribute('aria-pressed', String(simplified));
       toggle.innerHTML = simplified ? '<span aria-hidden="true">◑</span> Visão completa' : '<span aria-hidden="true">◐</span> Visão simplificada';
-      if (persist) window.localStorage.setItem(key, simplified ? '1' : '0');
+      if (persist) {
+        try { window.localStorage.setItem(key, simplified ? '1' : '0'); } catch (_) { /* Keep the current view usable. */ }
+      }
     };
     setView(saved === null ? isMobile : saved === '1', false);
     toggle.addEventListener('click', () => setView(!dashboard.classList.contains('is-simplified')));

@@ -20,6 +20,27 @@ from finance.models import FinancialCategory,FinancialTransaction
 
 
 class PostDeployFixesTests(TestCase):
+    def test_arena_sports_retired_without_removing_contracts(self):
+        plan=Plan.objects.create(name="Arena Sports",slug="retired-arena",monthly_price="99.90",featured=True)
+        subscription=Subscription.objects.create(tenant=self.tenant,plan=plan,started_at=timezone.now(),status="active")
+        call_command("seed_sales_plans",stdout=StringIO())
+        plan.refresh_from_db()
+        subscription.refresh_from_db()
+        self.assertFalse(plan.public_visible)
+        self.assertFalse(plan.featured)
+        self.assertEqual(subscription.plan_id,plan.pk)
+        self.assertEqual(plan.monthly_price,Decimal("99.90"))
+        self.assertNotContains(self.client.get(reverse("billing-plans")),"Arena Sports")
+
+    def test_simplified_dashboard_keeps_important_shortcuts(self):
+        response=self.client.get(reverse("portal-home"))
+        self.assertContains(response,'aria-label="Atalhos da operação"')
+        for name in ("reception-access","tenant-ratings","tenant-public"):
+            url=reverse(name,args=[self.tenant.slug]) if name=="tenant-public" else reverse(name)
+            self.assertContains(response,url)
+        self.assertContains(response,"js/form-validation-pt")
+        self.assertContains(response,"css/usability")
+
     def setUp(self):
         self.tenant=Tenant.objects.create(name="Empresa teste",slug="post-deploy-fixes",category="barbearia",
             public_enabled=True,public_booking_enabled=True,status=Tenant.Status.ACTIVE,onboarding_step=5,

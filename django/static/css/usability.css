@@ -1,0 +1,16 @@
+/* Native choices must remain readable regardless of the browser's popup theme. */
+select, .portal-search select, .form-field select { color: #172033; background-color: #fff; color-scheme: light; }
+select option, select optgroup { color: #172033; background-color: #fff; }
+.portal-search select { min-height: 44px; padding: 10px 12px; border: 1px solid #cbd5e5; border-radius: 10px; font: inherit; }
+.operation-quick-links { display: none; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.operation-dashboard.is-simplified .operation-quick-links { display: flex; }
+.operation-dashboard.is-simplified .portal-module-card { min-height: 0; padding: 18px; }
+.operation-dashboard.is-simplified .portal-module-card > p,
+.operation-dashboard.is-simplified .operation-module-top { display: none; }
+.operation-dashboard.is-simplified .portal-module-card h3 { margin: 0 0 12px; }
+@media (max-width: 700px) {
+  .operation-quick-links { display: flex; }
+  .operation-dashboard .portal-module-card { min-height: 0; padding: 16px; }
+  .operation-dashboard .portal-module-card > p,
+  .operation-dashboard .operation-module-top { display: none; }
+}

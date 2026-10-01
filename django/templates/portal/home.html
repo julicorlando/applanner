@@ -14,6 +14,12 @@
   </header>
 
   <div id="operation-dashboard-content">
+  <nav class="operation-quick-links" aria-label="Atalhos da operação">
+    {% if tenant.public_enabled %}<a class="button" href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">Página pública ↗</a>{% endif %}
+    {% if request.user.is_superuser or request.user.role == 'owner' %}<a class="button" href="{% url 'tenant-ratings' %}">Avaliações da equipe</a><a class="button" href="{% url 'tenant-payment-gateway' %}">Recebimentos</a><a class="button" href="{% url 'tenant-whatsapp-settings' %}">WhatsApp</a>{% endif %}
+    {% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' %}<a class="button" href="{% url 'reception-access' %}">Cadastrar recepção</a>{% endif %}
+    <a class="button" href="{% url 'portal-diagnostics' %}">Diagnóstico</a>
+  </nav>
   <div class="operation-utilities operation-secondary-content">
     <section class="panel operation-share" aria-labelledby="operation-share-title">
       <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">↗</span><div><span class="eyebrow">PRESENÇA ONLINE</span><h2 id="operation-share-title">Links para compartilhar</h2></div></div>
@@ -66,7 +72,7 @@
   {% if contracted_modules %}<section class="operation-modules operation-secondary-content" aria-labelledby="contracted-title"><div class="operation-section-heading"><div><span class="eyebrow">SEU PLANO</span><h2 id="contracted-title">Módulos contratados</h2><p>Funções incluídas no plano e módulos adicionais liberados para {{ tenant.name }}.</p></div><span class="operation-module-count">{{ contracted_modules|length }} módulos</span></div>
     <div class="portal-module-grid">{% for item in contracted_modules %}<article class="portal-module-card"><h3>{{ item.name }}</h3><p>{{ item.description }}</p>{% if item.route %}<a href="{% url 'portal-resource-list' item.route.0 item.route.1 %}">Abrir módulo →</a>{% elif item.gateway %}<a href="{% url 'tenant-payment-gateway' %}">Abrir integrações bancárias →</a>{% elif item.documentation %}<a href="{% url 'accounts:documentation' %}">Documentação e chaves da API →</a>{% else %}<span>Consulte as funções disponíveis para seu perfil acima.</span>{% endif %}</article>{% endfor %}</div>
   </section>{% endif %}
-</section>
 </div>
+</section>
 <script src="{% static 'js/portal-dashboard.js' %}" defer></script>
 {% endblock %}
