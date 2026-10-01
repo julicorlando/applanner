@@ -65,7 +65,7 @@
         {% for item in next_appointments %}
           <div class="appointment-row">
             <time>{{ item.starts_at|date:"d/m H:i" }}</time>
-            <div><strong>{{ item.customer_display_name }}</strong><span>{{ item.service.name }}{% if item.professional %} · {{ item.professional.name }}{% endif %}</span></div>
+            <div><strong>{{ item.customer_display_name }}</strong>{% include "portal/customer_name_difference.html" with appointment=item only %}<span>{{ item.service.name }}{% if item.professional %} · {{ item.professional.name }}{% endif %}</span></div>
             <em>{{ item.get_status_display }}</em>
           </div>
         {% empty %}<p class="empty">Nenhum atendimento futuro pendente ou confirmado.</p>{% endfor %}

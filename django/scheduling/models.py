@@ -222,6 +222,11 @@ class Appointment(TimeStampedModel):
         # same canonical customer as return intelligence and the editing form.
         return self.customer.name if self.customer_id else self.customer_name_snapshot or "Cliente a definir"
 
+    @property
+    def customer_name_differs(self):
+        return bool(self.customer_id and self.customer_name_snapshot.strip()
+                    and self.customer_name_snapshot.strip() != self.customer.name.strip())
+
     def save(self,*args,**kwargs):
         if self._state.adding and not self.customer_name_snapshot and self.customer_id:
             self.customer_name_snapshot=self.customer.name

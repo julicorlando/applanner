@@ -2,7 +2,7 @@
 {% block title %}Atendimento · {{ appointment.customer_display_name }}{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
-  <div class="portal-heading"><div><a class="back-link" href="{% url 'professional-area' %}">← Minha agenda</a><span class="eyebrow">ATENDIMENTO</span><h1>{{ appointment.customer_display_name }}</h1><p>{{ appointment.service.name }} · {{ appointment.starts_at|date:"d/m/Y H:i" }} · {{ appointment.get_status_display }}</p></div></div>
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'professional-area' %}">← Minha agenda</a><span class="eyebrow">ATENDIMENTO</span><h1>{{ appointment.customer_display_name }}</h1>{% include "portal/customer_name_difference.html" with appointment=appointment only %}<p>{{ appointment.service.name }} · {{ appointment.starts_at|date:"d/m/Y H:i" }} · {{ appointment.get_status_display }}</p></div></div>
   <article class="panel"><p>Valor do serviço: R$ {{ appointment.service_price_snapshot|default:appointment.service.price|floatformat:2 }}</p>
   {% if paid_booking_payment %}<p class="flash success">{% if prepaid_full %}Total pago online{% else %}Sinal pago online{% endif %}: R$ {{ paid_booking_payment.gross_amount|floatformat:2 }} por Pix. {% if not prepaid_full %}Registre a forma de pagamento do saldo no fechamento.{% endif %}</p>{% elif appointment.booking_payment != 'on_site' %}<p>Pix solicitado no agendamento: aguardando pagamento ou a confirmação do provedor.</p>{% endif %}
   {% if appointment.status == 'confirmed' or appointment.status == 'pending' or appointment.status == 'waiting' or appointment.status == 'in_progress' %}

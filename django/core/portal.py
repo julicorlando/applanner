@@ -1088,6 +1088,8 @@ def resource_list(request,module_slug,resource_slug):
     if tenant is None:
         return redirect("portal-home")
     qs=_tenant_queryset(model,tenant)
+    if model._meta.label_lower=="scheduling.appointment":
+        qs=qs.select_related("customer","service","professional","vehicle")
     q=(request.GET.get("q") or "").strip()
     if q:
         lookup=Q()
@@ -1134,6 +1136,7 @@ def resource_list(request,module_slug,resource_slug):
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,
         "headers":_headers(model,columns),"rows":rows,"q":q,
+        "customer_column":columns.index("customer") if model._meta.label_lower=="scheduling.appointment" else None,
         "agenda_filters":agenda_filters,"period":period,"status_filter":status,"status_choices":status_choices,
         "can_create":resource.get("create",True) or bool(resource.get("custom_create")),
         "can_edit":resource.get("edit",True),
@@ -1218,6 +1221,7 @@ def resource_create(request,module_slug,resource_slug):
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,"form":form,
         "title":f"Novo — {resource['title']}",
+        "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
     })
 
 
@@ -1253,6 +1257,9 @@ def resource_edit(request,module_slug,resource_slug,pk):
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,"form":form,
         "title":f"Editar — {resource['title']}",
+        "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
+        "professional_existing_active":model._meta.label_lower=="scheduling.professional" and obj.active,
+        "appointment_identity":obj if model._meta.label_lower=="scheduling.appointment" else None,
     })
 
 

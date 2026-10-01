@@ -42,3 +42,14 @@ Esses são testes integrados de rotas/backend com clientes HTTP separados, sem c
 6. Criar reserva dentro do prazo de cancelamento e conferir explicação; repetir fora do prazo e testar as ações.
 
 Nenhuma validação em aparelho físico foi realizada neste ambiente. Não declarar homologação integral nem aprovação de integrações externas a partir da suíte automatizada.
+
+
+## Complemento após a homologação de 01/10/2026
+
+O formulário de profissionais mostra o uso e as vagas do plano antes do envio, incluindo liberações do Master. Perfis inativos não consomem vagas e profissionais ativos já existentes continuam editáveis.
+
+As telas internas de agenda, edição, painel inicial e área do profissional identificam o nome informado na reserva e o nome do cadastro quando diferem. O cadastro e o telefone permanecem vinculados ao histórico, sem sobrescrita automática. A página pública continua mostrando apenas os dados informados pelo cliente.
+
+O Master pode abrir **Planos → Excluir plano**. A remoção exige o nome exato do plano e é bloqueada quando existem assinaturas (inclusive canceladas), checkouts, propostas ou histórico de trocas. Os vínculos de módulos de um plano sem uso são removidos com ele; os módulos do catálogo são preservados. Planos usados podem ser desativados e ocultados por **Editar e desativar**.
+
+O responsável informou nesta conversa que os testes em sessão anônima, celular real, Arena, Automotivo, Pix, cartão, e-mails e WhatsApp funcionaram, incluindo confirmação de recebimento. Essa validação foi relatada pelo usuário; modelos de aparelho, comprovantes e detalhes das transações não foram fornecidos e não são apresentados como testes executados pelo agente.

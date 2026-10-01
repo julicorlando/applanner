@@ -29,7 +29,7 @@ class AgendaUXTests(TestCase):
         response=self.client.get("/")
         self.assertEqual([a.pk for a in response.context["next_appointments"]],[confirmed.pk])
         self.assertContains(response,"Nome único")
-        self.assertNotContains(response,"Nome informado diferente")
+        self.assertContains(response,"Nome informado na reserva: Nome informado diferente")
         self.assertContains(response,"?period=cancelled")
 
     def test_upcoming_cancelled_and_history_filters_are_separate(self):

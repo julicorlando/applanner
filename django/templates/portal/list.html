@@ -21,7 +21,7 @@
       <tbody{% if module_slug == 'agenda' and resource_slug == 'agendamentos' or module_slug == 'arena' and resource_slug == 'reservas' %} data-live-agenda="agendamentos"{% endif %}>
       {% for row in rows %}
         <tr>
-          {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+          {% for cell in row.cells %}<td>{{ cell }}{% if customer_column != None and forloop.counter0 == customer_column %}<br>{% include "portal/customer_name_difference.html" with appointment=row.obj only %}{% endif %}</td>{% endfor %}
           <td class="table-actions">
             {% if resource.detail %}<a href="{% url 'portal-resource-detail' module_slug resource_slug row.obj.pk %}">Abrir</a>{% endif %}
             {% if can_edit %}<a href="{% url 'portal-resource-edit' module_slug resource_slug row.obj.pk %}">Editar</a>{% endif %}

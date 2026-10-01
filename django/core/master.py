@@ -6,6 +6,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.deletion import ProtectedError
 from django.forms import modelform_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -648,6 +649,45 @@ def remove_user(request,pk):
             messages.success(request,"Acesso excluído. O histórico operacional foi preservado.")
             return redirect("master-resource-list",slug="usuarios")
     return render(request,"master/user_remove.html",{"target":user})
+
+
+def _plan_references(plan):
+    from billing.models import CheckoutSession,Subscription,SubscriptionHistory
+    from commercial.models import Proposal
+    references=[]
+    if Subscription.objects.filter(plan=plan).exists(): references.append("assinaturas, inclusive históricas")
+    if CheckoutSession.objects.filter(plan=plan).exists(): references.append("checkouts ou tentativas de pagamento")
+    if Proposal.objects.filter(Q(plan=plan)|Q(base_plan=plan)).exists(): references.append("propostas comerciais")
+    if SubscriptionHistory.objects.filter(Q(from_plan=plan)|Q(to_plan=plan)).exists():
+        references.append("histórico de trocas de plano")
+    return references
+
+
+@login_required
+def delete_plan(request,pk):
+    """Remove somente planos sem vínculos, preservando o histórico comercial."""
+    _guard(request.user)
+    plan=get_object_or_404(Plan,pk=pk)
+    references=_plan_references(plan)
+    if request.method=="POST":
+        if references:
+            messages.error(request,"Este plano não pode ser excluído porque possui "+", ".join(references)+". Desative a venda e deixe-o invisível para preservar o histórico.")
+            return redirect("master-resource-list",slug="planos")
+        if request.POST.get("confirm_name","").strip()!=plan.name:
+            messages.error(request,"Digite o nome exato do plano para confirmar a exclusão.")
+        else:
+            try:
+                with transaction.atomic():
+                    locked=Plan.objects.select_for_update().get(pk=plan.pk)
+                    if _plan_references(locked):
+                        raise ValidationError("O plano recebeu novos vínculos e não pode ser excluído. Desative-o para preservar o histórico.")
+                    locked.delete()
+            except (ProtectedError,ValidationError):
+                messages.error(request,"O plano recebeu vínculos e não pode ser excluído. Desative-o para preservar o histórico.")
+                return redirect("master-resource-list",slug="planos")
+            messages.success(request,f"Plano {plan.name} excluído.")
+            return redirect("master-resource-list",slug="planos")
+    return render(request,"master/plan_delete.html",{"plan":plan,"references":references})
 
 
 @login_required
