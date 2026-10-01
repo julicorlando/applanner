@@ -6,13 +6,15 @@
   <header class="portal-heading operation-heading">
     <div><span class="eyebrow">PAINEL DA EMPRESA</span><h1>{{ tenant.name }}</h1><p>Encontre rapidamente o que precisa para atender seus clientes.</p></div>
     <div class="operation-heading-actions">
+      <button class="button ghost portal-view-toggle" id="portal-view-toggle" type="button" aria-pressed="false" aria-controls="operation-dashboard-content"><span aria-hidden="true">◐</span> Visão simplificada</button>
       {% if request.user.is_superuser or request.user.role == 'owner' %}<a class="button ghost" href="{% url 'portal-setup' %}">Configurar minha operação</a>{% endif %}
       {% if arena_mode %}<a class="button primary" href="{% url 'portal-resource-create' 'arena' 'reservas' %}">Nova reserva <span aria-hidden="true">＋</span></a>{% else %}{% for item in modules %}{% if item.slug == 'agenda' %}<a class="button primary" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">Novo agendamento <span aria-hidden="true">＋</span></a>{% endif %}{% endfor %}{% endif %}
       {% if request.user.is_superuser %}<a class="button ghost" href="{% url 'portal-home' %}?trocar=1">Trocar empresa</a>{% endif %}
     </div>
   </header>
 
-  <div class="operation-utilities">
+  <div id="operation-dashboard-content">
+  <div class="operation-utilities operation-secondary-content">
     <section class="panel operation-share" aria-labelledby="operation-share-title">
       <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">↗</span><div><span class="eyebrow">PRESENÇA ONLINE</span><h2 id="operation-share-title">Links para compartilhar</h2></div></div>
       {% if tenant.public_enabled %}
@@ -34,14 +36,14 @@
   </div>
 
   {% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' %}
-  <section class="panel operation-access" aria-labelledby="operation-access-title">
+  <section class="panel operation-access operation-secondary-content" aria-labelledby="operation-access-title">
     <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">♙</span><div><span class="eyebrow">EQUIPE</span><h2 id="operation-access-title">Acesso da recepção</h2></div></div>
     <p>Crie um usuário para a recepção cuidar de agenda, clientes e comunicação. O financeiro continua disponível apenas para a gestão.</p>
     <a class="button" href="{% url 'reception-access' %}">Cadastrar recepção <span aria-hidden="true">→</span></a>
   </section>
   {% endif %}
 
-  <section class="panel operation-diagnostics" aria-labelledby="diagnostics-title">
+  <section class="panel operation-diagnostics operation-secondary-content" aria-labelledby="diagnostics-title">
     <div class="operation-section-heading"><div><span class="eyebrow">SAÚDE DA OPERAÇÃO</span><h2 id="diagnostics-title">Diagnóstico rápido</h2><p>Veja o que está pronto para receber clientes e o que precisa de atenção.</p></div><a class="button" href="{% url 'portal-diagnostics' %}">Abrir diagnóstico completo →</a></div>
     <div class="diagnostic-strip">{% for check in operation_health %}<a class="diagnostic-item {% if check.ok %}is-ok{% else %}is-pending{% endif %}" href="{{ check.url }}"><span aria-hidden="true">{% if check.ok %}✓{% else %}!{% endif %}</span><strong>{{ check.label }}</strong><small>{% if check.ok %}Pronto{% else %}Atenção{% endif %}</small></a>{% endfor %}</div>
   </section>
@@ -61,9 +63,10 @@
       {% empty %}<div class="panel operation-empty"><h3>Nenhum módulo disponível</h3><p>Peça ao responsável da empresa para revisar seu acesso.</p></div>{% endfor %}
     </div>
   </section>
-  {% if contracted_modules %}<section class="operation-modules" aria-labelledby="contracted-title"><div class="operation-section-heading"><div><span class="eyebrow">SEU PLANO</span><h2 id="contracted-title">Módulos contratados</h2><p>Funções incluídas no plano e módulos adicionais liberados para {{ tenant.name }}.</p></div><span class="operation-module-count">{{ contracted_modules|length }} módulos</span></div>
+  {% if contracted_modules %}<section class="operation-modules operation-secondary-content" aria-labelledby="contracted-title"><div class="operation-section-heading"><div><span class="eyebrow">SEU PLANO</span><h2 id="contracted-title">Módulos contratados</h2><p>Funções incluídas no plano e módulos adicionais liberados para {{ tenant.name }}.</p></div><span class="operation-module-count">{{ contracted_modules|length }} módulos</span></div>
     <div class="portal-module-grid">{% for item in contracted_modules %}<article class="portal-module-card"><h3>{{ item.name }}</h3><p>{{ item.description }}</p>{% if item.route %}<a href="{% url 'portal-resource-list' item.route.0 item.route.1 %}">Abrir módulo →</a>{% elif item.gateway %}<a href="{% url 'tenant-payment-gateway' %}">Abrir integrações bancárias →</a>{% elif item.documentation %}<a href="{% url 'accounts:documentation' %}">Documentação e chaves da API →</a>{% else %}<span>Consulte as funções disponíveis para seu perfil acima.</span>{% endif %}</article>{% endfor %}</div>
   </section>{% endif %}
 </section>
+</div>
 <script src="{% static 'js/portal-dashboard.js' %}" defer></script>
 {% endblock %}

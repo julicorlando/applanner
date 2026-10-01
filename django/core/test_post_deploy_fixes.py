@@ -153,6 +153,13 @@ class PostDeployFixesTests(TestCase):
         self.assertContains(response,"Página pública")
         self.assertEqual(response.context["checks"][-1]["key"],"whatsapp")
 
+    def test_operation_home_exposes_simplified_view_toggle(self):
+        response=self.client.get(reverse("portal-home"))
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,"Visão simplificada")
+        self.assertContains(response,"portal-view-toggle")
+        self.assertContains(response,static("js/portal-dashboard.js"))
+
     def test_arena_setup_requires_compatible_court_price_and_hours(self):
         from arena.models import Court,CourtHours,PriceRule
         self.tenant.category="arena"
