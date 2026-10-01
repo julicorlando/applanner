@@ -5,7 +5,7 @@
 <section class="shell portal-page narrow">
   <div class="portal-heading"><div><span class="eyebrow">MEU AGENDAMENTO</span><h1>{{ appointment.service.name }}</h1><p>{{ appointment.tenant.name }}</p></div><div class="status-pill">{{ appointment.get_status_display }}</div></div>
   <article class="panel">
-    <div class="appointment-row"><time>{{ appointment.starts_at|date:"d/m H:i" }}</time><div><strong>{{ appointment.professional.name|default:"Profissional a definir" }}</strong><span>{{ appointment.customer_display_name }}</span></div><em>R$ {{ appointment.service_price_snapshot|default:appointment.service.price }}</em></div>
+    <div class="appointment-row"><time>{{ appointment.starts_at|date:"d/m H:i" }}</time><div><strong>{{ appointment.professional.name|default:"Profissional a definir" }}</strong><span>{{ appointment.customer_name_snapshot|default:"Cliente" }}</span></div><em>R$ {{ appointment.service_price_snapshot|default:appointment.service.price }}</em></div>
     {% if rating_token %}<p>Atendimento concluído. Conte como foi sua experiência.</p><a class="button primary" href="{% url 'public-appointment-rating' rating_token %}">Dar nota de 1 a 5</a>{% endif %}
   </article>
   {% if appointment.booking_payment != 'on_site' %}

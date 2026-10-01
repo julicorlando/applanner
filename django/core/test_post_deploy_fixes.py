@@ -171,7 +171,9 @@ class PostDeployFixesTests(TestCase):
         self.assertEqual(old.customer_name_snapshot,"Nome cadastrado")
         self.assertEqual(_value(old,"customer"),"Atualizado pelo gestor")
         self.assertEqual(new.customer_display_name,"Atualizado pelo gestor")
-        self.assertContains(self.client.get(reverse("public-appointment-page",args=[response.json()["manage_token"]])),"Atualizado pelo gestor")
+        receipt=self.client.get(reverse("public-appointment-page",args=[response.json()["manage_token"]]))
+        self.assertContains(receipt,"Nome desta reserva")
+        self.assertNotContains(receipt,"Atualizado pelo gestor")
 
     def test_anonymous_booking_requires_phone_and_reuses_normalized_identity(self):
         from django.core.cache import cache

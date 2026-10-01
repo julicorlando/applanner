@@ -14,10 +14,11 @@
 - Telefones com DDD, com 55 e com formatação são comparados como o mesmo número. Novos clientes são gravados com 55.
 - Matching por telefone e/ou e-mail, sempre restrito à empresa. E-mail sem distinção de maiúsculas/minúsculas.
 - Um contato existente mantém o mesmo Customer e, assim, histórico, pacotes, fidelidade e inteligência de retorno. Nenhum dado pessoal existente é sobrescrito por uma reserva anônima.
-- Nome informado em cada reserva de serviços permanece no snapshot para auditoria. Nome operacional em painel, agenda, área profissional e gestão pública vem do cadastro do cliente. Alterações feitas pelo gestor se refletem nessas telas.
+- Nome informado em cada reserva de serviços permanece no snapshot para auditoria. Nome operacional em painel, agenda, área profissional e edição interna vem do cadastro do cliente. Alterações feitas pelo gestor se refletem nessas telas.
 - Telefone e e-mail que apontem para pessoas diferentes, ou duplicatas do legado, exigem revisão pela empresa; não há fusão automática ou exclusão de dados.
 - Cadastros novos pela gestão exigem telefone e impedem duplicatas. ETL não chama full_clean: dados históricos incompletos permanecem preservados.
 - Reservas públicas da Arena passam a vincular Customer, também preservando o histórico do cliente.
+- Comprovante público mostra apenas o nome informado na própria reserva, para não revelar o nome de cadastros existentes a quem conhece um telefone.
 - Mensagem pública explica preservação de cadastro; não há endpoint público para descobrir nomes ou dados pessoais pelo telefone.
 
 ## Homologação

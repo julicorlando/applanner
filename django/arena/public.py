@@ -108,7 +108,7 @@ class CourtBookingAPIView(APIView):
                 customer,reused=resolve_customer(tenant,name,phone,email)
                 reservation,token=service.create_reservation(
                     tenant=tenant,court=court,start=start,end=start+timedelta(minutes=duration),
-                    customer=customer,customer_name=customer.name,customer_phone=phone,customer_email=email,
+                    customer=customer,customer_name=name,customer_phone=phone,customer_email=email,
                     payment_method=payment,notes=str(request.data.get("notes") or ""),
                 )
         except ValidationError as exc:
