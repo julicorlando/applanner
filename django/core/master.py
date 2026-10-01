@@ -87,6 +87,8 @@ class PlanMasterForm(forms.ModelForm):
                 features.pop(key,None)
             else:
                 features[key]=value
+        if "arena" in self.cleaned_data["segments"]:
+            features["arena_limits_configured"]=True
         features["included_features"]=[
             line.strip() for line in (self.cleaned_data.get("included_features") or "").splitlines()
             if line.strip()

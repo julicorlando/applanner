@@ -13,7 +13,7 @@
 
 O plano padrão `segment-arena` recebe `courts: 0` e `reservations: 0`: quadras ativas sem limite e reservas sem limite mensal. Isso explicita o funcionamento anterior, sem impor quotas arbitrárias a contratos existentes.
 
-`seed_sales_plans` preenche apenas chaves ausentes nesse plano padrão. Preserva valores existentes, preços, assinaturas, módulos e demais ajustes. Outros planos não recebem limites automaticamente.
+`seed_sales_plans` preenche chaves ausentes nesse plano padrão apenas na primeira atualização do catálogo. Uma marca de configuração impede que redeploys revertam escolhas posteriores do Master, inclusive limites deixados em branco. Preserva valores existentes, preços, assinaturas, módulos e demais ajustes. Outros planos não recebem limites automaticamente.
 
 O Master pode editar limites no formulário de planos. Zero significa sem limite; vazio significa não definido. A comparação pública apresenta zero como **Sem limite**, nunca como 0 quadras/reservas.
 

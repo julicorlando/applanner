@@ -41,15 +41,16 @@ class Command(BaseCommand):
                     "featured":item["segment"]=="arena","sort_order":order,
                     "features":{"professionals":3,"units":1,"segments":[item["segment"]],
                                 "included_features":list(item["features"]),
-                                **({"courts":0,"reservations":0} if item["segment"]=="arena" else {})},
+                                **({"courts":0,"reservations":0,"arena_limits_configured":True} if item["segment"]=="arena" else {})},
                 },
             )
             if not new:
-                if item["segment"]=="arena":
+                if item["segment"]=="arena" and not (plan.features or {}).get("arena_limits_configured"):
                     features=dict(plan.features or {})
                     before=dict(features)
                     features.setdefault("courts",0)
                     features.setdefault("reservations",0)
+                    features["arena_limits_configured"]=True
                     if features!=before:
                         plan.features=features
                         plan.save(update_fields=["features"])

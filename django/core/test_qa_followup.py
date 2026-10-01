@@ -129,3 +129,12 @@ class QAFollowupTests(TestCase):
         self.assertEqual(plan.features["courts"],0)
         self.assertEqual(plan.features["reservations"],200)
         self.assertEqual(plan.features["custom"],"preserve")
+        data["courts_limit"]=""
+        data["reservations_limit"]=""
+        form=PlanMasterForm(data,instance=plan)
+        self.assertTrue(form.is_valid(),form.errors)
+        form.save()
+        call_command("seed_sales_plans",stdout=StringIO())
+        plan.refresh_from_db()
+        self.assertNotIn("courts",plan.features)
+        self.assertNotIn("reservations",plan.features)
