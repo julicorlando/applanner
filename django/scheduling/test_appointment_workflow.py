@@ -81,6 +81,15 @@ class AppointmentWorkflowTests(TestCase):
         self.client.force_login(self.owner)
         self.assertContains(self.client.get(reverse("tenant-ratings")),"Ana")
         self.assertContains(self.client.get(reverse("tenant-ratings")),"5,0")
+        response=self.client.get(reverse("tenant-ratings"))
+        self.assertContains(response,'role="meter"')
+        self.assertContains(response,'aria-valuenow="5.0"')
+        self.assertContains(response,"Muito satisfeito")
+        self.assertEqual(response.context["professionals"][0].satisfaction_position,100)
+        Professional.objects.create(tenant=self.tenant,name="Sem avaliações")
+        response=self.client.get(reverse("tenant-ratings"))
+        self.assertContains(response,'role="meter"',count=1)
+        self.assertContains(response,"Aguardando a primeira avaliação")
 
     def test_qr_gateway_callback_requests_cancellation_and_staff_releases_slot(self):
         TenantWhatsAppConnection.objects.create(tenant=self.tenant,enabled=True)

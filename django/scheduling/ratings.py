@@ -48,6 +48,13 @@ def tenant_ratings(request):
     professionals=Professional.objects.filter(tenant=tenant).annotate(
         review_count=Count("appointmentrating"),rating_average=Avg("appointmentrating__score"),
     ).order_by("name")
+    for professional in professionals:
+        average=professional.rating_average
+        professional.satisfaction_position=round((average-1)*25,1) if average is not None else None
+        professional.satisfaction_label=(
+            ["Muito insatisfeito","Insatisfeito","Neutro","Satisfeito","Muito satisfeito"]
+            [min(4,max(0,int(average+0.5)-1))] if average is not None else "Sem notas"
+        )
     recent=AppointmentRating.objects.filter(tenant=tenant).select_related("professional","appointment__customer").order_by("-created_at")[:50]
     return render(request,"portal/tenant_ratings.html",{
         "professionals":professionals,"recent":recent,"tenant":tenant,
