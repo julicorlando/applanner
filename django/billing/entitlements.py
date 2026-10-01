@@ -78,3 +78,44 @@ def validate_professional_capacity(professional):
             f"Limite de {capacity['limit']} profissionais ativos atingido. "
             "Desative um profissional ou solicite ao Master a ampliação do limite."
         )
+
+
+def arena_limit(tenant,key):
+    """Zero/absent means unrestricted; explicit Master releases win over the plan."""
+    override=(tenant.metadata or {}).get(f"{key}_limit_override")
+    subscription=active_subscription(tenant)
+    raw=(subscription.plan.features or {}).get(key) if subscription else None
+    if override is not None:
+        raw=override
+    return int(raw) if not isinstance(raw,bool) and str(raw).isdigit() and int(raw)>0 else None
+
+
+def validate_court_capacity(court):
+    from django.core.exceptions import ValidationError
+    if not court.tenant_id or not court.active:
+        return
+    if court.pk and type(court).objects.filter(pk=court.pk,tenant_id=court.tenant_id,active=True).exists():
+        return
+    limit=arena_limit(court.tenant,"courts")
+    if limit is not None and court.tenant.sports_courts.filter(active=True).count()>=limit:
+        label="quadra ativa" if limit==1 else "quadras ativas"
+        raise ValidationError(f"Limite de {limit} {label} atingido. Desative uma quadra ou solicite uma liberação ao Master.")
+
+
+def validate_reservation_capacity(tenant,start):
+    from zoneinfo import ZoneInfo
+    from datetime import datetime
+    from django.core.exceptions import ValidationError
+    from arena.models import Reservation
+    limit=arena_limit(tenant,"reservations")
+    if limit is None:
+        return
+    tz=ZoneInfo(tenant.timezone or "America/Recife")
+    month=start.astimezone(tz)
+    beginning=datetime(month.year,month.month,1,tzinfo=tz)
+    end=datetime(month.year+1,1,1,tzinfo=tz) if month.month==12 else datetime(month.year,month.month+1,1,tzinfo=tz)
+    used=Reservation.objects.filter(tenant=tenant,starts_at__gte=beginning,starts_at__lt=end,
+        status__in=[Reservation.Status.PENDING_PAYMENT,Reservation.Status.CONFIRMED,Reservation.Status.COMPLETED]).count()
+    if used>=limit:
+        label="reserva" if limit==1 else "reservas"
+        raise ValidationError(f"Limite de {limit} {label} neste mês atingido. Entre em contato com a arena para verificar uma liberação.")

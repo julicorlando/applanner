@@ -266,6 +266,9 @@ class ArenaReservationService:
         source=Reservation.Source.PUBLIC,created_by=None,notes="",accept_terms=False,
         public_rules=True
     ):
+        from billing.entitlements import validate_reservation_capacity
+        tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
+        validate_reservation_capacity(tenant,start)
         court=Court.objects.select_for_update().get(pk=court.pk,tenant=tenant,active=True)
         if not self.is_available(tenant,court,start,end,public_rules=public_rules):
             raise ValidationError("Este horário não está mais disponível.")

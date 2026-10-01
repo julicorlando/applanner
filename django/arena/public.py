@@ -135,6 +135,13 @@ class CourtBookingAPIView(APIView):
 def court_reservation_page(request,token):
     reservation=get_object_or_404(Reservation.objects.select_related("court","tenant"),
         manage_token_hash=hashlib.sha256(token.encode()).hexdigest())
+    cancel_reason=""
+    if reservation.status!=Reservation.Status.CONFIRMED:
+        cancel_reason=f"Não é possível cancelar online: a reserva está {reservation.get_status_display().lower()}."
+    elif reservation.payment_method!="onsite":
+        cancel_reason="Reservas com pagamento antecipado precisam ser canceladas com a arena para tratar o pagamento."
+    elif reservation.starts_at<=timezone.now():
+        cancel_reason="O horário desta reserva já começou; o cancelamento online não está disponível."
     if request.method=="POST" and request.POST.get("action")=="cancel":
         if reservation.status!=Reservation.Status.CONFIRMED or reservation.payment_method!="onsite":
             messages.error(request,"Esta reserva não pode ser cancelada online. Contate a arena.")
@@ -149,4 +156,4 @@ def court_reservation_page(request,token):
     payment=reservation.tenant.payment_transactions.filter(reference_type="reservation",
         reference_id=reservation.pk,method="pix").order_by("-created_at").first()
     return render(request,"arena/public_reservation.html",{"reservation":reservation,
-        "payment":payment,"token":token})
+        "payment":payment,"token":token,"cancel_reason":cancel_reason})

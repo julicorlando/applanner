@@ -158,10 +158,15 @@ def plans(request):
     comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
                 for module in sorted(catalog.values(),key=lambda item:(item.sort_order,item.name))]
     arena_cards=["arena" in (card["plan"].features or {}).get("segments",[]) for card in cards]
+    def arena_limit(plan,key):
+        value=(plan.features or {}).get(key)
+        if value==0 and not isinstance(value,bool):
+            return "Sem limite"
+        return str(value) if value is not None else "Consultar"
     comparison.append({"label":"Profissionais","values":["Não se aplica" if arena else str((card["plan"].features or {}).get("professionals","Consultar")) for card,arena in zip(cards,arena_cards)]})
     if any(arena_cards):
         for key,label in (("courts","Quadras"),("reservations","Reservas por mês")):
-            comparison.append({"label":label,"values":[str((card["plan"].features or {}).get(key,"Consultar")) if arena else "Não se aplica" for card,arena in zip(cards,arena_cards)]})
+            comparison.append({"label":label,"values":[arena_limit(card["plan"],key) if arena else "Não se aplica" for card,arena in zip(cards,arena_cards)]})
     comparison.append({"label":"Unidades","values":[str((card["plan"].features or {}).get("units","Consultar")) for card in cards]})
     for cycle,label in (("quarterly","Trimestral"),("semiannual","Semestral"),("annual","Anual")):
         comparison.append({"label":f"Ciclo {label.lower()}","values":[f"R$ {number_format(_price(card['plan'],cycle),decimal_pos=2)}" for card in cards]})

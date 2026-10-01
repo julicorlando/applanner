@@ -691,6 +691,12 @@ def _model_form(model, resource, *args, tenant=None, **kwargs):
         form.fields["phone"].label="Telefone com DDD"
         form.fields["phone"].help_text="Obrigatório. Use o telefone do cliente para manter seu histórico de atendimentos e retorno."
     for name,field in form.fields.items():
+        if model._meta.label_lower=="scheduling.tenantschedulesettings":
+            field.help_text={
+                "slot_interval_minutes":"Define as opções exibidas ao cliente: 15 minutos gera horários como 09:00, 09:15 e 09:30.",
+                "buffer_minutes":"Reserva uma pausa de segurança antes e depois do atendimento. Não altera a duração do serviço.",
+                "cancel_notice_minutes":"Aplica-se ao cancelamento e à remarcação pelo cliente. Zero permite alterações até o início.",
+            }.get(name,field.help_text)
         if _field(model,name):
             field.label=field_label(model,name)
         if model._meta.label_lower=="scheduling.customer" and name=="phone":
@@ -1087,6 +1093,10 @@ def resource_list(request,module_slug,resource_slug):
         lookup=Q()
         if model._meta.label_lower in {"scheduling.appointment","arena.reservation"}:
             lookup |= Q(customer__name__icontains=q)|Q(customer__phone__icontains=q)|Q(customer__email__icontains=q)
+        if model._meta.label_lower=="scheduling.appointment":
+            lookup |= Q(service__name__icontains=q)|Q(professional__name__icontains=q)
+        elif model._meta.label_lower=="arena.reservation":
+            lookup |= Q(court__name__icontains=q)|Q(modality__name__icontains=q)
         for field in model._meta.fields:
             if field.get_internal_type() in {"CharField","TextField","EmailField","SlugField"}:
                 lookup |= Q(**{f"{field.name}__icontains":q})
@@ -1194,7 +1204,7 @@ def resource_create(request,module_slug,resource_slug):
             obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=True)
             try:
                 with transaction.atomic():
-                    if model._meta.label_lower in {"scheduling.professional","scheduling.customer"}:
+                    if model._meta.label_lower in {"scheduling.professional","scheduling.customer","arena.court"}:
                         obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
                     obj.full_clean()
                     obj.save()
@@ -1230,7 +1240,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
         obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=False)
         try:
             with transaction.atomic():
-                if model._meta.label_lower in {"scheduling.professional","scheduling.customer"}:
+                if model._meta.label_lower in {"scheduling.professional","scheduling.customer","arena.court"}:
                     obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
                 obj.full_clean()
                 obj.save()

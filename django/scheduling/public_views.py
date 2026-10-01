@@ -24,9 +24,22 @@ def _caps(row):
     cfg=AvailabilityService().settings(row.tenant)
     manageable=row.status in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED}
     in_time=row.starts_at>=timezone.now()+timedelta(minutes=cfg.cancel_notice_minutes)
+    def reason(enabled, action):
+        if not manageable:
+            return f"Não é possível {action}: o agendamento está {row.get_status_display().lower()}."
+        if not enabled:
+            return f"O estabelecimento não permite {action} online."
+        if row.starts_at<=timezone.now():
+            return f"Não é possível {action} online: o horário do agendamento já começou."
+        if not in_time:
+            return (f"Para {action} online, é necessário avisar com pelo menos "
+                    f"{cfg.cancel_notice_minutes} minutos de antecedência. O prazo desta reserva já encerrou.")
+        return ""
     return {
         "can_cancel":bool(cfg.customer_can_cancel and manageable and in_time),
         "can_reschedule":bool(cfg.customer_can_reschedule and manageable and in_time),
+        "cancel_reason":reason(cfg.customer_can_cancel,"cancelar"),
+        "reschedule_reason":reason(cfg.customer_can_reschedule,"reagendar"),
     }
 
 
@@ -52,6 +65,14 @@ def appointment_page(request,token):
     payments=TenantPaymentTransaction.objects.filter(tenant=row.tenant,reference_type="appointment",
         reference_id=row.pk).order_by("-created_at")
     payment=payments.first()
+    payment_connected=has_connected_tenant_gateway(row.tenant)
+    payment_reason=""
+    if row.status not in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED}:
+        payment_reason=f"O pagamento online não está disponível: o agendamento está {row.get_status_display().lower()}."
+    elif not payment_connected:
+        payment_reason="O estabelecimento ainda não habilitou o recebimento online."
+    elif not row.customer.email:
+        payment_reason="Para gerar o Pix, é necessário um e-mail no cadastro do cliente. Solicite a atualização ao estabelecimento."
     if request.method=="POST":
         action=request.POST.get("action")
         if action=="pay":
@@ -73,7 +94,7 @@ def appointment_page(request,token):
         caps=_caps(row)
         if action=="cancel":
             if not caps["can_cancel"]:
-                messages.error(request,"Este agendamento não pode mais ser cancelado online.")
+                messages.error(request,caps["cancel_reason"])
             else:
                 row.status=Appointment.Status.CANCELLED
                 row.save(update_fields=["status","updated_at"])
@@ -82,7 +103,7 @@ def appointment_page(request,token):
 
         if action=="reschedule":
             if not caps["can_reschedule"]:
-                messages.error(request,"Este agendamento não pode mais ser remarcado online.")
+                messages.error(request,caps["reschedule_reason"])
                 return redirect("public-appointment-page",token=token)
             try:
                 starts_at=_start(row.tenant,request.POST["starts_at"])
@@ -142,7 +163,8 @@ def appointment_page(request,token):
 
     return render(request,"scheduling/public_appointment.html",{
         "appointment":row,"token":token,"capabilities":_caps(row),
-        "payment":payment,"payment_amount":amount,"payment_connected":has_connected_tenant_gateway(row.tenant),
+        "payment":payment,"payment_amount":amount,"payment_connected":payment_connected,
+        "can_pay":not payment_reason,"payment_reason":payment_reason,
         "professionals":_candidates(row),
         "rating_token":dumps({"appointment":row.pk},salt="appointment-rating")
             if row.status==Appointment.Status.COMPLETED else None,

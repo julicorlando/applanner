@@ -40,6 +40,10 @@ class PlanMasterForm(forms.ModelForm):
     )
     professionals_limit=forms.IntegerField(min_value=1,required=False,label="Limite de profissionais")
     units_limit=forms.IntegerField(min_value=1,required=False,label="Limite de unidades")
+    courts_limit=forms.IntegerField(min_value=0,required=False,label="Limite de quadras ativas",
+        help_text="Arena: zero significa sem limite; vazio significa não definido. Ajustes não desativam quadras existentes.")
+    reservations_limit=forms.IntegerField(min_value=0,required=False,label="Limite de reservas por mês",
+        help_text="Arena: zero significa sem limite. Conta reservas não canceladas pela data do atendimento, no fuso da empresa.")
     included_features=forms.CharField(
         required=False,label="Funcionalidades comerciais",
         widget=forms.Textarea(attrs={"rows":8,"placeholder":"Uma funcionalidade por linha"}),
@@ -60,6 +64,8 @@ class PlanMasterForm(forms.ModelForm):
         features=(getattr(self.instance,"features",None) or {}) if self.instance else {}
         self.fields["professionals_limit"].initial=features.get("professionals")
         self.fields["units_limit"].initial=features.get("units")
+        self.fields["courts_limit"].initial=features.get("courts")
+        self.fields["reservations_limit"].initial=features.get("reservations")
         self.fields["segments"].initial=features.get("segments",[value for value,_ in self.fields["segments"].choices])
         self.fields["included_features"].initial="\n".join(features.get("included_features") or [])
 
@@ -75,6 +81,12 @@ class PlanMasterForm(forms.ModelForm):
         else:
             features.pop("units",None)
         features["segments"]=self.cleaned_data["segments"]
+        for key in ("courts","reservations"):
+            value=self.cleaned_data.get(f"{key}_limit")
+            if value is None:
+                features.pop(key,None)
+            else:
+                features[key]=value
         features["included_features"]=[
             line.strip() for line in (self.cleaned_data.get("included_features") or "").splitlines()
             if line.strip()
@@ -86,6 +98,10 @@ class PlanMasterForm(forms.ModelForm):
 
 
 class TenantMasterForm(forms.ModelForm):
+    courts_limit_override=forms.IntegerField(min_value=0,required=False,label="Liberação de quadras para esta empresa",
+        help_text="Vazio: seguir o plano. Zero: sem limite. Outro número: limite autorizado pelo Master.")
+    reservations_limit_override=forms.IntegerField(min_value=0,required=False,label="Liberação de reservas mensais para esta empresa",
+        help_text="Vazio: seguir o plano. Zero: sem limite. Outro número: limite autorizado pelo Master.")
     professional_limit_override=forms.IntegerField(min_value=0,required=False,
         label="Liberação de profissionais para esta empresa",
         help_text="Vazio: seguir o plano. Zero: sem limite. Outro número: limite autorizado pelo Master, inclusive no teste grátis.")
@@ -99,10 +115,19 @@ class TenantMasterForm(forms.ModelForm):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.fields["professional_limit_override"].initial=(self.instance.metadata or {}).get("professional_limit_override")
+        for key in ("courts","reservations"):
+            self.fields[f"{key}_limit_override"].initial=(self.instance.metadata or {}).get(f"{key}_limit_override")
 
     def save(self,commit=True):
         obj=super().save(commit=False)
         obj.metadata={**(obj.metadata or {})}
+        for key in ("courts","reservations"):
+            field=f"{key}_limit_override"
+            value=self.cleaned_data.get(field)
+            if value is None:
+                obj.metadata.pop(field,None)
+            else:
+                obj.metadata[field]=value
         value=self.cleaned_data.get("professional_limit_override")
         if value is None:
             obj.metadata.pop("professional_limit_override",None)

@@ -92,6 +92,11 @@ class Court(TimeStampedModel):
         constraints=[models.UniqueConstraint(fields=["tenant","slug"],name="uq_sports_court_slug")]
         indexes=[models.Index(fields=["tenant","unit","active"],name="arena_court_unit_idx")]
 
+    def clean(self):
+        super().clean()
+        from billing.entitlements import validate_court_capacity
+        validate_court_capacity(self)
+
     def __str__(self):
         return self.name
 

@@ -40,10 +40,19 @@ class Command(BaseCommand):
                     "active":active,"public_visible":active,
                     "featured":item["segment"]=="arena","sort_order":order,
                     "features":{"professionals":3,"units":1,"segments":[item["segment"]],
-                                "included_features":list(item["features"])},
+                                "included_features":list(item["features"]),
+                                **({"courts":0,"reservations":0} if item["segment"]=="arena" else {})},
                 },
             )
             if not new:
+                if item["segment"]=="arena":
+                    features=dict(plan.features or {})
+                    before=dict(features)
+                    features.setdefault("courts",0)
+                    features.setdefault("reservations",0)
+                    if features!=before:
+                        plan.features=features
+                        plan.save(update_fields=["features"])
                 continue
             created += 1
             for module in Module.objects.filter(slug__in=item["modules"]):

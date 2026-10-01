@@ -17,9 +17,9 @@
       {% if payment.pix_qr_code %}<img alt="QR code para pagamento Pix" style="width:220px;height:220px" src="data:image/png;base64,{{ payment.pix_qr_code }}">{% endif %}
       {% if payment.checkout_url %}<p><a class="button" href="{{ payment.checkout_url }}" rel="noopener" target="_blank">Abrir pagamento</a></p>{% endif %}
       <p>Status: {{ payment.get_status_display }}. Atualize esta página após pagar.</p>
-    {% elif appointment.status == 'confirmed' and payment_connected %}
+    {% elif can_pay %}
       <form method="post">{% csrf_token %}<button class="button primary" name="action" value="pay">Gerar Pix de R$ {{ payment_amount|floatformat:2 }}</button></form>
-    {% else %}<p>Pagamento indisponível no momento. Entre em contato com o estabelecimento.</p>{% endif %}
+    {% else %}<p>{{ payment_reason }} Entre em contato com {{ appointment.tenant.name }}.</p>{% endif %}
   </article>
   {% endif %}
   {% if capabilities.can_reschedule %}
@@ -35,6 +35,16 @@
   {% endif %}
   {% if capabilities.can_cancel %}
   <article class="panel" style="margin-top:14px"><form method="post" onsubmit="return confirm('Cancelar este agendamento?')">{% csrf_token %}<input type="hidden" name="action" value="cancel"><button class="button ghost">Cancelar agendamento</button></form></article>
+  {% endif %}
+  {% if capabilities.cancel_reason or capabilities.reschedule_reason %}
+  <article class="panel" style="margin-top:14px" aria-labelledby="manage-policy-title">
+    <h2 id="manage-policy-title">Opções de alteração</h2>
+    {% if capabilities.cancel_reason %}<p>{{ capabilities.cancel_reason }}</p>{% endif %}
+    {% if capabilities.reschedule_reason %}<p>{{ capabilities.reschedule_reason }}</p>{% endif %}
+    <p>Precisa de ajuda? Entre em contato com {{ appointment.tenant.name }}.</p>
+    {% if appointment.tenant.phone %}<p>Telefone: {{ appointment.tenant.phone }}</p>{% endif %}
+    {% if appointment.tenant.email %}<p>E-mail: {{ appointment.tenant.email }}</p>{% endif %}
+  </article>
   {% endif %}
 </section>
 {% if capabilities.can_reschedule %}
