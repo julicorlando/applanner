@@ -157,10 +157,8 @@ def plans(request):
     catalog={module.pk:module for card in cards for module in card["modules"]}
     comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
                 for module in sorted(catalog.values(),key=lambda item:(item.sort_order,item.name))]
-    features=sorted({str(item) for card in cards for item in (card["plan"].features or {}).get("included_features",[])})
-    comparison.extend({"label":feature,"values":["Declarado no plano" if feature in (card["plan"].features or {}).get("included_features",[]) else "Não informado" for card in cards]} for feature in features)
     for key,label in (("professionals","Profissionais"),("units","Unidades")):
-        comparison.append({"label":label,"values":[str((card["plan"].features or {}).get(key,"Não informado")) for card in cards]})
+        comparison.append({"label":label,"values":[str((card["plan"].features or {}).get(key,"Consultar")) for card in cards]})
     for cycle,label in (("quarterly","Trimestral"),("semiannual","Semestral"),("annual","Anual")):
         comparison.append({"label":f"Ciclo {label.lower()}","values":[f"R$ {number_format(_price(card['plan'],cycle),decimal_pos=2)}" for card in cards]})
     return render(request,"billing/plans.html",{"cards":cards,"medical_plan":medical,"comparison":comparison})
@@ -301,6 +299,8 @@ def signup(request):
 
 @login_required
 def subscription_status(request):
+    from billing.entitlements import professional_capacity
+    from billing.segment_access import segment_enabled
     subscription=(
         Subscription.objects.filter(tenant=request.user.tenant)
         .select_related("plan").order_by("-started_at").first()
@@ -315,6 +315,7 @@ def subscription_status(request):
         category="account_deletion").exclude(status__in=[SupportTicket.Status.CLOSED,SupportTicket.Status.RESOLVED])
         .order_by("-created_at").first() if request.user.tenant_id else None)
     return render(request,"billing/subscription_status.html",{"subscription":subscription,"pix_charge":pix_charge,
+        "professional_capacity":professional_capacity(request.user.tenant,subscription) if request.user.tenant_id and not segment_enabled(request.user.tenant,"arena") else None,
         "pending_deletion":pending_deletion,"can_manage":request.user.tenant_id and request.user.role=="owner"})
 
 

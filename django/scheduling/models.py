@@ -50,6 +50,11 @@ class Professional(TimeStampedModel):
     services=models.ManyToManyField(Service,through="ProfessionalService",related_name="professionals",blank=True)
     services_restricted=models.BooleanField(default=False)
 
+    def clean(self):
+        super().clean()
+        from billing.entitlements import validate_professional_capacity
+        validate_professional_capacity(self)
+
     class Meta:
         constraints=[
             models.UniqueConstraint(fields=["tenant","public_slug"],name="uq_professional_public_slug"),

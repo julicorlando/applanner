@@ -28,6 +28,7 @@ FIELD_LABELS={
     "public_booking_enabled":"Agendamento público ativo","email":"E-mail","phone":"Telefone",
     "status":"Situação","created_at":"Criado em","updated_at":"Atualizado em",
     "provider_environment":"Ambiente da assinatura no Mercado Pago",
+    "professional_limit_override":"Liberação de profissionais para esta empresa",
 }
 
 
@@ -67,14 +68,46 @@ class PlanMasterForm(forms.ModelForm):
         features=dict(obj.features or {})
         if self.cleaned_data.get("professionals_limit"):
             features["professionals"]=self.cleaned_data["professionals_limit"]
+        else:
+            features.pop("professionals",None)
         if self.cleaned_data.get("units_limit"):
             features["units"]=self.cleaned_data["units_limit"]
+        else:
+            features.pop("units",None)
         features["segments"]=self.cleaned_data["segments"]
         features["included_features"]=[
             line.strip() for line in (self.cleaned_data.get("included_features") or "").splitlines()
             if line.strip()
         ][:30]
         obj.features=features
+        if commit:
+            obj.save()
+        return obj
+
+
+class TenantMasterForm(forms.ModelForm):
+    professional_limit_override=forms.IntegerField(min_value=0,required=False,
+        label="Liberação de profissionais para esta empresa",
+        help_text="Vazio: seguir o plano. Zero: sem limite. Outro número: limite autorizado pelo Master, inclusive no teste grátis.")
+
+    class Meta:
+        from tenants.models import Tenant
+        model=Tenant
+        fields=["name","slug","public_slug","category","email","phone","logo","cover","status",
+                "public_enabled","public_booking_enabled","locale","timezone"]
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fields["professional_limit_override"].initial=(self.instance.metadata or {}).get("professional_limit_override")
+
+    def save(self,commit=True):
+        obj=super().save(commit=False)
+        obj.metadata={**(obj.metadata or {})}
+        value=self.cleaned_data.get("professional_limit_override")
+        if value is None:
+            obj.metadata.pop("professional_limit_override",None)
+        else:
+            obj.metadata["professional_limit_override"]=value
         if commit:
             obj.save()
         return obj
@@ -497,7 +530,7 @@ def resource_form(request,slug,pk=None):
     if pk is None and not config.get("create",True): raise PermissionDenied
     if pk is not None and not config.get("edit",True): raise PermissionDenied
     obj=get_object_or_404(model,pk=pk,deleted_at__isnull=True) if pk and slug=="usuarios" else (get_object_or_404(model,pk=pk) if pk else None)
-    Form=(UserMasterForm if slug=="usuarios" else PlanMasterForm if config.get("special")=="plan"
+    Form=(UserMasterForm if slug=="usuarios" else TenantMasterForm if slug=="empresas" else PlanMasterForm if config.get("special")=="plan"
           else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"])))
     form=Form(request.POST or None,request.FILES or None,instance=obj)
     for name,field in form.fields.items():

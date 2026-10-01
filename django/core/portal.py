@@ -20,7 +20,7 @@ from django.utils import timezone
 from accounts.permissions import has_capability,require_any_capability
 from arena.services import ArenaReservationService
 from billing.segment_access import require_segment,segment_enabled
-from billing.entitlements import active_subscription,module_enabled
+from billing.entitlements import active_subscription,module_enabled,professional_capacity
 from healthcare.services import create_record, read_record
 
 
@@ -1112,6 +1112,7 @@ def resource_list(request,module_slug,resource_slug):
         "agenda_filters":agenda_filters,"period":period,"status_filter":status,"status_choices":status_choices,
         "can_create":resource.get("create",True) or bool(resource.get("custom_create")),
         "can_edit":resource.get("edit",True),
+        "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
         "can_manage_professionals":request.user.is_superuser or request.user.role in {
             "owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager"
         },
@@ -1177,8 +1178,10 @@ def resource_create(request,module_slug,resource_slug):
             obj=form.save(commit=False)
             obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=True)
             try:
-                obj.full_clean()
                 with transaction.atomic():
+                    if model._meta.label_lower=="scheduling.professional":
+                        obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
+                    obj.full_clean()
                     obj.save()
                     form.save_m2m()
                 messages.success(request,f"{resource['title']}: cadastro criado.")
@@ -1211,8 +1214,10 @@ def resource_edit(request,module_slug,resource_slug,pk):
         obj=form.save(commit=False)
         obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=False)
         try:
-            obj.full_clean()
             with transaction.atomic():
+                if model._meta.label_lower=="scheduling.professional":
+                    obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
+                obj.full_clean()
                 obj.save()
                 form.save_m2m()
             messages.success(request,"Alterações salvas.")

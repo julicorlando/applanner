@@ -20,6 +20,99 @@ from finance.models import FinancialCategory,FinancialTransaction
 
 
 class PostDeployFixesTests(TestCase):
+    def limited_plan(self, limit=2):
+        plan=Plan.objects.create(name="Plano com limite",slug="quota-test",features={"professionals":limit})
+        return Subscription.objects.create(tenant=self.tenant,plan=plan,started_at=timezone.now(),status="trial",
+            trial_ends_at=timezone.now()+timedelta(days=7))
+
+    def test_trial_blocks_new_active_professional_but_preserves_existing(self):
+        self.limited_plan()
+        url=reverse("portal-resource-create",args=["agenda","profissionais"])
+        response=self.client.post(url,{"name":"Excedente","active":"on","all_services":"on","service_selection":"on"})
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,"Limite de 2 profissionais ativos atingido")
+        self.assertFalse(Professional.objects.filter(tenant=self.tenant,name="Excedente").exists())
+        # Preserve operation when a legacy/imported team already exceeds its plan.
+        Professional.objects.create(tenant=self.tenant,name="Legado")
+        self.professional.name="Ana atualizada"
+        self.professional.full_clean()
+        self.professional.save()
+        response=self.client.get(reverse("billing-subscription-status"))
+        self.assertContains(response,"ultrapassa o limite")
+
+    def test_inactive_professional_does_not_use_capacity_and_reactivation_is_validated(self):
+        from django.core.exceptions import ValidationError
+        self.limited_plan()
+        inactive=Professional(tenant=self.tenant,name="Inativo",active=False)
+        inactive.full_clean()
+        inactive.save()
+        inactive.active=True
+        with self.assertRaises(ValidationError):
+            inactive.full_clean()
+        self.other.active=False
+        self.other.save()
+        inactive.full_clean()
+        inactive.save()
+
+    def test_master_override_can_expand_or_remove_limit_for_only_one_tenant(self):
+        from billing.entitlements import professional_capacity
+        from django.core.exceptions import ValidationError
+        self.limited_plan()
+        self.tenant.metadata={"professional_limit_override":3}
+        self.tenant.save()
+        candidate=Professional(tenant=self.tenant,name="Liberado")
+        candidate.full_clean()
+        candidate.save()
+        self.assertTrue(professional_capacity(self.tenant)["overridden"])
+        response=self.client.get(reverse("billing-subscription-status"))
+        self.assertContains(response,"liberação especial do Master")
+        self.tenant.metadata={"professional_limit_override":0}
+        self.tenant.save()
+        self.assertTrue(professional_capacity(self.tenant)["unlimited"])
+        another=Professional(tenant=self.tenant,name="Sem limite")
+        another.full_clean()
+        self.tenant.metadata={}
+        self.tenant.save()
+        with self.assertRaises(ValidationError):
+            another.full_clean()
+
+    def test_master_limit_form_preserves_metadata_and_allows_reverting_to_plan(self):
+        from core.master import TenantMasterForm
+        self.tenant.metadata={"keep":"value"}
+        self.tenant.save()
+        data={"name":self.tenant.name,"slug":self.tenant.slug,"status":"active","locale":"pt-br",
+              "timezone":"America/Recife","professional_limit_override":"0"}
+        form=TenantMasterForm(data,instance=self.tenant)
+        self.assertTrue(form.is_valid(),form.errors)
+        form.save()
+        self.assertEqual(self.tenant.metadata,{"keep":"value","professional_limit_override":0})
+        data["professional_limit_override"]=""
+        form=TenantMasterForm(data,instance=self.tenant)
+        self.assertTrue(form.is_valid(),form.errors)
+        form.save()
+        self.assertEqual(self.tenant.metadata,{"keep":"value"})
+
+    def test_public_booking_and_rescheduling_controls_have_associated_labels(self):
+        from html.parser import HTMLParser
+        class Labels(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.targets=set()
+            def handle_starttag(self,tag,attrs):
+                if tag=="label":
+                    self.targets.add(dict(attrs).get("for"))
+        response=self.client.get(reverse("tenant-public",args=[self.tenant.slug]))
+        labels=Labels()
+        labels.feed(response.content.decode())
+        self.assertTrue({"booking-service","booking-professional","booking-date","booking-name",
+                         "booking-phone","booking-email","booking-notes"}.issubset(labels.targets))
+        from django.template.loader import render_to_string
+        html=render_to_string("scheduling/public_appointment.html",{"appointment":self.appointment(status="confirmed"),
+            "tenant":self.tenant,"professionals":[self.professional],"capabilities":{"can_reschedule":True}},request=response.wsgi_request)
+        labels=Labels()
+        labels.feed(html)
+        self.assertTrue({"manage-professional","manage-date"}.issubset(labels.targets))
+
     def test_arena_sports_retired_without_removing_contracts(self):
         plan=Plan.objects.create(name="Arena Sports",slug="retired-arena",monthly_price="99.90",featured=True)
         subscription=Subscription.objects.create(tenant=self.tenant,plan=plan,started_at=timezone.now(),status="active")
@@ -158,8 +251,9 @@ class PostDeployFixesTests(TestCase):
         Plan.objects.create(name="Dois",slug="comparison-two",monthly_price=20)
         response=self.client.get(reverse("billing-plans"))
         rows={row["label"]:row["values"] for row in response.context["comparison"]}
-        self.assertEqual(set(rows["Agenda pública"]),{"Declarado no plano","Não informado"})
-        self.assertEqual(set(rows["Profissionais"]),{"3","Não informado"})
+        self.assertNotIn("Agenda pública",rows)
+        self.assertEqual(set(rows["Profissionais"]),{"3","Consultar"})
+        self.assertContains(response,"Agenda pública")
 
     def test_whatsapp_state_is_portuguese(self):
         response=self.client.get(reverse("tenant-whatsapp-settings"))

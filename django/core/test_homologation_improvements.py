@@ -167,6 +167,7 @@ class HomologationImprovementsTests(TestCase):
         self.assertContains(response,"49,90")
         rows={item["label"]:item["values"] for item in response.context["comparison"]}
         self.assertEqual(set(rows["Quadras e reservas"]),{"Incluído","Não incluído"})
-        self.assertIn("Relatórios esportivos",rows)
+        self.assertNotIn("Relatórios esportivos",rows)
+        self.assertContains(response,"Relatórios esportivos")
         plan.refresh_from_db()
         self.assertEqual(plan.monthly_price,Decimal("99.90"))

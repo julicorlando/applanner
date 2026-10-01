@@ -52,9 +52,9 @@
   <div class="panel">
     <form id="public-booking" class="portal-form">{% csrf_token %}
       <div class="portal-module-grid">
-        <div class="form-field"><label>{{ booking_wording.2 }}</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
-        <div class="form-field"><label>Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" data-all-services="{{ professional.public_all_services|yesno:'true,false' }}" data-service-ids="{{ professional.public_service_ids }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
-        <div class="form-field"><label>Data</label><input id="booking-date" type="date" required></div>
+        <div class="form-field"><label for="booking-service">{{ booking_wording.2 }}</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
+        <div class="form-field"><label for="booking-professional">Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" data-all-services="{{ professional.public_all_services|yesno:'true,false' }}" data-service-ids="{{ professional.public_service_ids }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
+        <div class="form-field"><label for="booking-date">Data</label><input id="booking-date" type="date" required></div>
       </div>
       {% if online_payment_choices %}<fieldset class="form-field"><legend>Como deseja pagar?</legend><div class="booking-slots">
         {% if payment_settings.allow_pay_on_site %}<label class="button ghost"><input type="radio" name="payment_choice" value="on_site" checked> Pagar na unidade</label>{% endif %}
@@ -63,13 +63,13 @@
       </div><small>O agendamento é confirmado agora. O Pix só consta como pago após a confirmação do banco.</small></fieldset>{% elif not booking_payment_available %}<p class="flash error">O estabelecimento ainda precisa configurar uma forma de pagamento para receber agendamentos online.</p>{% endif %}
       <div class="form-field booking-times"><label id="booking-slot-label">Horários disponíveis</label><p class="booking-times-hint">Toque em um horário para selecioná-lo. Os horários disponíveis aparecem após escolher serviço e data.</p><input type="hidden" id="booking-slot"><div id="booking-slots" class="booking-slots" role="group" aria-labelledby="booking-slot-label"></div><small id="booking-slot-status" role="status" aria-live="polite">Escolha o serviço e a data para ver os horários.</small></div>
       <div class="portal-module-grid" style="margin-top:14px">
-        <div class="form-field"><label>Seu nome</label><input id="booking-name" required minlength="2"></div>
-        <div class="form-field"><label>Telefone</label><input id="booking-phone" autocomplete="tel"></div>
-        <div class="form-field"><label>E-mail</label><input id="booking-email" type="email" autocomplete="email"></div>
-        <div class="form-field"><label>Observações</label><input id="booking-notes"></div>
+        <div class="form-field"><label for="booking-name">Seu nome</label><input id="booking-name" autocomplete="name" required minlength="2"></div>
+        <div class="form-field"><label for="booking-phone">Telefone</label><input id="booking-phone" type="tel" autocomplete="tel"></div>
+        <div class="form-field"><label for="booking-email">E-mail</label><input id="booking-email" type="email" autocomplete="email"></div>
+        <div class="form-field"><label for="booking-notes">Observações</label><input id="booking-notes"></div>
       </div>
       {% if segment == 'auto' %}<div class="portal-module-grid"><div class="form-field"><label for="booking-plate">Placa do veículo</label><input id="booking-plate" autocomplete="off" maxlength="8" placeholder="ABC1D23" required></div><div class="form-field"><label for="booking-vehicle-model">Modelo do veículo</label><input id="booking-vehicle-model" maxlength="100" placeholder="Ex.: Onix" required></div></div>{% endif %}
-      <div id="booking-feedback" style="margin-top:12px"></div>
+      <div id="booking-feedback" role="status" aria-live="polite" style="margin-top:12px"></div>
       {% if waitlist_enabled %}<div id="booking-waitlist" class="panel" hidden><h3>Sem horários? Entre na lista de espera</h3><p>Usaremos o nome e o contato informados acima para avisar se surgir uma vaga nesta data.</p><button type="button" class="button" id="booking-waitlist-submit">Entrar na lista de espera</button></div>{% endif %}
       <div class="form-actions"><button class="button primary" type="submit" {% if not booking_payment_available %}disabled{% endif %}>Confirmar agendamento</button></div>
     </form>

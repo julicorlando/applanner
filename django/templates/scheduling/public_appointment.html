@@ -26,8 +26,8 @@
   <article class="panel" style="margin-top:14px">
     <h2>Remarcar</h2>
     <form method="post" class="portal-form" id="reschedule-form">{% csrf_token %}<input type="hidden" name="action" value="reschedule">
-      <div class="form-field"><label>Profissional</label><select name="professional_id" id="manage-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if professional.pk == appointment.professional_id %}selected{% endif %}>{{ professional.name }}</option>{% endfor %}</select></div>
-      <div class="form-field"><label>Data</label><input id="manage-date" type="date" required></div>
+      <div class="form-field"><label for="manage-professional">Profissional</label><select name="professional_id" id="manage-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if professional.pk == appointment.professional_id %}selected{% endif %}>{{ professional.name }}</option>{% endfor %}</select></div>
+      <div class="form-field"><label for="manage-date">Data</label><input id="manage-date" type="date" required></div>
       <div class="form-field"><label id="manage-slot-label">Horários disponíveis</label><input type="hidden" id="manage-slot" name="starts_at"><div id="manage-slots" class="booking-slots" role="group" aria-labelledby="manage-slot-label"></div><small id="manage-slot-status" role="status" aria-live="polite">Escolha a data para ver os horários.</small></div>
       <button class="button primary" id="manage-submit" type="submit" disabled>Confirmar remarcação</button>
     </form>
