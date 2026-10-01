@@ -5,6 +5,8 @@ from decimal import Decimal
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from core.crypto import encrypt_text
+from django.core.exceptions import ValidationError
+from .customer_identity import contact_values, resolve_customer
 
 from django.db import transaction
 from django.urls import reverse
@@ -56,18 +58,10 @@ class PublicWaitlistAPIView(APIView):
             tenant=tenant,service_id=service.pk,professional_id=item.pk,day=day,public_rules=True,
         ) for item in candidates):
             return Response({"detail":"Ainda há horários disponíveis nesta data. Escolha um horário para agendar."},status=409)
-        name=str(request.data.get("name") or "").strip()[:150]
-        phone=str(request.data.get("phone") or "").strip()[:32]
-        email=str(request.data.get("email") or "").strip().lower()[:254]
-        if len(name)<2 or not (phone or email):
-            return Response({"detail":"Informe nome e pelo menos telefone ou e-mail."},status=400)
-        # Lock tenant so concurrent submissions cannot create duplicate waiting entries.
-        Tenant.objects.select_for_update().get(pk=tenant.pk)
-        customer=(Customer.objects.filter(tenant=tenant,email=email).first() if email else None)
-        if not customer and phone:
-            customer=Customer.objects.filter(tenant=tenant,phone=phone).first()
-        if not customer:
-            customer=Customer.objects.create(tenant=tenant,name=name,email=email,phone=phone)
+        try:
+            customer,reused=resolve_customer(tenant,request.data.get("name"),request.data.get("phone"),request.data.get("email"))
+        except ValidationError as exc:
+            return Response({"detail":" ".join(exc.messages)},status=400)
         entry,created=WaitlistEntry.objects.get_or_create(tenant=tenant,customer=customer,service=service,
             professional=professional,preferred_date=day,status=WaitlistEntry.Status.WAITING)
         return Response({"detail":"Você entrou na lista de espera. O estabelecimento entrará em contato se surgir um horário.",
@@ -222,14 +216,10 @@ class PublicBookingAPIView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
-        name=str(data.get("name") or "").strip()
-        email=str(data.get("email") or "").strip().lower()
-        phone=str(data.get("phone") or "").strip()
-        if not 2<=len(name)<=150 or (not email and not phone):
-            return Response(
-                {"detail":"Informe um nome entre 2 e 150 caracteres e pelo menos e-mail ou telefone."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        try:
+            name,phone,email=contact_values(data.get("name"),data.get("phone"),data.get("email"))
+        except ValidationError as exc:
+            return Response({"detail":" ".join(exc.messages)},status=400)
 
         config=availability.settings(tenant)
         payment_choice=str(data.get("payment_choice") or Appointment.BookingPayment.ON_SITE)
@@ -259,22 +249,17 @@ class PublicBookingAPIView(APIView):
             if not re.fullmatch(r"[A-Z]{3}[0-9][A-Z0-9][0-9]{2}",vehicle_plate) or not vehicle_model:
                 return Response({"detail":"Informe placa e modelo válidos do veículo."},status=400)
 
-        customer=None
-        if email:
-            customer=Customer.objects.filter(tenant=tenant,email=email).first()
-        if customer is None and phone:
-            customer=Customer.objects.filter(tenant=tenant,phone=phone).first()
+        try:
+            customer,reused=resolve_customer(tenant,name,phone,email)
+        except ValidationError as exc:
+            return Response({"detail":" ".join(exc.messages)},status=409)
         vehicle=None
         if vehicle_plate:
             from auto.models import Vehicle
             vehicle=Vehicle.objects.select_for_update().filter(tenant=tenant,plate=vehicle_plate).first()
             if vehicle and (customer is None or vehicle.customer_id!=customer.pk):
+                transaction.set_rollback(True)
                 return Response({"detail":"Esta placa já está vinculada a outro cliente. Procure o estabelecimento."},status=409)
-        if customer is None:
-            customer=Customer.objects.create(
-                tenant=tenant,name=name,email=email,phone=phone,active=True
-            )
-
         if vehicle_plate:
             if vehicle is None:
                 vehicle=Vehicle.objects.create(tenant=tenant,customer=customer,plate=vehicle_plate,model=vehicle_model)
@@ -300,6 +285,7 @@ class PublicBookingAPIView(APIView):
                 "ends_at":appointment.ends_at.isoformat(),
                 "service":{"id":service.pk,"name":service.name,"price":str(service.price),"duration_minutes":service.duration_minutes},
                 "timezone":tenant.timezone or "America/Recife",
+                "customer_reused":reused,
                 "professional":{"id":professional.pk,"name":professional.name},
                 "manage_token":token,
                 "manage_url":request.build_absolute_uri(manage_path),

@@ -13,6 +13,16 @@ class Customer(TimeStampedModel):
     consent_marketing=models.BooleanField(default=False)
     active=models.BooleanField(default=True)
 
+    def clean(self):
+        super().clean()
+        from .customer_identity import contact_values,identity_matches
+        self.name,self.phone,self.email=contact_values(self.name,self.phone,self.email)
+        if self.tenant_id:
+            from django.core.exceptions import ValidationError
+            phones,emails=identity_matches(self.tenant,self.phone,self.email)
+            if phones.exclude(pk=self.pk).exists() or emails.exclude(pk=self.pk).exists():
+                raise ValidationError("Este telefone ou e-mail já pertence a um cliente da empresa. Use o cadastro existente para preservar o histórico.")
+
     class Meta:
         indexes=[
             models.Index(fields=["tenant","name"]),
@@ -208,7 +218,9 @@ class Appointment(TimeStampedModel):
 
     @property
     def customer_display_name(self):
-        return self.customer_name_snapshot or (self.customer.name if self.customer_id else "Cliente a definir")
+        # The submitted name is retained for audit; operational screens use the
+        # same canonical customer as return intelligence and the editing form.
+        return self.customer.name if self.customer_id else self.customer_name_snapshot or "Cliente a definir"
 
     def save(self,*args,**kwargs):
         if self._state.adding and not self.customer_name_snapshot and self.customer_id:

@@ -168,9 +168,44 @@ class PostDeployFixesTests(TestCase):
         self.customer.name="Atualizado pelo gestor"
         self.customer.save()
         old.refresh_from_db()
-        self.assertEqual(_value(old,"customer"),"Nome cadastrado")
-        self.assertEqual(new.customer_display_name,"Nome desta reserva")
-        self.assertContains(self.client.get(reverse("public-appointment-page",args=[response.json()["manage_token"]])),"Nome desta reserva")
+        self.assertEqual(old.customer_name_snapshot,"Nome cadastrado")
+        self.assertEqual(_value(old,"customer"),"Atualizado pelo gestor")
+        self.assertEqual(new.customer_display_name,"Atualizado pelo gestor")
+        self.assertContains(self.client.get(reverse("public-appointment-page",args=[response.json()["manage_token"]])),"Atualizado pelo gestor")
+
+    def test_anonymous_booking_requires_phone_and_reuses_normalized_identity(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.client.logout()
+        url=reverse("public-booking",args=[self.tenant.slug])
+        payload={"service_id":self.service.pk,"professional_id":self.professional.pk,
+            "starts_at":self.start.isoformat(),"name":"Nome informado","email":""}
+        self.assertEqual(self.client.post(url,payload,content_type="application/json").status_code,400)
+        response=self.client.post(url,{**payload,"phone":"(81) 99999-9999"},content_type="application/json")
+        self.assertEqual(response.status_code,201,response.content)
+        self.assertTrue(response.json()["customer_reused"])
+        appointment=Appointment.objects.get(pk=response.json()["id"])
+        self.assertEqual(appointment.customer_id,self.customer.pk)
+        self.assertEqual(appointment.customer_display_name,self.customer.name)
+        self.assertEqual(Customer.objects.filter(tenant=self.tenant).count(),1)
+
+    def test_anonymous_automotive_booking_links_vehicle_and_customer_history(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.tenant.category="auto"
+        self.tenant.save()
+        self.client.logout()
+        payload={"service_id":self.service.pk,"professional_id":self.professional.pk,
+            "starts_at":self.start.isoformat(),"name":"Nome informado","phone":"81999999999",
+            "vehicle_plate":"ABC1D23","vehicle_model":"Sedan"}
+        response=self.client.post(reverse("public-booking",args=[self.tenant.slug]),payload,content_type="application/json")
+        self.assertEqual(response.status_code,201,response.content)
+        appointment=Appointment.objects.get(pk=response.json()["id"])
+        self.assertEqual(appointment.customer_id,self.customer.pk)
+        self.assertEqual(appointment.vehicle.customer_id,self.customer.pk)
+        self.assertEqual(appointment.vehicle.plate,"ABC1D23")
 
     def test_rescheduling_only_offers_compatible_active_professionals(self):
         appointment=self.appointment()

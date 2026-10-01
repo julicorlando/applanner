@@ -3,7 +3,7 @@
 {% block content %}
 <section class="shell portal-page narrow">
   <div class="portal-heading"><div><a class="back-link" href="{% url 'tenant-public' reservation.tenant.public_slug|default:reservation.tenant.slug %}">← {{ reservation.tenant.name }}</a><span class="eyebrow">ARENA · RESERVA</span><h1>{{ reservation.court.name }}</h1><p>{{ reservation.starts_at|date:"d/m/Y H:i" }} · {{ reservation.duration_minutes }} minutos</p></div></div>
-  <article class="panel"><h2>{{ reservation.get_status_display }}</h2><p>Reserva de {{ reservation.customer_name }}. Valor: R$ {{ reservation.total_amount }}.</p>
+  <article class="panel"><h2>{{ reservation.get_status_display }}</h2><p>Reserva de {{ reservation.customer_display_name }}. Valor: R$ {{ reservation.total_amount }}.</p>
     {% if reservation.payment_method == 'onsite' %}<p>Pagamento na unidade. Não há cobrança antecipada.</p>{% elif payment %}<p>Sinal por Pix: R$ {{ reservation.deposit_amount }}. Estado: {{ payment.get_status_display }}.</p>{% if payment.pix_copy_paste %}<label for="pix-code">Pix copia e cola</label><textarea id="pix-code" readonly rows="3">{{ payment.pix_copy_paste }}</textarea>{% endif %}{% if payment.checkout_url %}<p><a class="button primary" href="{{ payment.checkout_url }}" rel="noopener" target="_blank">Abrir pagamento</a></p>{% endif %}{% endif %}
     {% if reservation.status == 'confirmed' and reservation.payment_method == 'onsite' %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="cancel"><button class="button ghost" type="submit" onclick="return confirm('Cancelar reserva e liberar o horário?')">Cancelar reserva</button></form>{% endif %}
   </article>

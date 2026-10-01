@@ -29,7 +29,8 @@ class PortugueseCatalogLabelsTests(SimpleTestCase):
         model = apps.get_model(resource["model"])
         form = _model_form(model, resource)
         self.assertEqual(form.fields["birth_date"].label, "Data de nascimento")
-        self.assertEqual(form.fields["phone"].label, "Telefone")
+        self.assertEqual(form.fields["phone"].label, "Telefone com DDD")
+        self.assertTrue(form.fields["phone"].required)
         self.assertEqual(_headers(model, ["created_at", "phone"]), ["Criado em", "Telefone"])
 
     def test_master_plan_column_is_named_in_portuguese(self):

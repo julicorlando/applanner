@@ -8,7 +8,7 @@
     <div>
       <span class="eyebrow">VISÃO DE HOJE</span>
       <h1>{{ tenant.name }}</h1>
-      <p>{% if arena_mode %}Acompanhe suas quadras e reservas.{% else %}{{ today_pending }} compromisso{{ today_pending|pluralize }} ainda pela frente.{% endif %}</p>
+      <p>{% if arena_mode %}Acompanhe suas quadras e reservas.{% else %}{{ today_pending }} compromisso{{ today_pending|pluralize }} pendente{{ today_pending|pluralize }} ou confirmado{{ today_pending|pluralize }} hoje.{% endif %}</p>
     </div>
     <div class="dashboard-head-actions">
       <a class="button ghost" href="/app/">Ver todos os módulos</a>
@@ -59,15 +59,16 @@
   <div class="dashboard-grid">
     <section class="panel">
       <div class="panel-head"><h2>{% if arena_mode %}Próximas reservas{% else %}Próximos atendimentos{% endif %}</h2><a href="{% if arena_mode %}{% url 'portal-resource-list' 'arena' 'reservas' %}{% else %}/app/agenda/agendamentos/{% endif %}">Ver todos →</a></div>
+      <nav class="actions" aria-label="Visões da agenda"><a href="{% if arena_mode %}/app/arena/reservas/{% else %}/app/agenda/agendamentos/{% endif %}?period=upcoming">Próximos</a><a href="{% if arena_mode %}/app/arena/reservas/{% else %}/app/agenda/agendamentos/{% endif %}?period=cancelled">Cancelados</a><a href="{% if arena_mode %}/app/arena/reservas/{% else %}/app/agenda/agendamentos/{% endif %}?period=history">Histórico</a></nav>
       <div class="appointment-list" data-live-agenda="painel-hoje">
-        {% if arena_mode %}{% for item in arena_upcoming %}<div class="appointment-row"><time>{{ item.starts_at|date:"d/m H:i" }}</time><div><strong>{{ item.customer_name }}</strong><span>{{ item.court.name }}</span></div><em>{{ item.get_status_display }}</em></div>{% empty %}<p class="empty">Nenhuma reserva futura.</p>{% endfor %}{% else %}
+        {% if arena_mode %}{% for item in arena_upcoming %}<div class="appointment-row"><time>{{ item.starts_at|date:"d/m H:i" }}</time><div><strong>{{ item.customer_display_name }}</strong><span>{{ item.court.name }}</span></div><em>{{ item.get_status_display }}</em></div>{% empty %}<p class="empty">Nenhuma reserva futura.</p>{% endfor %}{% else %}
         {% for item in next_appointments %}
           <div class="appointment-row">
-            <time>{{ item.starts_at|date:"H:i" }}</time>
-            <div><strong>{{ item.customer.name }}</strong><span>{{ item.service.name }}{% if item.professional %} · {{ item.professional.name }}{% endif %}</span></div>
+            <time>{{ item.starts_at|date:"d/m H:i" }}</time>
+            <div><strong>{{ item.customer_display_name }}</strong><span>{{ item.service.name }}{% if item.professional %} · {{ item.professional.name }}{% endif %}</span></div>
             <em>{{ item.get_status_display }}</em>
           </div>
-        {% empty %}<p class="empty">Nenhum atendimento para hoje.</p>{% endfor %}
+        {% empty %}<p class="empty">Nenhum atendimento futuro pendente ou confirmado.</p>{% endfor %}
         {% endif %}
       </div>
     </section>

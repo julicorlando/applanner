@@ -36,9 +36,10 @@
     <div class="form-field booking-times"><label id="arena-slot-label">Horários disponíveis</label><input type="hidden" id="arena-slot"><div id="arena-slots" class="booking-slots" role="group" aria-labelledby="arena-slot-label"></div><small id="arena-slot-status" role="status" aria-live="polite">Escolha quadra e data para ver os horários.</small></div>
     <div class="portal-module-grid">
       <div class="form-field"><label for="arena-name">Seu nome</label><input id="arena-name" required minlength="2"></div>
-      <div class="form-field"><label for="arena-phone">Telefone</label><input id="arena-phone" autocomplete="tel"></div>
-      <div class="form-field"><label for="arena-email">E-mail</label><input id="arena-email" type="email" autocomplete="email"></div>
+      <div class="form-field"><label for="arena-phone">Telefone com DDD</label><input id="arena-phone" type="tel" autocomplete="tel" required></div>
+      <div class="form-field"><label for="arena-email">E-mail (opcional)</label><input id="arena-email" type="email" autocomplete="email"></div>
     </div>
+    <p>Nome e telefone com DDD são obrigatórios. Seu histórico será vinculado ao contato; dados já cadastrados só podem ser corrigidos pelo estabelecimento.</p>
     <div class="form-field"><label for="arena-notes">Observações</label><input id="arena-notes"></div>
     {% if arena_deposit_available %}<fieldset class="form-field"><legend>Pagamento</legend><label><input type="radio" name="arena-payment" value="onsite" checked> Pagar na unidade</label> <label><input type="radio" name="arena-payment" value="pix"> Sinal por Pix (exige e-mail)</label></fieldset>{% endif %}
     <div id="arena-feedback" role="status" aria-live="polite"></div><div class="form-actions"><button class="button primary" type="submit">Confirmar reserva</button></div>
@@ -64,10 +65,11 @@
       <div class="form-field booking-times"><label id="booking-slot-label">Horários disponíveis</label><p class="booking-times-hint">Toque em um horário para selecioná-lo. Os horários disponíveis aparecem após escolher serviço e data.</p><input type="hidden" id="booking-slot"><div id="booking-slots" class="booking-slots" role="group" aria-labelledby="booking-slot-label"></div><small id="booking-slot-status" role="status" aria-live="polite">Escolha o serviço e a data para ver os horários.</small></div>
       <div class="portal-module-grid" style="margin-top:14px">
         <div class="form-field"><label for="booking-name">Seu nome</label><input id="booking-name" autocomplete="name" required minlength="2"></div>
-        <div class="form-field"><label for="booking-phone">Telefone</label><input id="booking-phone" type="tel" autocomplete="tel"></div>
-        <div class="form-field"><label for="booking-email">E-mail</label><input id="booking-email" type="email" autocomplete="email"></div>
+        <div class="form-field"><label for="booking-phone">Telefone com DDD</label><input id="booking-phone" type="tel" autocomplete="tel" required aria-describedby="customer-identity-hint"></div>
+        <div class="form-field"><label for="booking-email">E-mail (opcional)</label><input id="booking-email" type="email" autocomplete="email"></div>
         <div class="form-field"><label for="booking-notes">Observações</label><input id="booking-notes"></div>
       </div>
+      <p id="customer-identity-hint">Nome e telefone são obrigatórios. Use seu próprio número. Se o contato já estiver cadastrado, seu histórico será preservado; para corrigir dados existentes, fale com o estabelecimento.</p>
       {% if segment == 'auto' %}<div class="portal-module-grid"><div class="form-field"><label for="booking-plate">Placa do veículo</label><input id="booking-plate" autocomplete="off" maxlength="8" placeholder="ABC1D23" required></div><div class="form-field"><label for="booking-vehicle-model">Modelo do veículo</label><input id="booking-vehicle-model" maxlength="100" placeholder="Ex.: Onix" required></div></div>{% endif %}
       <div id="booking-feedback" role="status" aria-live="polite" style="margin-top:12px"></div>
       {% if waitlist_enabled %}<div id="booking-waitlist" class="panel" hidden><h3>Sem horários? Entre na lista de espera</h3><p>Usaremos o nome e o contato informados acima para avisar se surgir uma vaga nesta data.</p><button type="button" class="button" id="booking-waitlist-submit">Entrar na lista de espera</button></div>{% endif %}
@@ -132,7 +134,7 @@
   const picker=createBookingSlotPicker({container:document.getElementById('booking-slots'),input:slot,status:document.getElementById('booking-slot-status'),onAvailability:count=>{if(waitlist)waitlist.hidden=count!==0;}});
   if(waitlist)document.getElementById('booking-waitlist-submit').addEventListener('click',async()=>{
     const name=document.getElementById('booking-name').value.trim(),phone=document.getElementById('booking-phone').value.trim(),email=document.getElementById('booking-email').value.trim();
-    if(!name || !(phone||email)){feedback.textContent='Informe seu nome e telefone ou e-mail para entrar na lista.';return;}
+    if(!name || !phone){feedback.textContent='Informe seu nome e telefone com DDD para entrar na lista.';return;}
     const button=document.getElementById('booking-waitlist-submit');button.disabled=true;
     try{
       const response=await fetch('/api/public/{{ public_slug }}/waitlist/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf},body:JSON.stringify({service_id:service.value,professional_id:professional.value,date:date.value,name,phone,email})});
@@ -171,7 +173,7 @@
       payment_choice:form.querySelector('input[name="payment_choice"]:checked')?.value||'on_site',
       professional_link:{% if selected_professional %}true{% else %}false{% endif %}
     };
-    if(!payload.phone && !payload.email){feedback.innerHTML='<div class="flash error">Informe telefone ou e-mail.</div>';return;}
+    if(!payload.phone){feedback.textContent='Informe telefone com DDD.';return;}
     const submit=form.querySelector('button[type=submit]');submit.disabled=true;
     try {
     const response=await fetch('/api/public/{{ public_slug }}/book/',{
@@ -180,12 +182,13 @@
     const data=await response.json().catch(()=>({}));
     if(!response.ok){feedback.textContent=data.detail||'Não foi possível agendar.';submit.disabled=false;return;}
     feedback.replaceChildren();
-    const confirmation=document.createElement('div');confirmation.className='flash success';confirmation.setAttribute('role','status');
+    const confirmation=document.createElement('section');confirmation.className='booking-confirmation';confirmation.setAttribute('role','status');
     const title=document.createElement('strong');title.textContent='Agendamento confirmado!';confirmation.append(title);
     const when=new Intl.DateTimeFormat('pt-BR',{timeZone:data.timezone,dateStyle:'full',timeStyle:'short'}).format(new Date(data.starts_at));
     const price=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(data.service.price));
-    for(const text of [data.service.name+' · '+price,when,'Profissional: '+data.professional.name]){const line=document.createElement('p');line.textContent=text;confirmation.append(line);}
-    const link=document.createElement('a');link.href=data.manage_url;link.textContent=payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix';confirmation.append(link);feedback.append(confirmation);
+    for(const text of ['Serviço: '+data.service.name,'Data e horário: '+when,'Profissional: '+data.professional.name,'Valor: '+price]){const line=document.createElement('p');line.textContent=text;confirmation.append(line);}
+    if(data.customer_reused){const hint=document.createElement('p');hint.textContent='Seu contato foi vinculado ao cadastro existente. O nome e os dados já cadastrados foram preservados para manter seu histórico. Para corrigi-los, fale com o estabelecimento.';confirmation.append(hint);}
+    const link=document.createElement('a');link.className='button primary';link.href=data.manage_url;link.textContent=payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix';confirmation.append(link);feedback.append(confirmation);confirmation.scrollIntoView({block:'nearest',behavior:'smooth'});
     } catch {feedback.textContent='Não foi possível confirmar o agendamento. Consulte seus agendamentos antes de tentar novamente.';submit.disabled=false;}
   });
 })();

@@ -14,3 +14,9 @@ select option, select optgroup { color: #172033; background-color: #fff; }
   .operation-dashboard .portal-module-card > p,
   .operation-dashboard .operation-module-top { display: none; }
 }
+
+/* Public booking: a clear, responsive confirmation summary. */
+.booking-confirmation { padding: clamp(18px, 4vw, 30px); border: 1px solid var(--accent, #30c5ca); border-radius: 18px; background: var(--panel, #14213a); color: var(--text, #f5f7fc); box-shadow: 0 12px 32px rgba(0,0,0,.15); overflow-wrap: anywhere; }
+.booking-confirmation > strong { display: block; font-size: clamp(1.3rem, 4vw, 1.8rem); margin-bottom: 16px; }
+.booking-confirmation p { margin: 10px 0; line-height: 1.6; }
+.booking-confirmation .button { margin-top: 16px; white-space: normal; }

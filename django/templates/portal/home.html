@@ -59,7 +59,7 @@
     <div class="portal-module-grid">
       {% for item in modules %}
         <article class="portal-module-card operation-module operation-module-{{ item.slug }}">
-          <div class="operation-module-top"><span class="portal-module-kicker">{{ forloop.counter|stringformat:"02d" }}</span><span class="operation-module-label">{{ item.resources|length }} funções</span></div>
+          <div class="operation-module-top"><span class="portal-module-kicker">{{ forloop.counter|stringformat:"02d" }}</span><span class="operation-module-label">{{ item.resources|length }} {{ item.resources|length|pluralize:"função,funções" }}</span></div>
           <h3>{{ item.title }}</h3>
           <p>{{ item.description }}</p>
           <div class="portal-resource-links">

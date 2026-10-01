@@ -15,7 +15,7 @@
         {% elif subscription.provider_checkout_url %}<p><a class="button primary" href="{{ subscription.provider_checkout_url }}" rel="noopener">Continuar pagamento seguro</a></p>
         {% elif subscription.provider_subscription_id %}<p>A autorização de pagamento já foi iniciada. Solicite ajuda ao suporte para recuperar o link.</p>
         {% else %}<p>Escolha como pagar este ciclo. No cartão, a assinatura é automática; no Pix, você paga cada ciclo separadamente.</p>
-        <p class="payment-hint">O pagamento deve ser feito por uma conta diferente daquela que recebe as cobranças. Em testes, use o e-mail da conta compradora.</p>
+        <p class="payment-hint">O pagamento deve ser feito por uma conta diferente daquela que recebe as cobranças.</p>
         <div class="form-actions payment-choices">
           <form method="post" action="{% url 'billing-subscription-checkout' %}">{% csrf_token %}<label for="card-payer">E-mail do pagador</label><input id="card-payer" type="email" name="payment_email" value="{{ request.user.email }}" required><button class="button primary">Pagar com cartão</button></form>
           <form method="post" action="{% url 'billing-subscription-pix' %}">{% csrf_token %}<label for="pix-payer">E-mail do pagador</label><input id="pix-payer" type="email" name="payment_email" value="{{ request.user.email }}" required><button class="button">Pagar com Pix</button></form>

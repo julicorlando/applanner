@@ -105,7 +105,8 @@ def _tenant_dashboard(request):
         "professionals":Professional.objects.filter(tenant=tenant,active=True).count(),
         "revenue":net_revenue,
         "gross_revenue":gross_revenue,"expenses":expenses,"net_revenue":net_revenue,
-        "next_appointments":today_qs.select_related(
+        "next_appointments":Appointment.objects.filter(tenant=tenant,starts_at__gte=now,
+            status__in=[Appointment.Status.PENDING,Appointment.Status.CONFIRMED]).select_related(
             "customer","service","professional"
         ).order_by("starts_at")[:8],
         "modules":modules,

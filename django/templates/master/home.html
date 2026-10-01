@@ -54,7 +54,7 @@
         </div>
       </section>
       {% for group in groups %}<section class="master-function-group" id="master-group-{{ forloop.counter }}" data-master-group>
-        <div class="master-function-heading"><div><span class="eyebrow">ÁREA {{ forloop.counter|stringformat:"02d" }}</span><h3>{{ group.title }}</h3></div><span>{{ group.cards|length }} funções</span></div>
+        <div class="master-function-heading"><div><span class="eyebrow">ÁREA {{ forloop.counter|stringformat:"02d" }}</span><h3>{{ group.title }}</h3></div><span>{{ group.cards|length }} {{ group.cards|length|pluralize:"função,funções" }}</span></div>
         <div class="shortcut-grid master-function-grid">{% for item in group.cards %}<a class="master-function-card" href="{% url 'master-resource-list' item.slug %}" data-master-function><span class="shortcut-icon" aria-hidden="true">↗</span><strong>{{ item.title }}</strong><small>{{ item.count }} registros</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>{% endfor %}</div>
       </section>{% endfor %}
     </div>

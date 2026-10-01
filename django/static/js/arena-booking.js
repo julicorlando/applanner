@@ -58,7 +58,7 @@
       notes: document.getElementById('arena-notes').value.trim(),
       payment: form.querySelector('[name="arena-payment"]:checked')?.value || 'onsite',
     };
-    if (!payload.phone && !payload.email) { feedback.textContent = 'Informe telefone ou e-mail.'; return; }
+    if (!payload.phone) { feedback.textContent = 'Informe telefone com DDD.'; return; }
     button.disabled = true;
     feedback.textContent = 'Confirmando reserva...';
     try {
@@ -73,6 +73,7 @@
         button.disabled = false;
         return;
       }
+      feedback.classList.add('booking-confirmation');
       feedback.replaceChildren(document.createTextNode(`${result.detail} `));
       const when = new Intl.DateTimeFormat('pt-BR', {timeZone: result.timezone, dateStyle: 'full', timeStyle: 'short'}).format(new Date(result.starts_at));
       const until = new Intl.DateTimeFormat('pt-BR', {timeZone: result.timezone, hour: '2-digit', minute: '2-digit'}).format(new Date(result.ends_at));
@@ -83,6 +84,8 @@
         feedback.appendChild(line);
       }
       const link = document.createElement('a');
+      link.className = 'button primary';
+      if (result.customer_reused) { const hint = document.createElement('p'); hint.textContent = 'Seu histórico e os dados do cadastro existente foram preservados. Para corrigir seus dados, fale com o estabelecimento.'; feedback.appendChild(hint); }
       link.href = result.manage_url;
       link.textContent = 'Ver minha reserva';
       feedback.appendChild(link);

@@ -217,6 +217,10 @@ class Reservation(TimeStampedModel):
     cancelled_at=models.DateTimeField(null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="sports_reservations_created")
 
+    @property
+    def customer_display_name(self):
+        return self.customer.name if self.customer_id else self.customer_name
+
     class Meta:
         indexes=[
             models.Index(fields=["court","status","starts_at","ends_at"],name="arena_res_calendar_idx"),

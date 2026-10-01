@@ -71,6 +71,8 @@ class ArenaPublicBookingTests(TestCase):
         self.assertIn("total",response.json())
         self.assertEqual(response.json()["timezone"],"America/Recife")
         reservation=Reservation.objects.get(tenant=self.tenant)
+        self.assertIsNotNone(reservation.customer_id)
+        self.assertEqual(reservation.customer.phone,"5581999999999")
         self.assertEqual(reservation.status,Reservation.Status.CONFIRMED)
         self.assertEqual(reservation.deposit_amount,Decimal("0"))
         self.assertContains(self.client.get(manage_url),"Pagamento na unidade")
@@ -91,7 +93,7 @@ class ArenaPublicBookingTests(TestCase):
         self.assertNotContains(page,"Sinal por Pix")
         start=datetime.combine(self.day,time(10),ZoneInfo(self.tenant.timezone)).isoformat()
         data={"court_id":self.court.pk,"starts_at":start,"duration":60,
-              "name":"Cliente Teste","email":"cliente@example.test","payment":"pix"}
+              "name":"Cliente Teste","phone":"81999999999","email":"cliente@example.test","payment":"pix"}
         self.assertEqual(self.client.post(self.book,data,content_type="application/json").status_code,400)
         data["payment"]="onsite"
         self.assertEqual(self.client.post(self.book,data,content_type="application/json").status_code,201)
@@ -107,7 +109,7 @@ class ArenaPublicBookingTests(TestCase):
         self.assertContains(page,"Sinal por Pix")
         start=datetime.combine(self.day,time(10),ZoneInfo(self.tenant.timezone)).isoformat()
         response=self.client.post(self.book,{"court_id":self.court.pk,"starts_at":start,
-            "name":"Cliente Teste","email":"cliente@example.test","payment":"pix"},content_type="application/json")
+            "name":"Cliente Teste","phone":"81999999999","email":"cliente@example.test","payment":"pix"},content_type="application/json")
         self.assertEqual(response.status_code,201)
         reservation=Reservation.objects.get()
         self.assertEqual(reservation.status,Reservation.Status.PENDING_PAYMENT)

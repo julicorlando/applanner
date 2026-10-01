@@ -686,9 +686,15 @@ def _model_form(model, resource, *args, tenant=None, **kwargs):
         fields.remove("vehicle")
     Form=modelform_factory(model,form=OperationModelForm,fields=fields,widgets=_widgets_for(model,fields))
     form=Form(*args,tenant=tenant,**kwargs)
+    if model._meta.label_lower=="scheduling.customer" and "phone" in form.fields:
+        form.fields["phone"].required=True
+        form.fields["phone"].label="Telefone com DDD"
+        form.fields["phone"].help_text="Obrigatório. Use o telefone do cliente para manter seu histórico de atendimentos e retorno."
     for name,field in form.fields.items():
         if _field(model,name):
             field.label=field_label(model,name)
+        if model._meta.label_lower=="scheduling.customer" and name=="phone":
+            field.label="Telefone com DDD"
         model_field=_field(model,name)
         if model_field and model_field.get_internal_type()=="DateTimeField":
             field.input_formats=["%Y-%m-%dT%H:%M","%Y-%m-%d %H:%M:%S","%Y-%m-%d %H:%M"]
@@ -769,6 +775,8 @@ def _save_special(obj, *, resource, request, tenant, is_new):
 
 def _value(obj, name):
     if name=="customer" and obj._meta.label_lower=="scheduling.appointment":
+        return obj.customer_display_name
+    if name=="customer_name" and obj._meta.label_lower=="arena.reservation":
         return obj.customer_display_name
     from core.operation_forms import WEEKDAYS
     if name=="weekday":
@@ -1077,6 +1085,8 @@ def resource_list(request,module_slug,resource_slug):
     q=(request.GET.get("q") or "").strip()
     if q:
         lookup=Q()
+        if model._meta.label_lower in {"scheduling.appointment","arena.reservation"}:
+            lookup |= Q(customer__name__icontains=q)|Q(customer__phone__icontains=q)|Q(customer__email__icontains=q)
         for field in model._meta.fields:
             if field.get_internal_type() in {"CharField","TextField","EmailField","SlugField"}:
                 lookup |= Q(**{f"{field.name}__icontains":q})
@@ -1093,7 +1103,12 @@ def resource_list(request,module_slug,resource_slug):
             start=datetime.combine(local_today,time.min,tzinfo=tz)
             qs=qs.filter(starts_at__gte=start,starts_at__lt=start+timedelta(days=1))
         elif period=="upcoming":
-            qs=qs.filter(starts_at__gte=timezone.now())
+            qs=qs.filter(starts_at__gte=timezone.now(),status__in=["pending","confirmed","pending_payment"])
+        elif period=="cancelled":
+            qs=qs.filter(status="cancelled")
+        elif period=="history":
+            qs=qs.filter(Q(starts_at__lt=timezone.now())|Q(status__in=["completed","no_show"]))
+            qs=qs.exclude(status="cancelled")
         else:
             period=""
         if status in dict(status_choices):
@@ -1179,7 +1194,7 @@ def resource_create(request,module_slug,resource_slug):
             obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=True)
             try:
                 with transaction.atomic():
-                    if model._meta.label_lower=="scheduling.professional":
+                    if model._meta.label_lower in {"scheduling.professional","scheduling.customer"}:
                         obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
                     obj.full_clean()
                     obj.save()
@@ -1215,7 +1230,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
         obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=False)
         try:
             with transaction.atomic():
-                if model._meta.label_lower=="scheduling.professional":
+                if model._meta.label_lower in {"scheduling.professional","scheduling.customer"}:
                     obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
                 obj.full_clean()
                 obj.save()

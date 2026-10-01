@@ -74,7 +74,7 @@ class SignupForm(forms.Form):
     owner_name=forms.CharField(max_length=150,label="Seu nome")
     email=forms.EmailField(label="E-mail")
     payment_email=forms.EmailField(required=False,label="E-mail de quem pagará (se diferente)",
-        help_text="Em testes, use uma conta compradora diferente da conta vendedora do Mercado Pago.")
+        help_text="Preencha somente se outra pessoa for responsável pelo pagamento.")
     phone=forms.CharField(max_length=32,required=False,label="Telefone")
     password=forms.CharField(widget=forms.PasswordInput,label="Senha")
     password_confirm=forms.CharField(widget=forms.PasswordInput,label="Confirmar senha")
@@ -157,8 +157,12 @@ def plans(request):
     catalog={module.pk:module for card in cards for module in card["modules"]}
     comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
                 for module in sorted(catalog.values(),key=lambda item:(item.sort_order,item.name))]
-    for key,label in (("professionals","Profissionais"),("units","Unidades")):
-        comparison.append({"label":label,"values":[str((card["plan"].features or {}).get(key,"Consultar")) for card in cards]})
+    arena_cards=["arena" in (card["plan"].features or {}).get("segments",[]) for card in cards]
+    comparison.append({"label":"Profissionais","values":["Não se aplica" if arena else str((card["plan"].features or {}).get("professionals","Consultar")) for card,arena in zip(cards,arena_cards)]})
+    if any(arena_cards):
+        for key,label in (("courts","Quadras"),("reservations","Reservas por mês")):
+            comparison.append({"label":label,"values":[str((card["plan"].features or {}).get(key,"Consultar")) if arena else "Não se aplica" for card,arena in zip(cards,arena_cards)]})
+    comparison.append({"label":"Unidades","values":[str((card["plan"].features or {}).get("units","Consultar")) for card in cards]})
     for cycle,label in (("quarterly","Trimestral"),("semiannual","Semestral"),("annual","Anual")):
         comparison.append({"label":f"Ciclo {label.lower()}","values":[f"R$ {number_format(_price(card['plan'],cycle),decimal_pos=2)}" for card in cards]})
     return render(request,"billing/plans.html",{"cards":cards,"medical_plan":medical,"comparison":comparison})

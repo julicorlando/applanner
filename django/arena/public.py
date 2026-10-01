@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.formats import number_format
@@ -94,17 +95,22 @@ class CourtBookingAPIView(APIView):
         phone=str(request.data.get("phone") or "").strip()
         email=str(request.data.get("email") or "").strip().lower()
         payment=str(request.data.get("payment") or "onsite")
-        if len(name)<2 or not (phone or email) or len(phone)>30 or len(email)>254:
-            return Response({"detail":"Informe seu nome e telefone ou e-mail."},status=400)
+        from scheduling.customer_identity import contact_values,resolve_customer
+        try:
+            name,phone,email=contact_values(name,phone,email)
+        except ValidationError as exc:
+            return Response({"detail":" ".join(exc.messages)},status=400)
         if payment not in {"onsite","pix"} or (payment=="pix" and (not _deposit_available(tenant) or "@" not in email)):
             return Response({"detail":"Pagamento antecipado indisponível. Escolha pagar na unidade."},status=400)
         service=ArenaReservationService()
         try:
-            reservation,token=service.create_reservation(
-                tenant=tenant,court=court,start=start,end=start+timedelta(minutes=duration),
-                customer_name=name,customer_phone=phone,customer_email=email,
-                payment_method=payment,notes=str(request.data.get("notes") or ""),
-            )
+            with transaction.atomic():
+                customer,reused=resolve_customer(tenant,name,phone,email)
+                reservation,token=service.create_reservation(
+                    tenant=tenant,court=court,start=start,end=start+timedelta(minutes=duration),
+                    customer=customer,customer_name=customer.name,customer_phone=phone,customer_email=email,
+                    payment_method=payment,notes=str(request.data.get("notes") or ""),
+                )
         except ValidationError as exc:
             return Response({"detail":" ".join(exc.messages)},status=409)
         if payment=="pix":
@@ -121,6 +127,7 @@ class CourtBookingAPIView(APIView):
             "court":court.name,"starts_at":reservation.starts_at.isoformat(),
             "ends_at":reservation.ends_at.isoformat(),"total":str(reservation.total_amount),
             "timezone":tenant.timezone or "America/Recife",
+            "customer_reused":reused,
             "manage_url":f"/arena/reserva/{token}/",
         },status=status.HTTP_201_CREATED)
 
