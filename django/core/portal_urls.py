@@ -8,6 +8,7 @@ from scheduling.ratings import tenant_ratings
 urlpatterns = [
     path("primeiros-passos/",portal.setup_checklist,name="portal-setup"),
     path("diagnostico/",portal.operation_diagnostics,name="portal-diagnostics"),
+    path("recepcao/novo/",portal.reception_access,name="reception-access"),
     path("profissional/",professional_area,name="professional-area"),
     path("profissional/espera/<int:pk>/",professional_waitlist,name="professional-waitlist"),
     path("profissional/agendamento/<int:pk>/",professional_appointment,name="professional-appointment"),

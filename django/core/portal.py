@@ -968,6 +968,47 @@ def operation_diagnostics(request):
         "blocking_count":len(blocking),"ready":not blocking})
 
 
+class ReceptionAccessForm(forms.Form):
+    email=forms.EmailField(label="E-mail da recepção")
+    password1=forms.CharField(label="Senha temporária",widget=forms.PasswordInput,
+        help_text="A recepção deverá trocar esta senha no primeiro acesso.")
+    password2=forms.CharField(label="Confirmar senha",widget=forms.PasswordInput)
+    active=forms.BooleanField(label="Acesso ativo",required=False,initial=True)
+
+    def clean(self):
+        data=super().clean()
+        if data.get("password1")!=data.get("password2"):
+            self.add_error("password2","As senhas não conferem.")
+        if data.get("password1"):
+            from django.contrib.auth.password_validation import validate_password
+            try:
+                validate_password(data["password1"])
+            except ValidationError as exc:
+                self.add_error("password1",exc)
+        return data
+
+
+@login_required
+def reception_access(request):
+    tenant=_require_tenant(request) if request.user.is_superuser else request.user.tenant
+    if not tenant:
+        return redirect("portal-home")
+    if not (request.user.is_superuser or request.user.role in {"owner","manager","tenant-admin"}):
+        raise PermissionDenied("Somente a gestão pode cadastrar a recepção.")
+    form=ReceptionAccessForm(request.POST or None)
+    if request.method=="POST" and form.is_valid():
+        data=form.cleaned_data
+        User=apps.get_model("accounts","User")
+        if User.objects.filter(email__iexact=data["email"]).exists():
+            form.add_error("email","Este e-mail já pertence a uma conta.")
+        else:
+            user=User.objects.create_user(email=data["email"].lower(),password=data["password1"],tenant=tenant,
+                role="reception",is_active=data["active"],must_change_password=True)
+            messages.success(request,f"Acesso de recepção criado para {user.email}.")
+            return redirect("portal-home")
+    return render(request,"portal/reception_access.html",{"tenant":tenant,"form":form})
+
+
 def available_modules(user,tenant):
     modules=[]
     for slug,module in PORTAL_MODULES.items():

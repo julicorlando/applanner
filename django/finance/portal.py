@@ -11,8 +11,24 @@ from billing.segment_access import require_feature
 
 from scheduling.models import Customer,Professional
 from tenants.models import Tenant,Unit
-from .models import CashSession,Product,ProfessionalCommission,Sale
+from .models import CashSession,FinancialTransaction,Product,ProfessionalCommission,Sale
 from .services import cancel_sale,close_cash_session,create_sale,open_cash_session,pay_commission
+
+
+@login_required
+def summary(request):
+    require_any_capability(request.user,"finance.manage")
+    tenant=_tenant(request)
+    from django.db.models import Sum
+    from django.utils import timezone
+    now=timezone.localtime()
+    start=now.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
+    transactions=FinancialTransaction.objects.filter(tenant=tenant,status=FinancialTransaction.Status.PAID,paid_at__gte=start)
+    gross=transactions.filter(type=FinancialTransaction.Type.INCOME).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    expenses=transactions.filter(type=FinancialTransaction.Type.EXPENSE).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    return render(request,"finance/summary.html",{"tenant":tenant,"gross":gross,"expenses":expenses,
+        "net":gross-expenses,"transactions":transactions.select_related("category").order_by("-paid_at")[:100],
+        "month":start.strftime("%m/%Y")})
 
 
 def _tenant(request):

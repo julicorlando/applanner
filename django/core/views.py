@@ -52,12 +52,14 @@ def _tenant_dashboard(request):
     today_qs=Appointment.objects.filter(
         tenant=tenant,starts_at__gte=start,starts_at__lt=end
     )
-    revenue=FinancialTransaction.objects.filter(
+    monthly_transactions=FinancialTransaction.objects.filter(
         tenant=tenant,
-        type=FinancialTransaction.Type.INCOME,
         status=FinancialTransaction.Status.PAID,
         paid_at__gte=month_start,
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    )
+    gross_revenue=monthly_transactions.filter(type=FinancialTransaction.Type.INCOME).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    expenses=monthly_transactions.filter(type=FinancialTransaction.Type.EXPENSE).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    net_revenue=gross_revenue-expenses
 
     modules=list(TenantModule.objects.filter(tenant=tenant,enabled=True,module__active=True)
         .select_related("module").order_by("module__sort_order","module__name"))
@@ -101,7 +103,8 @@ def _tenant_dashboard(request):
         ]).count(),
         "customers":Customer.objects.filter(tenant=tenant,active=True).count(),
         "professionals":Professional.objects.filter(tenant=tenant,active=True).count(),
-        "revenue":revenue,
+        "revenue":net_revenue,
+        "gross_revenue":gross_revenue,"expenses":expenses,"net_revenue":net_revenue,
         "next_appointments":today_qs.select_related(
             "customer","service","professional"
         ).order_by("starts_at")[:8],

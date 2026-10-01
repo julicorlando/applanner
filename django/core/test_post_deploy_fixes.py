@@ -16,6 +16,7 @@ from core.portal import _value
 from scheduling.models import Appointment,Customer,Professional,ProfessionalAvailability,Service,TenantScheduleSettings
 from scheduling.public_views import _candidates
 from tenants.models import Tenant
+from finance.models import FinancialCategory,FinancialTransaction
 
 
 class PostDeployFixesTests(TestCase):
@@ -197,3 +198,31 @@ class PostDeployFixesTests(TestCase):
         self.assertEqual({row["value"] for row in conditions[str(barber.pk)]["categories"]},{"","barbearia","salao"})
         for invalid in ("not-an-id","99999999999999999999999999"):
             self.assertEqual(self.client.get(reverse("billing-signup"),{"plan":invalid}).status_code,200)
+
+    def test_owner_can_create_reception_access_without_finance(self):
+        response=self.client.post(reverse("reception-access"),{
+            "email":"recepcao@post-deploy.test","password1":"StrongPass123!","password2":"StrongPass123!","active":"on",
+        })
+        self.assertRedirects(response,reverse("portal-home"))
+        reception=User.objects.get(email="recepcao@post-deploy.test")
+        self.assertEqual(reception.role,"reception")
+        self.assertTrue(reception.must_change_password)
+        reception.must_change_password=False
+        reception.save(update_fields=["must_change_password"])
+        self.client.force_login(reception)
+        self.assertEqual(self.client.get(reverse("reception-access")).status_code,403)
+        self.assertEqual(self.client.get(reverse("finance-summary")).status_code,403)
+
+    def test_finance_summary_separates_gross_expenses_and_net(self):
+        category=FinancialCategory.objects.create(tenant=self.tenant,name="Operação")
+        paid_at=timezone.now()
+        FinancialTransaction.objects.create(tenant=self.tenant,category=category,type="income",description="Serviço",amount=Decimal("100.00"),status="paid",paid_at=paid_at)
+        FinancialTransaction.objects.create(tenant=self.tenant,category=category,type="expense",description="Compra",amount=Decimal("30.00"),status="paid",paid_at=paid_at)
+        FinancialTransaction.objects.create(tenant=self.tenant,category=category,type="expense",description="Pendente",amount=Decimal("999.00"),status="pending")
+        response=self.client.get(reverse("finance-summary"))
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.context["gross"],Decimal("100.00"))
+        self.assertEqual(response.context["expenses"],Decimal("30.00"))
+        self.assertEqual(response.context["net"],Decimal("70.00"))
+        self.assertContains(response,"Receita líquida")
+        self.assertContains(response,"R$ 70,00")
