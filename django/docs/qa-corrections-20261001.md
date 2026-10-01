@@ -5,6 +5,7 @@
 - Comprovante público explica por que cancelamento/remarcação estão indisponíveis: situação da reserva, política da empresa, prazo mínimo ou atendimento iniciado. Exibe os contatos públicos da empresa.
 - Arena explica indisponibilidade do cancelamento em reservas encerradas, iniciadas e com pagamento antecipado. A regra existente de tratar pagamentos com a empresa foi preservada.
 - Pix explica falta de conexão, falta de e-mail ou situação incompatível; não oferece gerar cobrança que já será recusada por esses motivos.
+- Remarcação pública com “qualquer profissional disponível” usa consulta bloqueada de profissionais elegíveis, evitando erro ao tentar bloquear uma lista em memória.
 - Pesquisa de agendamentos inclui serviço/profissional e mantém cliente/telefone/e-mail, filtros, atualização automática e isolamento por empresa. Arena inclui quadra/modalidade.
 - Configuração distingue passo dos horários de pausa entre atendimentos e explica a antecedência para cancelar ou reagendar.
 

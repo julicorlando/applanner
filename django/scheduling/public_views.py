@@ -129,7 +129,10 @@ def appointment_page(request,token):
                 ):
                     professional=candidate
             else:
-                for candidate in _candidates(row).select_for_update():
+                candidate_ids=[candidate.pk for candidate in _candidates(row)]
+                for candidate in Professional.objects.select_for_update().filter(
+                    tenant=row.tenant,active=True,pk__in=candidate_ids
+                ).order_by("name","pk"):
                     if not availability.professional_offers(
                         row.tenant,candidate.pk,row.service_id
                     ):

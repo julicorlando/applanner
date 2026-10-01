@@ -1,5 +1,6 @@
 import hashlib
-from datetime import timedelta
+from datetime import datetime,time,timedelta
+from zoneinfo import ZoneInfo
 from io import StringIO
 from unittest.mock import patch
 
@@ -11,7 +12,7 @@ from django.utils import timezone
 from accounts.models import User
 from billing.models import Plan
 from core.master import PlanMasterForm
-from scheduling.models import Appointment, Customer, Professional, Service, TenantScheduleSettings
+from scheduling.models import Appointment, Customer, Professional, ProfessionalAvailability, Service, TenantScheduleSettings
 from tenants.models import Tenant
 
 
@@ -58,6 +59,23 @@ class QAFollowupTests(TestCase):
         self.row.starts_at=timezone.now()-timedelta(minutes=30)
         self.row.save()
         self.assertContains(self.client.get(self.manage),"horário do agendamento já começou")
+
+    def test_anonymous_reschedule_can_choose_any_eligible_professional(self):
+        day=timezone.localdate()+timedelta(days=2)
+        start=datetime.combine(day,time(10),tzinfo=ZoneInfo(self.tenant.timezone))
+        self.row.starts_at=start
+        self.row.ends_at=start+timedelta(minutes=30)
+        self.row.save()
+        self.prof.services.add(self.service)
+        ProfessionalAvailability.objects.create(tenant=self.tenant,professional=self.prof,
+            weekday=day.isoweekday(),start_time=time(8),end_time=time(18))
+        new_start=start+timedelta(hours=1)
+        response=self.client.post(self.manage,{"action":"reschedule","starts_at":new_start.isoformat(),"professional_id":""})
+        self.assertEqual(response.status_code,302)
+        self.row.refresh_from_db()
+        self.assertEqual(self.row.starts_at,new_start)
+        self.assertEqual(self.row.professional_id,self.prof.pk)
+        self.assertEqual(self.row.reschedule_history.count(),1)
 
     def test_pix_without_connection_or_email_explains_why_generation_is_disabled(self):
         self.row.booking_payment="full"
