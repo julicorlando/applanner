@@ -690,6 +690,146 @@ def delete_plan(request,pk):
     return render(request,"master/plan_delete.html",{"plan":plan,"references":references})
 
 
+def _approve_account_deletion(row,actor):
+    """Encerra a operação da empresa preservando somente registros necessários para auditoria."""
+    from accounts.models import SecurityEvent,User
+    from applanner.transactional_email import queue_email
+    from billing.models import PaymentGateway,Subscription,SubscriptionHistory
+    from billing.payment_services import platform_provider
+    from core.models import AuditLog
+    from operations.models import BillingSupportRequest,SupportTicket
+    from tenants.models import Tenant
+
+    with transaction.atomic():
+        row=(BillingSupportRequest.objects.select_for_update()
+             .select_related("tenant","user","ticket").get(pk=row.pk))
+        if row.request_type!=BillingSupportRequest.RequestType.ACCOUNT_DELETION:
+            raise ValidationError("Esta solicitação não é de exclusão de conta.")
+        if row.status!=BillingSupportRequest.Status.PENDING:
+            raise ValidationError("Esta solicitação já foi analisada.")
+
+        tenant=Tenant.objects.select_for_update().get(pk=row.tenant_id)
+        requester_email=row.user.email
+        requester_name=row.user.first_name or requester_email.split("@")[0]
+        company_name=tenant.name
+        now=timezone.now()
+
+        subscriptions=list(
+            Subscription.objects.select_for_update().filter(tenant=tenant)
+            .exclude(status=Subscription.Status.CANCELLED).select_related("plan")
+            .order_by("-started_at")
+        )
+        for subscription in subscriptions:
+            if subscription.provider_subscription_id:
+                gateway_qs=PaymentGateway.objects.filter(
+                    provider="mercadopago",active=True,
+                    last_test_status=PaymentGateway.TestStatus.VALIDATED,
+                )
+                if subscription.provider_environment:
+                    gateway_qs=gateway_qs.filter(environment=subscription.provider_environment)
+                gateway=gateway_qs.first()
+                if not gateway:
+                    raise ValidationError(
+                        "Não foi possível excluir a conta porque a assinatura recorrente ainda "
+                        "não pôde ser cancelada no Mercado Pago."
+                    )
+                remote=platform_provider(gateway).cancel_subscription(subscription.provider_subscription_id)
+                if remote.get("status") not in {"canceled","cancelled"}:
+                    raise ValidationError(
+                        "O Mercado Pago não confirmou o cancelamento da assinatura. "
+                        "A exclusão não foi executada."
+                    )
+            previous=subscription.status
+            subscription.status=Subscription.Status.CANCELLED
+            subscription.cancelled_at=now
+            subscription.next_billing_at=None
+            subscription.provider_checkout_url=""
+            subscription.save(update_fields=[
+                "status","cancelled_at","next_billing_at","provider_checkout_url","updated_at",
+            ])
+            SubscriptionHistory.objects.create(
+                subscription=subscription,tenant=tenant,
+                from_plan=subscription.plan,to_plan=subscription.plan,
+                from_status=previous,to_status=subscription.status,
+                reason="Exclusão da conta aprovada pelo Master",
+            )
+
+        queue_email(
+            tenant,requester_email,"account_deletion_approved",
+            {"nome":requester_name,"empresa":company_name},
+        )
+
+        tenant.status=Tenant.Status.CANCELLED
+        tenant.public_enabled=False
+        tenant.public_booking_enabled=False
+        tenant.deleted_at=now
+        tenant.slug=(f"excluido-{tenant.pk}-{tenant.slug}")[:120]
+        tenant.public_slug=None
+        tenant.public_short_code=None
+        tenant.document=""
+        tenant.email=""
+        tenant.phone=""
+        tenant.description=""
+        tenant.metadata={}
+        tenant.save(update_fields=[
+            "status","public_enabled","public_booking_enabled","deleted_at","slug",
+            "public_slug","public_short_code","document","email","phone","description",
+            "metadata","updated_at",
+        ])
+
+        tenant_users=list(User.objects.select_for_update().filter(tenant=tenant,deleted_at__isnull=True))
+        removed_user_ids=[]
+        for user in tenant_users:
+            removed_user_ids.append(user.pk)
+            old_role=user.role
+            user.is_active=False
+            user.is_staff=False
+            user.is_superuser=False
+            user.role="deleted"
+            user.email=f"excluido-{user.pk}@users.invalid"
+            user.first_name=""
+            user.last_name=""
+            user.email_verified_at=None
+            user.two_factor_secret_encrypted=""
+            user.two_factor_enabled_at=None
+            user.must_change_password=False
+            user.session_version+=1
+            user.deleted_at=now
+            user.set_unusable_password()
+            user.save()
+            user.groups.clear()
+            user.user_permissions.clear()
+            user.role_links.all().delete()
+            user.api_tokens.all().delete()
+            user.trusted_devices.all().delete()
+            user.recovery_codes.all().delete()
+            user.email_verification_tokens.all().delete()
+            user.password_reset_tokens.all().delete()
+            SecurityEvent.objects.create(
+                user=actor,tenant=tenant,event_type="master_tenant_user_removed",
+                severity=SecurityEvent.Severity.HIGH,
+                metadata={"removed_user_id":user.pk,"previous_role":old_role,"deletion_request_id":row.pk},
+            )
+
+        row.status=BillingSupportRequest.Status.COMPLETED
+        row.reviewed_by=actor
+        row.reviewed_at=now
+        row.completed_at=now
+        row.save(update_fields=["status","reviewed_by","reviewed_at","completed_at","updated_at"])
+
+        row.ticket.status=SupportTicket.Status.CLOSED
+        row.ticket.assigned_to=actor
+        row.ticket.save(update_fields=["status","assigned_to","updated_at"])
+
+        AuditLog.objects.create(
+            tenant=tenant,user=actor,action="MASTER_ACCOUNT_DELETION_APPROVED",
+            entity_type="operations.BillingSupportRequest",entity_id=row.pk,
+            before={"tenant_status":"active","request_status":"pending"},
+            after={"tenant_status":"cancelled","request_status":"completed","removed_user_ids":removed_user_ids},
+        )
+        return company_name
+
+
 @login_required
 def operational_action(request,action,pk=None):
     _guard(request.user)
@@ -714,6 +854,31 @@ def operational_action(request,action,pk=None):
             else:
                 messages.error(request,"Falha na verificação do backup.")
             return redirect("master-resource-list",slug="backups")
+        if action in {"account-deletion-approve","account-deletion-reject"}:
+            from operations.models import BillingSupportRequest,SupportTicket
+            row=get_object_or_404(BillingSupportRequest,pk=pk)
+            if row.request_type!=BillingSupportRequest.RequestType.ACCOUNT_DELETION:
+                raise ValidationError("Esta solicitação não é de exclusão de conta.")
+            if row.status!=BillingSupportRequest.Status.PENDING:
+                raise ValidationError("Esta solicitação já foi analisada.")
+            if action=="account-deletion-reject":
+                now=timezone.now()
+                with transaction.atomic():
+                    row=BillingSupportRequest.objects.select_for_update().select_related("ticket").get(pk=row.pk)
+                    if row.status!=BillingSupportRequest.Status.PENDING:
+                        raise ValidationError("Esta solicitação já foi analisada.")
+                    row.status=BillingSupportRequest.Status.REJECTED
+                    row.reviewed_by=request.user
+                    row.reviewed_at=now
+                    row.save(update_fields=["status","reviewed_by","reviewed_at","updated_at"])
+                    row.ticket.status=SupportTicket.Status.RESOLVED
+                    row.ticket.assigned_to=request.user
+                    row.ticket.save(update_fields=["status","assigned_to","updated_at"])
+                messages.success(request,"Solicitação de exclusão rejeitada.")
+            else:
+                company_name=_approve_account_deletion(row,request.user)
+                messages.success(request,f"Conta de {company_name} excluída e e-mail de confirmação colocado na fila.")
+            return redirect("master-resource-list",slug="solicitacoes-billing")
         if action in {"module-request-approve","module-request-reject"}:
             row=get_object_or_404(ModuleRequest,pk=pk)
             approved=action=="module-request-approve"
