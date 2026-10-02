@@ -234,7 +234,7 @@ MASTER_RESOURCES={
     "acessos-suporte":{"model":"operations.SupportAccessSession","title":"Acessos remotos de suporte","fields":[],"columns":["ticket","tenant","master_user","started_at","ended_at"],"order":"-started_at","create":False,"edit":False},
     "verificacoes-backup":{"model":"operations.BackupVerification","title":"Verificações de backup","fields":[],"columns":["backup","status","verification_type","verified_at"],"order":"-verified_at","create":False,"edit":False},
     "alertas-cron":{"model":"operations.CronAlertLog","title":"Alertas dos jobs","fields":[],"columns":["alert_key","channel","status","message","created_at"],"order":"-created_at","create":False,"edit":False},
-    "solicitacoes-billing":{"model":"operations.BillingSupportRequest","title":"Solicitações financeiras","fields":[],"columns":["tenant","request_type","status","created_at"],"order":"-created_at","create":False,"edit":False},
+    "solicitacoes-billing":{"model":"operations.BillingSupportRequest","title":"Solicitações financeiras e exclusões","fields":[],"columns":["tenant","request_type","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "configuracoes-plataforma":{"model":"operations.PlatformSetting","title":"Configurações da plataforma","fields":[],"columns":["tenant","key","is_secret","updated_at"],"order":"key","create":False,"edit":False},
     "blog":{"model":"contenthub.BlogPost","title":"Blog","fields":["slug","title","excerpt","content","cover","status","featured","meta_title","meta_description","published_at"],"columns":["title","slug","status","published_at"],"order":"-published_at,-created_at","special":"blog"},
     "landings":{"model":"contenthub.LandingPage","title":"Landing pages","fields":["slug","locale","segment","headline","subheadline","body","cta_label","cta_url","seo_title","seo_description","active"],"columns":["headline","slug","locale","segment","active","updated_at"],"order":"headline"},
@@ -539,6 +539,7 @@ def resource_list(request,slug):
         "planos":"Para publicar um plano, marque Ativo e Visível ao público. Use Módulos em cada plano para escolher as funções; preços e dias de teste são editados no próprio plano.",
         "empresas":"Para aparecer no diretório, a empresa precisa estar ativa ou em teste, com Página pública ligada. Informe cidade e latitude/longitude da unidade para ordenar por proximidade.",
         "solicitacoes-modulos":"Solicitações de contratação são abertas pela empresa e analisadas aqui. Para liberar o WhatsApp de uma empresa, selecione-a no painel Operação e use Conectar WhatsApp da empresa.",
+        "solicitacoes-billing":"Pedidos de exclusão podem ser concluídos aqui. Aprovar e excluir desativa a página pública, encerra os acessos dos usuários, cancela a assinatura ativa e envia a confirmação por e-mail ao solicitante.",
     }
     return render(request,"master/list.html",{"slug":slug,"resource":config,"headers":headers,"rows":rows,"q":q,"help_text":help_text.get(slug)})
 
@@ -712,6 +713,7 @@ def _approve_account_deletion(row,actor):
         requester_email=row.user.email
         requester_name=row.user.first_name or requester_email.split("@")[0]
         company_name=tenant.name
+        previous_tenant_status=tenant.status
         now=timezone.now()
 
         subscriptions=list(
@@ -824,7 +826,7 @@ def _approve_account_deletion(row,actor):
         AuditLog.objects.create(
             tenant=tenant,user=actor,action="MASTER_ACCOUNT_DELETION_APPROVED",
             entity_type="operations.BillingSupportRequest",entity_id=row.pk,
-            before={"tenant_status":"active","request_status":"pending"},
+            before={"tenant_status":previous_tenant_status,"request_status":"pending"},
             after={"tenant_status":"cancelled","request_status":"completed","removed_user_ids":removed_user_ids},
         )
         return company_name
