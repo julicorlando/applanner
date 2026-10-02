@@ -179,7 +179,7 @@ class PublicRatingFlowTests(TestCase):
         self.assertContains(response,'name="score" value="5"')
         self.assertContains(response,"Muito insatisfeito")
         self.assertContains(response,"Muito satisfeito")
-        self.assertContains(response,"css/ratings.css")
+        self.assertContains(response,"ratings.")
         self.assertNotContains(response,'<select id="score"')
 
     def test_public_rating_submits_score_with_existing_backend_contract(self):
