@@ -20,3 +20,41 @@ select option, select optgroup { color: #172033; background-color: #fff; }
 .booking-confirmation > strong { display: block; font-size: clamp(1.3rem, 4vw, 1.8rem); margin-bottom: 16px; }
 .booking-confirmation p { margin: 10px 0; line-height: 1.6; }
 .booking-confirmation .button { margin-top: 16px; white-space: normal; }
+
+
+/* Directory: the whole establishment card is actionable, with a stronger booking CTA. */
+.directory-card { position: relative; overflow: hidden; cursor: pointer; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.directory-card:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--accent, #5b5cf0) 48%, var(--line, #dfe5f0)); box-shadow: 0 18px 42px rgba(0,0,0,.16); }
+.directory-card:focus-within { outline: 3px solid color-mix(in srgb, var(--accent, #5b5cf0) 42%, transparent); outline-offset: 3px; }
+.directory-card__overlay { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
+.directory-card__content { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; align-items: flex-start; }
+.segment-grid .directory-card h3 { margin: 28px 0 10px; font-size: clamp(1.15rem, 2vw, 1.35rem); line-height: 1.25; }
+.segment-grid .directory-card p { margin-top: 0; }
+.segment-grid .directory-card__segment { font-size: .72rem; letter-spacing: .02em; color: var(--muted, #697386); }
+.directory-card__location { margin-bottom: 22px; }
+.segment-grid .directory-card__cta { display: inline-flex; align-items: center; gap: 9px; margin-top: auto; padding: 11px 16px; border-radius: 999px; background: var(--accent, #5b5cf0); color: #fff; font-size: .8rem; font-weight: 800; box-shadow: 0 8px 22px color-mix(in srgb, var(--accent, #5b5cf0) 28%, transparent); }
+.directory-card:hover .directory-card__cta { filter: brightness(1.08); }
+
+/* Dashboard: scan-friendly upcoming appointments with separated date, customer and status. */
+.dashboard-appointment-list { display: grid; gap: 12px; margin-top: 16px; }
+.dashboard-appointment-card { grid-template-columns: 92px minmax(0,1fr); gap: 16px; align-items: stretch; padding: 14px; border: 1px solid var(--line, #e6e8ee); border-radius: 16px; background: color-mix(in srgb, var(--paper, #fff) 96%, var(--accent, #5b5cf0)); }
+.dashboard-appointment-card:first-child { border-top: 1px solid var(--line, #e6e8ee); }
+.dashboard-appointment-time { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 72px; padding: 10px 8px; border-radius: 13px; background: color-mix(in srgb, var(--accent, #5b5cf0) 12%, var(--paper, #fff)); color: inherit; }
+.dashboard-appointment-time span { font-size: .72rem; font-weight: 750; color: var(--muted, #697386); }
+.dashboard-appointment-time strong { margin-top: 4px; font-size: 1.15rem; letter-spacing: -.02em; }
+.dashboard-appointment-main { min-width: 0; display: grid; align-content: center; gap: 6px; }
+.appointment-row .dashboard-appointment-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.dashboard-appointment-title > strong { min-width: 0; font-size: .95rem; line-height: 1.3; overflow-wrap: anywhere; }
+.dashboard-appointment-meta { font-size: .78rem; color: var(--muted, #697386); line-height: 1.45; }
+.appointment-status { flex: 0 0 auto; display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent, #5b5cf0) 24%, transparent); background: color-mix(in srgb, var(--accent, #5b5cf0) 10%, transparent); color: inherit; font-size: .69rem; font-weight: 800; font-style: normal; }
+.appointment-status--confirmed { border-color: rgba(70,190,120,.32); background: rgba(70,190,120,.12); color: #3fc77a; }
+.appointment-status--pending,
+.appointment-status--pending_payment { border-color: rgba(235,174,62,.34); background: rgba(235,174,62,.12); color: #dca431; }
+
+@media (max-width: 560px) {
+  .dashboard-appointment-card { grid-template-columns: 72px minmax(0,1fr); padding: 11px; gap: 11px; }
+  .dashboard-appointment-time { min-height: 66px; }
+  .appointment-row .appointment-status { display: inline-flex; }
+  .appointment-row .dashboard-appointment-title { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .segment-grid .directory-card__cta { width: 100%; justify-content: center; }
+}
