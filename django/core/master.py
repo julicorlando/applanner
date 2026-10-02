@@ -27,7 +27,7 @@ FIELD_LABELS={
     "active":"Ativo","public_visible":"Visível na página de planos","is_custom":"Plano personalizado",
     "featured":"Em destaque","sort_order":"Ordem de exibição","public_enabled":"Página pública ativa",
     "public_booking_enabled":"Agendamento público ativo","email":"E-mail","phone":"Telefone",
-    "status":"Situação","created_at":"Criado em","updated_at":"Atualizado em",
+    "status":"Situação","request_type":"Tipo de solicitação","created_at":"Criado em","updated_at":"Atualizado em",
     "provider_environment":"Ambiente da assinatura no Mercado Pago",
     "professional_limit_override":"Liberação de profissionais para esta empresa",
 }
@@ -928,6 +928,8 @@ def operational_action(request,action,pk=None):
             return redirect("master-resource-list",slug="incidentes")
     except Exception as exc:
         messages.error(request,f"Falha operacional: {str(exc)[:240]}")
+        if action.startswith("account-deletion"):
+            return redirect("master-resource-list",slug="solicitacoes-billing")
     return redirect("master-home")
 
 
