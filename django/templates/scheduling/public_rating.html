@@ -1,4 +1,75 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Avalie seu atendimento{% endblock %}
-{% block content %}<section class="shell portal-page narrow"><div class="portal-heading"><div><span class="eyebrow">SUA OPINIÃO</span><h1>Como foi o atendimento?</h1><p>{{ appointment.tenant.name }} · {{ appointment.service.name }} · {{ appointment.professional.name }}</p></div></div>
-<article class="panel">{% if rating %}<h2>Obrigado! Sua nota foi {{ rating.score }} de 5.</h2>{% else %}<form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="score">Sua nota de 1 a 5</label><select id="score" name="score" required><option value="">Escolha uma nota</option>{% for n in "12345" %}<option value="{{ n }}">{{ n }}</option>{% endfor %}</select></div><button class="button primary">Enviar avaliação</button></form>{% endif %}</article></section>{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/ratings.css' %}">
+<section class="shell portal-page narrow public-rating-page">
+  <div class="portal-heading">
+    <div>
+      <span class="eyebrow">SUA OPINIÃO</span>
+      <h1>Como foi o atendimento?</h1>
+      <p>{{ appointment.tenant.name }} · {{ appointment.service.name }} · {{ appointment.professional.name }}</p>
+    </div>
+  </div>
+
+  <article class="panel public-rating-panel">
+    {% if rating %}
+      <div class="public-rating-thanks" role="status">
+        <span class="public-rating-thanks__icon" aria-hidden="true">{% if rating.score == 1 %}😞{% elif rating.score == 2 %}🙁{% elif rating.score == 3 %}😐{% elif rating.score == 4 %}🙂{% else %}😄{% endif %}</span>
+        <div>
+          <h2>Obrigado pela sua avaliação!</h2>
+          <p>Sua nota foi <strong>{{ rating.score }} de 5</strong>.</p>
+        </div>
+      </div>
+    {% else %}
+      <form method="post" class="portal-form public-rating-form">
+        {% csrf_token %}
+        <fieldset class="public-rating-fieldset">
+          <legend>Escolha uma nota de 1 a 5</legend>
+
+          <div class="public-rating-choices" role="radiogroup" aria-label="Avaliação do atendimento">
+            <label class="public-rating-choice public-rating-choice--1">
+              <input type="radio" name="score" value="1" required aria-label="1 - Muito insatisfeito">
+              <span class="public-rating-face" aria-hidden="true">😞</span>
+              <span class="sr-only">Muito insatisfeito</span>
+            </label>
+
+            <label class="public-rating-choice public-rating-choice--2">
+              <input type="radio" name="score" value="2" aria-label="2 - Insatisfeito">
+              <span class="public-rating-face" aria-hidden="true">🙁</span>
+              <span class="sr-only">Insatisfeito</span>
+            </label>
+
+            <label class="public-rating-choice public-rating-choice--3">
+              <input type="radio" name="score" value="3" aria-label="3 - Neutro">
+              <span class="public-rating-face" aria-hidden="true">😐</span>
+              <span class="sr-only">Neutro</span>
+            </label>
+
+            <label class="public-rating-choice public-rating-choice--4">
+              <input type="radio" name="score" value="4" aria-label="4 - Satisfeito">
+              <span class="public-rating-face" aria-hidden="true">🙂</span>
+              <span class="sr-only">Satisfeito</span>
+            </label>
+
+            <label class="public-rating-choice public-rating-choice--5">
+              <input type="radio" name="score" value="5" aria-label="5 - Muito satisfeito">
+              <span class="public-rating-face" aria-hidden="true">😄</span>
+              <span class="sr-only">Muito satisfeito</span>
+            </label>
+          </div>
+
+          <div class="public-rating-track" aria-hidden="true"></div>
+          <div class="public-rating-labels" aria-hidden="true">
+            <span>1 · Muito insatisfeito</span>
+            <span>3 · Neutro</span>
+            <span>5 · Muito satisfeito</span>
+          </div>
+        </fieldset>
+
+        <button class="button primary public-rating-submit" type="submit">Enviar avaliação</button>
+      </form>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}
