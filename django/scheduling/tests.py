@@ -2,12 +2,14 @@ import hashlib
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from django.core.signing import dumps
 from django.test import TestCase
+from django.utils import timezone
 
 from accounts.models import User
 from tenants.models import Tenant
 from .availability import AvailabilityService
-from .models import Appointment, Customer, Professional, ProfessionalAvailability, Service
+from .models import Appointment, AppointmentRating, Customer, Professional, ProfessionalAvailability, Service
 
 
 class AvailabilityServiceTests(TestCase):
@@ -142,3 +144,50 @@ class PublicBookingFlowTests(TestCase):
         self.assertContains(response,'id="manage-slots"')
         self.assertContains(response,'id="manage-submit" type="submit" disabled')
         self.assertNotContains(response,'<select id="manage-slot"')
+
+
+class PublicRatingFlowTests(TestCase):
+    def setUp(self):
+        self.tenant=Tenant.objects.create(
+            name="Empresa Avaliação",slug="empresa-avaliacao",status=Tenant.Status.ACTIVE,
+        )
+        self.customer=Customer.objects.create(tenant=self.tenant,name="Cliente Avaliação")
+        self.service=Service.objects.create(
+            tenant=self.tenant,name="Corte",duration_minutes=30,price=40,
+        )
+        self.professional=Professional.objects.create(
+            tenant=self.tenant,name="Profissional Avaliação",public_slug="profissional-avaliacao",
+        )
+        start=timezone.now()-timedelta(hours=1)
+        self.appointment=Appointment.objects.create(
+            tenant=self.tenant,customer=self.customer,service=self.service,
+            professional=self.professional,starts_at=start,
+            ends_at=start+timedelta(minutes=30),status=Appointment.Status.COMPLETED,
+        )
+        self.token=dumps(
+            {"appointment":self.appointment.pk},
+            salt="appointment-rating",
+            compress=True,
+        )
+        self.url=f"/avaliar/{self.token}/"
+
+    def test_public_rating_uses_visual_scale_instead_of_select(self):
+        response=self.client.get(self.url)
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,"Como foi o atendimento?")
+        self.assertContains(response,'name="score" value="1"')
+        self.assertContains(response,'name="score" value="5"')
+        self.assertContains(response,"Muito insatisfeito")
+        self.assertContains(response,"Muito satisfeito")
+        self.assertContains(response,"ratings.")
+        self.assertNotContains(response,'<select id="score"')
+
+    def test_public_rating_submits_score_with_existing_backend_contract(self):
+        response=self.client.post(self.url,{"score":"5"})
+        self.assertEqual(response.status_code,302)
+        rating=AppointmentRating.objects.get(appointment=self.appointment)
+        self.assertEqual(rating.score,5)
+
+        response=self.client.get(self.url)
+        self.assertContains(response,"Obrigado pela sua avaliação!")
+        self.assertContains(response,"5 de 5")
