@@ -58,3 +58,9 @@ select option, select optgroup { color: #172033; background-color: #fff; }
   .appointment-row .dashboard-appointment-title { align-items: flex-start; flex-direction: column; gap: 7px; }
   .segment-grid .directory-card__cta { width: 100%; justify-content: center; }
 }
+
+
+/* Master destructive actions stay visually distinct without breaking compact tables. */
+.table-actions form { display: inline-block; margin-left: 10px; }
+.table-actions .nav-link { font-weight: 750; }
+.table-actions .danger-action { color: #d85050; }
