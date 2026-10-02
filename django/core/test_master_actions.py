@@ -2,9 +2,13 @@ from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
-from operations.models import HomologationRun
+from billing.models import Plan,Subscription
+from communications.models import Notification
+from operations.models import BillingSupportRequest,HomologationRun,SupportTicket
+from tenants.models import Tenant
 
 
 class MasterOperationalActionTests(TestCase):
@@ -18,3 +22,61 @@ class MasterOperationalActionTests(TestCase):
         response=self.client.post(reverse("master-operational-action",args=["homologation-run"]))
         self.assertEqual(response.status_code,302)
         self.assertEqual(HomologationRun.objects.count(),1)
+
+
+    def test_master_can_approve_and_complete_account_deletion(self):
+        tenant=Tenant.objects.create(
+            name="Empresa para excluir",slug="empresa-para-excluir",
+            status=Tenant.Status.ACTIVE,public_enabled=True,public_booking_enabled=True,
+            email="contato@empresa.test",
+        )
+        owner=User.objects.create_user(
+            email="titular@empresa.test",password="StrongPassword123!",
+            tenant=tenant,role="owner",first_name="Titular",
+        )
+        member=User.objects.create_user(
+            email="equipe@empresa.test",password="StrongPassword123!",
+            tenant=tenant,role="user",
+        )
+        plan=Plan.objects.create(name="Plano exclusão",slug="plano-exclusao",monthly_price=49)
+        subscription=Subscription.objects.create(
+            tenant=tenant,plan=plan,status=Subscription.Status.ACTIVE,
+            started_at=timezone.now(),
+        )
+        ticket=SupportTicket.objects.create(
+            protocol="EX-TESTE",tenant=tenant,user=owner,category="account_deletion",
+            subject="Solicitação de exclusão de conta e dados",description="Encerrar",
+        )
+        deletion=BillingSupportRequest.objects.create(
+            tenant=tenant,user=owner,ticket=ticket,
+            request_type=BillingSupportRequest.RequestType.ACCOUNT_DELETION,
+        )
+
+        response=self.client.post(reverse(
+            "master-operational-object-action",
+            args=["account-deletion-approve",deletion.pk],
+        ))
+        self.assertEqual(response.status_code,302)
+
+        tenant.refresh_from_db()
+        owner.refresh_from_db()
+        member.refresh_from_db()
+        subscription.refresh_from_db()
+        deletion.refresh_from_db()
+        ticket.refresh_from_db()
+
+        self.assertEqual(tenant.status,Tenant.Status.CANCELLED)
+        self.assertIsNotNone(tenant.deleted_at)
+        self.assertFalse(tenant.public_enabled)
+        self.assertFalse(tenant.public_booking_enabled)
+        self.assertFalse(owner.is_active)
+        self.assertFalse(member.is_active)
+        self.assertIsNotNone(owner.deleted_at)
+        self.assertIsNotNone(member.deleted_at)
+        self.assertEqual(subscription.status,Subscription.Status.CANCELLED)
+        self.assertEqual(deletion.status,BillingSupportRequest.Status.COMPLETED)
+        self.assertEqual(deletion.reviewed_by,self.user)
+        self.assertEqual(ticket.status,SupportTicket.Status.CLOSED)
+        notification=Notification.objects.get(template_key="account_deletion_approved")
+        self.assertEqual(notification.destination,"titular@empresa.test")
+        self.assertEqual(notification.status,Notification.Status.QUEUED)

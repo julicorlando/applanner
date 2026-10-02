@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.utils import timezone
 from accounts.models import User
 from tenants.models import Tenant
-from operations.models import SupportTicket
+from operations.models import BillingSupportRequest,SupportTicket
 from .models import Plan, Subscription, SubscriptionHistory, PaymentGateway
 from .webhooks import _subscription_status
 
@@ -50,6 +50,10 @@ class AccountLifecycleTests(TestCase):
         for _ in range(2):
             self.client.post('/billing/conta/solicitar-exclusao/',{'password':'SenhaFortissima123!','reason':'Encerrar'})
         self.assertEqual(SupportTicket.objects.filter(tenant=self.tenant,category='account_deletion').count(),1)
+        self.assertEqual(BillingSupportRequest.objects.filter(
+            tenant=self.tenant,request_type=BillingSupportRequest.RequestType.ACCOUNT_DELETION,
+            status=BillingSupportRequest.Status.PENDING,
+        ).count(),1)
         self.subscription.refresh_from_db()
         self.assertEqual(self.subscription.status,'active')
 

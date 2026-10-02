@@ -5,13 +5,16 @@
   <div class="portal-heading"><div><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Encontre estabelecimentos.</h1><p>Veja empresas com página pública e agendamento pelo ApPlanner.</p><p id="location-status" role="status"></p></div><button class="button ghost" id="nearby" type="button">{% if located %}Atualizar localização{% else %}Encontrar perto de mim{% endif %}</button></div>
   <div class="segment-grid">
     {% for card in cards %}
-    <article>
-      {% if card.tenant.logo %}<img class="professional-avatar" src="{% url 'public-tenant-image' card.tenant.pk 'logo' %}" alt="Logo de {{ card.tenant.name }}" loading="lazy">{% endif %}
-      <span>{{ card.tenant.category_label }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
-      <h3>{{ card.tenant.name }}</h3>
-      <p>{{ card.tenant.description|truncatechars:180 }}</p>
-      {% with unit=card.nearest_unit %}{% if unit %}<p>{{ unit.city }}{% if unit.state %}/{{ unit.state }}{% endif %}{% if unit.district %} · {{ unit.district }}{% endif %}</p>{% endif %}{% endwith %}
-      <a href="{% url 'tenant-public' card.tenant.public_slug|default:card.tenant.slug %}">Abrir página e agendar →</a>
+    <article class="directory-card">
+      <a class="directory-card__overlay" href="{% url 'tenant-public' card.tenant.public_slug|default:card.tenant.slug %}" aria-label="Abrir página de {{ card.tenant.name }} e agendar"></a>
+      <div class="directory-card__content">
+        {% if card.tenant.logo %}<img class="professional-avatar" src="{% url 'public-tenant-image' card.tenant.pk 'logo' %}" alt="Logo de {{ card.tenant.name }}" loading="lazy">{% endif %}
+        <span class="directory-card__segment">{{ card.tenant.category_label }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
+        <h3>{{ card.tenant.name }}</h3>
+        <p>{{ card.tenant.description|truncatechars:180 }}</p>
+        {% with unit=card.nearest_unit %}{% if unit %}<p class="directory-card__location">{{ unit.city }}{% if unit.state %}/{{ unit.state }}{% endif %}{% if unit.district %} · {{ unit.district }}{% endif %}</p>{% endif %}{% endwith %}
+        <span class="directory-card__cta">Abrir página e agendar <span aria-hidden="true">→</span></span>
+      </div>
     </article>
     {% empty %}<div class="panel"><p>Nenhum estabelecimento está publicado no diretório.</p>{% if request.user.is_superuser %}<p>Ative <strong>Página pública</strong> no cadastro da empresa em <a href="{% url 'master-resource-list' 'empresas' %}">Master → Empresas</a>. Empresas em teste também podem aparecer.</p>{% endif %}</div>{% endfor %}
   </div>
