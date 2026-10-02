@@ -378,12 +378,21 @@ def request_account_deletion(request):
     if not request.user.check_password(request.POST.get("password", "")):
         messages.error(request,"Senha incorreta. Nenhuma solicitação foi criada.")
         return redirect("billing-subscription-status")
-    from operations.models import SupportTicket
+    from operations.models import BillingSupportRequest,SupportTicket
     from operations.triage import classify_priority
     with transaction.atomic():
         pending=SupportTicket.objects.select_for_update().filter(tenant_id=request.user.tenant_id,
             category="account_deletion").exclude(status__in=[SupportTicket.Status.CLOSED,SupportTicket.Status.RESOLVED]).first()
         if pending:
+            BillingSupportRequest.objects.get_or_create(
+                ticket=pending,
+                defaults={
+                    "tenant":request.user.tenant,
+                    "user":request.user,
+                    "request_type":BillingSupportRequest.RequestType.ACCOUNT_DELETION,
+                    "status":BillingSupportRequest.Status.PENDING,
+                },
+            )
             messages.info(request,f"Solicitação em análise: {pending.protocol}.")
         else:
             ticket=SupportTicket.objects.create(protocol="EX-"+token_hex(8).upper(),
@@ -391,6 +400,11 @@ def request_account_deletion(request):
                 subject="Solicitação de exclusão de conta e dados",
                 description=(request.POST.get("reason") or "Titular solicitou exclusão da conta.")[:2000],
                 priority=classify_priority("privacidade","Solicitação de exclusão de conta",""))
+            BillingSupportRequest.objects.create(
+                tenant=request.user.tenant,user=request.user,ticket=ticket,
+                request_type=BillingSupportRequest.RequestType.ACCOUNT_DELETION,
+                status=BillingSupportRequest.Status.PENDING,
+            )
             messages.success(request,f"Pedido {ticket.protocol} recebido. A equipe analisará dados, pagamentos e obrigações de conservação antes de concluir a exclusão.")
     return redirect("billing-subscription-status")
 
