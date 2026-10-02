@@ -34,6 +34,12 @@ TEMPLATES={
         "body":"Olá, {nome}!\n\nSeu agendamento em {empresa} foi confirmado.\nServiço: {servico}\nProfissional: {profissional}\nData e horário: {data_hora}\n\nAté breve!",
         "variables":{"nome","empresa","servico","profissional","data_hora"},"required":{"data_hora","servico"},"action":None,
     },
+    "account_deletion_approved":{
+        "label":"Exclusão de conta aprovada",
+        "subject":"Exclusão da conta de {empresa} concluída",
+        "body":"Olá, {nome}!\n\nSua solicitação de exclusão da conta de {empresa} foi aprovada e concluída pelo ApPlanner. O acesso da empresa e dos usuários vinculados foi encerrado e a página pública foi desativada.\n\nRegistros que precisem ser preservados por obrigação legal, segurança ou auditoria poderão permanecer retidos pelo prazo aplicável, sem acesso operacional pela conta excluída.\n\nEquipe ApPlanner",
+        "variables":{"nome","empresa"},"required":set(),"action":None,
+    },
 }
 
 
