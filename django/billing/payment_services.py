@@ -61,7 +61,7 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
         provider="mercadopago",active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED
     ).order_by("-environment").first()
     if not gateway:
-        raise RuntimeError("Mercado Pago da plataforma não está configurado.")
+        raise RuntimeError("provedor de cobrança da plataforma não está configurado.")
 
     amount=subscription.contracted_price or subscription.plan.monthly_price
     if subscription.billing_cycle==Subscription.BillingCycle.QUARTERLY:
@@ -115,7 +115,7 @@ def create_platform_pix_charge(*,subscription,payer_email):
         provider="mercadopago",active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED,
     ).first()
     if not gateway:
-        raise RuntimeError("Mercado Pago da plataforma não está configurado.")
+        raise RuntimeError("provedor de cobrança da plataforma não está configurado.")
     amount=subscription.contracted_price
     if amount is None:
         months={"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[subscription.billing_cycle]
@@ -146,7 +146,7 @@ def create_platform_pix_charge(*,subscription,payer_email):
     qr=remote.get("qr_code") or ""
     qr_base64=remote.get("qr_code_base64") or ""
     if not remote.get("order_id") or not (qr or qr_base64):
-        raise RuntimeError("Mercado Pago não retornou o código Pix. Tente novamente.")
+        raise RuntimeError("provedor de cobrança não retornou o código Pix. Tente novamente.")
     ticket_url=remote.get("ticket_url") or ""
     if ticket_url and not ticket_url.startswith("https://"):
         ticket_url=""
@@ -179,7 +179,7 @@ def configure_tenant_mercadopago(*,tenant,environment,access_token,webhook_secre
         provider="mercadopago",
         environment=environment,
         defaults={
-            "display_name":"Mercado Pago",
+            "display_name":"provedor de cobrança",
             "credentials_encrypted":encrypt_json({
                 "access_token":access_token,
                 "webhook_secret":webhook_secret,
