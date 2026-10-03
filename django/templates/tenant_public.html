@@ -144,7 +144,7 @@
       <p>{{ product.description }}</p>
       <strong>R$ {{ product.sale_price }}</strong>
       {% if product.public_available_stock > 0 and tenant.public_booking_enabled %}
-        <button type="button" class="button ghost public-product-reserve" data-reserve-product="{{ product.pk }}" data-product-name="{{ product.name|escape }}" data-product-price="{{ product.sale_price }}">Reservar com o agendamento</button>
+        <button type="button" class="button ghost public-product-reserve" data-reserve-product="{{ product.pk }}" data-product-name="{{ product.name|escape }}" data-product-price="{{ product.sale_price|floatformat:"2u" }}">Reservar com o agendamento</button>
       {% elif product.public_available_stock > 0 %}
         <span class="public-choice-card__action">Disponível no estabelecimento</span>
       {% else %}
