@@ -1,10 +1,11 @@
 import hashlib
+import json
 import secrets
 import re
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from core.crypto import encrypt_text
+from core.crypto import decrypt_text,encrypt_text
 from django.core.exceptions import ValidationError
 from .customer_identity import contact_values, resolve_customer
 
@@ -162,6 +163,86 @@ class PublicAvailabilityAPIView(APIView):
         return Response({"date":day.isoformat(),"auto_professional":True,"slots":slots})
 
 
+def _booking_idempotency_key(request):
+    value=(request.headers.get("Idempotency-Key") or request.data.get("idempotency_key") or "").strip()
+    if not value:
+        return ""
+    if not 8<=len(value)<=100 or not re.fullmatch(r"[A-Za-z0-9._:-]+",value):
+        raise ValidationError("Idempotency-Key inválido.")
+    return value
+
+
+def _booking_fingerprint(data):
+    normalized={
+        "service_id":str(data.get("service_id") or ""),
+        "professional_id":str(data.get("professional_id") or ""),
+        "starts_at":str(data.get("starts_at") or ""),
+        "name":str(data.get("name") or "").strip(),
+        "phone":re.sub(r"\D","",str(data.get("phone") or "")),
+        "email":str(data.get("email") or "").strip().lower(),
+        "payment_choice":str(data.get("payment_choice") or Appointment.BookingPayment.ON_SITE),
+        "product_ids":sorted(str(value) for value in (data.get("product_ids") or [])),
+        "vehicle_plate":re.sub(r"[^A-Z0-9]","",str(data.get("vehicle_plate") or "").upper()),
+        "vehicle_model":str(data.get("vehicle_model") or "").strip(),
+        "notes":str(data.get("notes") or "")[:2000],
+    }
+    return hashlib.sha256(
+        json.dumps(normalized,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
+def _booking_response(request,appointment,*,replay=False,customer_reused=True):
+    from finance.models import ProductReservation
+    token=decrypt_text(appointment.customer_manage_token_encrypted)
+    reservations=ProductReservation.objects.select_related("product").filter(appointment=appointment)
+    body={
+        "id":appointment.pk,"status":appointment.status,
+        "starts_at":appointment.starts_at.isoformat(),
+        "ends_at":appointment.ends_at.isoformat(),
+        "service":{
+            "id":appointment.service_id,"name":appointment.service.name,
+            "price":str(appointment.service_price_snapshot or appointment.service.price),
+            "duration_minutes":appointment.service.duration_minutes,
+        },
+        "timezone":appointment.tenant.timezone or "America/Recife",
+        "customer_reused":customer_reused,
+        "professional":{
+            "id":appointment.professional_id,
+            "name":appointment.professional.name if appointment.professional else "",
+        },
+        "reserved_products":[
+            {
+                "id":row.product_id,"name":row.product.name,
+                "quantity":str(row.quantity),"price":str(row.unit_price_snapshot),
+            }
+            for row in reservations
+        ],
+        "manage_token":token,
+        "manage_url":request.build_absolute_uri(reverse("public-appointment-page",args=[token])),
+        "idempotent_replay":replay,
+    }
+    response=Response(body,status=status.HTTP_200_OK if replay else status.HTTP_201_CREATED)
+    if replay:
+        response["X-Idempotent-Replay"]="true"
+    return response
+
+
+def _booking_replay(request,tenant,key,fingerprint):
+    if not key:
+        return None
+    appointment=Appointment.objects.select_related(
+        "tenant","service","professional"
+    ).filter(tenant=tenant,idempotency_key=key).first()
+    if not appointment:
+        return None
+    if appointment.idempotency_fingerprint!=fingerprint:
+        return Response(
+            {"detail":"Esta chave de idempotência já foi usada com dados diferentes."},
+            status=status.HTTP_409_CONFLICT,
+        )
+    return _booking_response(request,appointment,replay=True)
+
+
 class PublicBookingAPIView(APIView):
     permission_classes=[permissions.AllowAny]
     throttle_classes=[PublicBookingThrottle]
@@ -173,6 +254,14 @@ class PublicBookingAPIView(APIView):
             return Response({"detail":"Página não encontrada."},status=status.HTTP_404_NOT_FOUND)
 
         data=request.data
+        try:
+            idempotency_key=_booking_idempotency_key(request)
+        except ValidationError as exc:
+            return Response({"detail":" ".join(exc.messages)},status=status.HTTP_400_BAD_REQUEST)
+        fingerprint=_booking_fingerprint(data) if idempotency_key else ""
+        replay=_booking_replay(request,tenant,idempotency_key,fingerprint)
+        if replay:
+            return replay
         try:
             service=Service.objects.get(pk=int(data["service_id"]),tenant=tenant,active=True)
             starts_at=_parse_start(tenant,data["starts_at"])
@@ -191,6 +280,9 @@ class PublicBookingAPIView(APIView):
                 )
             except (ValueError,Professional.DoesNotExist):
                 return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
+            replay=_booking_replay(request,tenant,idempotency_key,fingerprint)
+            if replay:
+                return replay
             if not availability.professional_offers(tenant,professional.pk,service.pk):
                 return Response({"detail":"Profissional não oferece esse serviço."},status=status.HTTP_400_BAD_REQUEST)
             source=Appointment.Source.PROFESSIONAL_LINK if data.get("professional_link") else Appointment.Source.PUBLIC
@@ -204,6 +296,9 @@ class PublicBookingAPIView(APIView):
         else:
             # Lock candidates and pick the first one that remains free.
             for candidate in _candidate_professionals(tenant,service).select_for_update():
+                replay=_booking_replay(request,tenant,idempotency_key,fingerprint)
+                if replay:
+                    return replay
                 if not availability.professional_offers(tenant,candidate.pk,service.pk):
                     continue
                 if availability.is_available(
@@ -315,6 +410,8 @@ class PublicBookingAPIView(APIView):
             notes=str(data.get("notes") or "")[:2000],
             customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest(),
             customer_manage_token_encrypted=encrypt_text(token),
+            idempotency_key=idempotency_key,
+            idempotency_fingerprint=fingerprint,
         )
         reserved_products=[]
         if selected_products:
@@ -335,21 +432,8 @@ class PublicBookingAPIView(APIView):
                 for product in selected_products
             ]
 
-        manage_path=reverse("public-appointment-page",args=[token])
-        return Response(
-            {
-                "id":appointment.pk,"status":appointment.status,
-                "starts_at":appointment.starts_at.isoformat(),
-                "ends_at":appointment.ends_at.isoformat(),
-                "service":{"id":service.pk,"name":service.name,"price":str(service.price),"duration_minutes":service.duration_minutes},
-                "timezone":tenant.timezone or "America/Recife",
-                "customer_reused":reused,
-                "professional":{"id":professional.pk,"name":professional.name},
-                "reserved_products":reserved_products,
-                "manage_token":token,
-                "manage_url":request.build_absolute_uri(manage_path),
-            },
-            status=status.HTTP_201_CREATED,
+        return _booking_response(
+            request,appointment,replay=False,customer_reused=reused,
         )
 
 
