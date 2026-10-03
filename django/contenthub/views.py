@@ -56,6 +56,7 @@ def public_directory_page(request):
     ).prefetch_related("units").order_by("name")
     lat=request.GET.get("lat")
     lon=request.GET.get("lon")
+    postal_code=(request.GET.get("cep") or "").strip()
     try:
         if lat is not None and lon is not None:
             latitude,longitude=float(lat),float(lon)
@@ -65,6 +66,12 @@ def public_directory_page(request):
             latitude=longitude=None
     except (TypeError,ValueError):
         latitude=longitude=None
+    if latitude is None and postal_code:
+        from tenants.geocoding import coordinates_for_postal_code,normalize_postal_code
+        postal_code=normalize_postal_code(postal_code)
+        coords=coordinates_for_postal_code(postal_code) if postal_code else None
+        if coords:
+            latitude,longitude=coords
     cards=[]
     for tenant in rows[:300]:
         units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
@@ -82,4 +89,6 @@ def public_directory_page(request):
         })
     if latitude is not None:
         cards.sort(key=lambda row:(row["distance_km"] is None,row["distance_km"] or 0,row["tenant"].name))
-    return render(request,"contenthub/directory.html",{"cards":cards,"located":latitude is not None})
+    return render(request,"contenthub/directory.html",{
+        "cards":cards,"located":latitude is not None,"postal_code":postal_code,
+    })
