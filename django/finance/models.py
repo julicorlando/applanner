@@ -116,8 +116,8 @@ class ProductReservation(TimeStampedModel):
             ),
         ]
         indexes=[
-            models.Index(fields=["tenant","product"]),
-            models.Index(fields=["appointment"]),
+            models.Index(fields=["tenant","product"],name="finance_pro_tenant__056c87_idx"),
+            models.Index(fields=["appointment"],name="finance_pro_appointm_43ca6e_idx"),
         ]
 
     def __str__(self):
