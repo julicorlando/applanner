@@ -237,11 +237,18 @@ class SettlementForm(forms.Form):
 
     def clean(self):
         data=super().clean()
-        has_product_sale=bool(data.get("reserved_products") or data.get("product"))
+        reserved=data.get("reserved_products")
+        product=data.get("product")
+        has_product_sale=bool(reserved or product)
+        if reserved is not None and product and reserved.filter(pk=product.pk).exists():
+            self.add_error("product","Este produto já foi marcado entre os itens reservados vendidos.")
         if data.get("outcome")=="completed" and not data.get("payment_method") and (not self.prepaid_full or has_product_sale):
             self.add_error("payment_method","Informe como o atendimento foi pago.")
-        if data.get("outcome")=="no_show" and has_product_sale:
-            self.add_error("reserved_products","Não há venda de produtos em atendimento não realizado.")
+        if data.get("outcome")=="no_show":
+            if reserved:
+                self.add_error("reserved_products","Não há venda de produtos em atendimento não realizado.")
+            if product:
+                self.add_error("product","Não há venda de produtos em atendimento não realizado.")
         return data
 
 
