@@ -220,6 +220,7 @@ MASTER_RESOURCES={
     "checkouts":{"model":"billing.CheckoutSession","title":"Checkouts","fields":[],"columns":["public_id","tenant","plan","billing_cycle","total","status","expires_at"],"order":"-created_at","create":False,"edit":False},
     "cupons":{"model":"billing.Coupon","title":"Cupons","fields":["code","type","value","valid_from","valid_until","max_uses","active"],"columns":["code","type","value","uses_count","max_uses","active"],"order":"code"},
     "faturas":{"model":"billing.Invoice","title":"Faturas","fields":[],"columns":["number","tenant","amount","status","due_at","paid_at"],"order":"-created_at","create":False,"edit":False},
+    "notas-fiscais":{"model":"billing.FiscalDocumentRequest","title":"Solicitações de NFe","fields":[],"columns":["tenant","reference_month","amount","status","invoice_number","requested_at","uploaded_at"],"order":"-requested_at","create":False,"edit":False},
     "pagamentos":{"model":"billing.Payment","title":"Pagamentos","fields":[],"columns":["tenant","purpose","provider","amount","status","due_at","paid_at"],"order":"-created_at","create":False,"edit":False},
     "pix":{"model":"billing.PixCharge","title":"Cobranças Pix","fields":[],"columns":["public_id","tenant","amount","status","expires_at","paid_at"],"order":"-created_at","create":False,"edit":False},
     "eventos-provedor":{"model":"billing.ProviderEvent","title":"Eventos de provedores","fields":[],"columns":["provider","event_type","status","received_at","processed_at"],"order":"-received_at","create":False,"edit":False},
@@ -365,7 +366,7 @@ def home(request):
         if slug=="usuarios" else apps.get_model(cfg["model"]).objects.count()
     )} for slug,cfg in MASTER_RESOURCES.items()]
     sections=[
-        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
+        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","notas-fiscais","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
         ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","campanhas-indicacao","recompensas-indicacao","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","faq","aquisicao","meta-conversoes"}),
         ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing"}),
