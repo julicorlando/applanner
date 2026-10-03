@@ -205,7 +205,7 @@ MASTER_RESOURCES={
     "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","version","title","content","status","published_at"],"columns":["type","version","title","status","published_at"],"order":"-published_at,-created_at"},
     "comerciais":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":[],"columns":["commercial_user","tenant","base_amount","commission_amount","status","paid_at"],"order":"-created_at","create":False,"edit":False},
-    "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
+    "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","source","source_medium","source_campaign","referrer_user","converted_tenant","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
     "propostas":{"model":"commercial.Proposal","title":"Propostas comerciais","fields":[],"columns":["title","customer_name","commercial_user","final_price","status","approval_status"],"order":"-created_at","create":False,"edit":False},
     "operacao":{"model":"operations.PlatformOperationSettings","title":"Configuração operacional","fields":["backup_retention_days","backup_include_uploads","backup_encrypt","backup_before_update","lead_retention_days","critical_alert_email","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"columns":["backup_retention_days","backup_include_uploads","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"order":"id","special":"operation_settings"},
     "crons":{"model":"operations.CronHeartbeat","title":"Saúde dos jobs","fields":[],"columns":["cron_key","status","started_at","finished_at","duration_ms","host_name"],"order":"-started_at","create":False,"edit":False},
@@ -245,6 +245,9 @@ MASTER_RESOURCES={
     "marketing-entregas":{"model":"communications.MarketingDelivery","title":"Entregas de e-mail","fields":[],"columns":["campaign","lead","status","sent_at","opened_at","clicked_at"],"order":"-created_at","create":False,"edit":False},
     "whatsapp-conversas":{"model":"communications.WhatsAppConversation","title":"Conversas WhatsApp","fields":[],"columns":["tenant","contact_name","wa_id","status","assigned_to","last_message_at"],"order":"-last_message_at","create":False,"edit":False},
     "aquisicao":{"model":"growth.AcquisitionEvent","title":"Eventos de aquisição","fields":[],"columns":["event_name","tenant","source","medium","campaign","value_amount","created_at"],"order":"-created_at","create":False,"edit":False},
+    "campanhas-indicacao":{"model":"engagement.ReferralIncentiveCampaign","title":"Campanhas Indique e ganhe","fields":["name","active","reward_type","reward_value","company_referrals_enabled","professional_referrals_enabled","starts_at","ends_at"],"columns":["name","reward_type","reward_value","active","starts_at","ends_at"],"order":"-created_at"},
+    "recompensas-indicacao":{"model":"engagement.ReferralReward","title":"Recompensas de indicação","fields":[],"columns":["campaign","referrer_user","referred_tenant","referrer_kind","qualified_payment_count","reward_amount","status","pix_key","created_at"],"order":"-created_at","create":False,"edit":False},
+    "contas-bancarias":{"model":"billing.TenantBankAccount","title":"Contas bancárias das empresas","fields":[],"columns":["tenant","bank_name","holder_name","account_last4","pix_key_last4","is_primary","active","created_at"],"order":"tenant__name,-is_primary,bank_name","create":False,"edit":False},
     "meta-conversoes":{"model":"growth.MetaConversionLog","title":"Meta Conversions API","fields":[],"columns":["event_name","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "usuarios":{"model":"accounts.User","title":"Usuários","fields":["tenant","email","role","is_active","is_staff"],"columns":["email","tenant","role","is_active","is_staff"],"order":"email"},
     "papeis-usuarios":{"model":"accounts.UserRole","title":"Papéis dos usuários","fields":["user","role"],"columns":["user","role"],"order":"user__email"},
@@ -328,6 +331,14 @@ def _widgets(model,fields):
 
 
 def _value(obj,name):
+    if name=="pix_key" and obj._meta.label_lower=="engagement.referralreward":
+        if not obj.pix_key_encrypted:
+            return "—"
+        try:
+            from core.crypto import decrypt_text
+            return decrypt_text(obj.pix_key_encrypted)
+        except Exception:
+            return "Indisponível"
     if name=="role" and obj._meta.label_lower=="accounts.user":
         return {"owner":"Responsável","professional":"Profissional","user":"Usuário",
                 "master":"Master","manager":"Gestor","staff":"Equipe"}.get(obj.role,obj.role)
@@ -354,9 +365,9 @@ def home(request):
         if slug=="usuarios" else apps.get_model(cfg["model"]).objects.count()
     )} for slug,cfg in MASTER_RESOURCES.items()]
     sections=[
-        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento"}),
+        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
-        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","aquisicao","meta-conversoes"}),
+        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","campanhas-indicacao","recompensas-indicacao","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","faq","aquisicao","meta-conversoes"}),
         ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing"}),
     ]
     assigned=set().union(*(slugs for _,slugs in sections))
@@ -882,6 +893,17 @@ def operational_action(request,action,pk=None):
                 company_name=_approve_account_deletion(row,request.user)
                 messages.success(request,f"Conta de {company_name} excluída e e-mail de confirmação colocado na fila.")
             return redirect("master-resource-list",slug="solicitacoes-billing")
+        if action=="referral-reward-paid":
+            from engagement.models import ReferralReward
+            row=get_object_or_404(
+                ReferralReward,pk=pk,status=ReferralReward.Status.READY,
+                referrer_kind=ReferralReward.ReferrerKind.PROFESSIONAL,
+            )
+            row.status=ReferralReward.Status.PAID
+            row.paid_at=timezone.now()
+            row.save(update_fields=["status","paid_at","updated_at"])
+            messages.success(request,"Recompensa marcada como paga ao profissional.")
+            return redirect("master-resource-list",slug="recompensas-indicacao")
         if action in {"module-request-approve","module-request-reject"}:
             row=get_object_or_404(ModuleRequest,pk=pk)
             approved=action=="module-request-approve"
