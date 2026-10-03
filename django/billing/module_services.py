@@ -320,6 +320,11 @@ def cancel_module_addon(*,addon,user):
             adjustment.provider="mercadopago"
             adjustment.provider_reference=subscription.provider_subscription_id
 
+        if repeatable and addon.module_request_id:
+            ModuleRequest.objects.filter(
+                pk=addon.module_request_id,status=ModuleRequest.Status.ACTIVE
+            ).update(status=ModuleRequest.Status.CANCELLED,updated_at=timezone.now())
+
         if repeatable and addon.quantity>1:
             components=list(addon.pricing_components or [])
             if components:
@@ -327,7 +332,13 @@ def cancel_module_addon(*,addon,user):
             addon.quantity-=1
             addon.pricing_components=components
             addon.monthly_price=remaining_price
-            addon.save(update_fields=["quantity","pricing_components","monthly_price","updated_at"])
+            replacement_request=ModuleRequest.objects.filter(
+                tenant=addon.tenant,module=addon.module,status=ModuleRequest.Status.ACTIVE
+            ).order_by("-created_at").first()
+            addon.module_request=replacement_request
+            addon.save(update_fields=[
+                "quantity","pricing_components","monthly_price","module_request","updated_at"
+            ])
         else:
             addon.status=TenantModuleAddon.Status.CANCELLED
             addon.cancelled_at=timezone.now()
@@ -338,6 +349,10 @@ def cancel_module_addon(*,addon,user):
                 "status","cancelled_at","quantity","pricing_components","monthly_price","updated_at"
             ])
             TenantModule.objects.filter(tenant=addon.tenant,module=addon.module).delete()
+            if not repeatable and addon.module_request_id:
+                ModuleRequest.objects.filter(
+                    pk=addon.module_request_id,status=ModuleRequest.Status.ACTIVE
+                ).update(status=ModuleRequest.Status.CANCELLED,updated_at=timezone.now())
 
         subscription.addon_contracted_price=(monthly_after*months).quantize(Decimal("0.01"))
         subscription.contracted_price=new_total
