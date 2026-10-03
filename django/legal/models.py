@@ -22,6 +22,7 @@ class LegalDocument(TimeStampedModel):
     title=models.CharField(max_length=190)
     content=models.TextField()
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.DRAFT,db_index=True)
+    requires_acceptance=models.BooleanField(default=True)
     published_at=models.DateTimeField(null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="legal_documents")
 
