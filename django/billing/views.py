@@ -20,7 +20,7 @@ from accounts.models import PlatformRole,UserRole
 from tenants.models import Tenant,Unit,TenantOnboarding
 from .models import Module,ModuleRequest,Plan,Subscription,SubscriptionHistory,TenantModuleAddon,PixCharge,Payment,PaymentGateway
 from .payment_services import create_platform_subscription,create_platform_pix_charge,platform_provider
-from .module_services import cancel_module_addon,request_module
+from .module_services import cancel_module_addon,module_monthly_price,request_module
 from commercial.models import Proposal
 from applanner.transactional_email import account_values,queue_email
 
@@ -527,9 +527,12 @@ def subscription_modules(request):
             ]
         ).values_list("module_id",flat=True)
     )
-    available=Module.objects.filter(
+    available=list(Module.objects.filter(
         active=True,addon_sellable=True
-    ).exclude(pk__in=plan_module_ids|active_ids|pending_ids).order_by("sort_order","name")
+    ).exclude(pk__in=plan_module_ids|active_ids|pending_ids).order_by("sort_order","name"))
+    for module in available:
+        module.current_monthly_price=module_monthly_price(module,tenant)
+        module.current_unit_count=tenant.units.filter(active=True).count() if module.per_unit_billing else None
     return render(request,"billing/modules.html",{
         "subscription":subscription,"available":available,
         "requests":ModuleRequest.objects.filter(tenant=tenant).select_related("module").order_by("-created_at")[:100],
