@@ -34,6 +34,12 @@ TEMPLATES={
         "body":"Olá, {nome}!\n\nSeu agendamento em {empresa} foi confirmado.\nServiço: {servico}\nProfissional: {profissional}\nData e horário: {data_hora}\n\nAté breve!",
         "variables":{"nome","empresa","servico","profissional","data_hora"},"required":{"data_hora","servico"},"action":None,
     },
+    "referral_pix_request":{
+        "label":"Indicação qualificada · solicitar Pix",
+        "subject":"Sua indicação no ApPlanner foi qualificada",
+        "body":"Olá, {nome}!\n\nA empresa indicada {empresa_indicada} concluiu os pagamentos necessários e sua recompensa de R$ {valor} foi liberada.\n\nCadastre sua chave Pix com segurança no ApPlanner:\n{url_pix}\n\nEquipe ApPlanner",
+        "variables":{"nome","empresa_indicada","valor","url_pix"},"required":{"url_pix","valor"},"action":"url_pix",
+    },
     "account_deletion_approved":{
         "label":"Exclusão de conta aprovada",
         "subject":"Exclusão da conta de {empresa} concluída",
