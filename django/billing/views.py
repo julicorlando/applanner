@@ -83,9 +83,11 @@ class SignupForm(forms.Form):
 
     def __init__(self,*args,selected_plan=None,**kwargs):
         super().__init__(*args,**kwargs)
-        medical_available=Plan.objects.filter(
+        from contenthub.models import PlatformHomepage
+        platform=PlatformHomepage.objects.filter(pk=1).first()
+        medical_available=bool(platform and platform.medical_segment_visible and Plan.objects.filter(
             slug="segment-medico",active=True,public_visible=True
-        ).exists()
+        ).exists())
         if medical_available:
             self.fields["category"].widget.choices=[
                 *self.fields["category"].widget.choices,("clinica","Clínica e saúde")
@@ -152,9 +154,15 @@ class SignupForm(forms.Form):
 
 
 def plans(request):
+    from contenthub.models import PlatformHomepage
+    platform=PlatformHomepage.objects.filter(pk=1).first()
+    medical_visible=bool(platform and platform.medical_segment_visible)
     rows=Plan.objects.filter(
         active=True,public_visible=True,is_custom=False
-    ).prefetch_related("module_links__module").order_by("sort_order","name")
+    )
+    if not medical_visible:
+        rows=rows.exclude(slug="segment-medico")
+    rows=rows.prefetch_related("module_links__module").order_by("sort_order","name")
     cards=[]
     for plan in rows:
         modules=[
@@ -162,7 +170,7 @@ def plans(request):
             if link.enabled and link.module.active
         ]
         cards.append({"plan":plan,"modules":modules})
-    medical=Plan.objects.filter(slug="segment-medico",active=False).first()
+    medical=Plan.objects.filter(slug="segment-medico").first() if medical_visible else None
     catalog={module.pk:module for card in cards for module in card["modules"]}
     comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
                 for module in sorted(catalog.values(),key=lambda item:(item.sort_order,item.name))]
