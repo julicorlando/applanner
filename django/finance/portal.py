@@ -1,4 +1,5 @@
 from decimal import Decimal
+import secrets
 
 from django import forms
 from django.contrib import messages
@@ -45,6 +46,7 @@ def _tenant(request):
 
 
 class SaleForm(forms.Form):
+    idempotency_key=forms.CharField(required=False,widget=forms.HiddenInput)
     product=forms.ModelChoiceField(queryset=Product.objects.none(),label="Produto")
     quantity=forms.DecimalField(min_value=Decimal("0.001"),decimal_places=3,max_digits=12,initial=1)
     unit_price=forms.DecimalField(required=False,min_value=0,decimal_places=2,max_digits=12,label="Preço unitário")
@@ -75,7 +77,10 @@ class CashOpenForm(forms.Form):
 def pos(request):
     require_any_capability(request.user,"finance.manage")
     tenant=_tenant(request)
-    form=SaleForm(request.POST or None,tenant=tenant)
+    form=SaleForm(
+        request.POST or None,tenant=tenant,
+        initial={"idempotency_key":"sale-"+secrets.token_urlsafe(24)} if request.method!="POST" else None,
+    )
     if request.method=="POST" and form.is_valid():
         d=form.cleaned_data
         try:
@@ -87,6 +92,7 @@ def pos(request):
                 payment_method=d["payment_method"],unit=d["unit"],
                 customer=d["customer"],professional=d["professional"],
                 discount=d["sale_discount"] or 0,
+                idempotency_key=d.get("idempotency_key") or "sale-"+secrets.token_urlsafe(24),
             )
             messages.success(request,f"Venda #{sale.pk} concluída.")
             return redirect("finance-pos")

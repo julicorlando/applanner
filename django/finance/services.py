@@ -1,4 +1,6 @@
 from decimal import Decimal
+import hashlib
+import json
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -29,21 +31,64 @@ def create_sale(
     customer=None,
     professional=None,
     discount=Decimal("0"),
+    idempotency_key="",
 ):
     if not items:
         raise ValidationError("A venda precisa ter ao menos um item.")
 
+    idempotency_key=(idempotency_key or "").strip()
+    if len(idempotency_key)>100:
+        raise ValidationError("Chave de idempotência inválida.")
+
+    raw_items=list(items)
+    fingerprint=hashlib.sha256(
+        json.dumps({
+            "items":[
+                {
+                    "product_id":int(item["product_id"]),
+                    "quantity":str(item.get("quantity") or 0),
+                    "unit_price":str(item.get("unit_price") or ""),
+                    "discount":str(item.get("discount") or 0),
+                }
+                for item in raw_items
+            ],
+            "payment_method":payment_method or "",
+            "unit_id":getattr(unit,"pk",None),
+            "customer_id":getattr(customer,"pk",None),
+            "professional_id":getattr(professional,"pk",None),
+            "discount":str(discount or 0),
+        },sort_keys=True,separators=(",",":"),default=str).encode("utf-8")
+    ).hexdigest()
+
+    if idempotency_key:
+        existing=Sale.objects.filter(tenant=tenant,idempotency_key=idempotency_key).first()
+        if existing:
+            if existing.idempotency_fingerprint and existing.idempotency_fingerprint!=fingerprint:
+                raise ValidationError("Esta chave de idempotência já foi usada em outra venda.")
+            return existing
+
+    product_ids=sorted({int(item["product_id"]) for item in raw_items})
+    locked_products={
+        product.pk:product for product in Product.objects.select_for_update().filter(
+            pk__in=product_ids,tenant=tenant,active=True
+        ).order_by("pk")
+    }
+    if len(locked_products)!=len(product_ids):
+        raise ValidationError("Um ou mais produtos não foram encontrados.")
+
+    # A segunda checagem acontece depois do lock dos produtos. Em duas requisições
+    # simultâneas com a mesma chave, a segunda só prossegue depois da primeira.
+    if idempotency_key:
+        existing=Sale.objects.filter(tenant=tenant,idempotency_key=idempotency_key).first()
+        if existing:
+            if existing.idempotency_fingerprint and existing.idempotency_fingerprint!=fingerprint:
+                raise ValidationError("Esta chave de idempotência já foi usada em outra venda.")
+            return existing
+
     normalized=[]
     subtotal=Decimal("0")
-    for raw in items:
-        product=Product.objects.select_for_update().filter(
-            pk=raw["product_id"],
-            tenant=tenant,
-            active=True,
-        ).first()
-        if not product:
-            raise ValidationError(f"Produto {raw['product_id']} não encontrado.")
-
+    for raw in raw_items:
+        product=locked_products[int(raw["product_id"])]
         quantity=Decimal(str(raw.get("quantity") or 0))
         if quantity<=0:
             raise ValidationError("Quantidade deve ser maior que zero.")
@@ -75,6 +120,8 @@ def create_sale(
         discount=discount,
         total=total,
         payment_method=payment_method,
+        idempotency_key=idempotency_key,
+        idempotency_fingerprint=fingerprint if idempotency_key else "",
     )
 
     for product,quantity,unit_price,item_discount,item_total in normalized:
@@ -125,6 +172,7 @@ def create_sale(
 
     FinancialTransaction.objects.create(
         tenant=tenant,
+        unit=unit or (professional.unit if professional and professional.unit_id else None),
         type=FinancialTransaction.Type.INCOME,
         description=f"Venda #{sale.pk}",
         amount=total,
@@ -136,6 +184,19 @@ def create_sale(
         source_id=sale.pk,
         paid_at=timezone.now(),
     )
+
+    if discount>0 or any(item[3]>0 for item in normalized):
+        from core.audit import append_audit
+        append_audit(
+            tenant=tenant,user=user,action="SALE_WITH_DISCOUNT",
+            entity_type="finance.Sale",entity_id=sale.pk,
+            before=None,
+            after={
+                "subtotal":str(sale.subtotal),"sale_discount":str(sale.discount),
+                "total":str(sale.total),
+                "item_discounts":[str(item[3]) for item in normalized],
+            },
+        )
     return sale
 
 
@@ -200,12 +261,12 @@ def close_cash_session(*,session,user,closing_amount,notes=""):
         raise ValidationError("Caixa já está fechado.")
     cash_methods=["cash","dinheiro"]
     income=FinancialTransaction.objects.filter(
-        tenant=session.tenant,status=FinancialTransaction.Status.PAID,
+        tenant=session.tenant,unit=session.unit,status=FinancialTransaction.Status.PAID,
         type=FinancialTransaction.Type.INCOME,paid_at__gte=session.opened_at,
         payment_method__in=cash_methods,
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
     expense=FinancialTransaction.objects.filter(
-        tenant=session.tenant,status=FinancialTransaction.Status.PAID,
+        tenant=session.tenant,unit=session.unit,status=FinancialTransaction.Status.PAID,
         type=FinancialTransaction.Type.EXPENSE,paid_at__gte=session.opened_at,
         payment_method__in=cash_methods,
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
@@ -236,6 +297,7 @@ def pay_commission(*,commission,user):
         tenant=commission.tenant,
         idempotency_key=f"commission:{commission.pk}",
         defaults={
+            "unit":commission.professional.unit,
             "source_type":"professional_commission","source_id":commission.pk,
             "type":FinancialTransaction.Type.EXPENSE,
             "description":f"Comissão · {commission.professional.name}",

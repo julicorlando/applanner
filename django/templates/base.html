@@ -65,7 +65,8 @@
   {% if messages %}
   <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
   {% endif %}
-  <main id="conteudo">{% block content %}{% endblock %}</main>
+  <main id="conteudo">{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
+{% block content %}{% endblock %}</main>
   <footer class="footer">
     <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>
     <nav class="footer-legal" aria-label="Documentos legais">
@@ -74,6 +75,8 @@
       <a href="{% url 'legal-public-document' 'termos-clientes' %}">Termos · Clientes</a>
       <a href="{% url 'legal-public-document' 'cancelamento-empresas' %}">Cancelamento · Empresas</a>
       <a href="{% url 'legal-public-document' 'cancelamento-clientes' %}">Cancelamento · Clientes</a>
+      <a href="{% url 'legal-public-privacy-request' %}">Solicitação de privacidade</a>
+      {% if request.user.is_authenticated %}<a href="{% url 'legal-privacy-center' %}">Meus dados e privacidade</a>{% endif %}
     </nav>
     <span>© {% now "Y" %} ApPlanner</span>
   </footer>

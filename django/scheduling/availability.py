@@ -15,8 +15,15 @@ from .models import (
 
 
 class AvailabilityService:
-    def settings(self,tenant):
+    def settings(self,tenant,unit=None):
         settings_obj,_=TenantScheduleSettings.objects.get_or_create(tenant=tenant)
+        if unit and unit.tenant_id==tenant.pk:
+            from copy import copy
+            from core.unit_settings import AGENDA_FIELDS
+            settings_obj=copy(settings_obj)
+            for key,value in (unit.schedule_overrides or {}).items():
+                if key in AGENDA_FIELDS:
+                    setattr(settings_obj,key,value)
         return settings_obj
 
     def service(self,tenant,service_id):
@@ -25,6 +32,9 @@ class AvailabilityService:
     def professional_offers(self,tenant,professional_id,service_id):
         professional=Professional.objects.filter(pk=professional_id,tenant=tenant,active=True).first()
         if not professional:
+            return False
+        service=self.service(tenant,service_id)
+        if not service or service.unit_id not in (None,professional.unit_id):
             return False
         if not professional.services_restricted and not professional.services.exists():
             return True
@@ -37,7 +47,12 @@ class AvailabilityService:
         if start.date()!=end.date() or end<=start:
             return False
 
-        schedule=self.settings(tenant)
+        if professional.unit_id:
+            hours=professional.unit.business_hours.filter(weekday=start.isoweekday(),active=True).first()
+            if hours and (hours.closed or not hours.opens_at or not hours.closes_at
+                          or start.time()<hours.opens_at or end.time()>hours.closes_at):
+                return False
+        schedule=self.settings(tenant,unit=professional.unit)
         now=timezone.now().astimezone(tz)
         if public_rules:
             if start < now + timedelta(minutes=schedule.minimum_notice_minutes):
@@ -108,7 +123,7 @@ class AvailabilityService:
         if not availability:
             return []
 
-        schedule=self.settings(tenant)
+        schedule=self.settings(tenant,unit=professional.unit)
         tz=ZoneInfo(tenant.timezone or "America/Recife")
         cursor=datetime.combine(day,availability.start_time,tzinfo=tz)
         finish=datetime.combine(day,availability.end_time,tzinfo=tz)

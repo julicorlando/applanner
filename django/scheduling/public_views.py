@@ -21,7 +21,7 @@ def _appointment(token,lock=False):
 
 
 def _caps(row):
-    cfg=AvailabilityService().settings(row.tenant)
+    cfg=AvailabilityService().settings(row.tenant,unit=row.unit)
     manageable=row.status in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED}
     in_time=row.starts_at>=timezone.now()+timedelta(minutes=cfg.cancel_notice_minutes)
     def reason(enabled, action):

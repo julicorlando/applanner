@@ -8,6 +8,7 @@ from django.shortcuts import redirect, render
 from requests.exceptions import RequestException
 
 from core.crypto import encrypt_json
+from core.audit import append_audit
 from scheduling.models import TenantScheduleSettings
 from .models import PaymentGateway, TenantBankAccount, TenantPaymentConnection
 from .payment_services import configure_tenant_mercadopago
@@ -95,7 +96,7 @@ def tenant_gateway(request):
             make_primary=bool(data.get("is_primary") or not banks.exists())
             if make_primary:
                 TenantBankAccount.objects.filter(tenant=tenant,active=True).update(is_primary=False)
-            TenantBankAccount.objects.create(
+            account=TenantBankAccount.objects.create(
                 tenant=tenant,bank_code=(data.get("bank_code") or "").strip(),
                 bank_name=data["bank_name"].strip(),holder_name=data["holder_name"].strip(),
                 details_encrypted=encrypt_json({
@@ -110,6 +111,15 @@ def tenant_gateway(request):
                 pix_key_last4=_mask_last4(data.get("pix_key")),
                 is_primary=make_primary,created_by=request.user,
             )
+        append_audit(
+            tenant=tenant,user=request.user,request=request,
+            action="BANK_ACCOUNT_ADDED",entity_type="billing.TenantBankAccount",entity_id=account.pk,
+            after={
+                "bank_name":account.bank_name,"bank_code":account.bank_code,
+                "account_last4":account.account_last4,"pix_key_last4":account.pix_key_last4,
+                "is_primary":account.is_primary,
+            },
+        )
         messages.success(request,"Conta bancária cadastrada.")
         return redirect("tenant-payment-gateway")
 
@@ -118,6 +128,11 @@ def tenant_gateway(request):
             tenant=tenant,pk=request.POST.get("bank_account"),active=True
         ).first()
         if account:
+            before={
+                "bank_name":account.bank_name,"account_last4":account.account_last4,
+                "pix_key_last4":account.pix_key_last4,"is_primary":account.is_primary,
+                "active":account.active,
+            }
             was_primary=account.is_primary
             account.active=False
             account.is_primary=False
@@ -127,6 +142,11 @@ def tenant_gateway(request):
                 if replacement:
                     replacement.is_primary=True
                     replacement.save(update_fields=["is_primary","updated_at"])
+            append_audit(
+                tenant=tenant,user=request.user,request=request,
+                action="BANK_ACCOUNT_REMOVED",entity_type="billing.TenantBankAccount",entity_id=account.pk,
+                before=before,after={"active":False,"is_primary":False},
+            )
             messages.success(request,"Conta bancária removida.")
         return redirect("tenant-payment-gateway")
 
@@ -135,10 +155,19 @@ def tenant_gateway(request):
             tenant=tenant,pk=request.POST.get("bank_account"),active=True
         ).first()
         if account:
+            previous_primary=TenantBankAccount.objects.filter(
+                tenant=tenant,active=True,is_primary=True
+            ).values_list("pk",flat=True).first()
             with transaction.atomic():
                 TenantBankAccount.objects.filter(tenant=tenant,active=True).update(is_primary=False)
                 account.is_primary=True
                 account.save(update_fields=["is_primary","updated_at"])
+            append_audit(
+                tenant=tenant,user=request.user,request=request,
+                action="BANK_ACCOUNT_PRIMARY_CHANGED",entity_type="billing.TenantBankAccount",
+                entity_id=account.pk,before={"primary_account_id":previous_primary},
+                after={"primary_account_id":account.pk},
+            )
             messages.success(request,"Conta principal atualizada.")
         return redirect("tenant-payment-gateway")
 
@@ -146,8 +175,16 @@ def tenant_gateway(request):
         if not connected and request.POST.get("enabled")=="on":
             messages.error(request,"Conecte um provedor de cobrança online antes de ativar o pagamento no agendamento.")
         else:
+            previous_enabled=schedule_settings.online_booking_payments_enabled
             schedule_settings.online_booking_payments_enabled=request.POST.get("enabled")=="on"
             schedule_settings.save(update_fields=["online_booking_payments_enabled","updated_at"])
+            append_audit(
+                tenant=tenant,user=request.user,request=request,
+                action="BOOKING_PAYMENT_SETTING_CHANGED",
+                entity_type="scheduling.TenantScheduleSettings",entity_id=tenant.pk,
+                before={"online_booking_payments_enabled":previous_enabled},
+                after={"online_booking_payments_enabled":schedule_settings.online_booking_payments_enabled},
+            )
             messages.success(request,"Pagamento no agendamento atualizado.")
         return redirect("tenant-payment-gateway")
 
@@ -161,6 +198,11 @@ def tenant_gateway(request):
                 None,"Não foi possível validar o provedor. Confira ambiente, credenciais e chave do webhook."
             )
         else:
+            append_audit(
+                tenant=tenant,user=request.user,request=request,
+                action="PAYMENT_PROVIDER_CONNECTED",entity_type="billing.TenantPaymentConnection",
+                entity_id=None,after={"provider":"mercadopago","environment":provider_form.cleaned_data["environment"]},
+            )
             messages.success(request,"Provedor de cobrança online validado e conectado.")
             return redirect("tenant-payment-gateway")
 

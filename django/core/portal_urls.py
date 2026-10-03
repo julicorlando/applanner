@@ -1,12 +1,14 @@
 from django.urls import path
 from . import portal
 from .branding import tenant_branding
+from .unit_settings import unit_schedule_settings
 from billing.tenant_gateway import tenant_gateway
 from .professional_area import professional_area, professional_access, professional_appointment, professional_waitlist, reception_appointment
 from scheduling.ratings import tenant_ratings
 from engagement.referrals import referrals
 
 urlpatterns = [
+    path("configuracao-unidade/",unit_schedule_settings,name="unit-schedule-settings"),
     path("primeiros-passos/",portal.setup_checklist,name="portal-setup"),
     path("diagnostico/",portal.operation_diagnostics,name="portal-diagnostics"),
     path("recepcao/novo/",portal.reception_access,name="reception-access"),

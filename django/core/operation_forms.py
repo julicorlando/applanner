@@ -61,7 +61,7 @@ class OperationModelForm(forms.ModelForm):
             self.instance.services.set(self.cleaned_data["offered_services"] if self.instance.services_restricted else [])
         elif self._meta.model==Service:
             selected={p.pk for p in self.cleaned_data["offering_professionals"]}
-            for professional in Professional.objects.select_for_update().filter(tenant=self.tenant).order_by("pk"):
+            for professional in Professional.objects.select_for_update().filter(tenant=self.tenant,pk__in=self.fields["offering_professionals"].queryset.values("pk")).order_by("pk"):
                 if not professional.services_restricted and not professional.services.exists():
                     # Explicit selection freezes the previous all-services access;
                     # an empty result must mean no services, not unrestricted access.

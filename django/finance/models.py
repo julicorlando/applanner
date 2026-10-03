@@ -33,6 +33,9 @@ class FinancialTransaction(TimeStampedModel):
         CANCELLED="cancelled","Cancelado"
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="financial_transactions")
+    unit=models.ForeignKey(
+        "tenants.Unit",null=True,blank=True,on_delete=models.SET_NULL,related_name="financial_transactions"
+    )
     appointment=models.ForeignKey("scheduling.Appointment",null=True,blank=True,on_delete=models.SET_NULL,related_name="financial_transactions")
     category=models.ForeignKey(FinancialCategory,null=True,blank=True,on_delete=models.SET_NULL,related_name="transactions")
     source_type=models.CharField(max_length=40,blank=True)
@@ -58,6 +61,7 @@ class FinancialTransaction(TimeStampedModel):
         indexes=[
             models.Index(fields=["tenant","status","due_at"]),
             models.Index(fields=["tenant","source_type","source_id"]),
+            models.Index(fields=["tenant","unit","status","paid_at"],name="finance_tx_unit_paid_idx"),
         ]
 
 
@@ -138,6 +142,8 @@ class Sale(models.Model):
     discount=models.DecimalField(max_digits=10,decimal_places=2,default=0)
     total=models.DecimalField(max_digits=10,decimal_places=2)
     payment_method=models.CharField(max_length=40)
+    idempotency_key=models.CharField(max_length=100,blank=True)
+    idempotency_fingerprint=models.CharField(max_length=64,blank=True)
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.COMPLETED)
     cancel_reason=models.CharField(max_length=500,blank=True)
     cancelled_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="sales_cancelled")
@@ -145,6 +151,13 @@ class Sale(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        constraints=[
+            models.UniqueConstraint(
+                fields=["tenant","idempotency_key"],
+                condition=~models.Q(idempotency_key=""),
+                name="uq_sale_idempotency",
+            ),
+        ]
         indexes=[models.Index(fields=["tenant","created_at"])]
 
 

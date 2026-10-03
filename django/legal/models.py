@@ -56,3 +56,50 @@ class CustomerConsent(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["tenant","customer","type","created_at"],name="legal_consent_customer_idx")]
+
+
+class DataSubjectRequest(TimeStampedModel):
+    class Type(models.TextChoices):
+        EXPORT="export","Exportação de dados"
+        CORRECTION="correction","Correção de dados"
+        DELETION="deletion","Exclusão de dados"
+        CONSENT="consent","Consentimento / marketing"
+
+    class Status(models.TextChoices):
+        OPEN="open","Aberta"
+        IN_REVIEW="in_review","Em análise"
+        WAITING_IDENTITY="waiting_identity","Aguardando validação de identidade"
+        COMPLETED="completed","Concluída"
+        REJECTED="rejected","Rejeitada"
+        CANCELLED="cancelled","Cancelada"
+
+    tenant=models.ForeignKey(
+        "tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="data_subject_requests",
+    )
+    user=models.ForeignKey(
+        settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="data_subject_requests",
+    )
+    request_type=models.CharField(max_length=20,choices=Type.choices)
+    status=models.CharField(max_length=24,choices=Status.choices,default=Status.OPEN,db_index=True)
+    requester_name=models.CharField(max_length=160)
+    requester_email=models.EmailField()
+    requester_phone=models.CharField(max_length=32,blank=True)
+    details=models.TextField(blank=True)
+    deadline_at=models.DateTimeField(null=True,blank=True,db_index=True)
+    reviewed_by=models.ForeignKey(
+        settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="data_subject_requests_reviewed",
+    )
+    reviewed_at=models.DateTimeField(null=True,blank=True)
+    completed_at=models.DateTimeField(null=True,blank=True)
+    resolution_notes=models.TextField(blank=True)
+    source=models.CharField(max_length=24,default="privacy_center")
+    ip_address=models.GenericIPAddressField(null=True,blank=True)
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["status","deadline_at"],name="legal_dsr_status_due_idx"),
+            models.Index(fields=["requester_email","created_at"],name="legal_dsr_email_idx"),
+        ]

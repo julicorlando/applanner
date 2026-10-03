@@ -79,15 +79,17 @@ def request_module(*,tenant,module,user,note=""):
     if not module.active or not module.addon_sellable or module.addon_monthly_price is None:
         raise ValidationError("Este módulo não está disponível para contratação avulsa.")
     from .entitlements import module_enabled
-    if module_enabled(tenant,module.slug):
+    repeatable=module.slug=="professional-extra"
+    if not repeatable and module_enabled(tenant,module.slug):
         raise ValidationError("Este módulo já está habilitado.")
+    pending_statuses=[
+        ModuleRequest.Status.PENDING,ModuleRequest.Status.APPROVED,
+        ModuleRequest.Status.AWAITING_PAYMENT,ModuleRequest.Status.PAYMENT_FAILED,
+    ]
+    if not repeatable:
+        pending_statuses.append(ModuleRequest.Status.ACTIVE)
     existing=ModuleRequest.objects.filter(
-        tenant=tenant,module=module,
-        status__in=[
-            ModuleRequest.Status.PENDING,ModuleRequest.Status.APPROVED,
-            ModuleRequest.Status.AWAITING_PAYMENT,ModuleRequest.Status.ACTIVE,
-            ModuleRequest.Status.PAYMENT_FAILED,
-        ],
+        tenant=tenant,module=module,status__in=pending_statuses,
     ).order_by("-created_at").first()
     if existing:
         return existing
@@ -134,9 +136,24 @@ def activate_module_request(*,module_request,user):
     subscription=_subscription(row.tenant)
     if not subscription:
         raise ValidationError("A empresa não possui assinatura válida.")
-    if TenantModuleAddon.objects.filter(tenant=row.tenant,module=row.module,
-                                       status=TenantModuleAddon.Status.ACTIVE).exists():
+
+    repeatable=row.module.slug=="professional-extra"
+    existing_addon=TenantModuleAddon.objects.select_for_update().filter(
+        tenant=row.tenant,module=row.module,status=TenantModuleAddon.Status.ACTIVE
+    ).first()
+    if existing_addon and not repeatable:
         raise ValidationError("Este módulo adicional já está ativo para a empresa.")
+
+    quoted=Decimal(row.quoted_monthly_price or Decimal("0.00")).quantize(Decimal("0.01"))
+    if repeatable:
+        quoted=Decimal(row.module.addon_monthly_price or Decimal("0.00")).quantize(Decimal("0.01"))
+        if quoted<=0:
+            raise ValidationError(
+                "Defina no Master o valor mensal de '+1 profissional extra' antes de aprovar."
+            )
+        if row.quoted_monthly_price!=quoted:
+            row.quoted_monthly_price=quoted
+            row.save(update_fields=["quoted_monthly_price","updated_at"])
 
     months=_cycle_months(subscription.billing_cycle)
     monthly_before=_merged_monthly(row.tenant)
@@ -144,8 +161,8 @@ def activate_module_request(*,module_request,user):
     base=subscription.base_contracted_price
     if base is None:
         base=previous-monthly_before*months
-    new_monthly=(monthly_before+row.quoted_monthly_price).quantize(Decimal("0.01"))
-    new_total=(previous+row.quoted_monthly_price*months).quantize(Decimal("0.01"))
+    new_monthly=(monthly_before+quoted).quantize(Decimal("0.01"))
+    new_total=(previous+quoted*months).quantize(Decimal("0.01"))
     key=hashlib.sha256(
         f"add|{row.tenant_id}|{subscription.pk}|{row.pk}|{new_total}".encode()
     ).hexdigest()
@@ -155,7 +172,7 @@ def activate_module_request(*,module_request,user):
             "public_id":secrets.token_hex(16),"tenant":row.tenant,
             "subscription":subscription,"module_request":row,"action":SubscriptionModuleAdjustment.Action.ADD,
             "previous_amount":previous,"new_amount":new_total,
-            "addon_monthly_price":row.quoted_monthly_price,"created_by":user,
+            "addon_monthly_price":quoted,"created_by":user,
         },
     )
     if adjustment.status==SubscriptionModuleAdjustment.Status.APPLIED:
@@ -174,18 +191,38 @@ def activate_module_request(*,module_request,user):
             adjustment.provider_reference=subscription.provider_subscription_id
 
         with transaction.atomic():
-            addon,_=TenantModuleAddon.objects.update_or_create(
-                tenant=row.tenant,module=row.module,
-                defaults={
-                    "module_request":row,"monthly_price":row.quoted_monthly_price,
-                    "status":TenantModuleAddon.Status.ACTIVE,
-                    "billing_mode":TenantModuleAddon.BillingMode.MERGED,
-                    "provider":"mercadopago" if gateway else "",
-                    "provider_reference":subscription.provider_subscription_id if gateway else "",
-                    "started_at":timezone.now(),"next_billing_at":subscription.next_billing_at,
-                    "cancelled_at":None,
-                },
-            )
+            if repeatable and existing_addon:
+                components=list(existing_addon.pricing_components or [])
+                components.append(str(quoted))
+                existing_addon.quantity=max(int(existing_addon.quantity or 1),1)+1
+                existing_addon.pricing_components=components
+                existing_addon.monthly_price=(
+                    Decimal(existing_addon.monthly_price or 0)+quoted
+                ).quantize(Decimal("0.01"))
+                existing_addon.module_request=row
+                existing_addon.provider="mercadopago" if gateway else ""
+                existing_addon.provider_reference=subscription.provider_subscription_id if gateway else ""
+                existing_addon.next_billing_at=subscription.next_billing_at
+                existing_addon.save(update_fields=[
+                    "quantity","pricing_components","monthly_price","module_request","provider",
+                    "provider_reference","next_billing_at","updated_at",
+                ])
+                addon=existing_addon
+            else:
+                addon,_=TenantModuleAddon.objects.update_or_create(
+                    tenant=row.tenant,module=row.module,
+                    defaults={
+                        "module_request":row,"monthly_price":quoted,
+                        "quantity":1,
+                        "pricing_components":[str(quoted)] if repeatable else [],
+                        "status":TenantModuleAddon.Status.ACTIVE,
+                        "billing_mode":TenantModuleAddon.BillingMode.MERGED,
+                        "provider":"mercadopago" if gateway else "",
+                        "provider_reference":subscription.provider_subscription_id if gateway else "",
+                        "started_at":timezone.now(),"next_billing_at":subscription.next_billing_at,
+                        "cancelled_at":None,
+                    },
+                )
             TenantModule.objects.update_or_create(
                 tenant=row.tenant,module=row.module,defaults={"enabled":True}
             )
@@ -239,10 +276,24 @@ def cancel_module_addon(*,addon,user):
     base=subscription.base_contracted_price
     if base is None:
         base=previous-monthly_before*months
-    monthly_after=_merged_monthly(addon.tenant,exclude_addon_id=addon.pk)
-    new_total=(previous-addon.monthly_price*months).quantize(Decimal("0.01"))
+
+    repeatable=addon.module.slug=="professional-extra"
+    if repeatable:
+        quantity=max(int(addon.quantity or 1),1)
+        components=[Decimal(str(value)).quantize(Decimal("0.01")) for value in (addon.pricing_components or [])]
+        removal_price=components[-1] if components else (
+            Decimal(addon.monthly_price or 0)/Decimal(quantity)
+        ).quantize(Decimal("0.01"))
+        remaining_price=(Decimal(addon.monthly_price or 0)-removal_price).quantize(Decimal("0.01"))
+        monthly_after=(monthly_before-removal_price).quantize(Decimal("0.01"))
+    else:
+        removal_price=Decimal(addon.monthly_price or 0).quantize(Decimal("0.01"))
+        remaining_price=Decimal("0.00")
+        monthly_after=_merged_monthly(addon.tenant,exclude_addon_id=addon.pk)
+
+    new_total=(previous-removal_price*months).quantize(Decimal("0.01"))
     key=hashlib.sha256(
-        f"remove|{addon.tenant_id}|{subscription.pk}|{addon.pk}|{new_total}".encode()
+        f"remove|{addon.tenant_id}|{subscription.pk}|{addon.pk}|{addon.quantity}|{new_total}".encode()
     ).hexdigest()
     adjustment,_=SubscriptionModuleAdjustment.objects.get_or_create(
         idempotency_key=key,
@@ -252,9 +303,12 @@ def cancel_module_addon(*,addon,user):
             "module_request":addon.module_request,
             "action":SubscriptionModuleAdjustment.Action.REMOVE,
             "previous_amount":previous,"new_amount":new_total,
-            "addon_monthly_price":addon.monthly_price,"created_by":user,
+            "addon_monthly_price":removal_price,"created_by":user,
         },
     )
+    if adjustment.status==SubscriptionModuleAdjustment.Status.APPLIED:
+        return adjustment
+
     gateway=_gateway_for(subscription)
     provider_changed=False
     try:
@@ -266,14 +320,40 @@ def cancel_module_addon(*,addon,user):
             adjustment.provider="mercadopago"
             adjustment.provider_reference=subscription.provider_subscription_id
 
-        addon.status=TenantModuleAddon.Status.CANCELLED
-        addon.cancelled_at=timezone.now()
-        addon.save(update_fields=["status","cancelled_at","updated_at"])
-        TenantModule.objects.filter(tenant=addon.tenant,module=addon.module).delete()
-        if addon.module_request_id:
-            ModuleRequest.objects.filter(pk=addon.module_request_id).update(
-                status=ModuleRequest.Status.CANCELLED,updated_at=timezone.now()
-            )
+        if repeatable and addon.module_request_id:
+            ModuleRequest.objects.filter(
+                pk=addon.module_request_id,status=ModuleRequest.Status.ACTIVE
+            ).update(status=ModuleRequest.Status.CANCELLED,updated_at=timezone.now())
+
+        if repeatable and addon.quantity>1:
+            components=list(addon.pricing_components or [])
+            if components:
+                components.pop()
+            addon.quantity-=1
+            addon.pricing_components=components
+            addon.monthly_price=remaining_price
+            replacement_request=ModuleRequest.objects.filter(
+                tenant=addon.tenant,module=addon.module,status=ModuleRequest.Status.ACTIVE
+            ).order_by("-created_at").first()
+            addon.module_request=replacement_request
+            addon.save(update_fields=[
+                "quantity","pricing_components","monthly_price","module_request","updated_at"
+            ])
+        else:
+            addon.status=TenantModuleAddon.Status.CANCELLED
+            addon.cancelled_at=timezone.now()
+            addon.quantity=0 if repeatable else addon.quantity
+            addon.pricing_components=[] if repeatable else addon.pricing_components
+            addon.monthly_price=remaining_price if repeatable else addon.monthly_price
+            addon.save(update_fields=[
+                "status","cancelled_at","quantity","pricing_components","monthly_price","updated_at"
+            ])
+            TenantModule.objects.filter(tenant=addon.tenant,module=addon.module).delete()
+            if not repeatable and addon.module_request_id:
+                ModuleRequest.objects.filter(
+                    pk=addon.module_request_id,status=ModuleRequest.Status.ACTIVE
+                ).update(status=ModuleRequest.Status.CANCELLED,updated_at=timezone.now())
+
         subscription.addon_contracted_price=(monthly_after*months).quantize(Decimal("0.01"))
         subscription.contracted_price=new_total
         subscription.base_contracted_price=base

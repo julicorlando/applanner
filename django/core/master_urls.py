@@ -4,6 +4,7 @@ from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment
 from .master_email import email_templates,smtp_settings,waive_onboarding_email
 from communications.master_marketing import campaigns,create_campaign,cancel_campaign,import_contacts
+from billing.fiscal import master_fiscal_document
 
 urlpatterns=[
     path("empresas/<int:pk>/acessos/",master.tenant_access,name="master-tenant-access"),
@@ -18,6 +19,7 @@ urlpatterns=[
     path("pagamentos/cadastro-bancario/",master.platform_payment_gateway,name="master-platform-payment"),
     path("pagamentos/mercado-pago/",master.platform_payment_gateway,name="master-platform-payment-legacy"),
     path("email/smtp/",smtp_settings,name="master-smtp-settings"),
+    path("notas-fiscais/<int:pk>/",master_fiscal_document,name="master-fiscal-document"),
     path("email/modelos/",email_templates,name="master-email-templates"),
     path("email/modelos/<slug:key>/",email_templates,name="master-email-template-edit"),
     path("onboarding/<int:pk>/dispensa-email/",waive_onboarding_email,name="master-onboarding-waive-email"),

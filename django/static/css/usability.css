@@ -316,3 +316,8 @@ select option, select optgroup { color: #172033; background-color: #fff; }
 @media(max-width:560px){
   .reserved-product-interest__item{align-items:flex-start;flex-direction:column;gap:7px}
 }
+
+/* Native popup colors must match the control, including Windows dark mode. */
+body select,body select option,body select optgroup{color:#172033!important;background-color:#fff!important;color-scheme:light}
+[hidden]{display:none!important}
+.public-unit-card{cursor:pointer}

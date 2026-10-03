@@ -118,6 +118,12 @@ class PlatformOperationSettings(models.Model):
     critical_alerts_enabled=models.BooleanField(default=False)
     cron_stale_minutes=models.PositiveSmallIntegerField(default=15)
     disk_min_free_mb=models.PositiveIntegerField(default=1024)
+    maintenance_enabled=models.BooleanField(default=False)
+    maintenance_message=models.CharField(
+        max_length=300,blank=True,
+        default="Estamos realizando uma manutenção programada. Tente novamente em alguns minutos.",
+    )
+    status_page_enabled=models.BooleanField(default=True)
     updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="+")
     updated_at=models.DateTimeField(auto_now=True)
 
@@ -242,6 +248,7 @@ class PlatformSMTPSettings(models.Model):
     username=models.CharField(max_length=255,blank=True)
     password_encrypted=models.TextField(blank=True)
     from_email=models.EmailField()
+    dkim_selector=models.CharField(max_length=80,blank=True,default="default")
     use_tls=models.BooleanField(default=True)
     use_ssl=models.BooleanField(default=False)
     enabled=models.BooleanField(default=False)

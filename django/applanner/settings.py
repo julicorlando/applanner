@@ -37,6 +37,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "operations.maintenance.MaintenanceModeMiddleware",
     "operations.middleware.SupportImpersonationMiddleware",
     "accounts.middleware.SessionVersionMiddleware",
     "accounts.middleware.MustChangePasswordMiddleware",
@@ -58,7 +59,7 @@ TEMPLATES=[{
         "django.template.context_processors.request",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
-        "core.branding.platform_branding",
+        "core.branding.platform_branding","core.unit_scope.operation_unit_context",
     ]},
 }]
 DATABASES={"default":env.db("DATABASE_URL")}

@@ -132,12 +132,16 @@ def create_platform_pix_charge(*,subscription,payer_email):
         idempotency_key="subscription-pix-"+public_id,expires_at=expiry,
     )
     reference="subscription-pix-"+public_id
+    from .breakdown import subscription_charge_breakdown
     payment=Payment.objects.create(
         tenant=subscription.tenant,subscription=subscription,purpose="subscription",
         reference_id=subscription.pk,provider="mercadopago",environment=gateway.environment,
         provider_reference=reference,idempotency_key="subscription-pix-"+public_id,
         amount=amount,status=Payment.Status.PENDING,due_at=expiry,
-        metadata={"method":"pix","checkout_session_id":checkout.pk},
+        metadata={
+            "method":"pix","checkout_session_id":checkout.pk,
+            "breakdown":subscription_charge_breakdown(subscription),
+        },
     )
     remote=platform_provider(gateway).create_pix_order(
         amount=amount,external_reference=reference,payer_email=payer_email,

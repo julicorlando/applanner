@@ -129,8 +129,8 @@ PORTAL_MODULES = {
             "agendamentos": {
                 "model": "scheduling.Appointment",
                 "title": "Agendamentos",
-                "fields": ["customer","vehicle","professional","service","starts_at","status","source","notes"],
-                "columns": ["starts_at","customer","vehicle","service","professional","reserved_products","status"],
+                "fields": ["unit","customer","vehicle","professional","service","starts_at","status","source","notes"],
+                "columns": ["starts_at","unit","customer","vehicle","service","professional","reserved_products","status"],
                 "order": "-starts_at",
                 "special": "appointment",
             },
@@ -151,16 +151,27 @@ PORTAL_MODULES = {
             "servicos": {
                 "model": "scheduling.Service",
                 "title": "Serviços",
-                "fields": ["name","description","duration_minutes","price","active"],
+                "fields": ["unit","name","description","duration_minutes","price","active"],
                 "columns": ["name","duration_minutes","price","active"],
                 "order": "name",
             },
             "unidades": {
                 "model": "tenants.Unit",
                 "title": "Unidades",
-                "fields": ["name","address","address_number","district","city","state","postal_code","phone","whatsapp","email","is_primary","active"],
+                "fields": [
+                    "name","address","address_number","address_complement","district","city","state","postal_code",
+                    "latitude","longitude","phone","whatsapp","email","instagram","facebook","tiktok","website",
+                    "map_url","amenities","payment_methods","public_notes","is_primary","active"
+                ],
                 "columns": ["name","city","state","phone","is_primary","active"],
                 "order": "-is_primary,name",
+            },
+            "horarios-unidades": {
+                "model": "tenants.UnitBusinessHours",
+                "title": "Horários das unidades",
+                "fields": ["unit","weekday","opens_at","closes_at","closed","active"],
+                "columns": ["unit","weekday","opens_at","closes_at","closed","active"],
+                "order": "unit__name,weekday",
             },
             "expedientes": {
                 "model": "scheduling.ProfessionalAvailability",
@@ -200,8 +211,8 @@ PORTAL_MODULES = {
             "lancamentos": {
                 "model": "finance.FinancialTransaction",
                 "title": "Lançamentos",
-                "fields": ["category","type","description","amount","payment_method","competence_at","status","due_at"],
-                "columns": ["type","description","amount","status","due_at"],
+                "fields": ["unit","category","type","description","amount","payment_method","competence_at","status","due_at"],
+                "columns": ["unit","type","description","amount","status","due_at"],
                 "order": "-created_at",
                 "special": "financial_transaction",
             },
@@ -718,7 +729,7 @@ def _widgets_for(model, fields):
     return widgets
 
 
-def _model_form(model, resource, *args, tenant=None, **kwargs):
+def _model_form(model, resource, *args, tenant=None, unit=None, **kwargs):
     from core.labels import field_label
     from core.operation_forms import OperationModelForm
     fields=list(resource["fields"])
@@ -726,6 +737,24 @@ def _model_form(model, resource, *args, tenant=None, **kwargs):
         fields.remove("vehicle")
     Form=modelform_factory(model,form=OperationModelForm,fields=fields,widgets=_widgets_for(model,fields))
     form=Form(*args,tenant=tenant,**kwargs)
+    if unit:
+        from core.unit_scope import scope_queryset
+        for name,field in form.fields.items():
+            if getattr(field,"queryset",None) is not None:
+                field.queryset=scope_queryset(field.queryset,unit)
+        if "unit" in form.fields:
+            form.fields["unit"].queryset=tenant.units.filter(pk=unit.pk,active=True)
+            form.fields["unit"].initial=unit.pk
+            form.fields["unit"].required=True
+    if tenant and "unit" in form.fields and model._meta.label_lower in {
+        "scheduling.appointment","finance.financialtransaction"
+    }:
+        units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
+        if units:
+            form.fields["unit"].required=True
+            if not unit and not form.is_bound and not getattr(form.instance,"unit_id",None):
+                form.fields["unit"].initial=units[0].pk
+            form.fields["unit"].help_text="A unidade define a agenda e os indicadores financeiros deste lançamento."
     if model._meta.label_lower=="scheduling.customer" and "phone" in form.fields:
         form.fields["phone"].required=True
         form.fields["phone"].label="Telefone com DDD"
@@ -789,12 +818,18 @@ def _save_special(obj, *, resource, request, tenant, is_new):
         obj.created_by=request.user
 
     if special=="appointment":
+        if not obj.unit_id:
+            obj.unit=tenant.units.filter(active=True).order_by("-is_primary","name").first()
+        if obj.professional_id and obj.professional.unit_id and obj.unit_id!=obj.professional.unit_id:
+            raise ValidationError({"professional":"O profissional selecionado pertence a outra unidade."})
         if obj.service_id and obj.starts_at:
             obj.ends_at=obj.starts_at+timedelta(minutes=obj.service.duration_minutes)
             obj.service_price_snapshot=obj.service.price
         if is_new:
             obj.created_by=request.user
     elif special=="financial_transaction":
+        if not obj.unit_id:
+            obj.unit=tenant.units.filter(active=True).order_by("-is_primary","name").first()
         if obj.status==obj.Status.PAID and not obj.paid_at:
             obj.paid_at=timezone.now()
     elif special=="barber_queue":
@@ -979,7 +1014,9 @@ def home(request):
             "route":route if route in routes else None,"gateway":module.slug=="banking_integrations" and
                 (request.user.is_superuser or request.user.role=="owner"),
             "documentation":module.slug=="api"})
-    public_professionals=(tenant.professionals.filter(active=True,public_slug__isnull=False)
+    from core.unit_scope import selected_unit
+    unit=selected_unit(request,tenant)
+    public_professionals=(tenant.professionals.filter(active=True,public_slug__isnull=False,**({"unit":unit} if unit else {}))
                           .exclude(public_slug="").order_by("name") if tenant.public_enabled else [])
     return render(request,"portal/home.html",{
         "tenant":tenant,"modules":modules,"contracted_modules":contracted,
@@ -1137,6 +1174,13 @@ def resource_list(request,module_slug,resource_slug):
     qs=_tenant_queryset(model,tenant)
     if model._meta.label_lower=="scheduling.appointment":
         qs=qs.select_related("customer","service","professional","vehicle").prefetch_related("product_reservations__product")
+    from core.unit_scope import selected_unit as resolve_unit,scope_queryset
+    unit=resolve_unit(request,tenant)
+    if model._meta.label_lower=="scheduling.tenantschedulesettings" and unit:
+        return redirect(reverse("unit-schedule-settings")+f"?unit={unit.pk}")
+    qs=scope_queryset(qs,unit)
+    selected_unit=str(unit.pk) if unit else ""
+    unit_choices=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
     q=(request.GET.get("q") or "").strip()
     if q:
         lookup=Q()
@@ -1185,6 +1229,7 @@ def resource_list(request,module_slug,resource_slug):
         "headers":_headers(model,columns),"rows":rows,"q":q,
         "customer_column":columns.index("customer") if model._meta.label_lower=="scheduling.appointment" else None,
         "agenda_filters":agenda_filters,"period":period,"status_filter":status,"status_choices":status_choices,
+        "unit_choices":unit_choices,"selected_unit":selected_unit,
         "can_create":_role_resource_write(request.user,module_slug,resource_slug) and (resource.get("create",True) or bool(resource.get("custom_create"))),
         "can_edit":_role_resource_write(request.user,module_slug,resource_slug) and resource.get("edit",True),
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
@@ -1247,7 +1292,8 @@ def resource_create(request,module_slug,resource_slug):
     else:
         if not resource.get("create",True):
             raise PermissionDenied
-        form=_model_form(model,resource,request.POST or None,request.FILES or None,tenant=tenant)
+        from core.unit_scope import selected_unit
+        form=_model_form(model,resource,request.POST or None,request.FILES or None,tenant=tenant,unit=selected_unit(request,tenant))
         if request.user.role=="reception" and model._meta.label_lower=="finance.product":
             form.fields.pop("commission_type",None)
             form.fields.pop("commission_value",None)
@@ -1263,6 +1309,9 @@ def resource_create(request,module_slug,resource_slug):
                         obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
                     obj.full_clean()
                     obj.save()
+                    if model._meta.label_lower=="tenants.unit" and obj.postal_code and (obj.latitude is None or obj.longitude is None):
+                        from tenants.tasks import queue_unit_geocoding
+                        transaction.on_commit(lambda unit_id=obj.pk:queue_unit_geocoding(unit_id))
                     form.save_m2m()
                 messages.success(request,f"{resource['title']}: cadastro criado.")
                 return redirect("portal-resource-list",module_slug=module_slug,resource_slug=resource_slug)
@@ -1292,8 +1341,10 @@ def resource_edit(request,module_slug,resource_slug,pk):
         raise PermissionDenied("A recepção pode consultar esta área, mas não alterá-la.")
     if not resource.get("edit",True):
         raise PermissionDenied
-    obj=get_object_or_404(_tenant_queryset(model,tenant),pk=pk)
-    form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant)
+    from core.unit_scope import selected_unit,scope_queryset
+    unit=selected_unit(request,tenant)
+    obj=get_object_or_404(scope_queryset(_tenant_queryset(model,tenant),unit),pk=pk)
+    form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant,unit=unit)
     if request.user.role=="reception" and model._meta.label_lower=="finance.product":
         form.fields.pop("commission_type",None)
         form.fields.pop("commission_value",None)
