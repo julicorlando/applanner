@@ -1167,8 +1167,9 @@ def resource_list(request,module_slug,resource_slug):
         "headers":_headers(model,columns),"rows":rows,"q":q,
         "customer_column":columns.index("customer") if model._meta.label_lower=="scheduling.appointment" else None,
         "agenda_filters":agenda_filters,"period":period,"status_filter":status,"status_choices":status_choices,
-        "can_create":resource.get("create",True) or bool(resource.get("custom_create")),
-        "can_edit":resource.get("edit",True),
+        "can_create":(resource.get("create",True) or bool(resource.get("custom_create"))) and _reception_can_write(request.user,module_slug,resource_slug),
+        "can_edit":resource.get("edit",True) and _reception_can_write(request.user,module_slug,resource_slug),
+        "can_finalize_appointments":resource_slug=="agendamentos" and request.user.role=="reception",
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
         "can_manage_professionals":request.user.is_superuser or request.user.role in {
             "owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager"
@@ -1186,6 +1187,8 @@ def resource_create(request,module_slug,resource_slug):
     if tenant is None:
         return redirect("portal-home")
     module,resource,model=_resource(module_slug,resource_slug)
+    if not _reception_can_write(request.user,module_slug,resource_slug):
+        raise PermissionDenied("A recepção possui acesso apenas para consulta nesta área.")
     custom=resource.get("custom_create")
 
     if custom=="barber_command":
@@ -1228,6 +1231,9 @@ def resource_create(request,module_slug,resource_slug):
         if not resource.get("create",True):
             raise PermissionDenied
         form=_model_form(model,resource,request.POST or None,request.FILES or None,tenant=tenant)
+        if request.user.role=="reception" and model._meta.label_lower=="finance.product":
+            form.fields.pop("commission_type",None)
+            form.fields.pop("commission_value",None)
         if resource.get("special")=="support_ticket":
             form.fields.pop("priority",None)
             form.fields.pop("status",None)
@@ -1272,10 +1278,15 @@ def resource_edit(request,module_slug,resource_slug,pk):
     if tenant is None:
         return redirect("portal-home")
     module,resource,model=_resource(module_slug,resource_slug)
+    if not _reception_can_write(request.user,module_slug,resource_slug):
+        raise PermissionDenied("A recepção possui acesso apenas para consulta nesta área.")
     if not resource.get("edit",True):
         raise PermissionDenied
     obj=get_object_or_404(_tenant_queryset(model,tenant),pk=pk)
     form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant)
+    if request.user.role=="reception" and model._meta.label_lower=="finance.product":
+        form.fields.pop("commission_type",None)
+        form.fields.pop("commission_value",None)
     if request.method=="POST" and form.is_valid():
         obj=form.save(commit=False)
         obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=False)
