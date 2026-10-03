@@ -8,12 +8,17 @@ from django.utils import timezone
 
 from accounts.models import User
 from billing.models import (
-    Module, Plan, Subscription, TenantModuleAddon,
+    Module, Payment, Plan, Subscription, TenantBankAccount, TenantModuleAddon,
 )
 from billing.module_services import module_monthly_price, sync_per_unit_addon_pricing
 from contenthub.models import FAQItem, PlatformHomepage
 from core.portal import _role_resource_visible, _role_resource_write
 from growth.attribution import infer_attribution
+from communications.models import Notification
+from engagement.models import ReferralIncentiveCampaign, ReferralReward
+from engagement.referrals import (
+    finalize_company_referral_discounts, qualify_referral_rewards_for_tenant,
+)
 from legal.models import LegalDocument
 from scheduling.models import Appointment, Customer, Professional, Service
 from tenants.models import Tenant, Unit
@@ -187,3 +192,152 @@ class ProfessionalReturnScopeTests(TestCase):
         names=[row.customer.name for row in response.context["return_rows"]]
         self.assertIn("Cliente recorrente",names)
         self.assertNotIn("Cliente não recorrente com Ana",names)
+
+
+class BankAccountRegistrationTests(TestCase):
+    def test_company_can_register_multiple_banks_and_keeps_details_encrypted(self):
+        tenant=Tenant.objects.create(
+            name="Empresa Bancária",slug="empresa-bancaria",status=Tenant.Status.ACTIVE
+        )
+        owner=User.objects.create_user(
+            email="bank-owner@example.test",password="StrongPassword123!",
+            tenant=tenant,role="owner",
+        )
+        self.client.force_login(owner)
+        url=reverse("tenant-payment-gateway")
+
+        first={
+            "action":"bank_add","bank-bank_code":"001","bank-bank_name":"Banco do Brasil",
+            "bank-holder_name":"Empresa Bancária","bank-holder_document":"12345678000199",
+            "bank-branch":"1234","bank-account_number":"123456-7",
+            "bank-account_type":"checking","bank-pix_key_type":"email",
+            "bank-pix_key":"financeiro@empresa.test","bank-is_primary":"on",
+        }
+        second={
+            "action":"bank_add","bank-bank_code":"077","bank-bank_name":"Banco Inter",
+            "bank-holder_name":"Empresa Bancária","bank-holder_document":"12345678000199",
+            "bank-branch":"0001","bank-account_number":"987654-3",
+            "bank-account_type":"payment","bank-pix_key_type":"phone",
+            "bank-pix_key":"+5581999999999",
+        }
+        self.assertEqual(self.client.post(url,first).status_code,302)
+        self.assertEqual(self.client.post(url,second).status_code,302)
+
+        rows=list(TenantBankAccount.objects.filter(tenant=tenant).order_by("id"))
+        self.assertEqual(len(rows),2)
+        self.assertTrue(rows[0].is_primary)
+        self.assertFalse(rows[1].is_primary)
+        self.assertNotIn("123456-7",rows[0].details_encrypted)
+        self.assertNotIn("financeiro@empresa.test",rows[0].details_encrypted)
+
+
+class ReferralRewardTests(TestCase):
+    def _paid(self,tenant,subscription,amount="100.00"):
+        return Payment.objects.create(
+            tenant=tenant,subscription=subscription,purpose="subscription",
+            amount=Decimal(amount),status=Payment.Status.PAID,paid_at=timezone.now(),
+        )
+
+    def test_company_reward_qualifies_only_after_second_payment_and_is_one_cycle_discount(self):
+        referrer_tenant=Tenant.objects.create(
+            name="Indicadora",slug="indicadora",status=Tenant.Status.ACTIVE
+        )
+        referred_tenant=Tenant.objects.create(
+            name="Indicada",slug="indicada",status=Tenant.Status.ACTIVE
+        )
+        plan=Plan.objects.create(
+            name="Plano indicação",slug="plano-indicacao-test",monthly_price=Decimal("100.00")
+        )
+        referrer_subscription=Subscription.objects.create(
+            tenant=referrer_tenant,plan=plan,status=Subscription.Status.ACTIVE,
+            started_at=timezone.now(),contracted_price=Decimal("100.00"),
+            base_contracted_price=Decimal("100.00"),
+        )
+        referred_subscription=Subscription.objects.create(
+            tenant=referred_tenant,plan=plan,status=Subscription.Status.ACTIVE,
+            started_at=timezone.now(),contracted_price=Decimal("100.00"),
+            base_contracted_price=Decimal("100.00"),
+        )
+        owner=User.objects.create_user(
+            email="indicador@example.test",password="StrongPassword123!",
+            tenant=referrer_tenant,role="owner",
+        )
+        campaign=ReferralIncentiveCampaign.objects.create(
+            name="Campanha R$ 10",reward_type=ReferralIncentiveCampaign.RewardType.FIXED,
+            reward_value=Decimal("10.00"),active=True,
+        )
+        reward=ReferralReward.objects.create(
+            campaign=campaign,referrer_user=owner,referred_tenant=referred_tenant,
+            referrer_kind=ReferralReward.ReferrerKind.COMPANY,
+        )
+
+        self._paid(referred_tenant,referred_subscription)
+        qualify_referral_rewards_for_tenant(referred_tenant.pk)
+        reward.refresh_from_db()
+        referrer_subscription.refresh_from_db()
+        self.assertEqual(reward.status,ReferralReward.Status.PENDING)
+        self.assertEqual(referrer_subscription.contracted_price,Decimal("100.00"))
+
+        self._paid(referred_tenant,referred_subscription)
+        qualify_referral_rewards_for_tenant(referred_tenant.pk)
+        reward.refresh_from_db()
+        referrer_subscription.refresh_from_db()
+        self.assertEqual(reward.status,ReferralReward.Status.APPLIED)
+        self.assertEqual(reward.reward_amount,Decimal("10.00"))
+        self.assertEqual(referrer_subscription.contracted_price,Decimal("90.00"))
+
+        self._paid(referrer_tenant,referrer_subscription,amount="90.00")
+        finalize_company_referral_discounts(referrer_tenant.pk)
+        reward.refresh_from_db()
+        referrer_subscription.refresh_from_db()
+        self.assertEqual(reward.status,ReferralReward.Status.PAID)
+        self.assertEqual(referrer_subscription.contracted_price,Decimal("100.00"))
+
+    def test_professional_reward_requests_pix_after_second_payment(self):
+        referrer_tenant=Tenant.objects.create(
+            name="Empresa do profissional",slug="empresa-profissional",status=Tenant.Status.ACTIVE
+        )
+        referred_tenant=Tenant.objects.create(
+            name="Indicada Profissional",slug="indicada-profissional",status=Tenant.Status.ACTIVE
+        )
+        plan=Plan.objects.create(
+            name="Plano profissional",slug="plano-prof-ref-test",monthly_price=Decimal("80.00")
+        )
+        referred_subscription=Subscription.objects.create(
+            tenant=referred_tenant,plan=plan,status=Subscription.Status.ACTIVE,
+            started_at=timezone.now(),contracted_price=Decimal("80.00"),
+            base_contracted_price=Decimal("80.00"),
+        )
+        professional=User.objects.create_user(
+            email="prof-indicador@example.test",password="StrongPassword123!",
+            tenant=referrer_tenant,role="professional",
+        )
+        campaign=ReferralIncentiveCampaign.objects.create(
+            name="Campanha Profissional",reward_type=ReferralIncentiveCampaign.RewardType.PERCENT,
+            reward_value=Decimal("10.00"),active=True,
+        )
+        reward=ReferralReward.objects.create(
+            campaign=campaign,referrer_user=professional,referred_tenant=referred_tenant,
+            referrer_kind=ReferralReward.ReferrerKind.PROFESSIONAL,
+        )
+        self._paid(referred_tenant,referred_subscription,amount="80.00")
+        self._paid(referred_tenant,referred_subscription,amount="80.00")
+        qualify_referral_rewards_for_tenant(referred_tenant.pk)
+
+        reward.refresh_from_db()
+        self.assertEqual(reward.status,ReferralReward.Status.PIX_REQUIRED)
+        self.assertEqual(reward.reward_amount,Decimal("8.00"))
+        self.assertTrue(Notification.objects.filter(
+            tenant=referrer_tenant,destination=professional.email,
+            template_key="referral_pix_request",
+        ).exists())
+
+        self.client.force_login(professional)
+        response=self.client.post(reverse("professional-referrals"),{
+            "reward":reward.pk,"pix_key":"prof-indicador@example.test",
+        })
+        self.assertEqual(response.status_code,302)
+        reward.refresh_from_db()
+        self.assertEqual(reward.status,ReferralReward.Status.READY)
+        self.assertEqual(reward.pix_key_last4,"test")
+        self.assertNotIn("prof-indicador@example.test",reward.pix_key_encrypted)
