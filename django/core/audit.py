@@ -66,3 +66,47 @@ def append_audit(
         before=_safe(before),
         after=_safe(after),
     )
+
+
+def verify_audit_chain(chain_key=None):
+    import hashlib
+    import json
+    from .models import AuditChainState
+
+    qs=AuditLog.objects.order_by("chain_key","created_at","pk")
+    if chain_key:
+        qs=qs.filter(chain_key=chain_key)
+    previous_by_chain={}
+    checked=0
+    for row in qs.iterator():
+        key=row.chain_key or (f"tenant:{row.tenant_id}" if row.tenant_id else "platform")
+        previous=previous_by_chain.get(key,"")
+        payload=json.dumps({
+            "tenant_id":row.tenant_id,
+            "user_id":row.user_id,
+            "action":row.action,
+            "entity_type":row.entity_type,
+            "entity_id":row.entity_id,
+            "ip_address":str(row.ip_address or ""),
+            "user_agent":row.user_agent or "",
+            "before":row.before,
+            "after":row.after,
+            "created_at":row.created_at.isoformat() if row.created_at else "",
+        },sort_keys=True,separators=(",",":"),ensure_ascii=False,default=str)
+        expected=hashlib.sha256((previous+"|"+payload).encode("utf-8")).hexdigest()
+        if row.previous_hash!=previous or row.entry_hash!=expected:
+            return {
+                "valid":False,"checked":checked,
+                "broken_id":row.pk,"chain_key":key,
+            }
+        previous_by_chain[key]=row.entry_hash
+        checked+=1
+
+    for key,last_hash in previous_by_chain.items():
+        state=AuditChainState.objects.filter(chain_key=key).first()
+        if not state or state.last_hash!=last_hash:
+            return {
+                "valid":False,"checked":checked,
+                "broken_id":None,"chain_key":key,
+            }
+    return {"valid":True,"checked":checked,"broken_id":None,"chain_key":chain_key}
