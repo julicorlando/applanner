@@ -1215,16 +1215,24 @@ def resource_create(request,module_slug,resource_slug):
                     obj.full_clean()
                     obj.save()
                     form.save_m2m()
+                    if model._meta.label_lower=="tenants.unit":
+                        from billing.module_services import sync_multiunit_addon
+                        sync_multiunit_addon(tenant=tenant,user=request.user)
                 messages.success(request,f"{resource['title']}: cadastro criado.")
                 return redirect("portal-resource-list",module_slug=module_slug,resource_slug=resource_slug)
-            except ValidationError as exc:
+            except (ValidationError,RuntimeError) as exc:
                 form.add_error(None,exc)
 
+    multiunit_price=None
+    if model._meta.label_lower=="tenants.unit":
+        Module=apps.get_model("billing","Module")
+        multiunit_price=Module.objects.filter(slug="multiunit",active=True).values_list("addon_monthly_price",flat=True).first()
     return render(request,"portal/form.html",{
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,"form":form,
         "title":f"Novo — {resource['title']}",
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
+        "multiunit_price":multiunit_price,
     })
 
 
@@ -1252,10 +1260,17 @@ def resource_edit(request,module_slug,resource_slug,pk):
                 obj.full_clean()
                 obj.save()
                 form.save_m2m()
+                if model._meta.label_lower=="tenants.unit":
+                    from billing.module_services import sync_multiunit_addon
+                    sync_multiunit_addon(tenant=tenant,user=request.user)
             messages.success(request,"Alterações salvas.")
             return redirect("portal-resource-list",module_slug=module_slug,resource_slug=resource_slug)
-        except ValidationError as exc:
+        except (ValidationError,RuntimeError) as exc:
             form.add_error(None,exc)
+    multiunit_price=None
+    if model._meta.label_lower=="tenants.unit":
+        Module=apps.get_model("billing","Module")
+        multiunit_price=Module.objects.filter(slug="multiunit",active=True).values_list("addon_monthly_price",flat=True).first()
     return render(request,"portal/form.html",{
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,"form":form,
@@ -1263,6 +1278,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
         "professional_existing_active":model._meta.label_lower=="scheduling.professional" and obj.active,
         "appointment_identity":obj if model._meta.label_lower=="scheduling.appointment" else None,
+        "multiunit_price":multiunit_price,
     })
 
 
