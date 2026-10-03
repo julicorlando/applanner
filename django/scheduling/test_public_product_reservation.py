@@ -1,6 +1,7 @@
 from datetime import time, timedelta
 from decimal import Decimal
 
+from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 
@@ -13,6 +14,7 @@ from .models import (
 
 class PublicProductReservationTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.tenant=Tenant.objects.create(
             name="Barbearia Reserva",slug="barbearia-reserva",public_slug="barbearia-reserva",
             public_enabled=True,public_booking_enabled=True,status=Tenant.Status.ACTIVE,
@@ -34,6 +36,10 @@ class PublicProductReservationTests(TestCase):
             tenant=self.tenant,name="Pomada",sale_price=Decimal("35.00"),
             cost_price=Decimal("10.00"),stock=Decimal("2.000"),active=True,
         )
+
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
 
     def _slot(self):
         payload=self.client.get(
