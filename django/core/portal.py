@@ -129,8 +129,8 @@ PORTAL_MODULES = {
             "agendamentos": {
                 "model": "scheduling.Appointment",
                 "title": "Agendamentos",
-                "fields": ["customer","vehicle","professional","service","starts_at","status","source","notes"],
-                "columns": ["starts_at","customer","vehicle","service","professional","reserved_products","status"],
+                "fields": ["unit","customer","vehicle","professional","service","starts_at","status","source","notes"],
+                "columns": ["starts_at","unit","customer","vehicle","service","professional","reserved_products","status"],
                 "order": "-starts_at",
                 "special": "appointment",
             },
@@ -200,8 +200,8 @@ PORTAL_MODULES = {
             "lancamentos": {
                 "model": "finance.FinancialTransaction",
                 "title": "Lançamentos",
-                "fields": ["category","type","description","amount","payment_method","competence_at","status","due_at"],
-                "columns": ["type","description","amount","status","due_at"],
+                "fields": ["unit","category","type","description","amount","payment_method","competence_at","status","due_at"],
+                "columns": ["unit","type","description","amount","status","due_at"],
                 "order": "-created_at",
                 "special": "financial_transaction",
             },
@@ -1137,6 +1137,14 @@ def resource_list(request,module_slug,resource_slug):
     qs=_tenant_queryset(model,tenant)
     if model._meta.label_lower=="scheduling.appointment":
         qs=qs.select_related("customer","service","professional","vehicle").prefetch_related("product_reservations__product")
+    selected_unit=(request.GET.get("unit") or "").strip()
+    unit_choices=[]
+    if _field(model,"unit"):
+        unit_choices=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
+        if selected_unit.isdigit() and any(str(row.pk)==selected_unit for row in unit_choices):
+            qs=qs.filter(unit_id=int(selected_unit))
+        else:
+            selected_unit=""
     q=(request.GET.get("q") or "").strip()
     if q:
         lookup=Q()
@@ -1185,6 +1193,7 @@ def resource_list(request,module_slug,resource_slug):
         "headers":_headers(model,columns),"rows":rows,"q":q,
         "customer_column":columns.index("customer") if model._meta.label_lower=="scheduling.appointment" else None,
         "agenda_filters":agenda_filters,"period":period,"status_filter":status,"status_choices":status_choices,
+        "unit_choices":unit_choices,"selected_unit":selected_unit,
         "can_create":_role_resource_write(request.user,module_slug,resource_slug) and (resource.get("create",True) or bool(resource.get("custom_create"))),
         "can_edit":_role_resource_write(request.user,module_slug,resource_slug) and resource.get("edit",True),
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
