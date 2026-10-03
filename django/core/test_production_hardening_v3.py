@@ -5,7 +5,7 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from django.core.exceptions import ValidationError
-from django.db import close_old_connections
+from django.db import close_old_connections,connections
 from django.test import Client,TestCase,TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -80,7 +80,9 @@ class BookingConcurrencyTests(TransactionTestCase):
             except Exception as exc:
                 errors.append(exc)
             finally:
-                close_old_connections()
+                # Threads own separate DB connections; close them explicitly so
+                # PostgreSQL can drop the test database after TransactionTestCase.
+                connections.close_all()
 
         threads=[threading.Thread(target=worker,args=(index,)) for index in (1,2)]
         for thread in threads: thread.start()
@@ -155,7 +157,9 @@ class StockAndCouponConcurrencyTests(TransactionTestCase):
             except Exception as exc:
                 errors.append(exc)
             finally:
-                close_old_connections()
+                # Threads own separate DB connections; close them explicitly so
+                # PostgreSQL can drop the test database after TransactionTestCase.
+                connections.close_all()
 
         threads=[threading.Thread(target=worker,args=(index,)) for index in (1,2)]
         for thread in threads: thread.start()
@@ -203,7 +207,9 @@ class StockAndCouponConcurrencyTests(TransactionTestCase):
             except Exception as exc:
                 errors.append(exc)
             finally:
-                close_old_connections()
+                # Threads own separate DB connections; close them explicitly so
+                # PostgreSQL can drop the test database after TransactionTestCase.
+                connections.close_all()
 
         threads=[threading.Thread(target=worker) for _ in range(2)]
         for thread in threads: thread.start()
