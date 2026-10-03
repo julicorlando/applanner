@@ -42,6 +42,11 @@ class PublicSalesTests(TestCase):
         self.assertEqual(arena.monthly_price,42)
         self.assertEqual(Plan.objects.filter(slug__startswith="segment-").count(),4)
         self.assertContains(self.client.get(reverse("home")),"Começar teste grátis")
+        self.assertNotContains(self.client.get(reverse("billing-plans")),"Médico / Clínica")
+        from contenthub.models import PlatformHomepage
+        homepage,_=PlatformHomepage.objects.get_or_create(pk=1)
+        homepage.medical_segment_visible=True
+        homepage.save(update_fields=["medical_segment_visible","updated_at"])
         self.assertContains(self.client.get(reverse("billing-plans")),"Médico / Clínica")
 
     def test_signup_respects_segment_and_medical_is_unavailable(self):
@@ -52,7 +57,7 @@ class PublicSalesTests(TestCase):
         choices=[key for key,_ in form.fields["category"].widget.choices]
         self.assertEqual(choices,["","arena"])
         data={"plan":arena.pk,"billing_cycle":"monthly","business_name":"Arena Nova",
-              "category":"barbearia","owner_name":"Titular","email":"titular@example.test",
+              "postal_code":"55819000","category":"barbearia","owner_name":"Titular","email":"titular@example.test",
               "password":"SenhaSegura2026!","password_confirm":"SenhaSegura2026!"}
         self.assertFalse(SignupForm(data,selected_plan=arena).is_valid())
         legacy=Plan.objects.create(name="Legado",slug="legacy-arena",monthly_price=40,
@@ -80,7 +85,8 @@ class PublicSalesTests(TestCase):
         })
         self.assertEqual(response.status_code,302)
         lead=Lead.objects.get(email="julio@example.com")
-        self.assertEqual(lead.source,"custom_plan")
+        self.assertEqual(lead.source,"organic")
+        self.assertEqual(lead.source_medium,"organic")
         self.assertTrue(lead.consent_granted)
         self.assertIn("Financeiro",lead.notes)
 
