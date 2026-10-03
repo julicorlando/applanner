@@ -37,6 +37,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "operations.maintenance.MaintenanceModeMiddleware",
     "operations.middleware.SupportImpersonationMiddleware",
     "accounts.middleware.SessionVersionMiddleware",
     "accounts.middleware.MustChangePasswordMiddleware",
