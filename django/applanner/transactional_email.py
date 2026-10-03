@@ -40,6 +40,12 @@ TEMPLATES={
         "body":"Olá, {nome}!\n\nSua solicitação de exclusão da conta de {empresa} foi aprovada e concluída pelo ApPlanner. O acesso da empresa e dos usuários vinculados foi encerrado e a página pública foi desativada.\n\nRegistros que precisem ser preservados por obrigação legal, segurança ou auditoria poderão permanecer retidos pelo prazo aplicável, sem acesso operacional pela conta excluída.\n\nEquipe ApPlanner",
         "variables":{"nome","empresa"},"required":set(),"action":None,
     },
+    "referral_pix_request":{
+        "label":"Indicação qualificada — informar Pix",
+        "subject":"Sua indicação no ApPlanner foi qualificada",
+        "body":"Olá, {nome}!\n\nA empresa {empresa_indicada} completou os pagamentos necessários e sua indicação foi qualificada. Informe sua chave Pix pelo link seguro abaixo para o Master concluir o pagamento do benefício:\n{url_pix}\n\nO link expira em 14 dias.\n\nEquipe ApPlanner",
+        "variables":{"nome","empresa_indicada","url_pix"},"required":{"url_pix"},"action":"url_pix",
+    },
 }
 
 
