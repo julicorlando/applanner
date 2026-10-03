@@ -272,3 +272,47 @@ select option, select optgroup { color: #172033; background-color: #fff; }
   .public-choice-card{min-height:210px;padding:22px}
   .public-choice-card h3{margin-top:28px}
 }
+
+
+/* Atendimento: produtos que o cliente reservou como interesse de compra. */
+.reserved-product-interest{
+  margin:18px 0;
+  padding:18px;
+  border:1px solid color-mix(in srgb,var(--accent) 34%,var(--line));
+  border-radius:16px;
+  background:color-mix(in srgb,var(--accent) 7%,var(--paper));
+}
+.reserved-product-interest h2{margin:6px 0 8px;font-size:1.08rem}
+.reserved-product-interest>p{margin:0 0 14px;color:var(--muted);line-height:1.55}
+.reserved-product-interest__grid{display:grid;gap:9px}
+.reserved-product-interest__item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--paper);
+}
+.reserved-product-interest__item div{display:grid;gap:3px}
+.reserved-product-interest__item small{color:var(--muted)}
+.reserved-products-sale-field{
+  padding:16px;
+  border:1px solid color-mix(in srgb,var(--accent) 28%,var(--line));
+  border-radius:14px;
+}
+.reserved-products-sale-field>div{display:grid;gap:8px;margin-top:8px}
+.reserved-products-sale-field label:has(input[type="checkbox"]){
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  cursor:pointer;
+}
+.reserved-products-sale-field input[type="checkbox"]{width:auto;margin:0}
+@media(max-width:560px){
+  .reserved-product-interest__item{align-items:flex-start;flex-direction:column;gap:7px}
+}
