@@ -68,28 +68,19 @@ CATALOG_LINKS={
 }
 
 
-RECEPTION_VISIBLE_RESOURCES={
-    "agenda":{"agendamentos","clientes","profissionais","servicos","unidades","expedientes","intervalos","folgas","configuracao"},
-    "financeiro":{"produtos","pdv"},
-    "barbearia":{"fila","comandas"},
-    "arena":{"reservas","espera-arena","quadras","modalidades","horarios-quadras","bloqueios"},
-    "auto":{"veiculos","ordens","orcamentos","crm"},
-    "relacionamento":{"inteligencia","espera"},
-    "comunicacao":{"whatsapp"},
-    "suporte":set(),
-}
+RECEPTION_VISIBLE_RESOURCES=None
 RECEPTION_WRITE_RESOURCES={
     ("agenda","agendamentos"),("agenda","clientes"),("agenda","expedientes"),
     ("agenda","intervalos"),("agenda","folgas"),("financeiro","produtos"),
-    ("financeiro","pdv"),("relacionamento","espera"),
+    ("financeiro","pdv"),("relacionamento","espera"),("barbearia","fila"),
+    ("arena","espera-arena"),
 }
 
 
 def _role_resource_visible(user,module_slug,resource_slug):
-    if user.is_superuser or user.role!="reception":
-        return True
-    allowed=RECEPTION_VISIBLE_RESOURCES.get(module_slug)
-    return allowed is not None and resource_slug in allowed
+    # A recepção pode consultar os recursos operacionais liberados ao seu papel.
+    # A escrita continua limitada explicitamente por RECEPTION_WRITE_RESOURCES.
+    return True
 
 
 def _role_resource_write(user,module_slug,resource_slug):
