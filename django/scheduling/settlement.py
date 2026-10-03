@@ -81,9 +81,11 @@ def settle_appointment(
     sale=None
     if attended:
         if sale_items:
-            sale=create_sale(tenant=appointment.tenant,user=user,customer=appointment.customer,
-                             professional=professional,payment_method=payment_method,
-                             items=sale_items)
+            sale=create_sale(
+                tenant=appointment.tenant,user=user,customer=appointment.customer,
+                professional=professional,payment_method=payment_method,
+                items=sale_items,idempotency_key=f"appointment:{appointment.pk}:products",
+            )
         price=appointment.service_price_snapshot
         if price is None:
             price=appointment.service.price
