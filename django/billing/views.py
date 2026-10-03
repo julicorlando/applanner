@@ -203,16 +203,21 @@ class CustomPlanForm(forms.Form):
 
 def custom_plan(request):
     from commercial.models import Lead
-    from growth.attribution import capture_attribution,record_acquisition
+    from growth.attribution import capture_attribution,current_attribution,record_acquisition
 
     capture_attribution(request)
     form=CustomPlanForm(request.POST or None)
     if request.method=="POST" and form.is_valid():
         data=form.cleaned_data
+        attribution=current_attribution(request)
         Lead.objects.create(
             name=data["name"],business_type=data["business_type"],
             email=data["email"],phone=data["phone"],
-            source="custom_plan",consent_granted=True,
+            source=attribution.get("source") or "custom_plan",
+            source_medium=attribution.get("medium",""),
+            source_campaign=attribution.get("campaign",""),
+            source_detail=attribution.get("content","") or "Monte o seu plano",
+            consent_granted=True,
             consent_at=timezone.now(),consent_version="custom_plan_v1",
             consent_purpose="Contato comercial para proposta de plano personalizado",
             notes="Módulos solicitados: "+", ".join(module.name for module in data["modules"]),
@@ -224,7 +229,7 @@ def custom_plan(request):
 
 
 def signup(request):
-    from growth.attribution import capture_attribution,record_acquisition
+    from growth.attribution import capture_attribution,current_attribution,record_acquisition
     capture_attribution(request)
     plan_id=request.POST.get("plan") if request.method=="POST" else request.GET.get("plan")
     plan_id=plan_id if plan_id and plan_id.isascii() and plan_id.isdigit() and len(plan_id)<=19 and int(plan_id)<=2**63-1 else None
@@ -291,6 +296,30 @@ def signup(request):
             if proposal:
                 proposal.tenant=tenant
                 proposal.save(update_fields=["tenant","updated_at"])
+            attribution=current_attribution(request)
+            from commercial.models import Lead
+            lead=Lead.objects.filter(email__iexact=data["email"],anonymized_at__isnull=True).order_by("-created_at").first()
+            if not lead:
+                lead=Lead.objects.create(
+                    name=data["owner_name"],phone=data["phone"],email=data["email"],
+                    business_type=data["category"],source=attribution.get("source") or "cadastro",
+                )
+            lead.status=Lead.Status.CONVERTED
+            lead.business_type=data["category"]
+            lead.source=attribution.get("source") or lead.source or "cadastro"
+            lead.source_medium=attribution.get("medium","")
+            lead.source_campaign=attribution.get("campaign","")
+            lead.source_detail=attribution.get("content","")
+            lead.converted_tenant=tenant
+            lead.save(update_fields=[
+                "status","business_type","source","source_medium","source_campaign",
+                "source_detail","converted_tenant","updated_at",
+            ])
+            if attribution.get("referral_code"):
+                from growth.referrals import register_signup_referral
+                register_signup_referral(
+                    code=attribution["referral_code"],referred_tenant=tenant,
+                )
             record_acquisition(request,"CompleteRegistration",tenant=tenant,user=user,segment=data["category"])
         try:
             from tenants.geocoding import enrich_unit_from_postal_code
