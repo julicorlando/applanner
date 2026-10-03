@@ -199,7 +199,7 @@ def qualify_referral_rewards_for_tenant(tenant_id):
                         "nome":user.first_name or user.email.split("@")[0],
                         "empresa_indicada":reward.referred_tenant.name,
                         "valor":f"{reward.reward_amount:.2f}",
-                        "url_pix":base+"/app/relacionamento/indicacoes/",
+                        "url_pix":base+"/app/profissional/indicacoes/",
                     },
                 )
     return len(paid)
