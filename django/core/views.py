@@ -48,10 +48,18 @@ def _tenant_dashboard(request):
     start=now.replace(hour=0,minute=0,second=0,microsecond=0)
     end=start+timedelta(days=1)
     month_start=start.replace(day=1)
+    active_units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
+    selected_unit=None
+    raw_unit=(request.GET.get("unit") or "").strip()
+    if raw_unit.isdigit():
+        selected_unit=next((row for row in active_units if row.pk==int(raw_unit)),None)
 
     today_qs=Appointment.objects.filter(
         tenant=tenant,starts_at__gte=start,starts_at__lt=end
     )
+    if selected_unit:
+        today_qs=today_qs.filter(unit=selected_unit)
+
     finance_start=start if request.user.role=="reception" else month_start
     finance_transactions=FinancialTransaction.objects.filter(
         tenant=tenant,
@@ -59,6 +67,8 @@ def _tenant_dashboard(request):
         paid_at__gte=finance_start,
         paid_at__lt=end if request.user.role=="reception" else now+timedelta(days=1),
     )
+    if selected_unit:
+        finance_transactions=finance_transactions.filter(unit=selected_unit)
     gross_revenue=finance_transactions.filter(type=FinancialTransaction.Type.INCOME).aggregate(total=Sum("amount"))["total"] or Decimal("0")
     expenses=finance_transactions.filter(type=FinancialTransaction.Type.EXPENSE).aggregate(total=Sum("amount"))["total"] or Decimal("0")
     net_revenue=gross_revenue-expenses
@@ -102,6 +112,43 @@ def _tenant_dashboard(request):
         return_intelligence_rows=list(return_qs[:8])
         for row in return_intelligence_rows:
             row.contact_blocked=contact_blocked(tenant,row.customer)
+    unit_performance=[]
+    if active_units:
+        month_appointments=Appointment.objects.filter(
+            tenant=tenant,starts_at__gte=month_start,starts_at__lt=now+timedelta(days=1)
+        )
+        month_finance=FinancialTransaction.objects.filter(
+            tenant=tenant,status=FinancialTransaction.Status.PAID,
+            paid_at__gte=month_start,paid_at__lt=now+timedelta(days=1),
+        )
+        for unit in active_units:
+            unit_appts=month_appointments.filter(unit=unit)
+            unit_finance=month_finance.filter(unit=unit)
+            unit_gross=unit_finance.filter(
+                type=FinancialTransaction.Type.INCOME
+            ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+            unit_expenses=unit_finance.filter(
+                type=FinancialTransaction.Type.EXPENSE
+            ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+            completed=unit_appts.filter(status=Appointment.Status.COMPLETED).count()
+            cancelled=unit_appts.filter(
+                status__in=[Appointment.Status.CANCELLED,Appointment.Status.NO_SHOW]
+            ).count()
+            total=unit_appts.count()
+            unit_performance.append({
+                "unit":unit,
+                "appointments":total,
+                "completed":completed,
+                "cancelled":cancelled,
+                "gross":unit_gross,
+                "expenses":unit_expenses,
+                "net":unit_gross-unit_expenses,
+                "average_ticket":(
+                    (unit_gross/Decimal(completed)).quantize(Decimal("0.01"))
+                    if completed else Decimal("0")
+                ),
+            })
+
     arena_mode=segment_enabled(tenant,"arena")
     arena_category="arena" in (tenant.category or "").lower() or "quadra" in (tenant.category or "").lower()
     if arena_mode:
@@ -128,12 +175,17 @@ def _tenant_dashboard(request):
             Appointment.Status.PENDING,Appointment.Status.CONFIRMED
         ]).count(),
         "customers":Customer.objects.filter(tenant=tenant,active=True).count(),
-        "professionals":Professional.objects.filter(tenant=tenant,active=True).count(),
+        "professionals":Professional.objects.filter(
+            tenant=tenant,active=True,**({"unit":selected_unit} if selected_unit else {})
+        ).count(),
         "revenue":net_revenue,
         "gross_revenue":gross_revenue,"expenses":expenses,"net_revenue":net_revenue,
-        "next_appointments":Appointment.objects.filter(tenant=tenant,starts_at__gte=now,
-            status__in=[Appointment.Status.PENDING,Appointment.Status.CONFIRMED]).select_related(
-            "customer","service","professional"
+        "next_appointments":Appointment.objects.filter(
+            tenant=tenant,starts_at__gte=now,
+            status__in=[Appointment.Status.PENDING,Appointment.Status.CONFIRMED],
+            **({"unit":selected_unit} if selected_unit else {})
+        ).select_related(
+            "unit","customer","service","professional"
         ).order_by("starts_at")[:8],
         "modules":modules,
         "available_modules":available,"segment_module":segment_module,
@@ -142,7 +194,13 @@ def _tenant_dashboard(request):
         "can_manage_finance":has_capability(request.user,"finance.manage") and request.user.role!="reception",
         "can_sell_products":has_capability(request.user,"finance.manage") and request.user.role=="reception",
         "reception_mode":request.user.role=="reception",
-        "revenue_period_label":"Receita líquida do dia" if request.user.role=="reception" else "Receita líquida do mês",
+        "revenue_period_label":(
+            ("Receita líquida do dia" if request.user.role=="reception" else "Receita líquida do mês")
+            + (f" · {selected_unit.name}" if selected_unit else "")
+        ),
+        "active_units":active_units,"selected_unit":selected_unit,
+        "unit_performance":unit_performance,
+        "multiunit_dashboard":len(active_units)>1,
         "arena_mode":arena_mode,"arena_category":arena_category,
         "arena_has_hours":arena_has_hours,"arena_has_prices":arena_has_prices,
         "arena_upcoming":arena_upcoming,
