@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from communications.models import Notification,TenantWhatsAppConnection,WhatsAppConversation,WhatsAppMessage
-from finance.models import FinancialTransaction,Product,ProfessionalCommission,Sale
+from finance.models import FinancialTransaction,Product,ProductReservation,ProfessionalCommission,Sale
 from scheduling.models import Appointment,AppointmentRating,AppointmentSettlement,Customer,Professional,Service
 from scheduling.settlement import settle_appointment
 from tenants.models import Tenant
@@ -53,6 +53,66 @@ class AppointmentWorkflowTests(TestCase):
         self.assertEqual(self.client.post(url,post).status_code,200)
         self.assertEqual(Sale.objects.count(),1)
         self.assertEqual(ProfessionalCommission.objects.count(),2)
+
+    def test_reserved_product_is_shown_as_interest_and_sold_with_service_when_confirmed(self):
+        product=Product.objects.create(
+            tenant=self.tenant,name="Pomada Mentolada",sale_price=Decimal("35"),
+            stock=Decimal("3"),commission_type=Product.CommissionType.PERCENT,
+            commission_value=Decimal("10"),
+        )
+        ProductReservation.objects.create(
+            tenant=self.tenant,appointment=self.appointment,product=product,
+            quantity=Decimal("1"),unit_price_snapshot=Decimal("35"),
+        )
+        self.client.force_login(self.prof_user)
+        url=reverse("professional-appointment",args=[self.appointment.pk])
+
+        page=self.client.get(url)
+        self.assertContains(page,"INTERESSE DO CLIENTE")
+        self.assertContains(page,"Pomada Mentolada")
+        self.assertContains(page,"A reserva não significa que houve venda")
+
+        response=self.client.post(url,{
+            "outcome":"completed","payment_method":"cash",
+            "reserved_products":[str(product.pk)],"quantity":"1",
+        })
+        self.assertEqual(response.status_code,302)
+        self.appointment.refresh_from_db();product.refresh_from_db()
+        settlement=AppointmentSettlement.objects.get(appointment=self.appointment)
+
+        self.assertEqual(self.appointment.status,Appointment.Status.COMPLETED)
+        self.assertEqual(product.stock,Decimal("2"))
+        self.assertIsNotNone(settlement.sale_id)
+        self.assertEqual(settlement.sale.total,Decimal("35"))
+        self.assertEqual(settlement.sale.items.get().product_id,product.pk)
+        self.assertEqual(FinancialTransaction.objects.get(
+            appointment=self.appointment,source_type="appointment"
+        ).amount,Decimal("80"))
+        self.assertEqual(
+            set(ProfessionalCommission.objects.filter(tenant=self.tenant).values_list("commission_amount",flat=True)),
+            {Decimal("32"),Decimal("3.50")},
+        )
+
+    def test_reserved_product_is_not_auto_sold_when_professional_does_not_mark_it(self):
+        product=Product.objects.create(
+            tenant=self.tenant,name="Shampoo",sale_price=Decimal("25"),stock=Decimal("2"),
+        )
+        ProductReservation.objects.create(
+            tenant=self.tenant,appointment=self.appointment,product=product,
+            quantity=Decimal("1"),unit_price_snapshot=Decimal("25"),
+        )
+        self.client.force_login(self.prof_user)
+        response=self.client.post(reverse("professional-appointment",args=[self.appointment.pk]),{
+            "outcome":"completed","payment_method":"cash","quantity":"1",
+        })
+        self.assertEqual(response.status_code,302)
+        product.refresh_from_db()
+        settlement=AppointmentSettlement.objects.get(appointment=self.appointment)
+
+        self.assertEqual(product.stock,Decimal("2"))
+        self.assertIsNone(settlement.sale_id)
+        self.assertEqual(Sale.objects.count(),0)
+        self.assertTrue(FinancialTransaction.objects.filter(appointment=self.appointment).exists())
 
     def test_no_show_and_other_professional_are_restricted(self):
         another=Professional.objects.create(tenant=self.tenant,name="Bia")

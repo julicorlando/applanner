@@ -204,27 +204,51 @@ def professional_waitlist(request,pk):
     })
 
 
+class ReservedProductChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self,obj):
+        return f"{obj.name} · R$ {obj.sale_price:.2f}"
+
+
 class SettlementForm(forms.Form):
     outcome=forms.ChoiceField(label="Resultado",choices=[("completed","Atendeu"),("no_show","Não atendeu")])
     payment_method=forms.ChoiceField(label="Forma de pagamento",required=False,choices=[
         ("","Selecione"),("pix","Pix"),("card","Cartão"),("cash","Dinheiro"),
         ("transfer","Transferência"),("other","Outra"),
     ])
-    product=forms.ModelChoiceField(label="Produto vendido (opcional)",required=False,queryset=Product.objects.none())
-    quantity=forms.DecimalField(label="Quantidade",min_value=Decimal("0.001"),max_digits=12,
+    reserved_products=ReservedProductChoiceField(
+        label="Produtos reservados que foram vendidos",
+        required=False,
+        queryset=Product.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        help_text="O cliente apenas demonstrou interesse. Marque somente os produtos que realmente foram vendidos neste atendimento.",
+    )
+    product=forms.ModelChoiceField(label="Outro produto vendido (opcional)",required=False,queryset=Product.objects.none())
+    quantity=forms.DecimalField(label="Quantidade do outro produto",min_value=Decimal("0.001"),max_digits=12,
                                 decimal_places=3,initial=1)
 
-    def __init__(self,*args,tenant,prepaid_full=False,**kwargs):
+    def __init__(self,*args,tenant,appointment=None,prepaid_full=False,**kwargs):
         super().__init__(*args,**kwargs)
         self.prepaid_full=prepaid_full
-        self.fields["product"].queryset=Product.objects.filter(tenant=tenant,active=True,stock__gt=0)
+        self.fields["product"].queryset=Product.objects.filter(tenant=tenant,active=True,stock__gt=0).order_by("name")
+        if appointment is not None:
+            self.fields["reserved_products"].queryset=Product.objects.filter(
+                tenant=tenant,active=True,reservations__appointment=appointment,
+            ).distinct().order_by("name")
 
     def clean(self):
         data=super().clean()
-        if data.get("outcome")=="completed" and not data.get("payment_method") and (not self.prepaid_full or data.get("product")):
+        reserved=data.get("reserved_products")
+        product=data.get("product")
+        has_product_sale=bool(reserved or product)
+        if reserved is not None and product and reserved.filter(pk=product.pk).exists():
+            self.add_error("product","Este produto já foi marcado entre os itens reservados vendidos.")
+        if data.get("outcome")=="completed" and not data.get("payment_method") and (not self.prepaid_full or has_product_sale):
             self.add_error("payment_method","Informe como o atendimento foi pago.")
-        if data.get("outcome")=="no_show" and data.get("product"):
-            self.add_error("product","Não há venda em atendimento não realizado.")
+        if data.get("outcome")=="no_show":
+            if reserved:
+                self.add_error("reserved_products","Não há venda de produtos em atendimento não realizado.")
+            if product:
+                self.add_error("product","Não há venda de produtos em atendimento não realizado.")
         return data
 
 
@@ -233,8 +257,10 @@ def professional_appointment(request,pk):
     if request.user.role!="professional" or not request.user.tenant_id:
         raise PermissionDenied("Área exclusiva do profissional.")
     professional=get_object_or_404(Professional,tenant_id=request.user.tenant_id,user=request.user,active=True)
-    appointment=get_object_or_404(Appointment.objects.select_related("customer","service"),
-                                  pk=pk,tenant=professional.tenant,professional=professional)
+    appointment=get_object_or_404(
+        Appointment.objects.select_related("customer","service").prefetch_related("product_reservations__product"),
+        pk=pk,tenant=professional.tenant,professional=professional,
+    )
     from billing.models import TenantPaymentTransaction
     paid=TenantPaymentTransaction.objects.filter(tenant=professional.tenant,
         reference_type="appointment",reference_id=appointment.pk,
@@ -248,12 +274,15 @@ def professional_appointment(request,pk):
         else:
             messages.success(request,"Mensagem pronta enviada ao WhatsApp do cliente.")
         return redirect("professional-appointment",pk=appointment.pk)
-    form=SettlementForm(request.POST or None,tenant=professional.tenant,prepaid_full=prepaid_full)
+    form=SettlementForm(
+        request.POST or None,tenant=professional.tenant,appointment=appointment,prepaid_full=prepaid_full,
+    )
     if request.method=="POST" and form.is_valid():
         try:
             settle_appointment(appointment_id=appointment.pk,professional=professional,user=request.user,
                 attended=form.cleaned_data["outcome"]=="completed",
                 payment_method=form.cleaned_data["payment_method"] or ("pix" if prepaid_full else ""),
+                reserved_product_ids=[item.pk for item in form.cleaned_data["reserved_products"]],
                 product_id=form.cleaned_data["product"].pk if form.cleaned_data["product"] else None,
                 quantity=form.cleaned_data["quantity"])
         except (ValidationError,Appointment.DoesNotExist) as exc:
@@ -263,6 +292,7 @@ def professional_appointment(request,pk):
             return redirect("professional-area")
     return render(request,"portal/professional_appointment.html",{
         "professional":professional,"appointment":appointment,"form":form,
+        "reserved_product_reservations":list(appointment.product_reservations.all()),
         "paid_booking_payment":paid,"prepaid_full":prepaid_full,
         "can_settle":appointment.status in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
             Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS} and appointment.starts_at<=timezone.now(),

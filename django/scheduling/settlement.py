@@ -13,7 +13,10 @@ from .models import Appointment, AppointmentSettlement
 
 
 @transaction.atomic
-def settle_appointment(*,appointment_id,professional,user,attended,payment_method="",product_id=None,quantity=1):
+def settle_appointment(
+    *,appointment_id,professional,user,attended,payment_method="",
+    reserved_product_ids=None,product_id=None,quantity=1,
+):
     appointment=Appointment.objects.select_for_update().select_related("service","customer","tenant").get(
         pk=appointment_id,tenant=professional.tenant,professional=professional,
     )
@@ -30,23 +33,57 @@ def settle_appointment(*,appointment_id,professional,user,attended,payment_metho
     paid_online=TenantPaymentTransaction.objects.filter(tenant=appointment.tenant,
         reference_type="appointment",reference_id=appointment.pk,
         status=TenantPaymentTransaction.Status.PAID).exists()
-    finance_method=("pix+"+payment_method if attended and paid_online and
-        appointment.booking_payment==Appointment.BookingPayment.PARTIAL else payment_method)
-    if not attended and product_id:
+    if attended and paid_online and appointment.booking_payment==Appointment.BookingPayment.FULL:
+        finance_method="pix"
+    elif attended and paid_online and appointment.booking_payment==Appointment.BookingPayment.PARTIAL:
+        finance_method="pix+"+payment_method
+    else:
+        finance_method=payment_method
+    raw_reserved=reserved_product_ids or []
+    try:
+        reserved_ids=list(dict.fromkeys(int(value) for value in raw_reserved))
+    except (TypeError,ValueError):
+        raise ValidationError("Produtos reservados inválidos.")
+    if not attended and (product_id or reserved_ids):
         raise ValidationError("Não é possível vender produtos em um atendimento não realizado.")
+
+    sale_items=[]
+    if reserved_ids:
+        from finance.models import ProductReservation
+        reservations=list(
+            ProductReservation.objects.select_for_update().select_related("product").filter(
+                appointment=appointment,tenant=appointment.tenant,product_id__in=reserved_ids,
+                product__active=True,
+            )
+        )
+        if len(reservations)!=len(reserved_ids):
+            raise ValidationError("Um dos produtos selecionados não pertence à reserva deste atendimento.")
+        by_product={row.product_id:row for row in reservations}
+        for product_id_reserved in reserved_ids:
+            row=by_product[product_id_reserved]
+            sale_items.append({
+                "product_id":row.product_id,
+                "quantity":row.quantity,
+                "unit_price":row.unit_price_snapshot,
+            })
+
     if product_id:
         try:
             product_id=int(product_id)
             quantity=Decimal(str(quantity))
         except (TypeError,ValueError,ArithmeticError):
             raise ValidationError("Produto ou quantidade inválidos.")
+        if product_id in reserved_ids:
+            raise ValidationError("Este produto já foi marcado entre os produtos reservados vendidos.")
+        sale_items.append({"product_id":product_id,"quantity":quantity})
+
     now=timezone.now()
     sale=None
     if attended:
-        if product_id:
+        if sale_items:
             sale=create_sale(tenant=appointment.tenant,user=user,customer=appointment.customer,
                              professional=professional,payment_method=payment_method,
-                             items=[{"product_id":product_id,"quantity":quantity}])
+                             items=sale_items)
         price=appointment.service_price_snapshot
         if price is None:
             price=appointment.service.price
