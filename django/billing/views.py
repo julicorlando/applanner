@@ -605,6 +605,11 @@ def subscription_modules(request):
     for module in available:
         module.current_monthly_price=module_monthly_price(module,tenant)
         module.current_unit_count=tenant.units.filter(active=True).count() if module.per_unit_billing else None
+        if module.slug=="professional-extra":
+            active_extra=TenantModuleAddon.objects.filter(
+                tenant=tenant,module=module,status=TenantModuleAddon.Status.ACTIVE
+            ).first()
+            module.current_extra_quantity=active_extra.quantity if active_extra else 0
     return render(request,"billing/modules.html",{
         "subscription":subscription,"available":available,
         "requests":ModuleRequest.objects.filter(tenant=tenant).select_related("module").order_by("-created_at")[:100],
