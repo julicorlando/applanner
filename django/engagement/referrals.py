@@ -170,7 +170,7 @@ def qualify_referral_rewards_for_tenant(tenant_id):
         count=len(paid)
         reward.qualified_payment_count=count
         reward.save(update_fields=["qualified_payment_count","updated_at"])
-        required=max(int(campaign.qualification_payments or 2),2)
+        required=2
         if count<required:
             continue
         qualifying_payment=paid[min(required-1,len(paid)-1)]
@@ -203,6 +203,52 @@ def qualify_referral_rewards_for_tenant(tenant_id):
                     },
                 )
     return len(paid)
+
+
+def finalize_company_referral_discounts(tenant_id):
+    rewards=list(
+        ReferralReward.objects.select_related("referrer_user","campaign").filter(
+            referrer_kind=ReferralReward.ReferrerKind.COMPANY,
+            status=ReferralReward.Status.APPLIED,
+            referrer_user__tenant_id=tenant_id,
+        )
+    )
+    if not rewards:
+        return 0
+    subscription=(
+        Subscription.objects.filter(
+            tenant_id=tenant_id,
+            status__in=[Subscription.Status.TRIAL,Subscription.Status.ACTIVE,Subscription.Status.PAST_DUE],
+        ).order_by("-started_at").first()
+    )
+    if not subscription:
+        return 0
+    restored=sum((row.reward_amount for row in rewards),Decimal("0.00")).quantize(Decimal("0.01"))
+    new_total=(Decimal(subscription.contracted_price or 0)+restored).quantize(Decimal("0.01"))
+    if subscription.provider_subscription_id:
+        from billing.models import PaymentGateway
+        gateway=PaymentGateway.objects.filter(
+            provider="mercadopago",active=True,
+            last_test_status=PaymentGateway.TestStatus.VALIDATED,
+        )
+        if subscription.provider_environment:
+            gateway=gateway.filter(environment=subscription.provider_environment)
+        gateway=gateway.first()
+        if gateway:
+            platform_provider(gateway).update_subscription_amount(
+                subscription.provider_subscription_id,new_total
+            )
+    subscription.contracted_price=new_total
+    if subscription.base_contracted_price is not None:
+        subscription.base_contracted_price=(
+            Decimal(subscription.base_contracted_price)+restored
+        ).quantize(Decimal("0.01"))
+    subscription.save(update_fields=["contracted_price","base_contracted_price","updated_at"])
+    now=timezone.now()
+    ReferralReward.objects.filter(pk__in=[row.pk for row in rewards]).update(
+        status=ReferralReward.Status.PAID,paid_at=now,updated_at=now
+    )
+    return len(rewards)
 
 
 @login_required
