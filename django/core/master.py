@@ -18,6 +18,7 @@ from billing.models import Module, Plan, PlanModule
 from billing.models import PaymentGateway
 from billing.payment_services import configure_mercadopago_gateway
 from core.labels import field_label
+from core.audit import append_audit,model_snapshot
 
 
 FIELD_LABELS={
@@ -576,6 +577,11 @@ def resource_form(request,slug,pk=None):
     obj=get_object_or_404(model,pk=pk,deleted_at__isnull=True) if pk and slug=="usuarios" else (get_object_or_404(model,pk=pk) if pk else None)
     Form=(UserMasterForm if slug=="usuarios" else TenantMasterForm if slug=="empresas" else PlanMasterForm if config.get("special")=="plan"
           else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"])))
+    critical_audit_slugs={
+        "planos","modulos","assinaturas","cupons","campanhas-indicacao",
+        "operacao","empresas","isencoes-assinaturas","legais",
+    }
+    before_snapshot=model_snapshot(obj) if obj is not None and slug in critical_audit_slugs else None
     form=Form(request.POST or None,request.FILES or None,instance=obj)
     for name,field in form.fields.items():
         if name not in {"new_password","confirm_password"}:
@@ -611,6 +617,13 @@ def resource_form(request,slug,pk=None):
             row.full_clean()
             row.save()
             form.save_m2m()
+            if slug in critical_audit_slugs:
+                append_audit(
+                    tenant=getattr(row,"tenant",None),user=request.user,request=request,
+                    action="MASTER_CRITICAL_RESOURCE_UPDATED" if obj else "MASTER_CRITICAL_RESOURCE_CREATED",
+                    entity_type=model._meta.label,entity_id=row.pk,
+                    before=before_snapshot,after=model_snapshot(row),
+                )
             messages.success(request,"Registro salvo.")
             return redirect("master-resource-list",slug=slug)
         except ValidationError as exc:
@@ -909,9 +922,16 @@ def operational_action(request,action,pk=None):
                 ReferralReward,pk=pk,status=ReferralReward.Status.READY,
                 referrer_kind=ReferralReward.ReferrerKind.PROFESSIONAL,
             )
+            before={"status":row.status,"reward_amount":str(row.reward_amount)}
             row.status=ReferralReward.Status.PAID
             row.paid_at=timezone.now()
             row.save(update_fields=["status","paid_at","updated_at"])
+            append_audit(
+                tenant=row.referred_tenant,user=request.user,request=request,
+                action="REFERRAL_REWARD_MARKED_PAID",
+                entity_type="engagement.ReferralReward",entity_id=row.pk,
+                before=before,after={"status":row.status,"paid_at":row.paid_at.isoformat()},
+            )
             messages.success(request,"Recompensa marcada como paga ao profissional.")
             return redirect("master-resource-list",slug="recompensas-indicacao")
         if action in {"module-request-approve","module-request-reject"}:
@@ -938,6 +958,16 @@ def operational_action(request,action,pk=None):
                         +adjustment.error_code)
             else:
                 messages.success(request,"Solicitação de módulo rejeitada.")
+            row.refresh_from_db()
+            append_audit(
+                tenant=row.tenant,user=request.user,request=request,
+                action="MODULE_REQUEST_APPROVED" if approved else "MODULE_REQUEST_REJECTED",
+                entity_type="billing.ModuleRequest",entity_id=row.pk,
+                before=None,after={
+                    "module_id":row.module_id,"status":row.status,
+                    "quoted_monthly_price":str(row.quoted_monthly_price),
+                },
+            )
             return redirect("master-resource-list",slug="solicitacoes-modulos")
         if action=="homologation-run":
             run=run_homologation(user=request.user)
