@@ -126,7 +126,7 @@ FIELD_LABELS = {
     "replacement_date": "Data de reposição", "request_type": "Tipo de solicitação",
     "require_checkin_photos": "Exigir fotos na entrada",
     "require_delivery_acceptance": "Exigir aceite na entrega",
-    "reserved_products": "Produtos reservados",
+    "reserved_products": "Interesse em produtos",
     "reservation_reminder_enabled": "Lembrete da reserva ativo",
     "reservation_reminder_hours": "Antecedência do lembrete (horas)",
     "responsible_name": "Nome do responsável", "responsible_phone": "Telefone do responsável",
