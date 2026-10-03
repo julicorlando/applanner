@@ -8,8 +8,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import (
-    ModuleRequest, PaymentGateway, Subscription, SubscriptionModuleAdjustment,
-    TenantModule, TenantModuleAddon,
+    CheckoutSession, ModuleRequest, Payment, PaymentGateway, PixCharge, Subscription,
+    SubscriptionModuleAdjustment, TenantModule, TenantModuleAddon,
 )
 from .payment_services import platform_provider
 
@@ -47,6 +47,34 @@ def _merged_monthly(tenant,exclude_addon_id=None):
     return sum((row.monthly_price for row in qs),Decimal("0.00"))
 
 
+def module_monthly_price(module,tenant):
+    base=Decimal(module.addon_monthly_price or Decimal("0.00")).quantize(Decimal("0.01"))
+    if module.per_unit_billing:
+        units=max(tenant.units.filter(active=True).count(),1)
+        return (base*units).quantize(Decimal("0.01"))
+    return base
+
+
+def invalidate_pending_subscription_charges(subscription):
+    pending=Payment.objects.filter(
+        subscription=subscription,purpose="subscription",status=Payment.Status.PENDING,
+    )
+    payment_ids=list(pending.values_list("pk",flat=True))
+    if payment_ids:
+        PixCharge.objects.filter(payment_id__in=payment_ids,status="pending").update(
+            status="cancelled",updated_at=timezone.now()
+        )
+        CheckoutSession.objects.filter(
+            pix_charges__payment_id__in=payment_ids,
+            status__in=[CheckoutSession.Status.STARTED,CheckoutSession.Status.AWAITING_PAYMENT],
+        ).update(status=CheckoutSession.Status.ABANDONED,updated_at=timezone.now())
+        pending.update(
+            status=Payment.Status.CANCELLED,
+            provider_status="superseded_by_subscription_amount_change",
+            updated_at=timezone.now(),
+        )
+
+
 def request_module(*,tenant,module,user,note=""):
     if not module.active or not module.addon_sellable or module.addon_monthly_price is None:
         raise ValidationError("Este módulo não está disponível para contratação avulsa.")
@@ -65,7 +93,7 @@ def request_module(*,tenant,module,user,note=""):
         return existing
     return ModuleRequest.objects.create(
         public_id=secrets.token_hex(16),tenant=tenant,module=module,requested_by=user,
-        quoted_monthly_price=module.addon_monthly_price,
+        quoted_monthly_price=module_monthly_price(module,tenant),
         tenant_note=(note or "")[:500],status=ModuleRequest.Status.PENDING,
     )
 
@@ -170,6 +198,7 @@ def activate_module_request(*,module_request,user):
             subscription.save(update_fields=[
                 "base_contracted_price","addon_contracted_price","contracted_price","updated_at"
             ])
+            invalidate_pending_subscription_charges(subscription)
             adjustment.module_addon=addon
             adjustment.status=SubscriptionModuleAdjustment.Status.APPLIED
             adjustment.applied_at=timezone.now()
@@ -251,6 +280,7 @@ def cancel_module_addon(*,addon,user):
         subscription.save(update_fields=[
             "base_contracted_price","addon_contracted_price","contracted_price","updated_at"
         ])
+        invalidate_pending_subscription_charges(subscription)
         adjustment.status=SubscriptionModuleAdjustment.Status.APPLIED
         adjustment.applied_at=timezone.now()
         adjustment.save()
@@ -270,3 +300,57 @@ def cancel_module_addon(*,addon,user):
         adjustment.error_code=exc.__class__.__name__[:120]
         adjustment.save(update_fields=["status","error_code","updated_at"])
         raise
+
+
+
+@transaction.atomic
+def sync_per_unit_addon_pricing(tenant_id):
+    from tenants.models import Tenant
+    tenant=Tenant.objects.select_for_update().get(pk=tenant_id)
+    subscription=_subscription(tenant)
+    if not subscription:
+        return None
+    addons=list(
+        TenantModuleAddon.objects.select_for_update().select_related("module").filter(
+            tenant=tenant,status=TenantModuleAddon.Status.ACTIVE,
+            billing_mode=TenantModuleAddon.BillingMode.MERGED,
+            module__per_unit_billing=True,
+        )
+    )
+    if not addons:
+        return subscription
+
+    months=_cycle_months(subscription.billing_cycle)
+    previous=Decimal(subscription.contracted_price or Decimal("0.00")).quantize(Decimal("0.01"))
+    delta_monthly=Decimal("0.00")
+    changed=[]
+    for addon in addons:
+        target=module_monthly_price(addon.module,tenant)
+        current=Decimal(addon.monthly_price or Decimal("0.00")).quantize(Decimal("0.01"))
+        if target!=current:
+            delta_monthly+=target-current
+            changed.append((addon,target))
+    if not changed:
+        return subscription
+
+    new_total=(previous+delta_monthly*months).quantize(Decimal("0.01"))
+    gateway=_gateway_for(subscription)
+    if gateway:
+        platform_provider(gateway).update_subscription_amount(
+            subscription.provider_subscription_id,new_total
+        )
+    for addon,target in changed:
+        addon.monthly_price=target
+        addon.save(update_fields=["monthly_price","updated_at"])
+        if addon.module_request_id:
+            ModuleRequest.objects.filter(pk=addon.module_request_id).update(
+                quoted_monthly_price=target,updated_at=timezone.now()
+            )
+    subscription.addon_contracted_price=(
+        Decimal(subscription.addon_contracted_price or Decimal("0.00"))+
+        delta_monthly*months
+    ).quantize(Decimal("0.01"))
+    subscription.contracted_price=new_total
+    subscription.save(update_fields=["addon_contracted_price","contracted_price","updated_at"])
+    invalidate_pending_subscription_charges(subscription)
+    return subscription
