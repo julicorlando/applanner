@@ -76,6 +76,7 @@ class SignupForm(forms.Form):
     payment_email=forms.EmailField(required=False,label="E-mail de quem pagará (se diferente)",
         help_text="Preencha somente se outra pessoa for responsável pelo pagamento.")
     phone=forms.CharField(max_length=32,required=False,label="Telefone")
+    postal_code=forms.CharField(max_length=10,label="CEP da empresa",help_text="Usamos o CEP para localizar sua empresa no Explorar e preparar a unidade principal.")
     password=forms.CharField(widget=forms.PasswordInput,label="Senha")
     password_confirm=forms.CharField(widget=forms.PasswordInput,label="Confirmar senha")
 
@@ -102,6 +103,13 @@ class SignupForm(forms.Form):
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError("Já existe uma conta com este e-mail.")
         return email
+
+    def clean_postal_code(self):
+        import re
+        digits=re.sub(r"\D","",self.cleaned_data["postal_code"])
+        if len(digits)!=8:
+            raise forms.ValidationError("Informe um CEP com 8 dígitos.")
+        return digits
 
     def clean(self):
         data=super().clean()
@@ -258,9 +266,9 @@ def signup(request):
                 status=Tenant.Status.TRIAL if trial_days else Tenant.Status.ACTIVE,
                 public_enabled=False,public_booking_enabled=True,
             )
-            Unit.objects.create(
+            unit=Unit.objects.create(
                 tenant=tenant,name=data["business_name"],is_primary=True,
-                email=data["email"],phone=data["phone"],active=True,
+                email=data["email"],phone=data["phone"],postal_code=data["postal_code"],active=True,
             )
             TenantOnboarding.objects.create(tenant=tenant,required=True)
             user=User.objects.create_user(
@@ -284,6 +292,11 @@ def signup(request):
                 proposal.tenant=tenant
                 proposal.save(update_fields=["tenant","updated_at"])
             record_acquisition(request,"CompleteRegistration",tenant=tenant,user=user,segment=data["category"])
+        try:
+            from tenants.geocoding import enrich_unit_from_postal_code
+            enrich_unit_from_postal_code(unit)
+        except Exception:
+            pass
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version
 
