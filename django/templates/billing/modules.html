@@ -5,7 +5,8 @@
   <div class="portal-heading"><div><a class="back-link" href="{% url 'billing-subscription-status' %}">← Assinatura</a><span class="eyebrow">ASSINATURA</span><h1>Módulos adicionais</h1><p>Solicite recursos extras; após aprovação eles são incorporados ao valor da assinatura.</p></div></div>
   <div class="portal-module-grid">
     {% for module in available %}
-    <article class="portal-module-card"><span class="portal-module-kicker">ADICIONAL</span><h3>{{ module.name }}</h3><p>{{ module.description }}</p><strong>{% if module.addon_monthly_price %}R$ {{ module.addon_monthly_price }}/mês{% else %}Sob consulta{% endif %}</strong>
+    <article class="portal-module-card"><span class="portal-module-kicker">ADICIONAL</span><h3>{{ module.name }}</h3><p>{{ module.description }}</p><strong>{% if module.addon_monthly_price %}R$ {{ module.current_monthly_price }}/mês{% else %}Sob consulta{% endif %}</strong>
+      {% if module.per_unit_billing %}<p class="payment-hint">Cobrança por unidade ativa: R$ {{ module.addon_monthly_price }} por unidade × {{ module.current_unit_count|default:1 }} unidade{{ module.current_unit_count|pluralize }}. Ao cadastrar ou remover unidades, o valor da assinatura é atualizado automaticamente.</p>{% endif %}
       <form method="post" style="margin-top:16px">{% csrf_token %}<input type="hidden" name="action" value="request"><input type="hidden" name="module" value="{{ module.pk }}"><button class="button primary">Solicitar módulo</button></form>
     </article>
     {% empty %}<article class="panel"><p class="empty">Nenhum módulo adicional disponível para sua assinatura.</p></article>{% endfor %}
