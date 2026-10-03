@@ -92,12 +92,12 @@
   <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2><p>Clique em um serviço para adicioná-lo ao seu agendamento.</p></div>
   <div class="segment-grid public-choice-grid">
     {% for service in services %}
-    <button type="button" class="public-choice-card public-service-card" data-select-service="{{ service.pk }}" aria-label="Adicionar {{ service.name }} ao agendamento">
+    <button type="button" class="public-choice-card public-service-card{% if not tenant.public_booking_enabled %} public-choice-card--disabled{% endif %}" {% if tenant.public_booking_enabled %}data-select-service="{{ service.pk }}"{% else %}disabled{% endif %} aria-label="{% if tenant.public_booking_enabled %}Adicionar {{ service.name }} ao agendamento{% else %}{{ service.name }}{% endif %}">
       <span>{{ service.duration_minutes }} min</span>
       <h3>{{ service.name }}</h3>
       <p>{{ service.description }}</p>
       <strong>R$ {{ service.price }}</strong>
-      <span class="public-choice-card__action">Selecionar e agendar →</span>
+      <span class="public-choice-card__action">{% if tenant.public_booking_enabled %}Selecionar e agendar →{% else %}Agendamento online indisponível{% endif %}</span>
     </button>
     {% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}
   </div>
@@ -143,8 +143,10 @@
       <h3>{{ product.name }}</h3>
       <p>{{ product.description }}</p>
       <strong>R$ {{ product.sale_price }}</strong>
-      {% if product.public_available_stock > 0 %}
+      {% if product.public_available_stock > 0 and tenant.public_booking_enabled %}
         <button type="button" class="button ghost public-product-reserve" data-reserve-product="{{ product.pk }}" data-product-name="{{ product.name|escape }}" data-product-price="{{ product.sale_price }}">Reservar com o agendamento</button>
+      {% elif product.public_available_stock > 0 %}
+        <span class="public-choice-card__action">Disponível no estabelecimento</span>
       {% else %}
         <span class="public-choice-card__action">Sem estoque para reserva</span>
       {% endif %}
