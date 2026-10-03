@@ -10,7 +10,7 @@ LEGACY_ROLE_CAPABILITIES={
     "master":{"*"},
     "owner":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","communications.manage","support.manage"},
     "manager":{"agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage","engagement.manage","healthcare.manage","support.manage"},
-    "reception":{"agenda.manage","engagement.manage","communications.manage","support.manage","barber.manage","arena.manage","auto.manage"},
+    "reception":{"agenda.manage","engagement.manage","products.sell","barber.manage","arena.manage","auto.manage"},
     "professional":{"agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","communications.manage","support.manage"},
     "commercial":{"commercial.manage","communications.manage"},
     "finance":{"finance.manage"},
