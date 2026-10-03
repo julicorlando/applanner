@@ -30,47 +30,58 @@ def retry_master_chatbot_queue():
     return len(ids)
 
 
-@shared_task(bind=True,max_retries=5,autoretry_for=(Exception,),retry_backoff=True,retry_jitter=True)
+@shared_task(bind=True,max_retries=5)
 def send_notification(self,notification_id):
-    with transaction.atomic():
-        notification=Notification.objects.select_for_update().filter(pk=notification_id).first()
-        if not notification or notification.status!=Notification.Status.QUEUED:
-            return
-        if notification.scheduled_at and notification.scheduled_at>timezone.now():
-            return
+    try:
+        with transaction.atomic():
+            notification=Notification.objects.select_for_update().filter(pk=notification_id).first()
+            if not notification or notification.status!=Notification.Status.QUEUED:
+                return
+            if notification.scheduled_at and notification.scheduled_at>timezone.now():
+                return
 
-        if notification.channel==Notification.Channel.EMAIL:
-            subject=notification.payload.get("subject") or "ApPlanner"
-            text=notification.payload.get("text") or notification.payload.get("message") or ""
-            html=notification.payload.get("html")
-            message=EmailMultiAlternatives(
-                subject=subject,
-                body=text,
-                to=[notification.destination],
-            )
-            if html:
-                message.attach_alternative(html,"text/html")
-            message.send(fail_silently=False)
-        elif notification.channel==Notification.Channel.WHATSAPP:
-            if notification.template_key in {"appointment_confirmation","appointment_reminder","appointment_feedback"}:
-                from .tenant_whatsapp import send_appointment_notification
-                provider_id=send_appointment_notification(notification)
-                if notification.status==Notification.Status.SKIPPED:
-                    return
-            else:
-                from .whatsapp import send_text
-                provider_id=send_text(
-                    notification.destination,
-                    notification.payload.get("text") or notification.payload.get("message") or "",
+            if notification.channel==Notification.Channel.EMAIL:
+                subject=notification.payload.get("subject") or "ApPlanner"
+                text=notification.payload.get("text") or notification.payload.get("message") or ""
+                html=notification.payload.get("html")
+                message=EmailMultiAlternatives(
+                    subject=subject,
+                    body=text,
+                    to=[notification.destination],
                 )
-            notification.provider_reference=provider_id
-        else:
-            raise RuntimeError(f"Canal ainda sem provider ativo: {notification.channel}")
+                if html:
+                    message.attach_alternative(html,"text/html")
+                message.send(fail_silently=False)
+            elif notification.channel==Notification.Channel.WHATSAPP:
+                if notification.template_key in {"appointment_confirmation","appointment_reminder","appointment_feedback"}:
+                    from .tenant_whatsapp import send_appointment_notification
+                    provider_id=send_appointment_notification(notification)
+                    if notification.status==Notification.Status.SKIPPED:
+                        return
+                else:
+                    from .whatsapp import send_text
+                    provider_id=send_text(
+                        notification.destination,
+                        notification.payload.get("text") or notification.payload.get("message") or "",
+                    )
+                notification.provider_reference=provider_id
+            else:
+                raise RuntimeError(f"Canal ainda sem provider ativo: {notification.channel}")
 
-        notification.status=Notification.Status.SENT
-        notification.sent_at=timezone.now()
-        notification.error_message=""
-        notification.save(update_fields=["status","sent_at","error_message","provider_reference"])
+            notification.status=Notification.Status.SENT
+            notification.sent_at=timezone.now()
+            notification.error_message=""
+            notification.save(update_fields=["status","sent_at","error_message","provider_reference"])
+    except Exception as exc:
+        if self.request.retries>=self.max_retries:
+            Notification.objects.filter(
+                pk=notification_id,status=Notification.Status.QUEUED
+            ).update(
+                status=Notification.Status.FAILED,
+                error_message=f"{exc.__class__.__name__}: falha definitiva após tentativas de entrega"[:500],
+            )
+            return
+        raise self.retry(exc=exc,countdown=min(300,2**self.request.retries))
 
 
 @shared_task
