@@ -67,6 +67,8 @@ urlpatterns = [
     path("api/public/<slug:slug>/book/", PublicBookingAPIView.as_view(), name="public-booking"),
     path("api/public/<slug:slug>/waitlist/", PublicWaitlistAPIView.as_view(), name="public-waitlist"),
     path("api/public/appointments/<str:token>/", CustomerAppointmentAPIView.as_view(), name="public-appointment-manage"),
+    path("webhooks/pagamentos/", mercadopago_platform_webhook, name="payment-platform-webhook"),
+    path("webhooks/tenant/pagamentos/<slug:slug>/", mercadopago_tenant_webhook, name="payment-tenant-webhook"),
     path("webhooks/mercadopago/", mercadopago_platform_webhook, name="mercadopago-platform-webhook"),
     path("webhooks/tenant/mercadopago/<slug:slug>/", mercadopago_tenant_webhook, name="mercadopago-tenant-webhook"),
 ]
