@@ -25,7 +25,7 @@
         <a href="/">Painel</a>
         {% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a>{% endif %}{% endif %}
         {% if request.user.tenant_id and request.user.role != 'professional' %}<a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}
-        {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Mercado Pago</a><a href="/commercial/">Comercial</a>{% endif %}
+        {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cobrança da plataforma</a><a href="/commercial/">Comercial</a>{% endif %}
         {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
         <a href="/account/2fa/setup/">Segurança</a>
         <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
@@ -40,7 +40,7 @@
     <details class="mobile-nav"><summary>Menu</summary><div class="mobile-nav-links">
       {% if request.user.is_authenticated %}
       <a href="/">Painel</a>{% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a><a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}{% endif %}
-      {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Mercado Pago</a><a href="/commercial/">Comercial</a>{% endif %}
+      {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cobrança da plataforma</a><a href="/commercial/">Comercial</a>{% endif %}
       {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
       <a href="/account/2fa/setup/">Segurança</a>
       <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
@@ -68,6 +68,14 @@
   <main id="conteudo">{% block content %}{% endblock %}</main>
   <footer class="footer">
     <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>
+    <nav class="footer-legal" aria-label="Documentos e ajuda">
+      <a href="{% url 'legal-public' 'privacy' 'all' %}">Política de Privacidade</a>
+      <a href="{% url 'legal-public' 'terms' 'company' %}">Termos para empresas</a>
+      <a href="{% url 'legal-public' 'terms' 'customer' %}">Termos para clientes</a>
+      <a href="{% url 'legal-public' 'cancellation' 'company' %}">Cancelamento para empresas</a>
+      <a href="{% url 'legal-public' 'cancellation' 'customer' %}">Cancelamento para clientes</a>
+      <a href="{% url 'faq-public' %}">FAQ</a>
+    </nav>
     <span>© {% now "Y" %} ApPlanner</span>
   </footer>
 </body>
