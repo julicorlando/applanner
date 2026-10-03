@@ -33,8 +33,8 @@
     {% if request.user.is_superuser or request.user.role == 'owner' %}
     <section class="panel operation-payments" aria-labelledby="operation-payments-title">
       <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">◈</span><div><span class="eyebrow">RECEBIMENTOS</span><h2 id="operation-payments-title">Pagamentos da empresa</h2></div></div>
-      <p>Conecte sua conta Mercado Pago para receber cobranças de clientes por Pix ou cartão. A assinatura do ApPlanner é separada.</p>
-      <a class="button" href="{% url 'tenant-payment-gateway' %}">Gerenciar Mercado Pago <span aria-hidden="true">→</span></a>
+      <p>Cadastre suas contas bancárias e configure, se necessário, um provedor compatível para receber cobranças online de clientes. A assinatura do ApPlanner é separada.</p>
+      <a class="button" href="{% url 'tenant-payment-gateway' %}">Cadastro Bancário <span aria-hidden="true">→</span></a>
       <a class="button" href="{% url 'tenant-ratings' %}">Avaliações da equipe <span aria-hidden="true">→</span></a>
       <a class="button" href="{% url 'tenant-whatsapp-settings' %}">Conectar WhatsApp da empresa <span aria-hidden="true">→</span></a>
     </section>
