@@ -373,9 +373,41 @@ def subscription_status(request):
     pending_deletion=(SupportTicket.objects.filter(tenant_id=request.user.tenant_id,
         category="account_deletion").exclude(status__in=[SupportTicket.Status.CLOSED,SupportTicket.Status.RESOLVED])
         .order_by("-created_at").first() if request.user.tenant_id else None)
-    return render(request,"billing/subscription_status.html",{"subscription":subscription,"pix_charge":pix_charge,
+
+    current_breakdown=None
+    payment_history=[]
+    if subscription:
+        from .breakdown import subscription_charge_breakdown
+        current_breakdown=subscription_charge_breakdown(subscription)
+        payment_history=list(
+            Payment.objects.filter(
+                tenant=subscription.tenant,subscription=subscription,
+                purpose="subscription",status=Payment.Status.PAID,
+            ).select_related("fiscal_document_request").order_by("-paid_at","-created_at")[:36]
+        )
+        method_labels={
+            "pix":"Pix","card_recurring":"Cartão recorrente",
+            "card":"Cartão","subscription":"Assinatura",
+        }
+        for payment in payment_history:
+            moment=payment.paid_at or payment.updated_at
+            payment.reference_month=timezone.localtime(moment).date().replace(day=1)
+            payment.charge_breakdown=(payment.metadata or {}).get("breakdown") or current_breakdown
+            payment.method_label=method_labels.get(
+                (payment.metadata or {}).get("method"),
+                "Pagamento da assinatura",
+            )
+            payment.fiscal_request=getattr(payment,"fiscal_document_request",None)
+
+    return render(request,"billing/subscription_status.html",{
+        "subscription":subscription,"pix_charge":pix_charge,
         "professional_capacity":professional_capacity(request.user.tenant,subscription) if request.user.tenant_id and not segment_enabled(request.user.tenant,"arena") else None,
-        "pending_deletion":pending_deletion,"can_manage":request.user.tenant_id and request.user.role=="owner"})
+        "pending_deletion":pending_deletion,
+        "can_manage":request.user.tenant_id and request.user.role=="owner",
+        "can_request_nfe":request.user.tenant_id and request.user.role in {"owner","manager","tenant-admin"},
+        "current_breakdown":current_breakdown,
+        "payment_history":payment_history,
+    })
 
 
 @login_required
