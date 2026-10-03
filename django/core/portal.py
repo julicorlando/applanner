@@ -941,11 +941,13 @@ def home(request):
             "documentation":module.slug=="api"})
     public_professionals=(tenant.professionals.filter(active=True,public_slug__isnull=False)
                           .exclude(public_slug="").order_by("name") if tenant.public_enabled else [])
+    from growth.referrals import active_referral_campaign
+    referral_campaign=active_referral_campaign() if request.user.role=="owner" else None
     return render(request,"portal/home.html",{
         "tenant":tenant,"modules":modules,"contracted_modules":contracted,
         "public_professionals":public_professionals,
         "arena_mode":segment_enabled(tenant,"arena"),
-        "operation_health":operation_health(tenant),
+        "operation_health":operation_health(tenant),"referral_campaign":referral_campaign,
     })
 
 
