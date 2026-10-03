@@ -397,14 +397,14 @@ def cancel_platform_subscription(request):
             gateway=PaymentGateway.objects.filter(provider="mercadopago",active=True,
                 last_test_status=PaymentGateway.TestStatus.VALIDATED).first()
             if not gateway:
-                messages.error(request,"Conexão do Mercado Pago indisponível. Abra um chamado antes de cancelar.")
+                messages.error(request,"Conexão do provedor de cobrança indisponível. Abra um chamado antes de cancelar.")
                 return redirect("billing-subscription-status")
             try:
                 remote=platform_provider(gateway).cancel_subscription(subscription.provider_subscription_id)
                 if remote.get("status") not in {"canceled","cancelled"}:
-                    raise RuntimeError("Cancelamento não confirmado pelo Mercado Pago.")
+                    raise RuntimeError("Cancelamento não confirmado pelo provedor de cobrança.")
             except (RuntimeError,ValueError):
-                messages.error(request,"O Mercado Pago não confirmou o cancelamento. Sua assinatura não foi alterada; contate o suporte.")
+                messages.error(request,"O provedor de cobrança não confirmou o cancelamento. Sua assinatura não foi alterada; contate o suporte.")
                 return redirect("billing-subscription-status")
         previous=subscription.status
         subscription.status=Subscription.Status.CANCELLED
