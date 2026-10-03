@@ -203,6 +203,7 @@ MASTER_RESOURCES={
     "backups":{"model":"operations.Backup","title":"Backups","fields":[],"columns":["type","scope","status","destination","size_bytes","completed_at"],"order":"-started_at","create":False,"edit":False},
     "homologacao":{"model":"operations.HomologationRun","title":"Homologações","fields":[],"columns":["status","score","executed_by","created_at"],"order":"-created_at","create":False,"edit":False},
     "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","version","title","content","status","requires_acceptance","published_at"],"columns":["type","version","title","status","published_at"],"order":"-published_at,-created_at"},
+    "solicitacoes-lgpd":{"model":"legal.DataSubjectRequest","title":"Solicitações LGPD","fields":["status","deadline_at","resolution_notes"],"columns":["requester_name","requester_email","tenant","request_type","status","deadline_at","created_at","completed_at"],"order":"status,deadline_at,-created_at","create":False,"special":"data_subject_request"},
     "comerciais":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":[],"columns":["commercial_user","tenant","base_amount","commission_amount","status","paid_at"],"order":"-created_at","create":False,"edit":False},
     "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","source","source_medium","source_campaign","referrer_user","converted_tenant","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
@@ -369,7 +370,7 @@ def home(request):
         ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","notas-fiscais","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
         ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","campanhas-indicacao","recompensas-indicacao","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","faq","aquisicao","meta-conversoes"}),
-        ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing"}),
+        ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing","solicitacoes-lgpd"}),
     ]
     assigned=set().union(*(slugs for _,slugs in sections))
     grouped=[{"title":title,"cards":[card for card in cards if card["slug"] in slugs]} for title,slugs in sections]
@@ -553,6 +554,7 @@ def resource_list(request,slug):
         "empresas":"Para aparecer no diretório, a empresa precisa estar ativa ou em teste, com Página pública ligada. Informe cidade e latitude/longitude da unidade para ordenar por proximidade.",
         "solicitacoes-modulos":"Solicitações de contratação são abertas pela empresa e analisadas aqui. Para liberar o WhatsApp de uma empresa, selecione-a no painel Operação e use Conectar WhatsApp da empresa.",
         "solicitacoes-billing":"Pedidos de exclusão podem ser concluídos aqui. Aprovar e excluir desativa a página pública, encerra os acessos dos usuários, cancela a assinatura ativa e envia a confirmação por e-mail ao solicitante.",
+        "solicitacoes-lgpd":"Acompanhe pedidos de exportação, correção, exclusão e consentimento. O prazo exibido é um SLA operacional interno; valide a identidade antes de fornecer ou excluir dados.",
     }
     return render(request,"master/list.html",{"slug":slug,"resource":config,"headers":headers,"rows":rows,"q":q,"help_text":help_text.get(slug)})
 
@@ -598,6 +600,13 @@ def resource_form(request,slug,pk=None):
             row.granted_by=request.user
         if config.get("special")=="blog" and not row.author_id:
             row.author=request.user
+        if config.get("special")=="data_subject_request":
+            row.reviewed_by=request.user
+            row.reviewed_at=timezone.now()
+            if row.status==row.Status.COMPLETED and not row.completed_at:
+                row.completed_at=timezone.now()
+            elif row.status!=row.Status.COMPLETED:
+                row.completed_at=None
         try:
             row.full_clean()
             row.save()
