@@ -21,7 +21,7 @@ class FirstAccessTests(TestCase):
     def signup(self):
         response=self.client.post("/cadastro/",{
             "plan":self.plan.pk,"billing_cycle":Subscription.BillingCycle.MONTHLY,
-            "business_name":"Novo Espaço","category":"barbearia","owner_name":"Responsável",
+            "business_name":"Novo Espaço","postal_code":"55819000","category":"barbearia","owner_name":"Responsável",
             "email":"first-owner@example.com","phone":"81999999999",
             "password":"StrongPassword!123","password_confirm":"StrongPassword!123",
         })

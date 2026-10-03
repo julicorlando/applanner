@@ -29,8 +29,9 @@ ROLES={
         "agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage",
         "engagement.manage","healthcare.manage","communications.manage","support.manage",
     ]),
-    "reception":("Atendimento",[
-        "agenda.manage","barber.manage","arena.manage","auto.manage","engagement.manage","communications.manage","support.manage",
+    "reception":("Recepção",[
+        "agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage",
+        "engagement.manage","healthcare.manage","communications.manage","support.manage",
     ]),
     "professional":("Profissional",[
         "agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","communications.manage","support.manage",

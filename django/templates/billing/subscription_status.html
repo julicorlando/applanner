@@ -8,7 +8,8 @@
       <h2>{{ subscription.plan.name }}</h2>
       <div class="module-row"><span></span><div><strong>Status</strong><small>{{ subscription.get_status_display }}</small></div></div>
       <div class="module-row"><span></span><div><strong>Ciclo</strong><small>{{ subscription.get_billing_cycle_display }}</small></div></div>
-      <div class="module-row"><span></span><div><strong>Valor contratado</strong><small>R$ {{ subscription.contracted_price }}</small></div></div>
+      <div class="module-row"><span></span><div><strong>Valor contratado atualizado</strong><small>R$ {{ subscription.contracted_price }}</small></div></div>
+      {% if subscription.addon_contracted_price %}<div class="module-row"><span></span><div><strong>Módulos adicionais no ciclo</strong><small>R$ {{ subscription.addon_contracted_price }}</small></div></div>{% endif %}
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
       {% if subscription.status == 'trial' or subscription.status == 'past_due' %}
         {% if pix_charge %}<p>Seu Pix aguarda pagamento até {{ pix_charge.expires_at|date:'d/m/Y H:i' }}.</p><a class="button primary" href="{% url 'billing-subscription-pix' %}">Ver QR code e Pix copia e cola</a>

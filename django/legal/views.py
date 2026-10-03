@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
 from django.shortcuts import redirect,render
 
 from .middleware import current_documents
@@ -33,3 +34,26 @@ def accept(request):
             )
         return redirect(request.GET.get("next") or "/")
     return render(request,"legal/accept.html",{"documents":pending})
+
+
+PUBLIC_TYPES={
+    "privacidade":"privacy",
+    "termos-empresas":"terms_company",
+    "termos-clientes":"terms_customer",
+    "cancelamento-empresas":"cancellation_company",
+    "cancelamento-clientes":"cancellation_customer",
+}
+
+
+def public_document(request,slug):
+    doc_type=PUBLIC_TYPES.get(slug)
+    if not doc_type:
+        raise Http404
+    from .models import LegalDocument
+    document=(
+        LegalDocument.objects.filter(type=doc_type,status=LegalDocument.Status.PUBLISHED)
+        .order_by("-published_at","-created_at").first()
+    )
+    if not document:
+        raise Http404
+    return render(request,"legal/public_document.html",{"document":document,"slug":slug})

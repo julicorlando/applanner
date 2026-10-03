@@ -30,7 +30,7 @@ class PlatformGatewayMasterTests(TestCase):
         gateway=PaymentGateway.objects.get(environment="sandbox")
         self.assertTrue(gateway.active)
         self.assertEqual(gateway.last_test_status,PaymentGateway.TestStatus.VALIDATED)
-        self.assertEqual(gateway.webhook_url,"https://testserver/webhooks/mercadopago/")
+        self.assertEqual(gateway.webhook_url,"https://testserver/webhooks/pagamentos/")
         self.assertNotIn(data["access_token"],gateway.access_token_encrypted)
         self.assertNotIn(data["webhook_secret"],gateway.webhook_secret_encrypted)
         self.assertNotContains(self.client.get(self.url),data["access_token"])

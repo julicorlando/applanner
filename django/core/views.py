@@ -52,13 +52,15 @@ def _tenant_dashboard(request):
     today_qs=Appointment.objects.filter(
         tenant=tenant,starts_at__gte=start,starts_at__lt=end
     )
-    monthly_transactions=FinancialTransaction.objects.filter(
+    finance_start=start if request.user.role=="reception" else month_start
+    finance_transactions=FinancialTransaction.objects.filter(
         tenant=tenant,
         status=FinancialTransaction.Status.PAID,
-        paid_at__gte=month_start,
+        paid_at__gte=finance_start,
+        paid_at__lt=end if request.user.role=="reception" else now+timedelta(days=1),
     )
-    gross_revenue=monthly_transactions.filter(type=FinancialTransaction.Type.INCOME).aggregate(total=Sum("amount"))["total"] or Decimal("0")
-    expenses=monthly_transactions.filter(type=FinancialTransaction.Type.EXPENSE).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    gross_revenue=finance_transactions.filter(type=FinancialTransaction.Type.INCOME).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    expenses=finance_transactions.filter(type=FinancialTransaction.Type.EXPENSE).aggregate(total=Sum("amount"))["total"] or Decimal("0")
     net_revenue=gross_revenue-expenses
 
     modules=list(TenantModule.objects.filter(tenant=tenant,enabled=True,module__active=True)
@@ -74,8 +76,32 @@ def _tenant_dashboard(request):
         modules.extend(row for row in plan_modules if row.module_id not in known)
     modules=[row for row in modules if module_enabled(tenant,row.module.slug)]
 
+    from engagement.referrals import active_referral_campaign
+    referral_campaign=active_referral_campaign()
+    company_referral_roles={"owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager"}
+    if referral_campaign and (
+        request.user.role not in company_referral_roles or not referral_campaign.company_referrals_enabled
+    ):
+        referral_campaign=None
+
     available=available_modules(request.user,tenant)
     segment_module=next((item for item in available if item["slug"] in {"auto","saude","arena","barbearia"}),None)
+
+    return_intelligence_rows=[]
+    behavior_enabled=not subscription or module_enabled(tenant,"behavior")
+    if behavior_enabled and request.user.role!="professional":
+        from engagement.contacting import contact_blocked
+        from engagement.models import BehaviorProfile
+        return_horizon=timezone.localdate()+timedelta(days=14)
+        return_qs=(
+            BehaviorProfile.objects.filter(
+                tenant=tenant,next_expected_date__isnull=False,
+                next_expected_date__lte=return_horizon,
+            ).select_related("customer").order_by("next_expected_date","customer__name")
+        )
+        return_intelligence_rows=list(return_qs[:8])
+        for row in return_intelligence_rows:
+            row.contact_blocked=contact_blocked(tenant,row.customer)
     arena_mode=segment_enabled(tenant,"arena")
     arena_category="arena" in (tenant.category or "").lower() or "quadra" in (tenant.category or "").lower()
     if arena_mode:
@@ -113,12 +139,18 @@ def _tenant_dashboard(request):
         "available_modules":available,"segment_module":segment_module,
         "subscription":subscription,
         "can_manage_agenda":has_capability(request.user,"agenda.manage"),
-        "can_manage_finance":has_capability(request.user,"finance.manage"),
+        "can_manage_finance":has_capability(request.user,"finance.manage") and request.user.role!="reception",
+        "can_sell_products":has_capability(request.user,"finance.manage") and request.user.role=="reception",
+        "reception_mode":request.user.role=="reception",
+        "revenue_period_label":"Receita líquida do dia" if request.user.role=="reception" else "Receita líquida do mês",
         "arena_mode":arena_mode,"arena_category":arena_category,
         "arena_has_hours":arena_has_hours,"arena_has_prices":arena_has_prices,
         "arena_upcoming":arena_upcoming,
         "arena_today_total":arena_today_total,"arena_today_pending":arena_today_pending,
         "courts_count":courts_count,
+        "referral_campaign":referral_campaign,
+        "return_intelligence_rows":return_intelligence_rows,
+        "behavior_enabled":behavior_enabled,
     })
 
 
@@ -260,8 +292,17 @@ def home(request):
     if getattr(request,"tenant",None):
         return tenant_public(request)
     from billing.models import Plan
-    from contenthub.models import BlogPost
-    plans=Plan.objects.filter(active=True,public_visible=True,is_custom=False).order_by("sort_order","name")[:4]
-    medical_plan=Plan.objects.filter(slug="segment-medico",active=False).first()
+    from contenthub.models import BlogPost,FAQItem,PlatformHomepage
+    platform=PlatformHomepage.objects.order_by("pk").first()
+    medical_visible=bool(platform and platform.medical_segment_visible)
+    plans_qs=Plan.objects.filter(active=True,public_visible=True,is_custom=False)
+    if not medical_visible:
+        plans_qs=plans_qs.exclude(slug="segment-medico")
+    plans=plans_qs.order_by("sort_order","name")[:4]
+    medical_plan=(Plan.objects.filter(slug="segment-medico").first() if medical_visible else None)
     posts=BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED).order_by("-featured","-published_at","-created_at")[:3]
-    return render(request,"home.html",{"plans":plans,"medical_plan":medical_plan,"posts":posts})
+    faqs=FAQItem.objects.filter(active=True).order_by("sort_order","id")[:24]
+    return render(request,"home.html",{
+        "plans":plans,"medical_plan":medical_plan,"posts":posts,"faqs":faqs,
+        "medical_segment_visible":medical_visible,
+    })

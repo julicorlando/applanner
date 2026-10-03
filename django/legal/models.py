@@ -5,19 +5,24 @@ from core.models import TimeStampedModel
 
 class LegalDocument(TimeStampedModel):
     class Type(models.TextChoices):
-        TERMS="terms","Termos"
-        PRIVACY="privacy","Privacidade"
+        TERMS="terms","Termos gerais"
+        TERMS_COMPANY="terms_company","Termos de uso · Empresas"
+        TERMS_CUSTOMER="terms_customer","Termos de uso · Clientes"
+        PRIVACY="privacy","Política de privacidade"
+        CANCELLATION_COMPANY="cancellation_company","Política de cancelamento · Empresas"
+        CANCELLATION_CUSTOMER="cancellation_customer","Política de cancelamento · Clientes"
 
     class Status(models.TextChoices):
         DRAFT="draft","Rascunho"
         PUBLISHED="published","Publicado"
         ARCHIVED="archived","Arquivado"
 
-    type=models.CharField(max_length=12,choices=Type.choices)
+    type=models.CharField(max_length=32,choices=Type.choices)
     version=models.CharField(max_length=30)
     title=models.CharField(max_length=190)
     content=models.TextField()
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.DRAFT,db_index=True)
+    requires_acceptance=models.BooleanField(default=True)
     published_at=models.DateTimeField(null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="legal_documents")
 

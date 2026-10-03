@@ -3,6 +3,23 @@ from django.core.exceptions import PermissionDenied
 from .permissions import has_capability
 
 
+
+
+RECEPTION_MUTATION_PREFIXES=(
+    "/app/agenda/",
+    "/app/financeiro/pdv/",
+    "/app/barbearia/fila/",
+    "/app/arena/espera-arena/",
+    "/app/relacionamento/inteligencia/",
+    "/app/relacionamento/espera/",
+    "/app/recepcao/agendamento/",
+)
+
+
+def _reception_mutation_allowed(path):
+    return any(path.startswith(prefix) for prefix in RECEPTION_MUTATION_PREFIXES)
+
+
 PREFIX_CAPABILITIES={
     "/app/agenda/":"agenda.manage",
     "/app/financeiro/":"finance.manage",
@@ -28,6 +45,15 @@ class CapabilityRouteMiddleware:
         if user and user.is_authenticated and user.role=="professional" and not user.is_superuser:
             if request.path.startswith("/app/") and not request.path.startswith("/app/profissional/"):
                 raise PermissionDenied("A conta profissional acessa apenas sua própria área.")
+        if (
+            user and user.is_authenticated and not user.is_superuser
+            and user.role=="reception" and request.method not in {"GET","HEAD","OPTIONS"}
+            and request.path.startswith("/app/")
+            and not _reception_mutation_allowed(request.path)
+        ):
+            raise PermissionDenied(
+                "A recepção possui acesso de consulta nesta área, sem permissão para alterar."
+            )
         if user and user.is_authenticated and not user.is_superuser and user.role_links.exists():
             path=request.path
             required=None

@@ -82,7 +82,7 @@
     <article><span>01</span><h3>Barbearias & Salões</h3><p>Agenda, fila, comandas, metas, comissão, produtos e recorrência.</p></article>
     <article><span>02</span><h3>Arenas & Quadras</h3><p>Reservas, mensalistas, rachas, escolinha, torneios e preço dinâmico.</p></article>
     <article><span>03</span><h3>Estética & Auto</h3><p>Boxes, OS, inspeção, materiais, orçamento, fotos e CRM de retorno.</p></article>
-    <article><span>04</span><h3>Clínicas</h3><p>Agenda profissional, prontuário criptografado, lembretes e consentimentos.</p></article>
+    {% if medical_segment_visible %}<article><span>04</span><h3>Clínicas</h3><p>Agenda profissional, prontuário criptografado, lembretes e consentimentos.</p></article>{% endif %}
   </div>
 </section>
 
@@ -93,6 +93,31 @@
     <p><b>Relacionamento</b><span>WhatsApp, e-mail, CRM, fidelidade e campanhas.</span></p>
     <p><b>Gestão</b><span>Financeiro, estoque, comissões e indicadores.</span></p>
     <p><b>Segurança</b><span>2FA, RBAC, auditoria, LGPD e isolamento multi-tenant.</span></p>
+  </div>
+</section>
+
+{% if faqs %}
+<section class="shell section" id="faq">
+  <div class="section-head"><span class="eyebrow">DÚVIDAS FREQUENTES</span><h2>FAQ</h2><p>Respostas rápidas sobre cadastro, planos, pagamentos e uso do ApPlanner.</p></div>
+  <div class="faq-list">
+    {% for item in faqs %}
+    <details class="panel faq-item">
+      <summary>{{ item.question }}</summary>
+      <div>{{ item.answer|linebreaks }}</div>
+    </details>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="shell section legal-home-links" aria-labelledby="legal-home-title">
+  <div class="section-head"><span class="eyebrow">TRANSPARÊNCIA</span><h2 id="legal-home-title">Políticas e termos</h2><p>Consulte as regras aplicáveis à plataforma, às empresas e aos clientes finais.</p></div>
+  <div class="segment-grid">
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'privacidade' %}"><strong>Política de Privacidade</strong><span>Como dados pessoais são tratados no ApPlanner.</span></a>
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'termos-empresas' %}"><strong>Termos de Uso · Empresas</strong><span>Regras para estabelecimentos e responsáveis pela conta.</span></a>
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'termos-clientes' %}"><strong>Termos de Uso · Clientes</strong><span>Regras para quem agenda pelos links públicos.</span></a>
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'cancelamento-empresas' %}"><strong>Cancelamento · Empresas</strong><span>Assinatura, encerramento e exclusão da conta.</span></a>
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'cancelamento-clientes' %}"><strong>Cancelamento · Clientes</strong><span>Cancelamento e reagendamento de serviços.</span></a>
   </div>
 </section>
 

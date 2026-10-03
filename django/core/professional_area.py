@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import date,datetime,timedelta
 from zoneinfo import ZoneInfo
+from types import SimpleNamespace
 
 from django import forms
 from django.contrib import messages
@@ -116,6 +117,30 @@ def professional_area(request):
     professional=get_object_or_404(
         Professional,tenant_id=request.user.tenant_id,user=request.user,active=True
     )
+    if request.method=="POST" and request.POST.get("action")=="contact_return":
+        from engagement.contacting import send_return_invitation
+        from scheduling.models import Customer
+        customer=get_object_or_404(
+            Customer,pk=request.POST.get("customer"),tenant=professional.tenant,active=True,
+            appointments__professional=professional,appointments__status=Appointment.Status.COMPLETED,
+        )
+        completed_for_professional=Appointment.objects.filter(
+            tenant=professional.tenant,customer=customer,professional=professional,
+            status=Appointment.Status.COMPLETED,
+        ).count()
+        if completed_for_professional<2:
+            raise PermissionDenied("O profissional só pode contatar clientes com recorrência no próprio atendimento.")
+        try:
+            send_return_invitation(
+                tenant=professional.tenant,customer=customer,user=request.user,professional=professional
+            )
+        except ValueError as exc:
+            messages.error(request,str(exc))
+        except Exception:
+            messages.error(request,"Não foi possível enviar a mensagem agora.")
+        else:
+            messages.success(request,"Convite de retorno enviado com seu link de agendamento.")
+        return redirect("professional-area")
     now=timezone.now()
     local_now=timezone.localtime(now)
     month_start=local_now.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
@@ -144,6 +169,46 @@ def professional_area(request):
     ).select_related("customer","service").order_by("preferred_date","created_at") if waitlist_enabled else WaitlistEntry.objects.none())
     if professional.services_restricted or professional.services.exists():
         waiting=waiting.filter(service__in=professional.services.filter(active=True))
+
+    from engagement.contacting import contact_blocked
+    completed_for_return=list(
+        Appointment.objects.filter(
+            tenant=professional.tenant,professional=professional,
+            status=Appointment.Status.COMPLETED,customer__active=True,
+        ).select_related("customer").order_by("customer_id","starts_at")
+    )
+    grouped={}
+    for item in completed_for_return:
+        grouped.setdefault(item.customer_id,[]).append(item)
+    return_rows=[]
+    for items in grouped.values():
+        if len(items)<2:
+            continue
+        dates=[timezone.localtime(item.starts_at).date() for item in items]
+        intervals=[max((dates[idx]-dates[idx-1]).days,1) for idx in range(1,len(dates))]
+        avg_days=max(round(sum(intervals)/len(intervals)),1)
+        if len(intervals)>1:
+            variation=sum(abs(value-avg_days) for value in intervals)/len(intervals)
+            confidence=max(20,min(100,round(100-(variation/max(avg_days,1))*100)))
+        else:
+            confidence=60
+        customer=items[-1].customer
+        row=SimpleNamespace(
+            customer=customer,customer_id=customer.pk,visits_count=len(items),
+            avg_interval_days=avg_days,last_visit_at=items[-1].starts_at,
+            next_expected_date=dates[-1]+timedelta(days=avg_days),
+            confidence_score=confidence,
+            contact_blocked=contact_blocked(professional.tenant,customer),
+        )
+        return_rows.append(row)
+    return_rows.sort(key=lambda row:(row.next_expected_date,row.customer.name))
+    return_rows=return_rows[:40]
+
+    from engagement.referrals import active_referral_campaign
+    referral_campaign=active_referral_campaign()
+    if referral_campaign and not referral_campaign.professional_referrals_enabled:
+        referral_campaign=None
+
     return render(request,"portal/professional_area.html",{
         "professional":professional,"upcoming":upcoming[:15],"current":current,"upcoming_count":upcoming.count(),
         "completed_month":appointments.filter(starts_at__gte=month_start,starts_at__lt=now,
@@ -151,6 +216,7 @@ def professional_area(request):
         "pending_commission":pending,"paid_commission":paid,
         "projected_commission":projected,"has_projection":professional.commission_percent is not None,
         "waitlist_enabled":waitlist_enabled,"waiting":waiting[:20],"waiting_count":waiting.count(),
+        "return_rows":return_rows,"referral_campaign":referral_campaign,
     })
 
 
@@ -296,4 +362,65 @@ def professional_appointment(request,pk):
         "paid_booking_payment":paid,"prepaid_full":prepaid_full,
         "can_settle":appointment.status in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
             Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS} and appointment.starts_at<=timezone.now(),
+    })
+
+
+@login_required
+def reception_appointment(request,pk):
+    if request.user.role!="reception" or not request.user.tenant_id:
+        raise PermissionDenied("Área exclusiva da recepção.")
+    appointment=get_object_or_404(
+        Appointment.objects.select_related("customer","service","professional")
+        .prefetch_related("product_reservations__product"),
+        pk=pk,tenant_id=request.user.tenant_id,
+    )
+    if not appointment.professional_id:
+        messages.error(request,"Defina um profissional antes de finalizar este atendimento.")
+        return redirect("portal-resource-edit","agenda","agendamentos",appointment.pk)
+    professional=appointment.professional
+    from billing.models import TenantPaymentTransaction
+    paid=TenantPaymentTransaction.objects.filter(
+        tenant=appointment.tenant,reference_type="appointment",reference_id=appointment.pk,
+        status=TenantPaymentTransaction.Status.PAID,
+    ).order_by("-paid_at").first()
+    prepaid_full=bool(paid and appointment.booking_payment==Appointment.BookingPayment.FULL)
+
+    if request.method=="POST" and request.POST.get("action")=="message":
+        try:
+            send_prepared_message(appointment,request.POST.get("kind",""),request.user)
+        except ValueError as exc:
+            messages.error(request,str(exc))
+        else:
+            messages.success(request,"Mensagem enviada ao cliente.")
+        return redirect("reception-appointment",pk=appointment.pk)
+
+    form=SettlementForm(
+        request.POST or None,tenant=appointment.tenant,appointment=appointment,
+        prepaid_full=prepaid_full,
+    )
+    if request.method=="POST" and form.is_valid():
+        try:
+            settle_appointment(
+                appointment_id=appointment.pk,professional=professional,user=request.user,
+                attended=form.cleaned_data["outcome"]=="completed",
+                payment_method=form.cleaned_data["payment_method"] or ("pix" if prepaid_full else ""),
+                reserved_product_ids=[item.pk for item in form.cleaned_data["reserved_products"]],
+                product_id=form.cleaned_data["product"].pk if form.cleaned_data["product"] else None,
+                quantity=form.cleaned_data["quantity"],
+            )
+        except (ValidationError,Appointment.DoesNotExist) as exc:
+            form.add_error(None,exc)
+        else:
+            messages.success(request,"Atendimento finalizado pela recepção. Serviço e vendas foram registrados.")
+            return redirect("portal-resource-list","agenda","agendamentos")
+
+    return render(request,"portal/professional_appointment.html",{
+        "professional":professional,"appointment":appointment,"form":form,
+        "reserved_product_reservations":list(appointment.product_reservations.all()),
+        "paid_booking_payment":paid,"prepaid_full":prepaid_full,
+        "reception_mode":True,
+        "can_settle":appointment.status in {
+            Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
+            Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
+        } and appointment.starts_at<=timezone.now(),
     })

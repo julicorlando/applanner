@@ -23,9 +23,10 @@ class ImageSizeForm(forms.ModelForm):
 class PlatformHomepageForm(ImageSizeForm):
     class Meta:
         model=PlatformHomepage
-        fields=["logo","hero_title","hero_description","closing_title"]
+        fields=["logo","hero_title","hero_description","closing_title","medical_segment_visible"]
         labels={"logo":"Logo personalizada (opcional)","hero_title":"Título principal",
-                "hero_description":"Descrição principal","closing_title":"Chamada final"}
+                "hero_description":"Descrição principal","closing_title":"Chamada final",
+                "medical_segment_visible":"Exibir Médico / Clínica e Clínicas publicamente"}
 
 
 class TenantBrandingForm(ImageSizeForm):

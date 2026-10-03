@@ -20,7 +20,7 @@ from accounts.models import PlatformRole,UserRole
 from tenants.models import Tenant,Unit,TenantOnboarding
 from .models import Module,ModuleRequest,Plan,Subscription,SubscriptionHistory,TenantModuleAddon,PixCharge,Payment,PaymentGateway
 from .payment_services import create_platform_subscription,create_platform_pix_charge,platform_provider
-from .module_services import cancel_module_addon,request_module
+from .module_services import cancel_module_addon,module_monthly_price,request_module
 from commercial.models import Proposal
 from applanner.transactional_email import account_values,queue_email
 
@@ -65,6 +65,8 @@ class SignupForm(forms.Form):
         required=False,initial="card",label="Como deseja pagar",
     )
     business_name=forms.CharField(max_length=150,label="Nome do negócio")
+    postal_code=forms.CharField(max_length=10,label="CEP da empresa",
+        help_text="Usaremos o CEP para posicionar sua unidade no Explorar e mostrar sua empresa para clientes próximos.")
     category=forms.CharField(max_length=60,label="Segmento",widget=forms.Select(choices=[
         ("","Selecione"),("barbearia","Barbearia"),("salao","Salão de beleza"),
         ("estetica","Estética"),("auto","Lava-jato e automotivo"),
@@ -81,9 +83,11 @@ class SignupForm(forms.Form):
 
     def __init__(self,*args,selected_plan=None,**kwargs):
         super().__init__(*args,**kwargs)
-        medical_available=Plan.objects.filter(
+        from contenthub.models import PlatformHomepage
+        platform=PlatformHomepage.objects.filter(pk=1).first()
+        medical_available=bool(platform and platform.medical_segment_visible and Plan.objects.filter(
             slug="segment-medico",active=True,public_visible=True
-        ).exists()
+        ).exists())
         if medical_available:
             self.fields["category"].widget.choices=[
                 *self.fields["category"].widget.choices,("clinica","Clínica e saúde")
@@ -95,6 +99,13 @@ class SignupForm(forms.Form):
         if selected_plan:
             self.fields["plan"].initial=selected_plan
             self.fields["category"].widget.choices=plan_categories(selected_plan,self.category_options)
+
+    def clean_postal_code(self):
+        import re
+        value=re.sub(r"\D","",self.cleaned_data["postal_code"])
+        if len(value)!=8:
+            raise forms.ValidationError("Informe um CEP brasileiro com 8 dígitos.")
+        return value
 
     def clean_email(self):
         email=self.cleaned_data["email"].strip().lower()
@@ -122,10 +133,14 @@ class SignupForm(forms.Form):
                 if current!=set(proposal.modules or []):
                     self.add_error("plan","O catálogo deste plano mudou. Solicite a atualização da proposta.")
         category=(data.get("category") or "").lower()
-        if category=="clinica" and not Plan.objects.filter(
-            slug="segment-medico",active=True,public_visible=True
-        ).exists():
-            self.add_error("category","O plano Médico / Clínica ainda não está disponível.")
+        if category=="clinica":
+            from contenthub.models import PlatformHomepage
+            platform=PlatformHomepage.objects.filter(pk=1).first()
+            medical_visible=bool(platform and platform.medical_segment_visible)
+            if not medical_visible or not Plan.objects.filter(
+                slug="segment-medico",active=True,public_visible=True
+            ).exists():
+                self.add_error("category","O segmento Médico / Clínica ainda não está disponível.")
         if plan and category:
             segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
                      "arena":"arena","clinica":"saude"}.get(category)
@@ -143,9 +158,15 @@ class SignupForm(forms.Form):
 
 
 def plans(request):
+    from contenthub.models import PlatformHomepage
+    platform=PlatformHomepage.objects.filter(pk=1).first()
+    medical_visible=bool(platform and platform.medical_segment_visible)
     rows=Plan.objects.filter(
         active=True,public_visible=True,is_custom=False
-    ).prefetch_related("module_links__module").order_by("sort_order","name")
+    )
+    if not medical_visible:
+        rows=rows.exclude(slug="segment-medico")
+    rows=rows.prefetch_related("module_links__module").order_by("sort_order","name")
     cards=[]
     for plan in rows:
         modules=[
@@ -153,7 +174,7 @@ def plans(request):
             if link.enabled and link.module.active
         ]
         cards.append({"plan":plan,"modules":modules})
-    medical=Plan.objects.filter(slug="segment-medico",active=False).first()
+    medical=Plan.objects.filter(slug="segment-medico").first() if medical_visible else None
     catalog={module.pk:module for card in cards for module in card["modules"]}
     comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
                 for module in sorted(catalog.values(),key=lambda item:(item.sort_order,item.name))]
@@ -188,16 +209,21 @@ class CustomPlanForm(forms.Form):
 
 def custom_plan(request):
     from commercial.models import Lead
-    from growth.attribution import capture_attribution,record_acquisition
+    from growth.attribution import acquisition_context,capture_attribution,record_acquisition
 
     capture_attribution(request)
     form=CustomPlanForm(request.POST or None)
     if request.method=="POST" and form.is_valid():
         data=form.cleaned_data
+        context=acquisition_context(request)
         Lead.objects.create(
             name=data["name"],business_type=data["business_type"],
             email=data["email"],phone=data["phone"],
-            source="custom_plan",consent_granted=True,
+            source=(context.get("source") or "organic")[:80],
+            source_medium=(context.get("medium") or "")[:80],
+            source_campaign=(context.get("campaign") or "")[:120],
+            referrer_user_id=request.session.get("referral_user_id") or None,
+            consent_granted=True,
             consent_at=timezone.now(),consent_version="custom_plan_v1",
             consent_purpose="Contato comercial para proposta de plano personalizado",
             notes="Módulos solicitados: "+", ".join(module.name for module in data["modules"]),
@@ -209,7 +235,7 @@ def custom_plan(request):
 
 
 def signup(request):
-    from growth.attribution import capture_attribution,record_acquisition
+    from growth.attribution import acquisition_context,capture_attribution,record_acquisition
     capture_attribution(request)
     plan_id=request.POST.get("plan") if request.method=="POST" else request.GET.get("plan")
     plan_id=plan_id if plan_id and plan_id.isascii() and plan_id.isdigit() and len(plan_id)<=19 and int(plan_id)<=2**63-1 else None
@@ -251,8 +277,9 @@ def signup(request):
                 status=Tenant.Status.TRIAL if trial_days else Tenant.Status.ACTIVE,
                 public_enabled=False,public_booking_enabled=True,
             )
-            Unit.objects.create(
+            unit=Unit.objects.create(
                 tenant=tenant,name=data["business_name"],is_primary=True,
+                postal_code=data["postal_code"],
                 email=data["email"],phone=data["phone"],active=True,
             )
             TenantOnboarding.objects.create(tenant=tenant,required=True)
@@ -277,6 +304,29 @@ def signup(request):
                 proposal.tenant=tenant
                 proposal.save(update_fields=["tenant","updated_at"])
             record_acquisition(request,"CompleteRegistration",tenant=tenant,user=user,segment=data["category"])
+            context=acquisition_context(request)
+            from commercial.models import Lead
+            referrer_id=request.session.get("referral_user_id")
+            lead=Lead.objects.create(
+                name=data["owner_name"],phone=data["phone"] or "",email=data["email"],
+                business_type=data["category"],estimated_value=contracted,
+                source=(context.get("source") or "organic")[:80],
+                source_medium=(context.get("medium") or "")[:80],
+                source_campaign=(context.get("campaign") or "")[:120],
+                status=Lead.Status.CONVERTED,
+                referrer_user_id=referrer_id if referrer_id else None,
+                converted_tenant=tenant,
+                consent_granted=True,consent_version="signup_v1",
+                consent_purpose="Cadastro e contratação do ApPlanner",
+                consent_at=now,
+            )
+            from engagement.referrals import create_referral_reward_from_signup
+            create_referral_reward_from_signup(request,tenant)
+            transaction.on_commit(lambda unit_id=unit.pk: __import__(
+                "tenants.tasks",fromlist=["geocode_unit_from_postal_code"]
+            ).geocode_unit_from_postal_code.delay(unit_id))
+        for key in ("referral_code","referral_campaign_id","referral_user_id"):
+            request.session.pop(key,None)
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version
 
@@ -347,14 +397,14 @@ def cancel_platform_subscription(request):
             gateway=PaymentGateway.objects.filter(provider="mercadopago",active=True,
                 last_test_status=PaymentGateway.TestStatus.VALIDATED).first()
             if not gateway:
-                messages.error(request,"Conexão do Mercado Pago indisponível. Abra um chamado antes de cancelar.")
+                messages.error(request,"Conexão do provedor de cobrança indisponível. Abra um chamado antes de cancelar.")
                 return redirect("billing-subscription-status")
             try:
                 remote=platform_provider(gateway).cancel_subscription(subscription.provider_subscription_id)
                 if remote.get("status") not in {"canceled","cancelled"}:
-                    raise RuntimeError("Cancelamento não confirmado pelo Mercado Pago.")
+                    raise RuntimeError("Cancelamento não confirmado pelo provedor de cobrança.")
             except (RuntimeError,ValueError):
-                messages.error(request,"O Mercado Pago não confirmou o cancelamento. Sua assinatura não foi alterada; contate o suporte.")
+                messages.error(request,"O provedor de cobrança não confirmou o cancelamento. Sua assinatura não foi alterada; contate o suporte.")
                 return redirect("billing-subscription-status")
         previous=subscription.status
         subscription.status=Subscription.Status.CANCELLED
@@ -514,9 +564,12 @@ def subscription_modules(request):
             ]
         ).values_list("module_id",flat=True)
     )
-    available=Module.objects.filter(
+    available=list(Module.objects.filter(
         active=True,addon_sellable=True
-    ).exclude(pk__in=plan_module_ids|active_ids|pending_ids).order_by("sort_order","name")
+    ).exclude(pk__in=plan_module_ids|active_ids|pending_ids).order_by("sort_order","name"))
+    for module in available:
+        module.current_monthly_price=module_monthly_price(module,tenant)
+        module.current_unit_count=tenant.units.filter(active=True).count() if module.per_unit_billing else None
     return render(request,"billing/modules.html",{
         "subscription":subscription,"available":available,
         "requests":ModuleRequest.objects.filter(tenant=tenant).select_related("module").order_by("-created_at")[:100],

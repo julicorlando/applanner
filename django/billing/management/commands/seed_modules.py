@@ -30,6 +30,7 @@ MODULES={
         "name":"Multiunidade",
         "description":"Gestão de mais de uma unidade no mesmo estabelecimento.",
         "active":True,"sort_order":0,"addon_monthly_price":"39.99","addon_sellable":True,
+        "per_unit_billing":True,
     },
     "medical_records":{"name":"Prontuários","description":"Prontuário clínico.","active":False,"sort_order":60},
     "odontology":{"name":"Odontologia","description":"Recursos de odontologia.","active":False,"sort_order":61},

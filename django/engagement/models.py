@@ -312,3 +312,94 @@ class PlatformAutomationLog(models.Model):
     class Meta:
         constraints=[models.UniqueConstraint(fields=["tenant","customer","event_type","channel","scheduled_for"],name="uq_platform_automation")]
         indexes=[models.Index(fields=["tenant","scheduled_for","status"],name="platform_automation_idx")]
+
+
+class ReferralIncentiveCampaign(TimeStampedModel):
+    class RewardType(models.TextChoices):
+        FIXED="fixed","Valor fixo"
+        PERCENT="percent","Percentual"
+
+    name=models.CharField(max_length=160)
+    active=models.BooleanField(default=True,db_index=True)
+    reward_type=models.CharField(max_length=12,choices=RewardType.choices,default=RewardType.FIXED)
+    reward_value=models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    qualification_payments=models.PositiveSmallIntegerField(default=2)
+    company_referrals_enabled=models.BooleanField(default=True)
+    professional_referrals_enabled=models.BooleanField(default=True)
+    starts_at=models.DateTimeField(null=True,blank=True)
+    ends_at=models.DateTimeField(null=True,blank=True)
+    created_by=models.ForeignKey(
+        settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="referral_incentive_campaigns_created",
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class ReferralReward(TimeStampedModel):
+    class ReferrerKind(models.TextChoices):
+        COMPANY="company","Empresa"
+        PROFESSIONAL="professional","Profissional"
+
+    class Status(models.TextChoices):
+        PENDING="pending","Aguardando qualificação"
+        ELIGIBLE="eligible","Qualificada"
+        APPLIED="applied","Desconto aplicado"
+        PIX_REQUIRED="pix_required","Aguardando chave Pix"
+        READY="ready","Pronta para pagamento"
+        PAID="paid","Paga"
+        CANCELLED="cancelled","Cancelada"
+
+    campaign=models.ForeignKey(
+        ReferralIncentiveCampaign,on_delete=models.PROTECT,related_name="rewards"
+    )
+    referrer_user=models.ForeignKey(
+        settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="referral_rewards"
+    )
+    referred_tenant=models.ForeignKey(
+        "tenants.Tenant",on_delete=models.CASCADE,related_name="referral_rewards"
+    )
+    referrer_kind=models.CharField(max_length=16,choices=ReferrerKind.choices)
+    status=models.CharField(max_length=20,choices=Status.choices,default=Status.PENDING,db_index=True)
+    qualified_payment_count=models.PositiveSmallIntegerField(default=0)
+    reward_amount=models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    pix_key_encrypted=models.TextField(blank=True)
+    pix_key_last4=models.CharField(max_length=4,blank=True)
+    pix_requested_at=models.DateTimeField(null=True,blank=True)
+    pix_received_at=models.DateTimeField(null=True,blank=True)
+    earned_at=models.DateTimeField(null=True,blank=True)
+    applied_at=models.DateTimeField(null=True,blank=True)
+    paid_at=models.DateTimeField(null=True,blank=True)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(
+                fields=["campaign","referred_tenant"],name="uq_referral_reward_campaign_tenant"
+            )
+        ]
+        indexes=[
+            models.Index(fields=["referrer_user","status"],name="eng_refreward_user_idx"),
+            models.Index(fields=["status","created_at"],name="eng_refreward_status_idx"),
+        ]
+
+
+class CustomerContactThrottle(TimeStampedModel):
+    tenant=models.ForeignKey(
+        "tenants.Tenant",on_delete=models.CASCADE,related_name="customer_contact_throttles"
+    )
+    customer=models.ForeignKey(
+        "scheduling.Customer",on_delete=models.CASCADE,related_name="contact_throttles"
+    )
+    last_contact_at=models.DateTimeField()
+    reason=models.CharField(max_length=40,blank=True)
+    sent_by=models.ForeignKey(
+        settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="customer_contact_throttles_sent",
+    )
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(fields=["tenant","customer"],name="uq_customer_contact_throttle")
+        ]
+        indexes=[models.Index(fields=["tenant","last_contact_at"],name="eng_contact_throttle_idx")]

@@ -31,6 +31,8 @@ class DomainForm(forms.Form):
 @login_required
 def domains(request):
     require_any_capability(request.user,"engagement.manage")
+    if request.user.role=="reception" and request.method=="POST":
+        raise PermissionDenied("A recepção possui acesso somente para consulta nesta área.")
     tenant=_tenant(request)
     form=DomainForm(request.POST or None)
     if request.method=="POST":
@@ -120,6 +122,8 @@ class PointsForm(forms.Form):
 @login_required
 def packages(request):
     require_any_capability(request.user,"engagement.manage")
+    if request.user.role=="reception" and request.method=="POST":
+        raise PermissionDenied("A recepção possui acesso somente para consulta nesta área.")
     tenant=_tenant(request)
     buy=PurchaseForm(tenant=tenant,prefix="buy")
     membership=MembershipForm(tenant=tenant,recurring=True,prefix="membership")
@@ -162,6 +166,8 @@ def packages(request):
 @login_required
 def loyalty(request):
     require_any_capability(request.user,"engagement.manage")
+    if request.user.role=="reception" and request.method=="POST":
+        raise PermissionDenied("A recepção possui acesso somente para consulta nesta área.")
     tenant=_tenant(request)
     settings_obj,_=TenantLoyaltySettings.objects.get_or_create(tenant=tenant)
     points_form=PointsForm(tenant=tenant)
@@ -226,20 +232,41 @@ def intelligence(request):
     tenant=_tenant(request)
     from django.utils import timezone
     from .behavior import refresh_behavior_for_tenant
+    from .contacting import contact_blocked,send_return_invitation
     from .models import BehaviorProfile
 
     if request.method=="POST":
+        action=request.POST.get("action") or "recalculate"
+        if action=="contact":
+            customer=get_object_or_404(Customer,pk=request.POST.get("customer"),tenant=tenant,active=True)
+            try:
+                send_return_invitation(tenant=tenant,customer=customer,user=request.user)
+            except ValueError as exc:
+                messages.error(request,str(exc))
+            except Exception:
+                messages.error(request,"Não foi possível enviar a mensagem agora.")
+            else:
+                messages.success(request,"Convite de retorno enviado com o link de agendamento.")
+            return redirect("engagement-intelligence")
+        if request.user.role=="reception":
+            raise PermissionDenied("A inteligência é recalculada automaticamente.")
         updated=refresh_behavior_for_tenant(tenant)
         messages.success(request,f"Inteligência atualizada: {updated} perfis recalculados.")
         return redirect("engagement-intelligence")
 
     today=timezone.localdate()
     horizon=today+__import__("datetime").timedelta(days=14)
-    qs=BehaviorProfile.objects.filter(tenant=tenant).select_related("customer").order_by("next_expected_date","customer__name")
+    qs=BehaviorProfile.objects.filter(tenant=tenant).select_related("customer").order_by(
+        "next_expected_date","customer__name"
+    )
+    rows=list(qs[:300])
+    for row in rows:
+        row.contact_blocked=contact_blocked(tenant,row.customer)
     return render(request,"engagement/intelligence.html",{
-        "rows":qs[:300],
+        "rows":rows,
         "total":qs.count(),
         "overdue":qs.filter(next_expected_date__lt=today).count(),
         "upcoming":qs.filter(next_expected_date__gte=today,next_expected_date__lte=horizon).count(),
         "high_confidence":qs.filter(confidence_score__gte=70).count(),
+        "reception_mode":request.user.role=="reception",
     })

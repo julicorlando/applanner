@@ -18,6 +18,8 @@ from .services import cancel_sale,close_cash_session,create_sale,open_cash_sessi
 @login_required
 def summary(request):
     require_any_capability(request.user,"finance.manage")
+    if request.user.role=="reception":
+        raise PermissionDenied("A recepção visualiza somente a receita líquida do dia no painel.")
     tenant=_tenant(request)
     from django.db.models import Sum
     from django.utils import timezone
@@ -97,6 +99,8 @@ def pos(request):
 @login_required
 def sale_cancel(request,pk):
     require_any_capability(request.user,"finance.manage")
+    if request.user.role=="reception":
+        raise PermissionDenied("Cancelamentos de vendas exigem autorização da gestão.")
     if request.method!="POST": raise PermissionDenied
     tenant=_tenant(request)
     sale=get_object_or_404(Sale,pk=pk,tenant=tenant)
@@ -110,6 +114,8 @@ def sale_cancel(request,pk):
 @login_required
 def cash(request):
     require_any_capability(request.user,"finance.manage")
+    if request.user.role=="reception":
+        raise PermissionDenied("A recepção não possui acesso à gestão do caixa.")
     tenant=_tenant(request)
     open_session=CashSession.objects.filter(tenant=tenant,status=CashSession.Status.OPEN).select_related("unit","opened_by").first()
     form=CashOpenForm(request.POST or None,tenant=tenant)
@@ -133,6 +139,8 @@ def cash(request):
 @login_required
 def commissions(request):
     require_any_capability(request.user,"finance.manage")
+    if request.user.role=="reception":
+        raise PermissionDenied("A recepção não possui acesso às comissões.")
     tenant=_tenant(request)
     if request.method=="POST":
         row=get_object_or_404(ProfessionalCommission,pk=request.POST.get("commission"),tenant=tenant)

@@ -37,3 +37,10 @@ def reconcile_subscription_states():
         due_at__lt=now,
     ).count()
     return {"expired_trials":expired_trials,"pix_renewals_due":due_pix_count,"pending_overdue":overdue}
+
+
+@shared_task(bind=True,max_retries=3,autoretry_for=(Exception,),retry_backoff=True)
+def sync_per_unit_addon_pricing_task(self,tenant_id):
+    from .module_services import sync_per_unit_addon_pricing
+    row=sync_per_unit_addon_pricing(tenant_id)
+    return row.pk if row else None

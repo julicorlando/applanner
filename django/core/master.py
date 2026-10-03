@@ -28,7 +28,7 @@ FIELD_LABELS={
     "featured":"Em destaque","sort_order":"Ordem de exibição","public_enabled":"Página pública ativa",
     "public_booking_enabled":"Agendamento público ativo","email":"E-mail","phone":"Telefone",
     "status":"Situação","request_type":"Tipo de solicitação","created_at":"Criado em","updated_at":"Atualizado em",
-    "provider_environment":"Ambiente da assinatura no Mercado Pago",
+    "provider_environment":"Ambiente da assinatura no provedor",
     "professional_limit_override":"Liberação de profissionais para esta empresa",
 }
 
@@ -192,7 +192,7 @@ class UserMasterForm(forms.ModelForm):
 MASTER_RESOURCES={
     "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","logo","cover","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","public_enabled","created_at"],"order":"-created_at"},
     "planos":{"model":"billing.Plan","title":"Planos","fields":["name","slug","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","public_visible","is_custom","featured","sort_order"],"columns":["name","monthly_price","trial_days","active","public_visible","is_custom","featured"],"order":"sort_order,name","special":"plan"},
-    "modulos":{"model":"billing.Module","title":"Módulos","fields":["name","slug","description","addon_monthly_price","addon_sellable","sort_order","active"],"columns":["name","slug","addon_monthly_price","addon_sellable","active"],"order":"sort_order,name"},
+    "modulos":{"model":"billing.Module","title":"Módulos","fields":["name","slug","description","addon_monthly_price","addon_sellable","per_unit_billing","sort_order","active"],"columns":["name","slug","addon_monthly_price","addon_sellable","active"],"order":"sort_order,name"},
     "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":[],"columns":["tenant","module","quoted_monthly_price","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "equipe-comercial":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":["commercial_user","tenant","base_amount","commission_percent","commission_amount","status","hold_until"],"columns":["commercial_user","tenant","commission_amount","status","created_at"],"order":"-created_at"},
@@ -202,10 +202,10 @@ MASTER_RESOURCES={
     "incidentes":{"model":"operations.OperationalIncident","title":"Incidentes","fields":["category","severity","title","details","status"],"columns":["severity","title","status","occurrence_count","last_seen_at"],"order":"-last_seen_at","create":False},
     "backups":{"model":"operations.Backup","title":"Backups","fields":[],"columns":["type","scope","status","destination","size_bytes","completed_at"],"order":"-started_at","create":False,"edit":False},
     "homologacao":{"model":"operations.HomologationRun","title":"Homologações","fields":[],"columns":["status","score","executed_by","created_at"],"order":"-created_at","create":False,"edit":False},
-    "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","version","title","content","status","published_at"],"columns":["type","version","title","status","published_at"],"order":"-published_at,-created_at"},
+    "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","version","title","content","status","requires_acceptance","published_at"],"columns":["type","version","title","status","published_at"],"order":"-published_at,-created_at"},
     "comerciais":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":[],"columns":["commercial_user","tenant","base_amount","commission_amount","status","paid_at"],"order":"-created_at","create":False,"edit":False},
-    "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
+    "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","source","source_medium","source_campaign","referrer_user","converted_tenant","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
     "propostas":{"model":"commercial.Proposal","title":"Propostas comerciais","fields":[],"columns":["title","customer_name","commercial_user","final_price","status","approval_status"],"order":"-created_at","create":False,"edit":False},
     "operacao":{"model":"operations.PlatformOperationSettings","title":"Configuração operacional","fields":["backup_retention_days","backup_include_uploads","backup_encrypt","backup_before_update","lead_retention_days","critical_alert_email","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"columns":["backup_retention_days","backup_include_uploads","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"order":"id","special":"operation_settings"},
     "crons":{"model":"operations.CronHeartbeat","title":"Saúde dos jobs","fields":[],"columns":["cron_key","status","started_at","finished_at","duration_ms","host_name"],"order":"-started_at","create":False,"edit":False},
@@ -239,11 +239,15 @@ MASTER_RESOURCES={
     "blog":{"model":"contenthub.BlogPost","title":"Blog","fields":["slug","title","excerpt","content","cover","status","featured","meta_title","meta_description","published_at"],"columns":["title","slug","status","published_at"],"order":"-published_at,-created_at","special":"blog"},
     "landings":{"model":"contenthub.LandingPage","title":"Landing pages","fields":["slug","locale","segment","headline","subheadline","body","cta_label","cta_url","seo_title","seo_description","active"],"columns":["headline","slug","locale","segment","active","updated_at"],"order":"headline"},
     "avaliacoes-publicas":{"model":"contenthub.PublicReview","title":"Avaliações públicas","fields":["tenant","customer_name","rating","comment","active"],"columns":["tenant","customer_name","rating","active","created_at"],"order":"-created_at"},
+    "faq":{"model":"contenthub.FAQItem","title":"FAQ da página inicial","fields":["question","answer","sort_order","active"],"columns":["question","sort_order","active","updated_at"],"order":"sort_order,id"},
     "marketing-contatos":{"model":"communications.MarketingLead","title":"Contatos de e-mail marketing","fields":["name","email","status","source"],"columns":["name","email","status","source","created_at"],"order":"-created_at"},
     "marketing-campanhas":{"model":"communications.MarketingCampaign","title":"Campanhas de e-mail","fields":[],"columns":["subject","status","total_count","sent_count","failed_count","created_at"],"order":"-created_at","create":False,"edit":False},
     "marketing-entregas":{"model":"communications.MarketingDelivery","title":"Entregas de e-mail","fields":[],"columns":["campaign","lead","status","sent_at","opened_at","clicked_at"],"order":"-created_at","create":False,"edit":False},
     "whatsapp-conversas":{"model":"communications.WhatsAppConversation","title":"Conversas WhatsApp","fields":[],"columns":["tenant","contact_name","wa_id","status","assigned_to","last_message_at"],"order":"-last_message_at","create":False,"edit":False},
     "aquisicao":{"model":"growth.AcquisitionEvent","title":"Eventos de aquisição","fields":[],"columns":["event_name","tenant","source","medium","campaign","value_amount","created_at"],"order":"-created_at","create":False,"edit":False},
+    "campanhas-indicacao":{"model":"engagement.ReferralIncentiveCampaign","title":"Campanhas Indique e ganhe","fields":["name","active","reward_type","reward_value","company_referrals_enabled","professional_referrals_enabled","starts_at","ends_at"],"columns":["name","reward_type","reward_value","active","starts_at","ends_at"],"order":"-created_at"},
+    "recompensas-indicacao":{"model":"engagement.ReferralReward","title":"Recompensas de indicação","fields":[],"columns":["campaign","referrer_user","referred_tenant","referrer_kind","qualified_payment_count","reward_amount","status","pix_key","created_at"],"order":"-created_at","create":False,"edit":False},
+    "contas-bancarias":{"model":"billing.TenantBankAccount","title":"Contas bancárias das empresas","fields":[],"columns":["tenant","bank_name","holder_name","account_last4","pix_key_last4","is_primary","active","created_at"],"order":"tenant__name,-is_primary,bank_name","create":False,"edit":False},
     "meta-conversoes":{"model":"growth.MetaConversionLog","title":"Meta Conversions API","fields":[],"columns":["event_name","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "usuarios":{"model":"accounts.User","title":"Usuários","fields":["tenant","email","role","is_active","is_staff"],"columns":["email","tenant","role","is_active","is_staff"],"order":"email"},
     "papeis-usuarios":{"model":"accounts.UserRole","title":"Papéis dos usuários","fields":["user","role"],"columns":["user","role"],"order":"user__email"},
@@ -265,7 +269,7 @@ class PlatformPaymentForm(forms.Form):
 @login_required
 def platform_payment_gateway(request):
     _guard(request.user)
-    webhook_url=request.build_absolute_uri("/webhooks/mercadopago/")
+    webhook_url=request.build_absolute_uri("/webhooks/pagamentos/")
     form=PlatformPaymentForm(request.POST or None)
     if request.method=="POST" and form.is_valid():
         try:
@@ -280,7 +284,7 @@ def platform_payment_gateway(request):
             # Do not echo secrets or provider responses in the Master interface.
             form.add_error(None,"Não foi possível validar a conexão. Confira o ambiente, as credenciais, a chave do webhook e o HTTPS.")
         else:
-            messages.success(request,"Mercado Pago da plataforma validado e ativado.")
+            messages.success(request,"Provedor de cobrança da plataforma validado e ativado.")
             return redirect("master-platform-payment")
     rows=PaymentGateway.objects.filter(provider="mercadopago").order_by("environment")
     connected=rows.filter(active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED).exists()
@@ -327,6 +331,14 @@ def _widgets(model,fields):
 
 
 def _value(obj,name):
+    if name=="pix_key" and obj._meta.label_lower=="engagement.referralreward":
+        if not obj.pix_key_encrypted:
+            return "—"
+        try:
+            from core.crypto import decrypt_text
+            return decrypt_text(obj.pix_key_encrypted)
+        except Exception:
+            return "Indisponível"
     if name=="role" and obj._meta.label_lower=="accounts.user":
         return {"owner":"Responsável","professional":"Profissional","user":"Usuário",
                 "master":"Master","manager":"Gestor","staff":"Equipe"}.get(obj.role,obj.role)
@@ -353,9 +365,9 @@ def home(request):
         if slug=="usuarios" else apps.get_model(cfg["model"]).objects.count()
     )} for slug,cfg in MASTER_RESOURCES.items()]
     sections=[
-        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento"}),
+        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
-        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","aquisicao","meta-conversoes"}),
+        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","campanhas-indicacao","recompensas-indicacao","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","faq","aquisicao","meta-conversoes"}),
         ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing"}),
     ]
     assigned=set().union(*(slugs for _,slugs in sections))
@@ -733,12 +745,12 @@ def _approve_account_deletion(row,actor):
                 if not gateway:
                     raise ValidationError(
                         "Não foi possível excluir a conta porque a assinatura recorrente ainda "
-                        "não pôde ser cancelada no Mercado Pago."
+                        "não pôde ser cancelada no provedor de cobrança."
                     )
                 remote=platform_provider(gateway).cancel_subscription(subscription.provider_subscription_id)
                 if remote.get("status") not in {"canceled","cancelled"}:
                     raise ValidationError(
-                        "O Mercado Pago não confirmou o cancelamento da assinatura. "
+                        "O provedor de cobrança não confirmou o cancelamento da assinatura. "
                         "A exclusão não foi executada."
                     )
             previous=subscription.status
@@ -881,6 +893,17 @@ def operational_action(request,action,pk=None):
                 company_name=_approve_account_deletion(row,request.user)
                 messages.success(request,f"Conta de {company_name} excluída e e-mail de confirmação colocado na fila.")
             return redirect("master-resource-list",slug="solicitacoes-billing")
+        if action=="referral-reward-paid":
+            from engagement.models import ReferralReward
+            row=get_object_or_404(
+                ReferralReward,pk=pk,status=ReferralReward.Status.READY,
+                referrer_kind=ReferralReward.ReferrerKind.PROFESSIONAL,
+            )
+            row.status=ReferralReward.Status.PAID
+            row.paid_at=timezone.now()
+            row.save(update_fields=["status","paid_at","updated_at"])
+            messages.success(request,"Recompensa marcada como paga ao profissional.")
+            return redirect("master-resource-list",slug="recompensas-indicacao")
         if action in {"module-request-approve","module-request-reject"}:
             row=get_object_or_404(ModuleRequest,pk=pk)
             approved=action=="module-request-approve"
@@ -900,7 +923,7 @@ def operational_action(request,action,pk=None):
                         f"Módulo ativado. Novo valor da assinatura: R$ {adjustment.new_amount:.2f} por ciclo.")
                 else:
                     messages.error(request,
-                        "O Mercado Pago não confirmou a alteração. O módulo permanece bloqueado "
+                        "O provedor de cobrança não confirmou a alteração. O módulo permanece bloqueado "
                         "e o valor da assinatura não mudou. Confira a conexão e tente novamente. "
                         +adjustment.error_code)
             else:

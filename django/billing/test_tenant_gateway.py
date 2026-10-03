@@ -30,7 +30,7 @@ class TenantGatewayTests(TestCase):
         self.assertEqual(connection.tenant,self.tenant)
         self.assertNotIn(self.data["access_token"],connection.credentials_encrypted)
         response=self.client.get(self.url,secure=True)
-        self.assertContains(response,"https://testserver/webhooks/tenant/mercadopago/empresa-a/")
+        self.assertContains(response,"https://testserver/webhooks/tenant/pagamentos/empresa-a/")
         self.assertNotContains(response,self.data["webhook_secret"])
         self.assertFalse(TenantPaymentConnection.objects.filter(tenant=self.other).exists())
         test_connection.assert_called_once()

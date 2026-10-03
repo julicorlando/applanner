@@ -9,6 +9,7 @@ from tenants.onboarding import onboarding
 from communications.views import marketing_click, marketing_open, marketing_unsubscribe, whatsapp_webhook
 from communications.tenant_whatsapp import tenant_whatsapp_receive
 from contenthub.views import blog_post, landing, public_directory, public_directory_page
+from engagement.referrals import referral_redirect
 from scheduling.public_views import appointment_page
 from scheduling.ratings import public_rating
 from scheduling.public_api import (
@@ -43,6 +44,7 @@ urlpatterns = [
     path("app/", include("core.portal_urls")),
     path("commercial/", include("commercial.urls")),
     path("master/", include("core.master_urls")),
+    path("indique/<str:code>/",referral_redirect,name="public-referral"),
     path("directory/", public_directory_page, name="public-directory"),
     path("api/directory/", public_directory, name="public-directory-api"),
     path("estabelecimentos/", public_directory_page, name="public-directory-page"),
@@ -65,6 +67,8 @@ urlpatterns = [
     path("api/public/<slug:slug>/book/", PublicBookingAPIView.as_view(), name="public-booking"),
     path("api/public/<slug:slug>/waitlist/", PublicWaitlistAPIView.as_view(), name="public-waitlist"),
     path("api/public/appointments/<str:token>/", CustomerAppointmentAPIView.as_view(), name="public-appointment-manage"),
+    path("webhooks/pagamentos/", mercadopago_platform_webhook, name="payment-platform-webhook"),
+    path("webhooks/tenant/pagamentos/<slug:slug>/", mercadopago_tenant_webhook, name="payment-tenant-webhook"),
     path("webhooks/mercadopago/", mercadopago_platform_webhook, name="mercadopago-platform-webhook"),
     path("webhooks/tenant/mercadopago/<slug:slug>/", mercadopago_tenant_webhook, name="mercadopago-tenant-webhook"),
 ]
