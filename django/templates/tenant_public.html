@@ -82,15 +82,44 @@
 
 {% if segment != 'arena' %}
 <section class="shell section" id="servicos">
-  <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2></div>
-  <div class="segment-grid">{% for service in services %}<article><span>{{ service.duration_minutes }} min</span><h3>{{ service.name }}</h3><p>{{ service.description }}</p><strong>R$ {{ service.price }}</strong></article>{% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}</div>
+  <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2><p>Clique em um serviço para adicioná-lo ao seu agendamento.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for service in services %}
+    <button type="button" class="public-choice-card public-service-card" data-select-service="{{ service.pk }}" aria-label="Adicionar {{ service.name }} ao agendamento">
+      <span>{{ service.duration_minutes }} min</span>
+      <h3>{{ service.name }}</h3>
+      <p>{{ service.description }}</p>
+      <strong>R$ {{ service.price }}</strong>
+      <span class="public-choice-card__action">Selecionar e agendar →</span>
+    </button>
+    {% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}
+  </div>
 </section>
 {% endif %}
 
 {% if segment != 'arena' and professionals and not selected_professional %}
-<section class="shell section"><div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2></div><div class="segment-grid">
-{% for professional in professionals %}<article>{% if professional.photo %}<img src="{% url 'public-professional-image' professional.pk %}" alt="{{ professional.name }}" style="width:72px;height:72px;object-fit:cover;border-radius:50%">{% endif %}<span>{{ professional.specialty|default:"Profissional" }}</span><h3>{{ professional.name }}</h3>{% if professional.public_slug %}<a href="{% url 'professional-public' public_slug professional.public_slug %}">Ver agenda exclusiva →</a>{% endif %}</article>{% endfor %}
-</div></section>
+<section class="shell section" id="profissionais">
+  <div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2><p>Clique no profissional para abrir a agenda exclusiva dele.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for professional in professionals %}
+      {% if professional.public_slug %}
+      <a class="public-choice-card public-professional-card" href="{% url 'professional-public' public_slug professional.public_slug %}" aria-label="Abrir agenda de {{ professional.name }}">
+        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% endif %}
+        <span>{{ professional.specialty|default:"Profissional" }}</span>
+        <h3>{{ professional.name }}</h3>
+        <span class="public-choice-card__action">Ver agenda e horários →</span>
+      </a>
+      {% else %}
+      <article class="public-choice-card public-professional-card public-choice-card--disabled">
+        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% endif %}
+        <span>{{ professional.specialty|default:"Profissional" }}</span>
+        <h3>{{ professional.name }}</h3>
+        <span class="public-choice-card__action">Agenda exclusiva indisponível</span>
+      </article>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
 {% endif %}
 
 {% if courts %}<section class="shell section" id="quadras"><div class="section-head"><span class="eyebrow">ARENA</span><h2>Quadras e espaços</h2></div><div class="segment-grid">{% for court in courts %}<article><h3>{{ court.name }}</h3><p>{{ court.description }}</p><span>{% if court.indoor %}Coberta{% else %}Ao ar livre{% endif %}{% if court.lighting %} · Iluminação{% endif %}{% if court.surface %} · {{ court.surface }}{% endif %}</span>{% if tenant.public_booking_enabled and arena_access_enabled %}<p><a href="#agendar" data-select-court="{{ court.pk }}">Ver horários e reservar →</a></p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
@@ -98,7 +127,24 @@
 {% if segment == 'saude' %}<section class="shell section"><article class="panel"><span class="eyebrow">ATENDIMENTO DE SAÚDE</span><h2>Suas informações de saúde são protegidas</h2><p>Agende sua consulta com um profissional. O prontuário clínico só pode ser acessado por pessoas autorizadas do estabelecimento.</p></article></section>{% endif %}
 
 {% if products %}
-<section class="shell section"><div class="section-head"><span class="eyebrow">PRODUTOS</span><h2>Produtos disponíveis.</h2></div><div class="segment-grid">{% for product in products %}<article><span>{{ product.category|default:"Produto" }}</span><h3>{{ product.name }}</h3><p>{{ product.description }}</p><strong>R$ {{ product.sale_price }}</strong></article>{% endfor %}</div></section>
+<section class="shell section" id="produtos">
+  <div class="section-head"><span class="eyebrow">PRODUTOS</span><h2>Reserve produtos junto com seu horário.</h2><p>A reserva separa 1 unidade para retirada no atendimento. O produto não é cobrado antecipadamente junto com o serviço.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for product in products %}
+    <article class="public-choice-card public-product-card{% if product.public_available_stock <= 0 %} public-choice-card--disabled{% endif %}" data-product-card="{{ product.pk }}">
+      <span>{{ product.category|default:"Produto" }}</span>
+      <h3>{{ product.name }}</h3>
+      <p>{{ product.description }}</p>
+      <strong>R$ {{ product.sale_price }}</strong>
+      {% if product.public_available_stock > 0 %}
+        <button type="button" class="button ghost public-product-reserve" data-reserve-product="{{ product.pk }}" data-product-name="{{ product.name|escape }}" data-product-price="{{ product.sale_price }}">Reservar com o agendamento</button>
+      {% else %}
+        <span class="public-choice-card__action">Sem estoque para reserva</span>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
 {% endif %}
 
 {% if packages %}
