@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import date,datetime,timedelta
 from zoneinfo import ZoneInfo
+from types import SimpleNamespace
 
 from django import forms
 from django.contrib import messages
@@ -123,6 +124,12 @@ def professional_area(request):
             Customer,pk=request.POST.get("customer"),tenant=professional.tenant,active=True,
             appointments__professional=professional,appointments__status=Appointment.Status.COMPLETED,
         )
+        completed_for_professional=Appointment.objects.filter(
+            tenant=professional.tenant,customer=customer,professional=professional,
+            status=Appointment.Status.COMPLETED,
+        ).count()
+        if completed_for_professional<2:
+            raise PermissionDenied("O profissional só pode contatar clientes com recorrência no próprio atendimento.")
         try:
             send_return_invitation(
                 tenant=professional.tenant,customer=customer,user=request.user,professional=professional
@@ -164,19 +171,38 @@ def professional_area(request):
         waiting=waiting.filter(service__in=professional.services.filter(active=True))
 
     from engagement.contacting import contact_blocked
-    from engagement.models import BehaviorProfile
-    return_qs=(
-        BehaviorProfile.objects.filter(
-            tenant=professional.tenant,visits_count__gte=2,
-            customer__appointments__professional=professional,
-            customer__appointments__status=Appointment.Status.COMPLETED,
-        )
-        .select_related("customer").distinct()
-        .order_by("next_expected_date","customer__name")
+    completed_for_return=list(
+        Appointment.objects.filter(
+            tenant=professional.tenant,professional=professional,
+            status=Appointment.Status.COMPLETED,customer__active=True,
+        ).select_related("customer").order_by("customer_id","starts_at")
     )
-    return_rows=list(return_qs[:40])
-    for row in return_rows:
-        row.contact_blocked=contact_blocked(professional.tenant,row.customer)
+    grouped={}
+    for item in completed_for_return:
+        grouped.setdefault(item.customer_id,[]).append(item)
+    return_rows=[]
+    for items in grouped.values():
+        if len(items)<2:
+            continue
+        dates=[timezone.localtime(item.starts_at).date() for item in items]
+        intervals=[max((dates[idx]-dates[idx-1]).days,1) for idx in range(1,len(dates))]
+        avg_days=max(round(sum(intervals)/len(intervals)),1)
+        if len(intervals)>1:
+            variation=sum(abs(value-avg_days) for value in intervals)/len(intervals)
+            confidence=max(20,min(100,round(100-(variation/max(avg_days,1))*100)))
+        else:
+            confidence=60
+        customer=items[-1].customer
+        row=SimpleNamespace(
+            customer=customer,customer_id=customer.pk,visits_count=len(items),
+            avg_interval_days=avg_days,last_visit_at=items[-1].starts_at,
+            next_expected_date=dates[-1]+timedelta(days=avg_days),
+            confidence_score=confidence,
+            contact_blocked=contact_blocked(professional.tenant,customer),
+        )
+        return_rows.append(row)
+    return_rows.sort(key=lambda row:(row.next_expected_date,row.customer.name))
+    return_rows=return_rows[:40]
 
     from engagement.referrals import active_referral_campaign
     referral_campaign=active_referral_campaign()
