@@ -26,6 +26,11 @@ MODULES={
         "active":True,"sort_order":0,"addon_monthly_price":"89.90","addon_sellable":True,
     },
     "whatsapp":{"name":"WhatsApp","description":"Comunicação por WhatsApp e QR da empresa.","active":True,"sort_order":41},
+    "professional-extra":{
+        "name":"+1 profissional extra",
+        "description":"Adiciona uma vaga de profissional à capacidade contratada. O valor unitário é definido pelo Master.",
+        "active":True,"sort_order":1,"addon_monthly_price":"0.00","addon_sellable":True,
+    },
     "multiunit":{
         "name":"Multiunidade",
         "description":"Gestão de mais de uma unidade no mesmo estabelecimento.",
