@@ -74,6 +74,8 @@ class PublicProductReservationTests(TestCase):
             f'/p/{self.tenant.public_slug}/profissional/{self.professional.public_slug}/',
         )
         self.assertContains(response,f'data-reserve-product="{self.product.pk}"')
+        self.assertContains(response,'data-product-price="35.00"')
+        self.assertNotContains(response,'data-product-price="35,00"')
         self.assertContains(response,'id="booking-product-selection"')
 
     def test_booking_creates_product_reservation_and_returns_it(self):
