@@ -13,6 +13,7 @@ CAPABILITIES={
     "healthcare.manage":"Saúde e prontuário",
     "communications.manage":"Comunicação, notificações e WhatsApp",
     "support.manage":"Suporte",
+    "products.sell":"Cadastro e venda de produtos pela recepção",
     "master.support.impersonate":"Acesso assistido autorizado pelo cliente",
     "commercial.manage":"Comercial",
 }
@@ -29,8 +30,8 @@ ROLES={
         "agenda.manage","finance.manage","barber.manage","arena.manage","auto.manage",
         "engagement.manage","healthcare.manage","communications.manage","support.manage",
     ]),
-    "reception":("Atendimento",[
-        "agenda.manage","barber.manage","arena.manage","auto.manage","engagement.manage","communications.manage","support.manage",
+    "reception":("Recepcionista",[
+        "agenda.manage","barber.manage","arena.manage","auto.manage","engagement.manage","products.sell",
     ]),
     "professional":("Profissional",[
         "agenda.manage","barber.manage","arena.manage","auto.manage","healthcare.manage","communications.manage","support.manage",
