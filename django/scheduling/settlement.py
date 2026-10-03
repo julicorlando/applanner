@@ -82,7 +82,7 @@ def settle_appointment(
     if attended:
         if sale_items:
             sale=create_sale(
-                tenant=appointment.tenant,user=user,customer=appointment.customer,
+                tenant=appointment.tenant,unit=appointment.unit,user=user,customer=appointment.customer,
                 professional=professional,payment_method=payment_method,
                 items=sale_items,idempotency_key=f"appointment:{appointment.pk}:products",
             )
@@ -92,7 +92,7 @@ def settle_appointment(
         if price>0:
             FinancialTransaction.objects.get_or_create(
                 tenant=appointment.tenant,idempotency_key=f"appointment:{appointment.pk}",
-                defaults={"appointment":appointment,"source_type":"appointment","source_id":appointment.pk,
+                defaults={"unit":appointment.unit,"appointment":appointment,"source_type":"appointment","source_id":appointment.pk,
                           "type":FinancialTransaction.Type.INCOME,"description":f"Atendimento #{appointment.pk}",
                           "amount":price,"payment_method":finance_method,"competence_at":timezone.localdate(),
                           "status":FinancialTransaction.Status.PAID,"paid_at":now},
