@@ -90,7 +90,7 @@ PORTAL_MODULES = {
                 "model": "scheduling.Appointment",
                 "title": "Agendamentos",
                 "fields": ["customer","vehicle","professional","service","starts_at","status","source","notes"],
-                "columns": ["starts_at","customer","vehicle","service","professional","status"],
+                "columns": ["starts_at","customer","vehicle","service","professional","reserved_products","status"],
                 "order": "-starts_at",
                 "special": "appointment",
             },
@@ -782,6 +782,9 @@ def _save_special(obj, *, resource, request, tenant, is_new):
 def _value(obj, name):
     if name=="customer" and obj._meta.label_lower=="scheduling.appointment":
         return obj.customer_display_name
+    if name=="reserved_products" and obj._meta.label_lower=="scheduling.appointment":
+        reservations=list(obj.product_reservations.all())
+        return ", ".join(f"{item.product.name} ({item.quantity:g})" for item in reservations) or "—"
     if name=="customer_name" and obj._meta.label_lower=="arena.reservation":
         return obj.customer_display_name
     from core.operation_forms import WEEKDAYS
@@ -1089,7 +1092,7 @@ def resource_list(request,module_slug,resource_slug):
         return redirect("portal-home")
     qs=_tenant_queryset(model,tenant)
     if model._meta.label_lower=="scheduling.appointment":
-        qs=qs.select_related("customer","service","professional","vehicle")
+        qs=qs.select_related("customer","service","professional","vehicle").prefetch_related("product_reservations__product")
     q=(request.GET.get("q") or "").strip()
     if q:
         lookup=Q()

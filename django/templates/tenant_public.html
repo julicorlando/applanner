@@ -70,6 +70,13 @@
         <div class="form-field"><label for="booking-notes">Observações</label><input id="booking-notes"></div>
       </div>
       <p id="customer-identity-hint">Nome e telefone são obrigatórios. Use seu próprio número. Se o contato já estiver cadastrado, seu histórico será preservado; para corrigir dados existentes, fale com o estabelecimento.</p>
+      {% if products %}
+      <div id="booking-product-selection" class="booking-product-selection" hidden>
+        <strong>Produtos reservados para este agendamento</strong>
+        <div id="booking-product-selection-list" class="booking-product-selection__list"></div>
+        <small>A reserva é de 1 unidade por produto e não altera o valor do serviço nem o Pix do agendamento. O pagamento do produto é feito diretamente ao estabelecimento.</small>
+      </div>
+      {% endif %}
       {% if segment == 'auto' %}<div class="portal-module-grid"><div class="form-field"><label for="booking-plate">Placa do veículo</label><input id="booking-plate" autocomplete="off" maxlength="8" placeholder="ABC1D23" required></div><div class="form-field"><label for="booking-vehicle-model">Modelo do veículo</label><input id="booking-vehicle-model" maxlength="100" placeholder="Ex.: Onix" required></div></div>{% endif %}
       <div id="booking-feedback" role="status" aria-live="polite" style="margin-top:12px"></div>
       {% if waitlist_enabled %}<div id="booking-waitlist" class="panel" hidden><h3>Sem horários? Entre na lista de espera</h3><p>Usaremos o nome e o contato informados acima para avisar se surgir uma vaga nesta data.</p><button type="button" class="button" id="booking-waitlist-submit">Entrar na lista de espera</button></div>{% endif %}
@@ -82,15 +89,44 @@
 
 {% if segment != 'arena' %}
 <section class="shell section" id="servicos">
-  <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2></div>
-  <div class="segment-grid">{% for service in services %}<article><span>{{ service.duration_minutes }} min</span><h3>{{ service.name }}</h3><p>{{ service.description }}</p><strong>R$ {{ service.price }}</strong></article>{% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}</div>
+  <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2><p>Clique em um serviço para adicioná-lo ao seu agendamento.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for service in services %}
+    <button type="button" class="public-choice-card public-service-card{% if not tenant.public_booking_enabled %} public-choice-card--disabled{% endif %}" {% if tenant.public_booking_enabled %}data-select-service="{{ service.pk }}"{% else %}disabled{% endif %} aria-label="{% if tenant.public_booking_enabled %}Adicionar {{ service.name }} ao agendamento{% else %}{{ service.name }}{% endif %}">
+      <span>{{ service.duration_minutes }} min</span>
+      <h3>{{ service.name }}</h3>
+      <p>{{ service.description }}</p>
+      <strong>R$ {{ service.price }}</strong>
+      <span class="public-choice-card__action">{% if tenant.public_booking_enabled %}Selecionar e agendar →{% else %}Agendamento online indisponível{% endif %}</span>
+    </button>
+    {% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}
+  </div>
 </section>
 {% endif %}
 
 {% if segment != 'arena' and professionals and not selected_professional %}
-<section class="shell section"><div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2></div><div class="segment-grid">
-{% for professional in professionals %}<article>{% if professional.photo %}<img src="{% url 'public-professional-image' professional.pk %}" alt="{{ professional.name }}" style="width:72px;height:72px;object-fit:cover;border-radius:50%">{% endif %}<span>{{ professional.specialty|default:"Profissional" }}</span><h3>{{ professional.name }}</h3>{% if professional.public_slug %}<a href="{% url 'professional-public' public_slug professional.public_slug %}">Ver agenda exclusiva →</a>{% endif %}</article>{% endfor %}
-</div></section>
+<section class="shell section" id="profissionais">
+  <div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2><p>Clique no profissional para abrir a agenda exclusiva dele.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for professional in professionals %}
+      {% if professional.public_slug %}
+      <a class="public-choice-card public-professional-card" href="{% url 'professional-public' public_slug professional.public_slug %}" aria-label="Abrir agenda de {{ professional.name }}">
+        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% endif %}
+        <span>{{ professional.specialty|default:"Profissional" }}</span>
+        <h3>{{ professional.name }}</h3>
+        <span class="public-choice-card__action">Ver agenda e horários →</span>
+      </a>
+      {% else %}
+      <article class="public-choice-card public-professional-card public-choice-card--disabled">
+        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% endif %}
+        <span>{{ professional.specialty|default:"Profissional" }}</span>
+        <h3>{{ professional.name }}</h3>
+        <span class="public-choice-card__action">Agenda exclusiva indisponível</span>
+      </article>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
 {% endif %}
 
 {% if courts %}<section class="shell section" id="quadras"><div class="section-head"><span class="eyebrow">ARENA</span><h2>Quadras e espaços</h2></div><div class="segment-grid">{% for court in courts %}<article><h3>{{ court.name }}</h3><p>{{ court.description }}</p><span>{% if court.indoor %}Coberta{% else %}Ao ar livre{% endif %}{% if court.lighting %} · Iluminação{% endif %}{% if court.surface %} · {{ court.surface }}{% endif %}</span>{% if tenant.public_booking_enabled and arena_access_enabled %}<p><a href="#agendar" data-select-court="{{ court.pk }}">Ver horários e reservar →</a></p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
@@ -98,7 +134,26 @@
 {% if segment == 'saude' %}<section class="shell section"><article class="panel"><span class="eyebrow">ATENDIMENTO DE SAÚDE</span><h2>Suas informações de saúde são protegidas</h2><p>Agende sua consulta com um profissional. O prontuário clínico só pode ser acessado por pessoas autorizadas do estabelecimento.</p></article></section>{% endif %}
 
 {% if products %}
-<section class="shell section"><div class="section-head"><span class="eyebrow">PRODUTOS</span><h2>Produtos disponíveis.</h2></div><div class="segment-grid">{% for product in products %}<article><span>{{ product.category|default:"Produto" }}</span><h3>{{ product.name }}</h3><p>{{ product.description }}</p><strong>R$ {{ product.sale_price }}</strong></article>{% endfor %}</div></section>
+<section class="shell section" id="produtos">
+  <div class="section-head"><span class="eyebrow">PRODUTOS</span><h2>Reserve produtos junto com seu horário.</h2><p>A reserva separa 1 unidade para retirada no atendimento. O produto não é cobrado antecipadamente junto com o serviço.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for product in products %}
+    <article class="public-choice-card public-product-card{% if product.public_available_stock <= 0 %} public-choice-card--disabled{% endif %}" data-product-card="{{ product.pk }}">
+      <span>{{ product.category|default:"Produto" }}</span>
+      <h3>{{ product.name }}</h3>
+      <p>{{ product.description }}</p>
+      <strong>R$ {{ product.sale_price }}</strong>
+      {% if product.public_available_stock > 0 and tenant.public_booking_enabled %}
+        <button type="button" class="button ghost public-product-reserve" data-reserve-product="{{ product.pk }}" data-product-name="{{ product.name|escape }}" data-product-price="{{ product.sale_price }}">Reservar com o agendamento</button>
+      {% elif product.public_available_stock > 0 %}
+        <span class="public-choice-card__action">Disponível no estabelecimento</span>
+      {% else %}
+        <span class="public-choice-card__action">Sem estoque para reserva</span>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
 {% endif %}
 
 {% if packages %}
@@ -128,6 +183,9 @@
   const date=document.getElementById('booking-date');
   const slot=document.getElementById('booking-slot');
   const feedback=document.getElementById('booking-feedback');
+  const selectedProducts=new Map();
+  const productSelection=document.getElementById('booking-product-selection');
+  const productSelectionList=document.getElementById('booking-product-selection-list');
   const csrf=form.querySelector('[name=csrfmiddlewaretoken]').value;
   const today=new Date(); date.min=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
   const waitlist=document.getElementById('booking-waitlist');
@@ -141,6 +199,50 @@
       const data=await response.json();feedback.textContent=data.detail||'Não foi possível entrar na lista de espera.';
       if(!response.ok)button.disabled=false;else waitlist.hidden=true;
     }catch{feedback.textContent='Não foi possível enviar o pedido. Tente novamente.';button.disabled=false;}
+  });
+
+  function renderProductSelection(){
+    if(!productSelection || !productSelectionList)return;
+    productSelectionList.replaceChildren();
+    for(const [id,item] of selectedProducts){
+      const row=document.createElement('span');
+      row.className='booking-product-chip';
+      row.textContent=item.name+' · '+new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(item.price));
+      const remove=document.createElement('button');
+      remove.type='button';remove.setAttribute('aria-label','Remover '+item.name);remove.textContent='×';
+      remove.addEventListener('click',()=>{
+        selectedProducts.delete(id);
+        const button=document.querySelector('[data-reserve-product="'+id+'"]');
+        if(button){button.classList.remove('is-selected');button.textContent='Reservar com o agendamento';}
+        renderProductSelection();
+      });
+      row.append(remove);productSelectionList.append(row);
+    }
+    productSelection.hidden=selectedProducts.size===0;
+  }
+
+  document.querySelectorAll('[data-select-service]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      service.value=button.dataset.selectService;
+      service.dispatchEvent(new Event('change',{bubbles:true}));
+      document.getElementById('agendar').scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
+
+  document.querySelectorAll('[data-reserve-product]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      const id=button.dataset.reserveProduct;
+      if(selectedProducts.has(id)){
+        selectedProducts.delete(id);
+        button.classList.remove('is-selected');
+        button.textContent='Reservar com o agendamento';
+      }else{
+        selectedProducts.set(id,{name:button.dataset.productName,price:button.dataset.productPrice});
+        button.classList.add('is-selected');
+        button.textContent='Reservado ✓';
+      }
+      renderProductSelection();
+    });
   });
 
   function loadSlots(){
@@ -171,7 +273,8 @@
       {% if segment == 'auto' %}vehicle_plate:document.getElementById('booking-plate').value,
       vehicle_model:document.getElementById('booking-vehicle-model').value,{% endif %}
       payment_choice:form.querySelector('input[name="payment_choice"]:checked')?.value||'on_site',
-      professional_link:{% if selected_professional %}true{% else %}false{% endif %}
+      professional_link:{% if selected_professional %}true{% else %}false{% endif %},
+      product_ids:[...selectedProducts.keys()].map(Number)
     };
     if(!payload.phone){feedback.textContent='Informe telefone com DDD.';return;}
     const submit=form.querySelector('button[type=submit]');submit.disabled=true;
@@ -186,7 +289,12 @@
     const title=document.createElement('strong');title.textContent='Agendamento confirmado!';confirmation.append(title);
     const when=new Intl.DateTimeFormat('pt-BR',{timeZone:data.timezone,dateStyle:'full',timeStyle:'short'}).format(new Date(data.starts_at));
     const price=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(data.service.price));
-    for(const text of ['Serviço: '+data.service.name,'Data e horário: '+when,'Profissional: '+data.professional.name,'Valor: '+price]){const line=document.createElement('p');line.textContent=text;confirmation.append(line);}
+    for(const text of ['Serviço: '+data.service.name,'Data e horário: '+when,'Profissional: '+data.professional.name,'Valor do serviço: '+price]){const line=document.createElement('p');line.textContent=text;confirmation.append(line);}
+    if(data.reserved_products?.length){
+      const products=document.createElement('p');
+      products.textContent='Produtos reservados: '+data.reserved_products.map(item=>item.name).join(', ')+'. Pagamento dos produtos no estabelecimento.';
+      confirmation.append(products);
+    }
     if(data.customer_reused){const hint=document.createElement('p');hint.textContent='Seu contato foi vinculado ao cadastro existente. O nome e os dados já cadastrados foram preservados para manter seu histórico. Para corrigi-los, fale com o estabelecimento.';confirmation.append(hint);}
     const link=document.createElement('a');link.className='button primary';link.href=data.manage_url;link.textContent=payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix';confirmation.append(link);feedback.append(confirmation);confirmation.scrollIntoView({block:'nearest',behavior:'smooth'});
     } catch {feedback.textContent='Não foi possível confirmar o agendamento. Consulte seus agendamentos antes de tentar novamente.';submit.disabled=false;}

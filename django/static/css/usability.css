@@ -176,3 +176,99 @@ select option, select optgroup { color: #172033; background-color: #fff; }
   .agenda-preview-viewport{height:188px}
   .preview-live-status{font-size:.67rem}
 }
+
+
+/* Página pública: cards acionáveis de serviço, profissional e produto. */
+.public-choice-grid{align-items:stretch}
+.public-choice-card{
+  position:relative;
+  min-height:240px;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  padding:27px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:var(--paper);
+  color:var(--ink);
+  text-align:left;
+  text-decoration:none;
+  font:inherit;
+  cursor:pointer;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+.public-choice-card:hover,
+.public-choice-card:focus-visible{
+  transform:translateY(-4px);
+  border-color:color-mix(in srgb,var(--accent) 55%,var(--line));
+  box-shadow:0 16px 38px rgba(0,0,0,.14);
+  outline:none;
+}
+.public-choice-card>span:first-child{font-size:.7rem;color:var(--muted)}
+.public-choice-card h3{font-size:1.18rem;margin:42px 0 12px}
+.public-choice-card p{font-size:.88rem;color:var(--muted);line-height:1.65;margin:0 0 16px}
+.public-choice-card strong{margin-top:auto}
+.public-choice-card__action{
+  display:inline-flex;
+  margin-top:18px;
+  font-size:.78rem!important;
+  font-weight:800;
+  color:var(--accent)!important;
+}
+.public-choice-card--disabled{opacity:.58;cursor:default}
+.public-choice-card--disabled:hover{transform:none;box-shadow:none;border-color:var(--line)}
+.public-professional-card__photo{
+  width:82px;
+  height:82px;
+  object-fit:cover;
+  border-radius:50%;
+  border:2px solid color-mix(in srgb,var(--accent) 36%,transparent);
+  box-shadow:0 8px 22px rgba(0,0,0,.14);
+}
+.public-professional-card h3{margin-top:24px}
+.public-product-card .public-product-reserve{
+  width:100%;
+  margin-top:18px;
+  position:relative;
+  z-index:1;
+}
+.public-product-reserve.is-selected{
+  background:color-mix(in srgb,var(--accent) 18%,var(--paper));
+  border-color:var(--accent);
+  color:var(--ink);
+}
+.booking-product-selection{
+  padding:16px;
+  border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));
+  border-radius:14px;
+  background:color-mix(in srgb,var(--accent) 7%,var(--paper));
+}
+.booking-product-selection>strong{display:block;margin-bottom:10px}
+.booking-product-selection>small{display:block;margin-top:10px;color:var(--muted);line-height:1.5}
+.booking-product-selection__list{display:flex;flex-wrap:wrap;gap:8px}
+.booking-product-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--paper);
+  font-size:.76rem;
+  font-weight:700;
+}
+.booking-product-chip button{
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  font-size:1rem;
+  cursor:pointer;
+  line-height:1;
+  padding:0 2px;
+}
+@media(max-width:560px){
+  .public-choice-card{min-height:210px;padding:22px}
+  .public-choice-card h3{margin-top:28px}
+}

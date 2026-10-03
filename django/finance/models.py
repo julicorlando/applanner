@@ -97,6 +97,33 @@ class Product(TimeStampedModel):
         return self.name
 
 
+class ProductReservation(TimeStampedModel):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="product_reservations")
+    appointment=models.ForeignKey(
+        "scheduling.Appointment",on_delete=models.CASCADE,related_name="product_reservations",
+    )
+    product=models.ForeignKey(Product,on_delete=models.PROTECT,related_name="reservations")
+    quantity=models.DecimalField(max_digits=12,decimal_places=3,default=1)
+    unit_price_snapshot=models.DecimalField(max_digits=10,decimal_places=2)
+
+    class Meta:
+        constraints=[
+            models.UniqueConstraint(
+                fields=["appointment","product"],name="uq_appointment_product_reservation",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gt=0),name="product_reservation_quantity_gt_0",
+            ),
+        ]
+        indexes=[
+            models.Index(fields=["tenant","product"],name="fin_prodres_tenant_prod_idx"),
+            models.Index(fields=["appointment"],name="fin_prodres_appt_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.product.name} · {self.appointment_id}"
+
+
 class Sale(models.Model):
     class Status(models.TextChoices):
         COMPLETED="completed","Concluída"

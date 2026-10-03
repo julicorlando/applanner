@@ -152,6 +152,7 @@ def _public_tenant_context(tenant,professional=None):
     from engagement.models import ServicePackage,TenantLoyaltySettings
     from finance.models import Product
     from scheduling.availability import AvailabilityService
+    from scheduling.models import Appointment
     from billing.payment_services import has_connected_tenant_gateway
 
     services=tenant.services.filter(active=True).order_by("name")[:100]
@@ -165,7 +166,24 @@ def _public_tenant_context(tenant,professional=None):
         if professional.services_restricted or professional.services.exists():
             services=offered.order_by("name")[:100]
     units=tenant.units.filter(active=True).order_by("-is_primary","name")
-    products=Product.objects.filter(tenant=tenant,active=True).order_by("name")[:24]
+    active_product_appointment_statuses=[
+        Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
+        Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
+    ]
+    products=list(
+        Product.objects.filter(tenant=tenant,active=True)
+        .annotate(
+            reserved_stock=Sum(
+                "reservations__quantity",
+                filter=Q(reservations__appointment__status__in=active_product_appointment_statuses),
+            )
+        )
+        .order_by("name")[:24]
+    )
+    for product in products:
+        product.public_available_stock=max(
+            Decimal("0"),product.stock-(product.reserved_stock or Decimal("0")),
+        )
     packages=ServicePackage.objects.filter(tenant=tenant,active=True).order_by("name")[:24]
     reviews=PublicReview.objects.filter(tenant=tenant,active=True).order_by("-created_at")[:12]
     loyalty=TenantLoyaltySettings.objects.filter(tenant=tenant,enabled=True).first()
