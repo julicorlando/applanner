@@ -122,7 +122,7 @@ def _gateway_for(subscription):
     else:
         gateway=gateways.filter(active=True).order_by("-environment").first()
     if not gateway:
-        raise ValidationError("A conexão Mercado Pago da assinatura não está disponível. Confira o ambiente e as credenciais.")
+        raise ValidationError("A conexão provedor de cobrança da assinatura não está disponível. Confira o ambiente e as credenciais.")
     return gateway
 
 
