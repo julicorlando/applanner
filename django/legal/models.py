@@ -5,15 +5,22 @@ from core.models import TimeStampedModel
 
 class LegalDocument(TimeStampedModel):
     class Type(models.TextChoices):
-        TERMS="terms","Termos"
-        PRIVACY="privacy","Privacidade"
+        TERMS="terms","Termos de uso"
+        PRIVACY="privacy","Política de privacidade"
+        CANCELLATION="cancellation","Política de cancelamento"
+
+    class Audience(models.TextChoices):
+        ALL="all","Todos"
+        COMPANY="company","Empresas e profissionais"
+        CUSTOMER="customer","Clientes finais"
 
     class Status(models.TextChoices):
         DRAFT="draft","Rascunho"
         PUBLISHED="published","Publicado"
         ARCHIVED="archived","Arquivado"
 
-    type=models.CharField(max_length=12,choices=Type.choices)
+    type=models.CharField(max_length=20,choices=Type.choices)
+    audience=models.CharField(max_length=16,choices=Audience.choices,default=Audience.ALL)
     version=models.CharField(max_length=30)
     title=models.CharField(max_length=190)
     content=models.TextField()
@@ -22,8 +29,8 @@ class LegalDocument(TimeStampedModel):
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="legal_documents")
 
     class Meta:
-        constraints=[models.UniqueConstraint(fields=["type","version"],name="uq_legal_type_version")]
-        indexes=[models.Index(fields=["type","status","published_at"],name="legal_current_idx")]
+        constraints=[models.UniqueConstraint(fields=["type","audience","version"],name="uq_legal_type_audience_version")]
+        indexes=[models.Index(fields=["type","audience","status","published_at"],name="legal_current_audience_idx")]
 
 
 class LegalAcceptance(models.Model):
