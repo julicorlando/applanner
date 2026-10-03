@@ -144,6 +144,7 @@ def professional_area(request):
     ).select_related("customer","service").order_by("preferred_date","created_at") if waitlist_enabled else WaitlistEntry.objects.none())
     if professional.services_restricted or professional.services.exists():
         waiting=waiting.filter(service__in=professional.services.filter(active=True))
+    from growth.referrals import active_referral_campaign
     return render(request,"portal/professional_area.html",{
         "professional":professional,"upcoming":upcoming[:15],"current":current,"upcoming_count":upcoming.count(),
         "completed_month":appointments.filter(starts_at__gte=month_start,starts_at__lt=now,
@@ -151,6 +152,7 @@ def professional_area(request):
         "pending_commission":pending,"paid_commission":paid,
         "projected_commission":projected,"has_projection":professional.commission_percent is not None,
         "waitlist_enabled":waitlist_enabled,"waiting":waiting[:20],"waiting_count":waiting.count(),
+        "referral_campaign":active_referral_campaign(),
     })
 
 
