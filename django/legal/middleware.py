@@ -13,7 +13,7 @@ def current_documents():
     docs=[]
     for doc_type in (LegalDocument.Type.TERMS,LegalDocument.Type.PRIVACY):
         row=LegalDocument.objects.filter(
-            type=doc_type,status=LegalDocument.Status.PUBLISHED
+            type=doc_type,status=LegalDocument.Status.PUBLISHED,requires_acceptance=True
         ).order_by("-published_at","-id").first()
         if row:
             docs.append(row)
