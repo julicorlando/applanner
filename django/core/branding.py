@@ -131,13 +131,15 @@ def tenant_branding(request):
     selected_unit=get_object_or_404(Unit,pk=raw,tenant=tenant,active=True) if raw and str(raw).isdigit() else (units[0] if units else None)
     if selected_unit:
         request.session[f"operation_unit_{tenant.pk}"]=selected_unit.pk
+    if request.GET.get("company")=="1":
+        selected_unit=None
     Form=UnitBrandingForm if selected_unit else TenantBrandingForm
     form=Form(request.POST or None,request.FILES or None,instance=selected_unit or tenant)
     if request.method=="POST" and form.is_valid():
         form.save()
         messages.success(request,"Página da unidade atualizada." if selected_unit else "Página pública atualizada.")
         from django.urls import reverse
-        return redirect(reverse("tenant-branding")+(f"?unit={selected_unit.pk}" if selected_unit else ""))
+        return redirect(reverse("tenant-branding")+(f"?unit={selected_unit.pk}" if selected_unit else "?company=1"))
     return render(request,"portal/branding.html",{"tenant":tenant,"form":form,"unit_choices":units,"selected_unit":selected_unit})
 
 

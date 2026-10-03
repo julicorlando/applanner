@@ -130,3 +130,10 @@ class UnitSelectionTests(TestCase):
         created=Service.objects.get(name='Novo serviço Bairro')
         self.assertEqual(created.unit_id,self.second.pk)
         self.assertTrue(self.b.services.filter(pk=created.pk).exists())
+
+    def test_general_publication_controls_remain_available(self):
+        self.client.force_login(self.owner)
+        response=self.client.get(reverse('tenant-branding'),{'company':1})
+        self.assertContains(response,'public_enabled')
+        self.assertContains(response,'public_booking_enabled')
+        self.assertIsNone(response.context['selected_unit'])
