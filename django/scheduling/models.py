@@ -191,6 +191,9 @@ class Appointment(TimeStampedModel):
         FULL="full","Total por Pix"
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="appointments")
+    unit=models.ForeignKey(
+        "tenants.Unit",null=True,blank=True,on_delete=models.SET_NULL,related_name="appointments"
+    )
     customer=models.ForeignKey(Customer,on_delete=models.PROTECT,related_name="appointments")
     vehicle=models.ForeignKey("auto.Vehicle",null=True,blank=True,on_delete=models.SET_NULL,related_name="appointments")
     professional=models.ForeignKey(Professional,null=True,blank=True,on_delete=models.SET_NULL,related_name="appointments")
@@ -242,6 +245,12 @@ class Appointment(TimeStampedModel):
 
     def clean(self):
         super().clean()
+        if self.unit_id and self.unit.tenant_id!=self.tenant_id:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa do agendamento."})
+        if self.professional_id and self.professional.unit_id and self.unit_id and self.professional.unit_id!=self.unit_id:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"professional":"O profissional não pertence à unidade selecionada."})
         if self.vehicle_id and self.customer_id and (
             self.vehicle.customer_id!=self.customer_id or self.vehicle.tenant_id!=self.tenant_id
         ):
@@ -252,6 +261,7 @@ class Appointment(TimeStampedModel):
         indexes=[
             models.Index(fields=["tenant","starts_at"]),
             models.Index(fields=["tenant","status","starts_at"]),
+            models.Index(fields=["tenant","unit","starts_at"],name="sched_appt_unit_start_idx"),
         ]
         constraints=[
             models.CheckConstraint(condition=models.Q(ends_at__gt=models.F("starts_at")),name="appointment_end_after_start"),
