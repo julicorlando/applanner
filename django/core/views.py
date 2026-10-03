@@ -86,6 +86,22 @@ def _tenant_dashboard(request):
 
     available=available_modules(request.user,tenant)
     segment_module=next((item for item in available if item["slug"] in {"auto","saude","arena","barbearia"}),None)
+
+    return_intelligence_rows=[]
+    behavior_enabled=not subscription or module_enabled(tenant,"behavior")
+    if behavior_enabled and request.user.role!="professional":
+        from engagement.contacting import contact_blocked
+        from engagement.models import BehaviorProfile
+        return_horizon=timezone.localdate()+timedelta(days=14)
+        return_qs=(
+            BehaviorProfile.objects.filter(
+                tenant=tenant,next_expected_date__isnull=False,
+                next_expected_date__lte=return_horizon,
+            ).select_related("customer").order_by("next_expected_date","customer__name")
+        )
+        return_intelligence_rows=list(return_qs[:8])
+        for row in return_intelligence_rows:
+            row.contact_blocked=contact_blocked(tenant,row.customer)
     arena_mode=segment_enabled(tenant,"arena")
     arena_category="arena" in (tenant.category or "").lower() or "quadra" in (tenant.category or "").lower()
     if arena_mode:
@@ -133,6 +149,8 @@ def _tenant_dashboard(request):
         "arena_today_total":arena_today_total,"arena_today_pending":arena_today_pending,
         "courts_count":courts_count,
         "referral_campaign":referral_campaign,
+        "return_intelligence_rows":return_intelligence_rows,
+        "behavior_enabled":behavior_enabled,
     })
 
 
