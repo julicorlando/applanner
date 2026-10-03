@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ document.title }} — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">TRANSPARÊNCIA</span><h1>{{ document.title }}</h1><p>Versão {{ document.version }}{% if document.published_at %} · publicada em {{ document.published_at|date:"d/m/Y" }}{% endif %}</p></div></div>
+  <article class="panel legal-public-content">{{ document.content|linebreaks }}</article>
+</section>
+{% endblock %}
