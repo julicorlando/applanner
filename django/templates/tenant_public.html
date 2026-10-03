@@ -70,6 +70,13 @@
         <div class="form-field"><label for="booking-notes">Observações</label><input id="booking-notes"></div>
       </div>
       <p id="customer-identity-hint">Nome e telefone são obrigatórios. Use seu próprio número. Se o contato já estiver cadastrado, seu histórico será preservado; para corrigir dados existentes, fale com o estabelecimento.</p>
+      {% if products %}
+      <div id="booking-product-selection" class="booking-product-selection" hidden>
+        <strong>Produtos reservados para este agendamento</strong>
+        <div id="booking-product-selection-list" class="booking-product-selection__list"></div>
+        <small>A reserva é de 1 unidade por produto e não altera o valor do serviço nem o Pix do agendamento. O pagamento do produto é feito diretamente ao estabelecimento.</small>
+      </div>
+      {% endif %}
       {% if segment == 'auto' %}<div class="portal-module-grid"><div class="form-field"><label for="booking-plate">Placa do veículo</label><input id="booking-plate" autocomplete="off" maxlength="8" placeholder="ABC1D23" required></div><div class="form-field"><label for="booking-vehicle-model">Modelo do veículo</label><input id="booking-vehicle-model" maxlength="100" placeholder="Ex.: Onix" required></div></div>{% endif %}
       <div id="booking-feedback" role="status" aria-live="polite" style="margin-top:12px"></div>
       {% if waitlist_enabled %}<div id="booking-waitlist" class="panel" hidden><h3>Sem horários? Entre na lista de espera</h3><p>Usaremos o nome e o contato informados acima para avisar se surgir uma vaga nesta data.</p><button type="button" class="button" id="booking-waitlist-submit">Entrar na lista de espera</button></div>{% endif %}
@@ -174,6 +181,9 @@
   const date=document.getElementById('booking-date');
   const slot=document.getElementById('booking-slot');
   const feedback=document.getElementById('booking-feedback');
+  const selectedProducts=new Map();
+  const productSelection=document.getElementById('booking-product-selection');
+  const productSelectionList=document.getElementById('booking-product-selection-list');
   const csrf=form.querySelector('[name=csrfmiddlewaretoken]').value;
   const today=new Date(); date.min=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
   const waitlist=document.getElementById('booking-waitlist');
@@ -187,6 +197,50 @@
       const data=await response.json();feedback.textContent=data.detail||'Não foi possível entrar na lista de espera.';
       if(!response.ok)button.disabled=false;else waitlist.hidden=true;
     }catch{feedback.textContent='Não foi possível enviar o pedido. Tente novamente.';button.disabled=false;}
+  });
+
+  function renderProductSelection(){
+    if(!productSelection || !productSelectionList)return;
+    productSelectionList.replaceChildren();
+    for(const [id,item] of selectedProducts){
+      const row=document.createElement('span');
+      row.className='booking-product-chip';
+      row.textContent=item.name+' · '+new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(item.price));
+      const remove=document.createElement('button');
+      remove.type='button';remove.setAttribute('aria-label','Remover '+item.name);remove.textContent='×';
+      remove.addEventListener('click',()=>{
+        selectedProducts.delete(id);
+        const button=document.querySelector('[data-reserve-product="'+id+'"]');
+        if(button){button.classList.remove('is-selected');button.textContent='Reservar com o agendamento';}
+        renderProductSelection();
+      });
+      row.append(remove);productSelectionList.append(row);
+    }
+    productSelection.hidden=selectedProducts.size===0;
+  }
+
+  document.querySelectorAll('[data-select-service]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      service.value=button.dataset.selectService;
+      service.dispatchEvent(new Event('change',{bubbles:true}));
+      document.getElementById('agendar').scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
+
+  document.querySelectorAll('[data-reserve-product]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      const id=button.dataset.reserveProduct;
+      if(selectedProducts.has(id)){
+        selectedProducts.delete(id);
+        button.classList.remove('is-selected');
+        button.textContent='Reservar com o agendamento';
+      }else{
+        selectedProducts.set(id,{name:button.dataset.productName,price:button.dataset.productPrice});
+        button.classList.add('is-selected');
+        button.textContent='Reservado ✓';
+      }
+      renderProductSelection();
+    });
   });
 
   function loadSlots(){
@@ -217,7 +271,8 @@
       {% if segment == 'auto' %}vehicle_plate:document.getElementById('booking-plate').value,
       vehicle_model:document.getElementById('booking-vehicle-model').value,{% endif %}
       payment_choice:form.querySelector('input[name="payment_choice"]:checked')?.value||'on_site',
-      professional_link:{% if selected_professional %}true{% else %}false{% endif %}
+      professional_link:{% if selected_professional %}true{% else %}false{% endif %},
+      product_ids:[...selectedProducts.keys()].map(Number)
     };
     if(!payload.phone){feedback.textContent='Informe telefone com DDD.';return;}
     const submit=form.querySelector('button[type=submit]');submit.disabled=true;
@@ -232,7 +287,12 @@
     const title=document.createElement('strong');title.textContent='Agendamento confirmado!';confirmation.append(title);
     const when=new Intl.DateTimeFormat('pt-BR',{timeZone:data.timezone,dateStyle:'full',timeStyle:'short'}).format(new Date(data.starts_at));
     const price=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(data.service.price));
-    for(const text of ['Serviço: '+data.service.name,'Data e horário: '+when,'Profissional: '+data.professional.name,'Valor: '+price]){const line=document.createElement('p');line.textContent=text;confirmation.append(line);}
+    for(const text of ['Serviço: '+data.service.name,'Data e horário: '+when,'Profissional: '+data.professional.name,'Valor do serviço: '+price]){const line=document.createElement('p');line.textContent=text;confirmation.append(line);}
+    if(data.reserved_products?.length){
+      const products=document.createElement('p');
+      products.textContent='Produtos reservados: '+data.reserved_products.map(item=>item.name).join(', ')+'. Pagamento dos produtos no estabelecimento.';
+      confirmation.append(products);
+    }
     if(data.customer_reused){const hint=document.createElement('p');hint.textContent='Seu contato foi vinculado ao cadastro existente. O nome e os dados já cadastrados foram preservados para manter seu histórico. Para corrigi-los, fale com o estabelecimento.';confirmation.append(hint);}
     const link=document.createElement('a');link.className='button primary';link.href=data.manage_url;link.textContent=payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix';confirmation.append(link);feedback.append(confirmation);confirmation.scrollIntoView({block:'nearest',behavior:'smooth'});
     } catch {feedback.textContent='Não foi possível confirmar o agendamento. Consulte seus agendamentos antes de tentar novamente.';submit.disabled=false;}
