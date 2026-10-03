@@ -32,7 +32,7 @@ def seed_docs(apps,schema_editor):
     for key,(title,content) in DOCS.items():
         LegalDocument.objects.get_or_create(
             type=key,version="2026-10",
-            defaults={"title":title,"content":content,"status":"published","published_at":now},
+            defaults={"title":title,"content":content,"status":"published","published_at":now,"requires_acceptance":False},
         )
 
 
@@ -40,6 +40,11 @@ class Migration(migrations.Migration):
     dependencies=[("legal","0001_initial")]
 
     operations=[
+        migrations.AddField(
+            model_name="legaldocument",
+            name="requires_acceptance",
+            field=models.BooleanField(default=True),
+        ),
         migrations.AlterField(
             model_name="legaldocument",
             name="type",
