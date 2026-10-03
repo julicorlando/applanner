@@ -269,7 +269,7 @@ class PlatformPaymentForm(forms.Form):
 @login_required
 def platform_payment_gateway(request):
     _guard(request.user)
-    webhook_url=request.build_absolute_uri("/webhooks/mercadopago/")
+    webhook_url=request.build_absolute_uri("/webhooks/pagamentos/")
     form=PlatformPaymentForm(request.POST or None)
     if request.method=="POST" and form.is_valid():
         try:
