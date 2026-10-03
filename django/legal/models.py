@@ -5,8 +5,12 @@ from core.models import TimeStampedModel
 
 class LegalDocument(TimeStampedModel):
     class Type(models.TextChoices):
-        TERMS="terms","Termos"
-        PRIVACY="privacy","Privacidade"
+        TERMS="terms","Termos gerais"
+        TERMS_COMPANY="terms_company","Termos de uso · Empresas"
+        TERMS_CUSTOMER="terms_customer","Termos de uso · Clientes"
+        PRIVACY="privacy","Política de privacidade"
+        CANCELLATION_COMPANY="cancellation_company","Política de cancelamento · Empresas"
+        CANCELLATION_CUSTOMER="cancellation_customer","Política de cancelamento · Clientes"
 
     class Status(models.TextChoices):
         DRAFT="draft","Rascunho"
