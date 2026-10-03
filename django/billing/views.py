@@ -133,10 +133,14 @@ class SignupForm(forms.Form):
                 if current!=set(proposal.modules or []):
                     self.add_error("plan","O catálogo deste plano mudou. Solicite a atualização da proposta.")
         category=(data.get("category") or "").lower()
-        if category=="clinica" and not Plan.objects.filter(
-            slug="segment-medico",active=True,public_visible=True
-        ).exists():
-            self.add_error("category","O plano Médico / Clínica ainda não está disponível.")
+        if category=="clinica":
+            from contenthub.models import PlatformHomepage
+            platform=PlatformHomepage.objects.filter(pk=1).first()
+            medical_visible=bool(platform and platform.medical_segment_visible)
+            if not medical_visible or not Plan.objects.filter(
+                slug="segment-medico",active=True,public_visible=True
+            ).exists():
+                self.add_error("category","O segmento Médico / Clínica ainda não está disponível.")
         if plan and category:
             segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
                      "arena":"arena","clinica":"saude"}.get(category)
