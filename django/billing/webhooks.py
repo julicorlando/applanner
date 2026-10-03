@@ -164,6 +164,8 @@ def _reconcile_platform(event,gateway,data,resource_id):
                 charge.save(update_fields=["status","paid_at","updated_at"])
                 charge.checkout_session.status=CheckoutSession.Status.PAID
                 charge.checkout_session.save(update_fields=["status","updated_at"])
+                from growth.referrals import process_referral_payment
+                process_referral_payment(payment)
                 subscription=charge.subscription
                 if subscription.status in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
                     subscription.status=Subscription.Status.ACTIVE
@@ -202,6 +204,9 @@ def _reconcile_platform(event,gateway,data,resource_id):
                     )
             payment.metadata={**payment.metadata,"mercadopago":remote}
             payment.save()
+            if payment.status==Payment.Status.PAID:
+                from growth.referrals import process_referral_payment
+                process_referral_payment(payment)
 
     elif "preapproval" in kind or "preapproval" in action or "subscription" in kind:
         remote=provider.get_subscription(resource_id)
