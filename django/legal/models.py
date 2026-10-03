@@ -17,7 +17,7 @@ class LegalDocument(TimeStampedModel):
         PUBLISHED="published","Publicado"
         ARCHIVED="archived","Arquivado"
 
-    type=models.CharField(max_length=12,choices=Type.choices)
+    type=models.CharField(max_length=32,choices=Type.choices)
     version=models.CharField(max_length=30)
     title=models.CharField(max_length=190)
     content=models.TextField()
