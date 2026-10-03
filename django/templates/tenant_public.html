@@ -191,7 +191,7 @@
   <div class="section-head"><span class="eyebrow">UNIDADES</span><h2>Escolha onde deseja ser atendido.</h2><p id="nearest-unit-status">Se você permitir a localização do dispositivo, destacamos automaticamente a unidade mais próxima.</p></div>
   <div class="segment-grid" id="public-units-grid">
     {% for unit in units %}
-    <article class="public-unit-card{% if selected_unit.pk == unit.pk %} is-selected{% endif %}" data-unit-card="{{ unit.pk }}" data-lat="{{ unit.latitude|default:'' }}" data-lng="{{ unit.longitude|default:'' }}">
+    <article class="public-unit-card{% if selected_unit.pk == unit.pk %} is-selected{% endif %}" data-unit-card="{{ unit.pk }}" data-lat="{% if unit.latitude != None %}{{ unit.latitude|floatformat:"7u" }}{% endif %}" data-lng="{% if unit.longitude != None %}{{ unit.longitude|floatformat:"7u" }}{% endif %}">
       <span class="public-unit-badge">{% if unit.is_primary %}Principal{% else %}Unidade{% endif %}</span>
       <span class="public-nearest-badge" hidden>Mais próxima</span>
       <h3>{{ unit.name }}</h3>
@@ -201,7 +201,7 @@
       {% if unit.public_hours %}<div class="public-unit-hours"><strong>Funcionamento</strong>{% for hour in unit.public_hours %}<p{% if hour.is_today %} class="is-today"{% endif %}><span>{{ hour.weekday_label }}{% if hour.is_today %} · Hoje{% endif %}</span><b>{% if hour.closed %}Fechado{% else %}{{ hour.opens_at|time:"H:i" }}–{{ hour.closes_at|time:"H:i" }}{% endif %}</b></p>{% endfor %}</div>{% endif %}
       {% if unit.amenities %}<div><strong>Comodidades</strong><p>{% for item in unit.amenities %}<span class="public-meta-chip">{{ item }}</span>{% endfor %}</p></div>{% endif %}
       {% if unit.payment_methods %}<div><strong>Formas de pagamento</strong><p>{% for item in unit.payment_methods %}<span class="public-meta-chip">{{ item }}</span>{% endfor %}</p></div>{% endif %}
-      {% if unit.instagram or unit.facebook or unit.tiktok or unit.website %}<p class="public-unit-socials">{% if unit.instagram %}<a href="{{ unit.instagram }}" target="_blank" rel="noopener">Instagram</a>{% endif %}{% if unit.facebook %} <a href="{{ unit.facebook }}" target="_blank" rel="noopener">Facebook</a>{% endif %}{% if unit.tiktok %} <a href="{{ unit.tiktok }}" target="_blank" rel="noopener">TikTok</a>{% endif %}{% if unit.website %} <a href="{{ unit.website }}" target="_blank" rel="noopener">Site</a>{% endif %}</p>{% endif %}
+      {% if unit.instagram or unit.facebook or unit.tiktok or unit.website %}<p class="public-unit-socials">{% if unit.public_instagram_url %}<a href="{{ unit.public_instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}{% if unit.facebook %} <a href="{{ unit.facebook }}" target="_blank" rel="noopener">Facebook</a>{% endif %}{% if unit.public_tiktok_url %} <a href="{{ unit.public_tiktok_url }}" target="_blank" rel="noopener">TikTok</a>{% endif %}{% if unit.website %} <a href="{{ unit.website }}" target="_blank" rel="noopener">Site</a>{% endif %}</p>{% endif %}
       {% if unit.map_url %}<a href="{{ unit.map_url }}" target="_blank" rel="noopener">Ver localização →</a>{% elif unit.latitude and unit.longitude %}<a href="https://www.google.com/maps/search/?api=1&query={{ unit.latitude }},{{ unit.longitude }}" target="_blank" rel="noopener">Ver localização →</a>{% endif %}
       {% if tenant.public_booking_enabled %}<p><a class="button ghost" href="#agendar" data-select-unit="{{ unit.pk }}">Agendar nesta unidade →</a></p>{% endif %}
     </article>

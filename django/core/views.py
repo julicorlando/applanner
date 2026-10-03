@@ -270,7 +270,17 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         1:"Segunda-feira",2:"Terça-feira",3:"Quarta-feira",4:"Quinta-feira",
         5:"Sexta-feira",6:"Sábado",7:"Domingo",
     }
+    def social_url(value,base):
+        value=(value or "").strip()
+        if not value:
+            return ""
+        if value.startswith(("http://","https://")):
+            return value
+        return base+value.lstrip("@")
+
     for unit in units:
+        unit.public_instagram_url=social_url(unit.instagram,"https://instagram.com/")
+        unit.public_tiktok_url=social_url(unit.tiktok,"https://tiktok.com/@")
         rows=[row for row in unit.business_hours.all() if row.active]
         rows.sort(key=lambda row:row.weekday)
         for row in rows:

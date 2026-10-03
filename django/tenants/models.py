@@ -108,7 +108,10 @@ class Unit(TimeStampedModel):
 class UnitBusinessHours(TimeStampedModel):
     tenant=models.ForeignKey(Tenant,on_delete=models.CASCADE,related_name="unit_business_hours")
     unit=models.ForeignKey(Unit,on_delete=models.CASCADE,related_name="business_hours")
-    weekday=models.PositiveSmallIntegerField()
+    weekday=models.PositiveSmallIntegerField(choices=[
+        (1,"Segunda-feira"),(2,"Terça-feira"),(3,"Quarta-feira"),(4,"Quinta-feira"),
+        (5,"Sexta-feira"),(6,"Sábado"),(7,"Domingo"),
+    ])
     opens_at=models.TimeField(null=True,blank=True)
     closes_at=models.TimeField(null=True,blank=True)
     closed=models.BooleanField(default=False)
