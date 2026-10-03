@@ -64,7 +64,9 @@ class PublicLegalAndHomeTests(TestCase):
             name="Médico / Clínica",slug="segment-medico",monthly_price=Decimal("99.00"),
             active=True,public_visible=True,
         )
-        platform=PlatformHomepage.objects.create(pk=1,medical_segment_visible=False)
+        platform,_=PlatformHomepage.objects.get_or_create(pk=1,defaults={"medical_segment_visible":False})
+        platform.medical_segment_visible=False
+        platform.save(update_fields=["medical_segment_visible","updated_at"])
         response=self.client.get(reverse("home"))
         self.assertNotContains(response,"Agenda profissional, prontuário criptografado")
 
