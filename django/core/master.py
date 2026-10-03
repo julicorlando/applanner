@@ -28,7 +28,7 @@ FIELD_LABELS={
     "featured":"Em destaque","sort_order":"Ordem de exibição","public_enabled":"Página pública ativa",
     "public_booking_enabled":"Agendamento público ativo","email":"E-mail","phone":"Telefone",
     "status":"Situação","request_type":"Tipo de solicitação","created_at":"Criado em","updated_at":"Atualizado em",
-    "provider_environment":"Ambiente da assinatura no Mercado Pago",
+    "provider_environment":"Ambiente da assinatura no provedor",
     "professional_limit_override":"Liberação de profissionais para esta empresa",
 }
 
@@ -281,7 +281,7 @@ def platform_payment_gateway(request):
             # Do not echo secrets or provider responses in the Master interface.
             form.add_error(None,"Não foi possível validar a conexão. Confira o ambiente, as credenciais, a chave do webhook e o HTTPS.")
         else:
-            messages.success(request,"Mercado Pago da plataforma validado e ativado.")
+            messages.success(request,"Provedor de cobrança da plataforma validado e ativado.")
             return redirect("master-platform-payment")
     rows=PaymentGateway.objects.filter(provider="mercadopago").order_by("environment")
     connected=rows.filter(active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED).exists()
