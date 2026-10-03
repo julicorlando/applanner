@@ -208,6 +208,8 @@ class Appointment(TimeStampedModel):
     notes=models.TextField(blank=True)
     customer_manage_token_hash=models.CharField(max_length=64,null=True,blank=True,unique=True)
     customer_manage_token_encrypted=models.TextField(blank=True)
+    idempotency_key=models.CharField(max_length=100,blank=True)
+    idempotency_fingerprint=models.CharField(max_length=64,blank=True)
     customer_confirmed_at=models.DateTimeField(null=True,blank=True)
     checked_in_at=models.DateTimeField(null=True,blank=True)
     service_started_at=models.DateTimeField(null=True,blank=True)
@@ -253,6 +255,11 @@ class Appointment(TimeStampedModel):
         ]
         constraints=[
             models.CheckConstraint(condition=models.Q(ends_at__gt=models.F("starts_at")),name="appointment_end_after_start"),
+            models.UniqueConstraint(
+                fields=["tenant","idempotency_key"],
+                condition=~models.Q(idempotency_key=""),
+                name="uq_appointment_idempotency",
+            ),
         ]
 
 
