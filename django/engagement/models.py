@@ -190,6 +190,9 @@ class WaitlistEntry(TimeStampedModel):
         EXPIRED="expired","Expirado"
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="waitlist")
+    unit=models.ForeignKey(
+        "tenants.Unit",null=True,blank=True,on_delete=models.SET_NULL,related_name="waitlist_entries"
+    )
     customer=models.ForeignKey("scheduling.Customer",on_delete=models.CASCADE,related_name="waitlist_entries")
     service=models.ForeignKey("scheduling.Service",on_delete=models.CASCADE,related_name="waitlist_entries")
     professional=models.ForeignKey("scheduling.Professional",null=True,blank=True,on_delete=models.SET_NULL,related_name="waitlist_entries")
