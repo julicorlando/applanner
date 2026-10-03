@@ -337,6 +337,35 @@ class TenantPaymentConnection(TimeStampedModel):
         ]
 
 
+class TenantBankAccount(TimeStampedModel):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="bank_accounts")
+    bank_code=models.CharField(max_length=12,blank=True)
+    bank_name=models.CharField(max_length=120)
+    holder_name=models.CharField(max_length=160)
+    details_encrypted=models.TextField()
+    account_last4=models.CharField(max_length=4,blank=True)
+    pix_key_last4=models.CharField(max_length=4,blank=True)
+    is_primary=models.BooleanField(default=False)
+    active=models.BooleanField(default=True)
+    created_by=models.ForeignKey(
+        settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="tenant_bank_accounts_created",
+    )
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","active"],name="billing_bank_tenant_idx")]
+        constraints=[
+            models.UniqueConstraint(
+                fields=["tenant"],condition=models.Q(is_primary=True,active=True),
+                name="uq_primary_bank_account_tenant",
+            ),
+        ]
+
+    def __str__(self):
+        suffix=f" •••• {self.account_last4}" if self.account_last4 else ""
+        return f"{self.bank_name}{suffix}"
+
+
 class TenantPaymentTransaction(TimeStampedModel):
     class Status(models.TextChoices):
         CREATED="created","Criado"
