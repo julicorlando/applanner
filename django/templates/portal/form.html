@@ -11,6 +11,12 @@
     <p>Profissionais inativos não ocupam vagas.</p><a href="{% url 'billing-subscription-status' %}">Ver meu plano e limites →</a>
   </aside>{% endif %}
   {% if appointment_identity.customer_name_differs %}<aside class="panel" aria-label="Identificação do cliente" style="margin-bottom:16px"><h2>Identificação do cliente</h2>{% include "portal/customer_name_difference.html" with appointment=appointment_identity only %}<p>O nome informado na reserva é preservado para consulta. O histórico continua vinculado ao cadastro do cliente, identificado pelo telefone; este aviso não altera seus dados.</p></aside>{% endif %}
+  {% if module_slug == 'agenda' and resource_slug == 'unidades' and multiunit_price %}
+  <aside class="panel" role="note" style="margin-bottom:16px">
+    <strong>Cobrança do Multiunidade</strong>
+    <p>A unidade principal está incluída na operação. Cada <strong>unidade adicional ativa</strong> acrescenta <strong>R$ {{ multiunit_price|floatformat:2 }}/mês</strong> ao valor mensal do módulo. Ao salvar ou ativar/desativar uma unidade, o valor contratado é recalculado automaticamente.</p>
+  </aside>
+  {% endif %}
   <form method="post" enctype="multipart/form-data" class="portal-form panel">
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
