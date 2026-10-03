@@ -268,6 +268,40 @@ class PlatformFinancialTransaction(TimeStampedModel):
         indexes=[models.Index(fields=["type","status","due_at"],name="platform_finance_status_idx")]
 
 
+class TenantBankAccount(TimeStampedModel):
+    class AccountType(models.TextChoices):
+        CHECKING="checking","Corrente"
+        SAVINGS="savings","Poupança"
+        PAYMENT="payment","Pagamento"
+        BUSINESS="business","Empresarial"
+
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="bank_accounts")
+    bank_name=models.CharField(max_length=120)
+    bank_code=models.CharField(max_length=10,blank=True)
+    account_type=models.CharField(max_length=16,choices=AccountType.choices,default=AccountType.CHECKING)
+    agency_encrypted=models.TextField(blank=True)
+    account_encrypted=models.TextField(blank=True)
+    holder_name=models.CharField(max_length=150)
+    pix_key_type=models.CharField(max_length=16,blank=True)
+    pix_key_encrypted=models.TextField(blank=True)
+    is_primary=models.BooleanField(default=False)
+    active=models.BooleanField(default=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="tenant_bank_accounts_created")
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","active","is_primary"],name="tenant_bank_active_idx")]
+        constraints=[
+            models.UniqueConstraint(
+                fields=["tenant"],
+                condition=models.Q(is_primary=True,active=True),
+                name="uq_tenant_primary_bank",
+            )
+        ]
+
+    def __str__(self):
+        return self.bank_name
+
+
 class PlatformBankAccount(TimeStampedModel):
     class AccountType(models.TextChoices):
         CHECKING="checking","Corrente"
