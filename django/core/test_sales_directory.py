@@ -64,7 +64,7 @@ class PublicSalesTests(TestCase):
             features={"segments":["arena"]},public_visible=True,active=True)
         legacy_data={**data,"plan":legacy.pk,"category":"arena"}
         self.assertTrue(SignupForm(legacy_data).is_valid())
-        self.assertContains(self.client.get(reverse("billing-plans")),"Em preparação")
+        self.assertNotContains(self.client.get(reverse("billing-plans")),"Médico / Clínica")
         data["category"]="clinica"
         self.assertFalse(SignupForm(data).is_valid())
         self.assertFalse(Plan.objects.filter(slug="segment-medico",active=True).exists())
