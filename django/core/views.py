@@ -260,8 +260,17 @@ def home(request):
     if getattr(request,"tenant",None):
         return tenant_public(request)
     from billing.models import Plan
-    from contenthub.models import BlogPost
+    from contenthub.models import BlogPost,FAQItem
+    from contenthub.views import feature_enabled
+    healthcare_public=feature_enabled("healthcare_public",False)
     plans=Plan.objects.filter(active=True,public_visible=True,is_custom=False).order_by("sort_order","name")[:4]
-    medical_plan=Plan.objects.filter(slug="segment-medico",active=False).first()
+    medical_plan=(
+        Plan.objects.filter(slug="segment-medico").order_by("-active","id").first()
+        if healthcare_public else None
+    )
     posts=BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED).order_by("-featured","-published_at","-created_at")[:3]
-    return render(request,"home.html",{"plans":plans,"medical_plan":medical_plan,"posts":posts})
+    faqs=FAQItem.objects.filter(active=True).order_by("sort_order","question")[:8]
+    return render(request,"home.html",{
+        "plans":plans,"medical_plan":medical_plan,"posts":posts,"faqs":faqs,
+        "healthcare_public":healthcare_public,
+    })
