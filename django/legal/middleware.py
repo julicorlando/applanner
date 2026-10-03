@@ -1,3 +1,4 @@
+from django.db import models
 from django.shortcuts import redirect
 
 from .models import LegalAcceptance,LegalDocument
@@ -9,12 +10,22 @@ EXEMPT_PREFIXES=(
 )
 
 
-def current_documents():
+def current_documents(audience=LegalDocument.Audience.COMPANY):
     docs=[]
-    for doc_type in (LegalDocument.Type.TERMS,LegalDocument.Type.PRIVACY):
+    for doc_type in (
+        LegalDocument.Type.TERMS,LegalDocument.Type.PRIVACY,LegalDocument.Type.CANCELLATION,
+    ):
         row=LegalDocument.objects.filter(
-            type=doc_type,status=LegalDocument.Status.PUBLISHED
-        ).order_by("-published_at","-id").first()
+            type=doc_type,status=LegalDocument.Status.PUBLISHED,
+            audience__in=[LegalDocument.Audience.ALL,audience],
+        ).order_by(
+            models.Case(
+                models.When(audience=audience,then=models.Value(0)),
+                default=models.Value(1),
+                output_field=models.IntegerField(),
+            ),
+            "-published_at","-id",
+        ).first()
         if row:
             docs.append(row)
     return docs
