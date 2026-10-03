@@ -205,7 +205,7 @@ class CustomPlanForm(forms.Form):
 
 def custom_plan(request):
     from commercial.models import Lead
-    from growth.attribution import capture_attribution,record_acquisition
+    from growth.attribution import acquisition_context,capture_attribution,record_acquisition
 
     capture_attribution(request)
     form=CustomPlanForm(request.POST or None)
@@ -295,9 +295,29 @@ def signup(request):
                 proposal.tenant=tenant
                 proposal.save(update_fields=["tenant","updated_at"])
             record_acquisition(request,"CompleteRegistration",tenant=tenant,user=user,segment=data["category"])
+            context=acquisition_context(request)
+            from commercial.models import Lead
+            referrer_id=request.session.get("referral_user_id")
+            lead=Lead.objects.create(
+                name=data["owner_name"],phone=data["phone"] or "",email=data["email"],
+                business_type=data["category"],estimated_value=contracted,
+                source=(context.get("source") or "organic")[:80],
+                source_medium=(context.get("medium") or "")[:80],
+                source_campaign=(context.get("campaign") or "")[:120],
+                status=Lead.Status.CONVERTED,
+                referrer_user_id=referrer_id if referrer_id else None,
+                converted_tenant=tenant,
+                consent_granted=True,consent_version="signup_v1",
+                consent_purpose="Cadastro e contratação do ApPlanner",
+                consent_at=now,
+            )
+            from engagement.referrals import create_referral_reward_from_signup
+            create_referral_reward_from_signup(request,tenant)
             transaction.on_commit(lambda unit_id=unit.pk: __import__(
                 "tenants.tasks",fromlist=["geocode_unit_from_postal_code"]
             ).geocode_unit_from_postal_code.delay(unit_id))
+        for key in ("referral_code","referral_campaign_id","referral_user_id"):
+            request.session.pop(key,None)
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version
 
