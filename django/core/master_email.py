@@ -4,6 +4,10 @@ import logging
 import smtplib
 import socket
 import ssl
+from email.utils import parseaddr
+
+import dns.exception
+import dns.resolver
 
 from django import forms
 from django.conf import settings
@@ -52,6 +56,10 @@ class MasterSMTPForm(forms.Form):
     username=forms.CharField(max_length=255,required=False,label="Usuário SMTP")
     password=forms.CharField(required=False,label="Senha SMTP",widget=forms.PasswordInput(attrs={"autocomplete":"new-password"}))
     from_email=forms.EmailField(label="E-mail remetente")
+    dkim_selector=forms.CharField(
+        max_length=80,required=False,initial="default",label="Seletor DKIM",
+        help_text="Ex.: default, mail, selector1. Consulte seu provedor de e-mail.",
+    )
     use_tls=forms.BooleanField(required=False,label="STARTTLS (normalmente porta 587)",initial=True)
     use_ssl=forms.BooleanField(required=False,label="SSL direto (normalmente porta 465)")
     enabled=forms.BooleanField(required=False,label="Ativar esta configuração")
@@ -60,7 +68,7 @@ class MasterSMTPForm(forms.Form):
         self.existing=existing
         if not args and existing:
             kwargs.setdefault("initial",{
-                key:getattr(existing,key) for key in ("host","port","username","from_email","use_tls","use_ssl","enabled")
+                key:getattr(existing,key) for key in ("host","port","username","from_email","dkim_selector","use_tls","use_ssl","enabled")
             })
         super().__init__(*args,**kwargs)
 
@@ -72,6 +80,49 @@ class MasterSMTPForm(forms.Form):
         if bool(values.get("username"))!=bool(values.get("password") or retained):
             raise forms.ValidationError("Informe usuário e senha SMTP juntos.")
         return values
+
+
+def _txt_records(name):
+    resolver=dns.resolver.Resolver(configure=True)
+    resolver.timeout=1.5
+    resolver.lifetime=2.5
+    try:
+        answers=resolver.resolve(name,"TXT")
+    except (dns.resolver.NXDOMAIN,dns.resolver.NoAnswer,dns.resolver.NoNameservers,dns.exception.Timeout):
+        return []
+    records=[]
+    for answer in answers:
+        try:
+            records.append(b"".join(answer.strings).decode("utf-8","replace"))
+        except Exception:
+            records.append(str(answer).strip('"'))
+    return records
+
+
+def email_dns_health(config):
+    if not config or not config.from_email or "@" not in config.from_email:
+        return {
+            "domain":"","spf":False,"dkim":False,"dmarc":False,
+            "spf_records":[],"dkim_records":[],"dmarc_records":[],
+        }
+    domain=config.from_email.rsplit("@",1)[1].strip().lower()
+    selector=(config.dkim_selector or "default").strip().lower()
+    spf_records=_txt_records(domain)
+    dkim_records=_txt_records(f"{selector}._domainkey.{domain}") if selector else []
+    dmarc_records=_txt_records(f"_dmarc.{domain}")
+    return {
+        "domain":domain,
+        "selector":selector,
+        "spf":any(record.lower().startswith("v=spf1") for record in spf_records),
+        "dkim":any(
+            "v=dkim1" in record.lower() or "p=" in record.lower()
+            for record in dkim_records
+        ),
+        "dmarc":any(record.lower().startswith("v=dmarc1") for record in dmarc_records),
+        "spf_records":spf_records,
+        "dkim_records":dkim_records,
+        "dmarc_records":dmarc_records,
+    }
 
 
 @login_required
@@ -108,7 +159,7 @@ def smtp_settings(request):
                 row,_=PlatformSMTPSettings.objects.select_for_update().get_or_create(pk=1,defaults={
                     "host":values["host"],"from_email":values["from_email"],
                 })
-                for field in ("host","port","username","from_email","use_tls","use_ssl","enabled"):
+                for field in ("host","port","username","from_email","dkim_selector","use_tls","use_ssl","enabled"):
                     setattr(row,field,values[field])
                 if values["password"]:
                     row.password_encrypted=encrypt_text(values["password"])
@@ -123,9 +174,19 @@ def smtp_settings(request):
                     ip_address=request.META.get("REMOTE_ADDR") or None)
             messages.success(request,"Configuração SMTP salva. Envie um teste para verificar a entrega.")
             return redirect("master-smtp-settings")
+    from communications.models import MarketingLead,Notification
+    recent_email_failures=Notification.objects.filter(
+        channel=Notification.Channel.EMAIL,status=Notification.Status.FAILED,
+        created_at__gte=timezone.now()-__import__("datetime").timedelta(hours=24),
+    ).count()
+    bounced_contacts=MarketingLead.objects.filter(status=MarketingLead.Status.BOUNCED).count()
+    dns_health=email_dns_health(row) if row else None
     return render(request,"master/smtp_settings.html",{
         "form":form,"configured":row,"has_password":bool(row and row.password_encrypted),
         "backend_supported":settings.EMAIL_BACKEND=="applanner.email_backend.PlatformEmailBackend",
+        "dns_health":dns_health,
+        "recent_email_failures":recent_email_failures,
+        "bounced_contacts":bounced_contacts,
     })
 
 
