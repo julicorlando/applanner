@@ -81,7 +81,8 @@ class SignupForm(forms.Form):
 
     def __init__(self,*args,selected_plan=None,**kwargs):
         super().__init__(*args,**kwargs)
-        medical_available=Plan.objects.filter(
+        from contenthub.views import feature_enabled
+        medical_available=feature_enabled("healthcare_public",False) and Plan.objects.filter(
             slug="segment-medico",active=True,public_visible=True
         ).exists()
         if medical_available:
@@ -122,10 +123,12 @@ class SignupForm(forms.Form):
                 if current!=set(proposal.modules or []):
                     self.add_error("plan","O catálogo deste plano mudou. Solicite a atualização da proposta.")
         category=(data.get("category") or "").lower()
-        if category=="clinica" and not Plan.objects.filter(
-            slug="segment-medico",active=True,public_visible=True
-        ).exists():
-            self.add_error("category","O plano Médico / Clínica ainda não está disponível.")
+        if category=="clinica":
+            from contenthub.views import feature_enabled
+            if not feature_enabled("healthcare_public",False) or not Plan.objects.filter(
+                slug="segment-medico",active=True,public_visible=True
+            ).exists():
+                self.add_error("category","O segmento Médico / Clínica ainda não está disponível.")
         if plan and category:
             segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
                      "arena":"arena","clinica":"saude"}.get(category)
@@ -153,7 +156,11 @@ def plans(request):
             if link.enabled and link.module.active
         ]
         cards.append({"plan":plan,"modules":modules})
-    medical=Plan.objects.filter(slug="segment-medico",active=False).first()
+    from contenthub.views import feature_enabled
+    medical=(
+        Plan.objects.filter(slug="segment-medico").first()
+        if feature_enabled("healthcare_public",False) else None
+    )
     catalog={module.pk:module for card in cards for module in card["modules"]}
     comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
                 for module in sorted(catalog.values(),key=lambda item:(item.sort_order,item.name))]
