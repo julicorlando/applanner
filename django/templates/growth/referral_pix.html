@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Informar chave Pix — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">INDIQUE E GANHE</span><h1>Informe sua chave Pix</h1><p>Sua indicação de {{ referral.referred_tenant.name }} foi qualificada.</p></div></div>
+  <article class="panel">
+    {% if referral.status == 'ready' %}<p class="flash success">Chave Pix recebida. O benefício está pronto para conferência e pagamento pelo Master.</p>
+    {% else %}<form method="post" class="portal-form">{% csrf_token %}{% if error %}<div class="form-errors">{{ error }}</div>{% endif %}<div class="form-field"><label for="pix_key">Chave Pix</label><input id="pix_key" name="pix_key" maxlength="190" required autocomplete="off"><small>A chave é armazenada de forma criptografada e fica disponível apenas para o fluxo autorizado de pagamento.</small></div><button class="button primary">Enviar chave Pix</button></form>{% endif %}
+  </article>
+</section>
+{% endblock %}
