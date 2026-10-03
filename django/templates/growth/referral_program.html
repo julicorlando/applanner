@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Indique e Ganhe — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><a class="back-link" href="/">← Painel</a><span class="eyebrow">INDIQUE E GANHE</span><h1>{{ campaign.name }}</h1><p>O benefício é liberado somente depois que a empresa indicada concluir {{ campaign.payment_threshold|default:2 }} pagamentos válidos.</p></div></div>
+  <article class="panel">
+    <h2>Seu link de indicação</h2>
+    <div class="operation-share-row"><div><strong>Compartilhe com uma empresa</strong><span>{{ referral_url }}</span></div><button class="button" type="button" onclick="navigator.clipboard.writeText('{{ referral_url|escapejs }}');this.textContent='Copiado ✓'">Copiar link</button></div>
+    {% if request.user.role == 'professional' %}<p>Como profissional, o valor definido nesta campanha é <strong>R$ {{ campaign.professional_reward_amount|floatformat:2 }}</strong>. Quando a indicação for qualificada, você receberá um e-mail solicitando sua chave Pix.</p>{% else %}<p>Como empresa, a recompensa é um desconto automático na mensalidade: {% if campaign.company_reward_type == 'percent' %}<strong>{{ campaign.company_reward_value|floatformat:2 }}%</strong>{% else %}<strong>R$ {{ campaign.company_reward_value|floatformat:2 }} por mês</strong>{% endif %}.</p>{% endif %}
+  </article>
+  <section class="panel" style="margin-top:16px"><h2>Minhas indicações</h2>
+    <div class="table-card"><table class="portal-table"><thead><tr><th>Empresa</th><th>Pagamentos</th><th>Status</th><th>Benefício</th></tr></thead><tbody>
+      {% for row in rows %}<tr><td>{{ row.referred_tenant.name }}</td><td>{{ row.payment_count }}/{{ row.campaign.payment_threshold }}</td><td>{{ row.get_status_display }}</td><td>{% if row.company_discount_amount %}Desconto R$ {{ row.company_discount_amount }} / mês{% elif row.professional_reward_amount %}R$ {{ row.professional_reward_amount }}{% else %}Aguardando{% endif %}</td></tr>{% empty %}<tr><td colspan="4" class="empty-table">Nenhuma indicação convertida ainda.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</section>
+{% endblock %}
