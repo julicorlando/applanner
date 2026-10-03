@@ -4,6 +4,7 @@ from django.urls import include, path
 
 from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_webhook
 from core.views import healthz, home, professional_public, tenant_public
+from operations.status_page import public_status
 from core.branding import public_platform_logo, public_tenant_image, public_professional_image, public_blog_image
 from tenants.onboarding import onboarding
 from communications.views import marketing_click, marketing_open, marketing_unsubscribe, whatsapp_webhook
@@ -24,6 +25,7 @@ urlpatterns = [
     path("api/v1/<slug:key>/<int:pk>/",api_resource,name="personal-api-detail"),
     path("inicio/",onboarding,name="tenant-onboarding"),
     path("healthz/", healthz, name="healthz"),
+    path("status/", public_status, name="platform-status"),
     path("imagens/logo/",public_platform_logo,name="public-platform-logo"),
     path("imagens/empresa/<int:pk>/<str:kind>/",public_tenant_image,name="public-tenant-image"),
     path("imagens/profissional/<int:pk>/",public_professional_image,name="public-professional-image"),
