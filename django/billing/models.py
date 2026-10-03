@@ -244,6 +244,8 @@ class TenantModuleAddon(TimeStampedModel):
     module=models.ForeignKey(Module,on_delete=models.PROTECT,related_name="addons")
     module_request=models.ForeignKey(ModuleRequest,null=True,blank=True,on_delete=models.SET_NULL,related_name="addons")
     monthly_price=models.DecimalField(max_digits=10,decimal_places=2)
+    quantity=models.PositiveIntegerField(default=1)
+    pricing_components=models.JSONField(default=list,blank=True)
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING,db_index=True)
     billing_mode=models.CharField(max_length=24,choices=BillingMode.choices,default=BillingMode.SEPARATE)
     provider=models.CharField(max_length=40,blank=True)
