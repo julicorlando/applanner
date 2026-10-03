@@ -9,6 +9,10 @@ class Migration(migrations.Migration):
             model_name="sale",name="idempotency_key",
             field=models.CharField(blank=True,max_length=100),
         ),
+        migrations.AddField(
+            model_name="sale",name="idempotency_fingerprint",
+            field=models.CharField(blank=True,max_length=64),
+        ),
         migrations.AddConstraint(
             model_name="sale",
             constraint=models.UniqueConstraint(
