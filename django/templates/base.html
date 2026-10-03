@@ -4,7 +4,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b1020">
+  <meta name="theme-color" content="#f5f7fa">
+  <script src="{% static 'js/theme.js' %}"></script>
   <title>{% block title %}ApPlanner{% endblock %}</title>
   <meta name="description" content="{% block description %}Agenda, operação, pagamentos e relacionamento em uma plataforma preparada para o seu negócio.{% endblock %}">
   <link rel="icon" type="image/png" href="{% static 'images/applanner-logo.png' %}">
@@ -12,6 +13,7 @@
   <link rel="stylesheet" href="{% static 'css/refresh.css' %}">
   <link rel="stylesheet" href="{% static 'css/nightfall.css' %}">
   <link rel="stylesheet" href="{% static 'css/usability.css' %}">
+  <link rel="stylesheet" href="{% static 'css/theme.css' %}">
   <script src="{% static 'js/form-validation-pt.js' %}" defer></script>
 </head>
 <body>
@@ -53,6 +55,7 @@
       <a href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
       {% endif %}
     </div></details>
+    {% include "theme_toggle.html" %}
   </header>
   {% if request.support_actor %}
     <div class="panel" role="status" style="margin:12px auto;max-width:1100px;padding:14px">

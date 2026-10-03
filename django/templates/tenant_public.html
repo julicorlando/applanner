@@ -5,15 +5,6 @@
 {% block content %}
 <style>
 :root{--tenant-accent:{{ tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}}
-body:has(.tenant-hero){background:var(--tenant-bg);color:var(--tenant-text)}
-body:has(.tenant-hero) .section,body:has(.tenant-hero) .panel,body:has(.tenant-hero) .segment-grid>article,body:has(.tenant-hero) .public-choice-card{background:var(--tenant-bg);color:var(--tenant-text)}
-body:has(.tenant-hero) :is(h1,h2,h3,p,label,small,strong,.eyebrow){color:var(--tenant-text)}
-body:has(.tenant-hero) .button.primary{background:var(--tenant-accent)!important;border-color:var(--tenant-accent)!important;color:#fff!important}
-body:has(.tenant-hero) .tenant-hero{background:var(--tenant-bg);color:var(--tenant-text)}
-body:has(.tenant-hero) .tenant-hero p{color:var(--tenant-text)}
-body:has(.tenant-hero) .form-field :is(input:not([type=checkbox]),textarea){background:var(--tenant-bg);color:var(--tenant-text)}
-body:has(.tenant-hero) .button.ghost{background:var(--tenant-bg);color:var(--tenant-text)}
-
 .public-cover-links{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1rem}.public-cover-links a,.public-meta-chip{display:inline-flex;padding:.42rem .7rem;border:1px solid color-mix(in srgb,var(--tenant-accent,#2563eb) 28%,transparent);border-radius:999px;text-decoration:none}.public-unit-card{position:relative}.public-unit-card.is-selected{outline:2px solid var(--tenant-accent,#2563eb);outline-offset:2px}.public-nearest-badge{margin-left:.4rem;font-weight:700}.public-unit-hours p{display:flex;justify-content:space-between;gap:1rem;margin:.35rem 0}.public-unit-hours .is-today{font-weight:700}.public-rating{display:grid;gap:.35rem}.public-rating__track{height:.55rem;border-radius:999px;background:#e5e7eb;overflow:hidden}.public-rating__track i{display:block;height:100%;background:var(--tenant-accent,#2563eb);border-radius:inherit}.public-unit-socials a{margin-right:.7rem}
 </style>
 <section class="tenant-hero{% if tenant.cover %} tenant-hero--has-cover{% endif %}" style="--tenant-accent:{{ tenant.public_accent_color|default:tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}">
