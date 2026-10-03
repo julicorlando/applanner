@@ -82,7 +82,7 @@
     <article><span>01</span><h3>Barbearias & Salões</h3><p>Agenda, fila, comandas, metas, comissão, produtos e recorrência.</p></article>
     <article><span>02</span><h3>Arenas & Quadras</h3><p>Reservas, mensalistas, rachas, escolinha, torneios e preço dinâmico.</p></article>
     <article><span>03</span><h3>Estética & Auto</h3><p>Boxes, OS, inspeção, materiais, orçamento, fotos e CRM de retorno.</p></article>
-    <article><span>04</span><h3>Clínicas</h3><p>Agenda profissional, prontuário criptografado, lembretes e consentimentos.</p></article>
+    {% if healthcare_public %}<article><span>04</span><h3>Clínicas</h3><p>Agenda profissional, prontuário criptografado, lembretes e consentimentos.</p></article>{% endif %}
   </div>
 </section>
 
@@ -95,6 +95,18 @@
     <p><b>Segurança</b><span>2FA, RBAC, auditoria, LGPD e isolamento multi-tenant.</span></p>
   </div>
 </section>
+
+{% if faqs %}
+<section class="shell section" id="faq">
+  <div class="section-head"><span class="eyebrow">DÚVIDAS FREQUENTES</span><h2>Antes de começar.</h2><p>Informações rápidas sobre contratação e uso do ApPlanner.</p></div>
+  <div class="faq-list">
+    {% for item in faqs %}
+    <details class="panel faq-item"><summary>{{ item.question }}</summary><div class="faq-answer">{{ item.answer|linebreaks }}</div></details>
+    {% endfor %}
+  </div>
+  <p style="margin-top:18px"><a class="button ghost" href="{% url 'faq-public' %}">Ver todas as perguntas →</a></p>
+</section>
+{% endif %}
 
 <section class="shell closing">
   <span class="eyebrow">APPLANNER</span>
