@@ -6,17 +6,24 @@ from .models import BlogPost,LandingPage
 
 
 def public_directory(request):
-    rows=Tenant.objects.filter(public_enabled=True,status__in=[Tenant.Status.ACTIVE,Tenant.Status.TRIAL],deleted_at__isnull=True).order_by("name")[:200]
+    rows=Tenant.objects.filter(
+        public_enabled=True,
+        status__in=[Tenant.Status.ACTIVE,Tenant.Status.TRIAL],
+        deleted_at__isnull=True,
+    ).prefetch_related("units").order_by("name")[:200]
     data=[]
     for tenant in rows:
-        units=list(tenant.units.filter(active=True).values(
-            "name","city","state","latitude","longitude","phone","whatsapp","website"
-        ))
-        data.append({
-            "name":tenant.name,"slug":tenant.public_slug or tenant.slug,
-            "category":tenant.category,"description":tenant.description,
-            "units":units,
-        })
+        for unit in tenant.units.filter(active=True).order_by("-is_primary","name"):
+            data.append({
+                "name":tenant.name if unit.is_primary else f"{tenant.name} · {unit.name}",
+                "tenant_name":tenant.name,
+                "unit":{"id":unit.pk,"name":unit.name,"city":unit.city,"state":unit.state,
+                        "latitude":unit.latitude,"longitude":unit.longitude,"phone":unit.phone,
+                        "whatsapp":unit.whatsapp,"website":unit.website},
+                "slug":tenant.public_slug or tenant.slug,
+                "booking_url":f"/p/{tenant.public_slug or tenant.slug}/?unit={unit.pk}#agendar",
+                "category":tenant.category,"description":tenant.description,
+            })
     return JsonResponse({"results":data})
 
 
@@ -41,7 +48,8 @@ def _distance_km(lat1,lon1,lat2,lon2):
 
 def public_directory_page(request):
     rows=Tenant.objects.filter(
-        public_enabled=True,status__in=[Tenant.Status.ACTIVE,Tenant.Status.TRIAL],deleted_at__isnull=True
+        public_enabled=True,status__in=[Tenant.Status.ACTIVE,Tenant.Status.TRIAL],
+        deleted_at__isnull=True,
     ).prefetch_related("units").order_by("name")
     lat=request.GET.get("lat")
     lon=request.GET.get("lon")
@@ -54,21 +62,21 @@ def public_directory_page(request):
             latitude=longitude=None
     except (TypeError,ValueError):
         latitude=longitude=None
+
     cards=[]
     for tenant in rows[:300]:
-        units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
-        distances=[]
-        if latitude is not None:
-            distances=[
-                (_distance_km(latitude,longitude,unit.latitude,unit.longitude),unit)
-                for unit in units if unit.latitude is not None and unit.longitude is not None
-            ]
-            distances.sort(key=lambda item:item[0])
-        cards.append({
-            "tenant":tenant,"units":units,
-            "nearest_unit":distances[0][1] if distances else (units[0] if units else None),
-            "distance_km":distances[0][0] if distances else None,
-        })
+        for unit in tenant.units.filter(active=True).order_by("-is_primary","name"):
+            distance=None
+            if latitude is not None and unit.latitude is not None and unit.longitude is not None:
+                distance=_distance_km(latitude,longitude,unit.latitude,unit.longitude)
+            cards.append({
+                "tenant":tenant,"unit":unit,"nearest_unit":unit,
+                "distance_km":distance,
+                "display_name":tenant.name if unit.is_primary else f"{tenant.name} · {unit.name}",
+            })
     if latitude is not None:
-        cards.sort(key=lambda row:(row["distance_km"] is None,row["distance_km"] or 0,row["tenant"].name))
+        cards.sort(key=lambda row:(row["distance_km"] is None,row["distance_km"] or 0,row["display_name"]))
+    else:
+        cards.sort(key=lambda row:(row["tenant"].name,not row["unit"].is_primary,row["unit"].name))
     return render(request,"contenthub/directory.html",{"cards":cards,"located":latitude is not None})
+
