@@ -24,8 +24,8 @@ class Migration(migrations.Migration):
             ],
             options={
                 "indexes":[
-                    models.Index(fields=["tenant","product"],name="finance_pro_tenant__056c87_idx"),
-                    models.Index(fields=["appointment"],name="finance_pro_appointm_43ca6e_idx"),
+                    models.Index(fields=["tenant","product"],name="fin_prodres_tenant_prod_idx"),
+                    models.Index(fields=["appointment"],name="fin_prodres_appt_idx"),
                 ],
                 "constraints":[
                     models.UniqueConstraint(fields=("appointment","product"),name="uq_appointment_product_reservation"),
