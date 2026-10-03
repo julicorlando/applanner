@@ -24,6 +24,22 @@ from billing.entitlements import active_subscription,module_enabled,professional
 from healthcare.services import create_record, read_record
 
 
+RECEPTION_WRITE_RESOURCES={
+    ("agenda","agendamentos"),("agenda","clientes"),("agenda","expedientes"),("agenda","folgas"),
+    ("financeiro","produtos"),("financeiro","pdv"),
+    ("relacionamento","espera"),("relacionamento","inteligencia"),
+}
+
+def _reception_can_write(user,module_slug,resource_slug):
+    return getattr(user,"role","")!="reception" or (module_slug,resource_slug) in RECEPTION_WRITE_RESOURCES
+
+def _require_resource_capability(user,module_slug,resource_slug):
+    if getattr(user,"role","")=="reception" and module_slug=="financeiro" and resource_slug in {"produtos","pdv"}:
+        require_any_capability(user,"products.sell")
+    else:
+        require_any_capability(user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
+
+
 MODULE_CAPABILITIES = {
     "agenda":"agenda.manage",
     "financeiro":"finance.manage",
@@ -615,7 +631,10 @@ def _require_tenant(request):
 def _require_module_access(user,module,tenant=None,module_slug=None,resource_slug=None):
     capability=module.get("capability")
     if capability:
-        require_any_capability(user,capability)
+        if getattr(user,"role","")=="reception" and module_slug=="financeiro" and resource_slug in {"produtos","pdv"}:
+            require_any_capability(user,"products.sell")
+        else:
+            require_any_capability(user,capability)
     if tenant and not user.is_superuser and module_slug in {"barbearia","arena","auto","saude"}:
         require_segment(tenant,{"barbearia":"barbearia","arena":"arena","auto":"auto","saude":"saude"}[module_slug])
     if resource_slug and not _feature_allowed(user,tenant,module_slug,resource_slug):
@@ -1032,12 +1051,17 @@ def available_modules(user,tenant):
     modules=[]
     for slug,module in PORTAL_MODULES.items():
         capability=module.get("capability")
-        if capability and not has_capability(user,capability):
+        if user.role=="reception" and slug=="financeiro":
+            if not has_capability(user,"products.sell"):
+                continue
+        elif capability and not has_capability(user,capability):
             continue
         if not user.is_superuser and slug in {"barbearia","arena","auto","saude"} and not segment_enabled(tenant,{"barbearia":"barbearia","arena":"arena","auto":"auto","saude":"saude"}[slug]):
             continue
         resources=[]
         for resource_slug,resource in module["resources"].items():
+            if user.role=="reception" and slug=="financeiro" and resource_slug not in {"produtos","pdv"}:
+                continue
             if not _feature_allowed(user,tenant,slug,resource_slug):
                 continue
             resources.append({"slug":resource_slug,"title":resource["title"]})
@@ -1060,7 +1084,7 @@ def select_tenant(request, tenant_id):
 
 @login_required
 def resource_list(request,module_slug,resource_slug):
-    require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
+    _require_resource_capability(request.user,module_slug,resource_slug)
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
@@ -1154,7 +1178,7 @@ def resource_list(request,module_slug,resource_slug):
 
 @login_required
 def resource_create(request,module_slug,resource_slug):
-    require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
+    _require_resource_capability(request.user,module_slug,resource_slug)
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
@@ -1240,7 +1264,7 @@ def resource_create(request,module_slug,resource_slug):
 
 @login_required
 def resource_edit(request,module_slug,resource_slug,pk):
-    require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
+    _require_resource_capability(request.user,module_slug,resource_slug)
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
@@ -1286,7 +1310,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
 
 @login_required
 def resource_detail(request,module_slug,resource_slug,pk):
-    require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
+    _require_resource_capability(request.user,module_slug,resource_slug)
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
