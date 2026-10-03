@@ -260,8 +260,17 @@ def home(request):
     if getattr(request,"tenant",None):
         return tenant_public(request)
     from billing.models import Plan
-    from contenthub.models import BlogPost
-    plans=Plan.objects.filter(active=True,public_visible=True,is_custom=False).order_by("sort_order","name")[:4]
-    medical_plan=Plan.objects.filter(slug="segment-medico",active=False).first()
+    from contenthub.models import BlogPost,FAQItem,PlatformHomepage
+    platform=PlatformHomepage.objects.order_by("pk").first()
+    medical_visible=bool(platform and platform.medical_segment_visible)
+    plans_qs=Plan.objects.filter(active=True,public_visible=True,is_custom=False)
+    if not medical_visible:
+        plans_qs=plans_qs.exclude(slug="segment-medico")
+    plans=plans_qs.order_by("sort_order","name")[:4]
+    medical_plan=(Plan.objects.filter(slug="segment-medico").first() if medical_visible else None)
     posts=BlogPost.objects.filter(status=BlogPost.Status.PUBLISHED).order_by("-featured","-published_at","-created_at")[:3]
-    return render(request,"home.html",{"plans":plans,"medical_plan":medical_plan,"posts":posts})
+    faqs=FAQItem.objects.filter(active=True).order_by("sort_order","id")[:24]
+    return render(request,"home.html",{
+        "plans":plans,"medical_plan":medical_plan,"posts":posts,"faqs":faqs,
+        "medical_segment_visible":medical_visible,
+    })
