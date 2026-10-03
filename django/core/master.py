@@ -28,6 +28,7 @@ FIELD_LABELS={
     "featured":"Em destaque","sort_order":"Ordem de exibição","public_enabled":"Página pública ativa",
     "public_booking_enabled":"Agendamento público ativo","email":"E-mail","phone":"Telefone",
     "status":"Situação","request_type":"Tipo de solicitação","created_at":"Criado em","updated_at":"Atualizado em",
+    "source":"Origem","source_medium":"Meio","source_campaign":"Campanha","pix_key_display":"Chave Pix",
     "provider_environment":"Ambiente da assinatura no Mercado Pago",
     "professional_limit_override":"Liberação de profissionais para esta empresa",
 }
@@ -205,7 +206,9 @@ MASTER_RESOURCES={
     "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","audience","version","title","content","status","published_at"],"columns":["type","audience","version","title","status","published_at"],"order":"-published_at,-created_at"},
     "comerciais":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":[],"columns":["commercial_user","tenant","base_amount","commission_amount","status","paid_at"],"order":"-created_at","create":False,"edit":False},
-    "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
+    "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","source","source_medium","source_campaign","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
+    "campanhas-indicacao":{"model":"growth.ReferralCampaign","title":"Campanhas Indique e Ganhe","fields":["name","active","company_reward_type","company_reward_value","professional_reward_amount","payment_threshold","starts_at","ends_at"],"columns":["name","active","company_reward_type","company_reward_value","professional_reward_amount","payment_threshold","starts_at","ends_at"],"order":"-created_at"},
+    "indicacoes":{"model":"growth.PlatformReferral","title":"Indicações","fields":[],"columns":["referrer_user","referrer_tenant","referrer_professional","referred_tenant","payment_count","status","company_discount_amount","professional_reward_amount","pix_key_display","created_at"],"order":"-created_at","create":False,"edit":False},
     "propostas":{"model":"commercial.Proposal","title":"Propostas comerciais","fields":[],"columns":["title","customer_name","commercial_user","final_price","status","approval_status"],"order":"-created_at","create":False,"edit":False},
     "operacao":{"model":"operations.PlatformOperationSettings","title":"Configuração operacional","fields":["backup_retention_days","backup_include_uploads","backup_encrypt","backup_before_update","lead_retention_days","critical_alert_email","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"columns":["backup_retention_days","backup_include_uploads","critical_alerts_enabled","cron_stale_minutes","disk_min_free_mb"],"order":"id","special":"operation_settings"},
     "crons":{"model":"operations.CronHeartbeat","title":"Saúde dos jobs","fields":[],"columns":["cron_key","status","started_at","finished_at","duration_ms","host_name"],"order":"-started_at","create":False,"edit":False},
@@ -357,7 +360,7 @@ def home(request):
     sections=[
         ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
-        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","faq","landings","avaliacoes-publicas","aquisicao","meta-conversoes"}),
+        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","campanhas-indicacao","indicacoes","propostas","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","faq","landings","avaliacoes-publicas","aquisicao","meta-conversoes"}),
         ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing"}),
     ]
     assigned=set().union(*(slugs for _,slugs in sections))
