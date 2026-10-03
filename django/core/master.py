@@ -745,12 +745,12 @@ def _approve_account_deletion(row,actor):
                 if not gateway:
                     raise ValidationError(
                         "Não foi possível excluir a conta porque a assinatura recorrente ainda "
-                        "não pôde ser cancelada no Mercado Pago."
+                        "não pôde ser cancelada no provedor de cobrança."
                     )
                 remote=platform_provider(gateway).cancel_subscription(subscription.provider_subscription_id)
                 if remote.get("status") not in {"canceled","cancelled"}:
                     raise ValidationError(
-                        "O Mercado Pago não confirmou o cancelamento da assinatura. "
+                        "O provedor de cobrança não confirmou o cancelamento da assinatura. "
                         "A exclusão não foi executada."
                     )
             previous=subscription.status
@@ -923,7 +923,7 @@ def operational_action(request,action,pk=None):
                         f"Módulo ativado. Novo valor da assinatura: R$ {adjustment.new_amount:.2f} por ciclo.")
                 else:
                     messages.error(request,
-                        "O Mercado Pago não confirmou a alteração. O módulo permanece bloqueado "
+                        "O provedor de cobrança não confirmou a alteração. O módulo permanece bloqueado "
                         "e o valor da assinatura não mudou. Confira a conexão e tente novamente. "
                         +adjustment.error_code)
             else:
