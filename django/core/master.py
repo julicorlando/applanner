@@ -202,7 +202,7 @@ MASTER_RESOURCES={
     "incidentes":{"model":"operations.OperationalIncident","title":"Incidentes","fields":["category","severity","title","details","status"],"columns":["severity","title","status","occurrence_count","last_seen_at"],"order":"-last_seen_at","create":False},
     "backups":{"model":"operations.Backup","title":"Backups","fields":[],"columns":["type","scope","status","destination","size_bytes","completed_at"],"order":"-started_at","create":False,"edit":False},
     "homologacao":{"model":"operations.HomologationRun","title":"Homologações","fields":[],"columns":["status","score","executed_by","created_at"],"order":"-created_at","create":False,"edit":False},
-    "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","version","title","content","status","published_at"],"columns":["type","version","title","status","published_at"],"order":"-published_at,-created_at"},
+    "legais":{"model":"legal.LegalDocument","title":"Documentos legais","fields":["type","audience","version","title","content","status","published_at"],"columns":["type","audience","version","title","status","published_at"],"order":"-published_at,-created_at"},
     "comerciais":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":[],"columns":["commercial_user","tenant","base_amount","commission_amount","status","paid_at"],"order":"-created_at","create":False,"edit":False},
     "leads":{"model":"commercial.Lead","title":"Leads comerciais","fields":[],"columns":["name","business_type","status","assigned_to","next_contact_at","created_at"],"order":"-created_at","create":False,"edit":False},
@@ -236,6 +236,8 @@ MASTER_RESOURCES={
     "alertas-cron":{"model":"operations.CronAlertLog","title":"Alertas dos jobs","fields":[],"columns":["alert_key","channel","status","message","created_at"],"order":"-created_at","create":False,"edit":False},
     "solicitacoes-billing":{"model":"operations.BillingSupportRequest","title":"Solicitações financeiras e exclusões","fields":[],"columns":["tenant","request_type","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "configuracoes-plataforma":{"model":"operations.PlatformSetting","title":"Configurações da plataforma","fields":[],"columns":["tenant","key","is_secret","updated_at"],"order":"key","create":False,"edit":False},
+    "faq":{"model":"contenthub.FAQItem","title":"FAQ","fields":["question","answer","category","sort_order","active"],"columns":["question","category","sort_order","active"],"order":"sort_order,question"},
+    "recursos-publicos":{"model":"contenthub.PlatformFeatureFlag","title":"Recursos públicos","fields":["key","label","description","enabled"],"columns":["label","key","enabled","updated_at"],"order":"label"},
     "blog":{"model":"contenthub.BlogPost","title":"Blog","fields":["slug","title","excerpt","content","cover","status","featured","meta_title","meta_description","published_at"],"columns":["title","slug","status","published_at"],"order":"-published_at,-created_at","special":"blog"},
     "landings":{"model":"contenthub.LandingPage","title":"Landing pages","fields":["slug","locale","segment","headline","subheadline","body","cta_label","cta_url","seo_title","seo_description","active"],"columns":["headline","slug","locale","segment","active","updated_at"],"order":"headline"},
     "avaliacoes-publicas":{"model":"contenthub.PublicReview","title":"Avaliações públicas","fields":["tenant","customer_name","rating","comment","active"],"columns":["tenant","customer_name","rating","active","created_at"],"order":"-created_at"},
@@ -355,7 +357,7 @@ def home(request):
     sections=[
         ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
-        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","aquisicao","meta-conversoes"}),
+        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","faq","landings","avaliacoes-publicas","aquisicao","meta-conversoes"}),
         ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing"}),
     ]
     assigned=set().union(*(slugs for _,slugs in sections))
