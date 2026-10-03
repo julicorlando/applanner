@@ -116,6 +116,24 @@ def professional_area(request):
     professional=get_object_or_404(
         Professional,tenant_id=request.user.tenant_id,user=request.user,active=True
     )
+    if request.method=="POST" and request.POST.get("action")=="contact_return":
+        from engagement.contacting import send_return_invitation
+        from scheduling.models import Customer
+        customer=get_object_or_404(
+            Customer,pk=request.POST.get("customer"),tenant=professional.tenant,active=True,
+            appointments__professional=professional,appointments__status=Appointment.Status.COMPLETED,
+        )
+        try:
+            send_return_invitation(
+                tenant=professional.tenant,customer=customer,user=request.user,professional=professional
+            )
+        except ValueError as exc:
+            messages.error(request,str(exc))
+        except Exception:
+            messages.error(request,"Não foi possível enviar a mensagem agora.")
+        else:
+            messages.success(request,"Convite de retorno enviado com seu link de agendamento.")
+        return redirect("professional-area")
     now=timezone.now()
     local_now=timezone.localtime(now)
     month_start=local_now.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
@@ -144,6 +162,27 @@ def professional_area(request):
     ).select_related("customer","service").order_by("preferred_date","created_at") if waitlist_enabled else WaitlistEntry.objects.none())
     if professional.services_restricted or professional.services.exists():
         waiting=waiting.filter(service__in=professional.services.filter(active=True))
+
+    from engagement.contacting import contact_blocked
+    from engagement.models import BehaviorProfile
+    return_qs=(
+        BehaviorProfile.objects.filter(
+            tenant=professional.tenant,visits_count__gte=2,
+            customer__appointments__professional=professional,
+            customer__appointments__status=Appointment.Status.COMPLETED,
+        )
+        .select_related("customer").distinct()
+        .order_by("next_expected_date","customer__name")
+    )
+    return_rows=list(return_qs[:40])
+    for row in return_rows:
+        row.contact_blocked=contact_blocked(professional.tenant,row.customer)
+
+    from engagement.referrals import active_referral_campaign
+    referral_campaign=active_referral_campaign()
+    if referral_campaign and not referral_campaign.professional_referrals_enabled:
+        referral_campaign=None
+
     return render(request,"portal/professional_area.html",{
         "professional":professional,"upcoming":upcoming[:15],"current":current,"upcoming_count":upcoming.count(),
         "completed_month":appointments.filter(starts_at__gte=month_start,starts_at__lt=now,
@@ -151,6 +190,7 @@ def professional_area(request):
         "pending_commission":pending,"paid_commission":paid,
         "projected_commission":projected,"has_projection":professional.commission_percent is not None,
         "waitlist_enabled":waitlist_enabled,"waiting":waiting[:20],"waiting_count":waiting.count(),
+        "return_rows":return_rows,"referral_campaign":referral_campaign,
     })
 
 
