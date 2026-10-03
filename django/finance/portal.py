@@ -71,7 +71,7 @@ class CashOpenForm(forms.Form):
 
 @login_required
 def pos(request):
-    require_any_capability(request.user,"finance.manage")
+    require_any_capability(request.user,"finance.manage","products.sell")
     tenant=_tenant(request)
     form=SaleForm(request.POST or None,tenant=tenant)
     if request.method=="POST" and form.is_valid():
