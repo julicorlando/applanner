@@ -162,9 +162,14 @@ def _reconcile_platform(event,gateway,data,resource_id):
                 payment.status=Payment.Status.PAID
                 payment.paid_at=payment.paid_at or paid_at
                 payment.provider_status="processed"
+                from .breakdown import subscription_charge_breakdown
+                payment.metadata={
+                    **(payment.metadata or {}),
+                    "breakdown":subscription_charge_breakdown(charge.subscription),
+                }
                 paid_row=next(row for row in details if row.get("status") in {"approved","processed"} and (row.get("payment_method") or {}).get("id")=="pix")
                 payment.provider_payment_id=str(paid_row.get("id") or payment.provider_payment_id)
-                payment.save(update_fields=["status","paid_at","provider_status","provider_payment_id","updated_at"])
+                payment.save(update_fields=["status","paid_at","provider_status","provider_payment_id","metadata","updated_at"])
                 charge.status="paid"
                 charge.paid_at=charge.paid_at or paid_at
                 charge.save(update_fields=["status","paid_at","updated_at"])
@@ -186,6 +191,36 @@ def _reconcile_platform(event,gateway,data,resource_id):
             payment=Payment.objects.filter(
                 provider="mercadopago",provider_reference=external
             ).order_by("-id").first()
+        if payment is None and external.startswith("subscription:"):
+            try:
+                subscription_id=int(external.split(":",1)[1])
+            except (TypeError,ValueError):
+                subscription_id=None
+            subscription=(
+                Subscription.objects.select_related("tenant","plan").filter(pk=subscription_id).first()
+                if subscription_id else None
+            )
+            if subscription:
+                from .breakdown import subscription_charge_breakdown
+                remote_status=_payment_status(remote.get("status"))
+                payment=Payment.objects.create(
+                    tenant=subscription.tenant,
+                    subscription=subscription,
+                    purpose="subscription",
+                    reference_id=subscription.pk,
+                    provider="mercadopago",
+                    environment=gateway.environment,
+                    provider_reference=external,
+                    provider_payment_id=resource_id,
+                    provider_status=str(remote.get("status") or ""),
+                    amount=Decimal(str(remote.get("transaction_amount") or subscription.contracted_price or 0)),
+                    status=remote_status,
+                    paid_at=timezone.now() if remote_status==Payment.Status.PAID else None,
+                    metadata={
+                        "method":"card_recurring",
+                        "breakdown":subscription_charge_breakdown(subscription),
+                    },
+                )
         if payment:
             if payment.metadata.get("method")=="pix" and external!=payment.provider_reference:
                 raise ValueError("Pagamento Pix não corresponde à cobrança registrada.")
@@ -202,6 +237,12 @@ def _reconcile_platform(event,gateway,data,resource_id):
             if payment.status==Payment.Status.PAID and payment.metadata.get("method")!="pix":
                 payment.paid_at=payment.paid_at or timezone.now()
                 if payment.subscription_id:
+                    from .breakdown import subscription_charge_breakdown
+                    if not (payment.metadata or {}).get("breakdown"):
+                        payment.metadata={
+                            **(payment.metadata or {}),
+                            "breakdown":subscription_charge_breakdown(payment.subscription),
+                        }
                     Subscription.objects.filter(pk=payment.subscription_id).update(
                         status=Subscription.Status.ACTIVE,
                         updated_at=timezone.now(),
