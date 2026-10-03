@@ -2,7 +2,7 @@
 {% block title %}{{ lead.name }} — Comercial{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
-  <div class="portal-heading"><div><a class="back-link" href="{% url 'commercial-dashboard' %}">← Comercial</a><span class="eyebrow">LEAD</span><h1>{{ lead.name }}</h1><p>{{ lead.business_type }} · {{ lead.email }} · {{ lead.phone }}</p></div></div>
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'commercial-dashboard' %}">← Comercial</a><span class="eyebrow">LEAD</span><h1>{{ lead.name }}</h1><p>{{ lead.business_type }} · {{ lead.email }} · {{ lead.phone }}</p><p><strong>Origem:</strong> {{ lead.source|default:"não identificada" }}{% if lead.source_medium %} · {{ lead.source_medium }}{% endif %}{% if lead.source_campaign %} · campanha {{ lead.source_campaign }}{% endif %}{% if lead.source_detail %} · {{ lead.source_detail }}{% endif %}</p></div></div>
   <div class="panel">
     {% if not lead.assigned_to_id %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="claim"><button class="button primary">Assumir lead</button></form>{% endif %}
     <form method="post" class="portal-form" style="margin-top:20px">{% csrf_token %}<input type="hidden" name="action" value="status">
