@@ -33,8 +33,12 @@ def settle_appointment(
     paid_online=TenantPaymentTransaction.objects.filter(tenant=appointment.tenant,
         reference_type="appointment",reference_id=appointment.pk,
         status=TenantPaymentTransaction.Status.PAID).exists()
-    finance_method=("pix+"+payment_method if attended and paid_online and
-        appointment.booking_payment==Appointment.BookingPayment.PARTIAL else payment_method)
+    if attended and paid_online and appointment.booking_payment==Appointment.BookingPayment.FULL:
+        finance_method="pix"
+    elif attended and paid_online and appointment.booking_payment==Appointment.BookingPayment.PARTIAL:
+        finance_method="pix+"+payment_method
+    else:
+        finance_method=payment_method
     raw_reserved=reserved_product_ids or []
     try:
         reserved_ids=list(dict.fromkeys(int(value) for value in raw_reserved))
