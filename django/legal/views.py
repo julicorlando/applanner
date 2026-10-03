@@ -1,8 +1,9 @@
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
 from django.shortcuts import redirect,render
 
 from .middleware import current_documents
-from .models import LegalAcceptance
+from .models import LegalAcceptance,LegalDocument
 
 
 def _client_ip(request):
@@ -33,3 +34,15 @@ def accept(request):
             )
         return redirect(request.GET.get("next") or "/")
     return render(request,"legal/accept.html",{"documents":pending})
+
+
+def public_document(request,doc_type,audience):
+    if doc_type not in LegalDocument.Type.values or audience not in LegalDocument.Audience.values:
+        raise Http404
+    row=LegalDocument.objects.filter(
+        type=doc_type,audience__in=[audience,LegalDocument.Audience.ALL],
+        status=LegalDocument.Status.PUBLISHED,
+    ).order_by("-published_at","-id").first()
+    if not row:
+        raise Http404
+    return render(request,"legal/public.html",{"document":row,"audience":audience})
