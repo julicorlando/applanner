@@ -65,3 +65,9 @@ def refresh_behavior_intelligence():
     for tenant in Tenant.objects.filter(status__in=["trial","active"]):
         total+=refresh_behavior_for_tenant(tenant)
     return total
+
+
+@shared_task
+def qualify_referral_rewards_task(tenant_id):
+    from .referrals import qualify_referral_rewards_for_tenant
+    return qualify_referral_rewards_for_tenant(tenant_id)
