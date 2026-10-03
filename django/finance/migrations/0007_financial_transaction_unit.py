@@ -9,9 +9,10 @@ def backfill_financial_units(apps,schema_editor):
         primary=Unit.objects.filter(tenant_id=tenant_id,active=True).order_by("-is_primary","id").first()
         if not primary:
             continue
-        FinancialTransaction.objects.filter(
+        for transaction in FinancialTransaction.objects.filter(
             tenant_id=tenant_id,unit__isnull=True,appointment__unit__isnull=False
-        ).update(unit_id=models.F("appointment__unit"))
+        ).select_related("appointment").iterator():
+            FinancialTransaction.objects.filter(pk=transaction.pk).update(unit_id=transaction.appointment.unit_id)
         FinancialTransaction.objects.filter(tenant_id=tenant_id,unit__isnull=True).update(unit_id=primary.pk)
 
 
