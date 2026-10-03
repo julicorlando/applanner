@@ -2,8 +2,19 @@ import math
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404,render
 from tenants.models import Tenant,Unit
-from .models import BlogPost,LandingPage
+from .models import BlogPost,FAQItem,LandingPage,PlatformFeatureFlag
 
+
+
+
+def feature_enabled(key,default=False):
+    row=PlatformFeatureFlag.objects.filter(key=key).only("enabled").first()
+    return row.enabled if row else default
+
+
+def faq_page(request):
+    rows=FAQItem.objects.filter(active=True).order_by("sort_order","question")
+    return render(request,"contenthub/faq.html",{"faqs":rows})
 
 def public_directory(request):
     rows=Tenant.objects.filter(public_enabled=True,status__in=[Tenant.Status.ACTIVE,Tenant.Status.TRIAL],deleted_at__isnull=True).order_by("name")[:200]
