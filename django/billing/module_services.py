@@ -116,8 +116,10 @@ def activate_module_request(*,module_request,user):
     base=subscription.base_contracted_price
     if base is None:
         base=previous-monthly_before*months
-    new_monthly=(monthly_before+row.quoted_monthly_price).quantize(Decimal("0.01"))
-    new_total=(previous+row.quoted_monthly_price*months).quantize(Decimal("0.01"))
+    quantity=max(0,row.tenant.units.filter(active=True).count()-1) if row.module.slug=="multiunit" else 1
+    module_monthly=(row.quoted_monthly_price*quantity).quantize(Decimal("0.01"))
+    new_monthly=(monthly_before+module_monthly).quantize(Decimal("0.01"))
+    new_total=(previous+module_monthly*months).quantize(Decimal("0.01"))
     key=hashlib.sha256(
         f"add|{row.tenant_id}|{subscription.pk}|{row.pk}|{new_total}".encode()
     ).hexdigest()
@@ -149,7 +151,8 @@ def activate_module_request(*,module_request,user):
             addon,_=TenantModuleAddon.objects.update_or_create(
                 tenant=row.tenant,module=row.module,
                 defaults={
-                    "module_request":row,"monthly_price":row.quoted_monthly_price,
+                    "module_request":row,"monthly_price":module_monthly,
+                    "unit_price":row.quoted_monthly_price,"quantity":quantity,
                     "status":TenantModuleAddon.Status.ACTIVE,
                     "billing_mode":TenantModuleAddon.BillingMode.MERGED,
                     "provider":"mercadopago" if gateway else "",
@@ -194,6 +197,59 @@ def activate_module_request(*,module_request,user):
         row.status=ModuleRequest.Status.PAYMENT_FAILED
         row.save(update_fields=["status","updated_at"])
         return adjustment
+
+
+@transaction.atomic
+def sync_multiunit_addon(*,tenant,user=None):
+    """Atualiza imediatamente a mensalidade do módulo Multiunidade conforme unidades adicionais ativas."""
+    addon=(
+        TenantModuleAddon.objects.select_for_update().select_related("module","tenant")
+        .filter(tenant=tenant,module__slug="multiunit",status=TenantModuleAddon.Status.ACTIVE)
+        .first()
+    )
+    if not addon:
+        return None
+    subscription=_subscription(tenant)
+    if not subscription:
+        raise ValidationError("Assinatura válida não encontrada para recalcular o Multiunidade.")
+
+    quantity=max(0,tenant.units.filter(active=True).count()-1)
+    unit_price=Decimal(addon.unit_price if addon.unit_price is not None else addon.module.addon_monthly_price or 0)
+    new_monthly=(unit_price*quantity).quantize(Decimal("0.01"))
+    old_monthly=Decimal(addon.monthly_price or 0).quantize(Decimal("0.01"))
+    addon.unit_price=unit_price
+    addon.quantity=quantity
+    if new_monthly==old_monthly:
+        addon.save(update_fields=["unit_price","quantity","updated_at"])
+        return addon
+
+    months=_cycle_months(subscription.billing_cycle)
+    previous=Decimal(subscription.contracted_price or 0).quantize(Decimal("0.01"))
+    new_total=(previous+(new_monthly-old_monthly)*months).quantize(Decimal("0.01"))
+    gateway=_gateway_for(subscription)
+    if gateway:
+        platform_provider(gateway).update_subscription_amount(
+            subscription.provider_subscription_id,new_total
+        )
+
+    addon.monthly_price=new_monthly
+    addon.provider="mercadopago" if gateway else addon.provider
+    addon.provider_reference=subscription.provider_subscription_id if gateway else addon.provider_reference
+    addon.save(update_fields=[
+        "unit_price","quantity","monthly_price","provider","provider_reference","updated_at",
+    ])
+
+    monthly_after=_merged_monthly(tenant)
+    base=subscription.base_contracted_price
+    if base is None:
+        base=(previous-old_monthly*months).quantize(Decimal("0.01"))
+    subscription.base_contracted_price=base
+    subscription.addon_contracted_price=(monthly_after*months).quantize(Decimal("0.01"))
+    subscription.contracted_price=new_total
+    subscription.save(update_fields=[
+        "base_contracted_price","addon_contracted_price","contracted_price","updated_at",
+    ])
+    return addon
 
 
 @transaction.atomic
