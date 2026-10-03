@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Atendimento · {{ appointment.customer_display_name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div>{% if reception_mode %}<a class="back-link" href="{% url 'portal-resource-list' 'agenda' 'agendamentos' %}">← Agenda da recepção</a>{% else %}<a class="back-link" href="{% url 'professional-area' %}">← Minha agenda</a>{% endif %}<span class="eyebrow">ATENDIMENTO</span><h1>{{ appointment.customer_display_name }}</h1>{% include "portal/customer_name_difference.html" with appointment=appointment only %}<p>{{ appointment.service.name }} · {{ appointment.starts_at|date:"d/m/Y H:i" }} · {{ appointment.get_status_display }}</p></div></div>
+  <article class="panel"><p>Valor do serviço: R$ {{ appointment.service_price_snapshot|default:appointment.service.price|floatformat:2 }}</p>
+  {% if paid_booking_payment %}<p class="flash success">{% if prepaid_full %}Total pago online{% else %}Sinal pago online{% endif %}: R$ {{ paid_booking_payment.gross_amount|floatformat:2 }} por Pix. {% if not prepaid_full %}Registre a forma de pagamento do saldo no fechamento.{% endif %}</p>{% elif appointment.booking_payment != 'on_site' %}<p>Pix solicitado no agendamento: aguardando pagamento ou a confirmação do provedor.</p>{% endif %}
+  {% if appointment.status == 'confirmed' or appointment.status == 'pending' or appointment.status == 'waiting' or appointment.status == 'in_progress' %}
+    <form method="post" class="form-actions">{% csrf_token %}<input type="hidden" name="action" value="message"><button class="button" name="kind" value="confirmation">Enviar confirmação pronta</button><button class="button" name="kind" value="reminder">Enviar lembrete pronto</button></form>
+  {% endif %}
+  {% if reserved_product_reservations %}
+    <aside class="reserved-product-interest" aria-label="Produtos de interesse do cliente">
+      <span class="eyebrow">INTERESSE DO CLIENTE</span>
+      <h2>Produtos reservados no agendamento</h2>
+      <p>O cliente demonstrou interesse nos itens abaixo. A reserva não significa que houve venda.</p>
+      <div class="reserved-product-interest__grid">
+        {% for reservation in reserved_product_reservations %}
+        <div class="reserved-product-interest__item">
+          <div><strong>{{ reservation.product.name }}</strong><small>1 un · valor reservado</small></div>
+          <b>R$ {{ reservation.unit_price_snapshot|floatformat:2 }}</b>
+        </div>
+        {% endfor %}
+      </div>
+    </aside>
+  {% endif %}
+  {% if can_settle %}<form method="post" class="portal-form">{% csrf_token %}{{ form.non_field_errors }}
+    {% for field in form %}
+      {% if field.name == "reserved_products" %}
+        {% if reserved_product_reservations %}
+        <div class="form-field reserved-products-sale-field">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+          {{ field.errors }}
+        </div>
+        {% endif %}
+      {% else %}
+        <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>
+      {% endif %}
+    {% endfor %}
+    <p>Ao registrar presença, o serviço entra no financeiro. Produtos só serão registrados como venda se você os marcar acima ou informar outro produto vendido; nesse caso, estoque, financeiro e comissão do produto são lançados automaticamente.</p>
+    <button class="button primary" type="submit">Encerrar atendimento</button>
+  </form>{% else %}<p>O atendimento pode ser encerrado após o início do horário, enquanto estiver aberto.</p>{% endif %}</article>
+</section>
+{% endblock %}

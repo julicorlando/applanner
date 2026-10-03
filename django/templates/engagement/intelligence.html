@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Inteligência de retorno — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">RELACIONAMENTO</span><h1>Inteligência de retorno</h1><p>O ApPlanner recalcula automaticamente os padrões de retorno dos clientes. Um mesmo cliente recebe no máximo uma mensagem em 24 horas, independentemente de quem iniciou o contato.</p></div>
+    {% if not reception_mode %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="recalculate"><button class="button">Recalcular agora</button></form>{% endif %}
+  </div>
+  <div class="metric-grid">
+    <article><span>Perfis analisados</span><strong>{{ total }}</strong></article>
+    <article><span>Retorno vencido</span><strong>{{ overdue }}</strong></article>
+    <article><span>Próximos 14 dias</span><strong>{{ upcoming }}</strong></article>
+    <article><span>Alta confiança</span><strong>{{ high_confidence }}</strong></article>
+  </div>
+  <div class="table-card">
+    <table class="portal-table">
+      <thead><tr><th>Cliente</th><th>Última visita</th><th>Próximo retorno</th><th>Intervalo médio</th><th>Visitas</th><th>Confiança</th><th>Contato</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>{{ row.customer }}</td>
+          <td>{{ row.last_visit_at|date:"d/m/Y"|default:"Aguardando primeira visita" }}</td>
+          <td>{{ row.next_expected_date|date:"d/m/Y"|default:"—" }}</td>
+          <td>{{ row.avg_interval_days|default:"—" }} dias</td>
+          <td>{{ row.visits_count }}</td>
+          <td>{{ row.confidence_score }}%</td>
+          <td>
+            {% if row.contact_blocked %}
+              <span class="status-pill">Contato feito nas últimas 24h</span>
+            {% else %}
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="contact"><input type="hidden" name="customer" value="{{ row.customer_id }}"><button class="nav-link" type="submit">Perguntar se quer agendar →</button></form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}<tr><td colspan="7" class="empty-table">Faça o primeiro agendamento para iniciar o acompanhamento.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

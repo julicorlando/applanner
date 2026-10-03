@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ tenant.public_seo_title|default:tenant.name }}{% endblock %}
+{% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
+{% block content %}
+<style>
+:root{--tenant-accent:{{ tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}}
+.public-cover-links{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1rem}.public-cover-links a,.public-meta-chip{display:inline-flex;padding:.42rem .7rem;border:1px solid color-mix(in srgb,var(--tenant-accent,#2563eb) 28%,transparent);border-radius:999px;text-decoration:none}.public-unit-card{position:relative}.public-unit-card.is-selected{outline:2px solid var(--tenant-accent,#2563eb);outline-offset:2px}.public-nearest-badge{margin-left:.4rem;font-weight:700}.public-unit-hours p{display:flex;justify-content:space-between;gap:1rem;margin:.35rem 0}.public-unit-hours .is-today{font-weight:700}.public-rating{display:grid;gap:.35rem}.public-rating__track{height:.55rem;border-radius:999px;background:#e5e7eb;overflow:hidden}.public-rating__track i{display:block;height:100%;background:var(--tenant-accent,#2563eb);border-radius:inherit}.public-unit-socials a{margin-right:.7rem}
+</style>
+<section class="tenant-hero{% if tenant.cover %} tenant-hero--has-cover{% endif %}" style="--tenant-accent:{{ tenant.public_accent_color|default:tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}">
+  <div class="shell tenant-hero__content">
+    {% if tenant.public_announcement %}<div class="tenant-announcement">{{ tenant.public_announcement }}</div>{% endif %}
+    {% if tenant.logo %}<img class="tenant-profile-logo" src="{% url 'public-tenant-image' tenant.pk 'logo' %}?unit={{ selected_unit.pk }}" alt="Foto de perfil de {{ tenant.name }}">{% endif %}
+    {% if tenant.cover %}<img class="tenant-cover" src="{% url 'public-tenant-image' tenant.pk 'cover' %}?unit={{ selected_unit.pk }}" alt="Capa de {{ tenant.name }}">{% endif %}
+    {% if selected_professional and selected_professional.photo %}<img class="professional-avatar" src="{% url 'public-professional-image' selected_professional.pk %}" alt="Foto de {{ selected_professional.name }}">{% endif %}
+    <span class="eyebrow">{{ tenant.category|default:"AGENDE ONLINE" }}</span>
+    {% if selected_professional %}
+      <h1>{{ selected_professional.name }}</h1>
+      <p>{{ selected_professional.specialty|default:tenant.name }} · {{ tenant.name }}</p>
+    {% else %}
+      <h1>{{ tenant.public_headline|default:tenant.name }}</h1>
+      <p>{{ tenant.public_subheadline|default:tenant.description }}</p>
+    {% endif %}
+    <div class="actions"><a class="button primary" href="#agendar">{{ tenant.public_cta_label|default:"Agendar agora" }}</a><a class="button ghost" href="{% if segment == 'arena' %}#quadras{% else %}#servicos{% endif %}">{% if segment == 'arena' %}Ver quadras{% else %}Ver serviços{% endif %}</a></div>
+    {% if selected_unit %}<p><strong>Unidade selecionada: {{ selected_unit.name }}</strong> · <a href="#unidades">Escolher outra unidade</a></p>{% endif %}
+    <nav class="public-cover-links" aria-label="Conteúdo do estabelecimento">
+      {% if segment != 'arena' and services %}<a href="#servicos">Serviços</a>{% endif %}
+      {% if segment != 'arena' and professionals and not selected_professional %}<a href="#profissionais">Profissionais</a>{% endif %}
+      {% if loyalty %}<a href="#fidelidade">Fidelidade</a>{% endif %}
+      {% if products %}<a href="#produtos">Produtos</a>{% endif %}
+      {% if packages %}<a href="#pacotes">Pacotes</a>{% endif %}
+      {% if memberships %}<a href="#assinaturas">Assinaturas</a>{% endif %}
+      {% if reviews %}<a href="#avaliacoes">Avaliações</a>{% endif %}
+      {% if units %}<a href="#unidades">Unidades</a>{% endif %}
+    </nav>
+  </div>
+</section>
+
+{% if tenant.public_booking_enabled %}
+{% if segment == 'arena' %}
+<section class="shell section" id="agendar">
+  <div class="section-head"><span class="eyebrow">RESERVA NA ARENA</span><h2>Escolha quadra, data e horário.</h2></div>
+  {% if arena_access_enabled %}
+  {% if courts %}
+  <div class="panel"><form id="arena-booking" class="portal-form" data-public-slug="{{ public_slug }}">{% csrf_token %}
+    <div class="portal-module-grid">
+      <div class="form-field"><label for="arena-court">Quadra</label><select id="arena-court" required><option value="">Selecione uma quadra</option>{% for court in courts %}<option value="{{ court.pk }}" data-min="{{ court.minimum_minutes }}" data-max="{{ court.maximum_minutes }}">{{ court.name }}</option>{% endfor %}</select></div>
+      <div class="form-field"><label for="arena-date">Data</label><input id="arena-date" type="date" required></div>
+      <div class="form-field"><label for="arena-duration">Duração</label><select id="arena-duration" required></select></div>
+    </div>
+    <div class="form-field booking-times"><label id="arena-slot-label">Horários disponíveis</label><input type="hidden" id="arena-slot"><div id="arena-slots" class="booking-slots" role="group" aria-labelledby="arena-slot-label"></div><small id="arena-slot-status" role="status" aria-live="polite">Escolha quadra e data para ver os horários.</small></div>
+    <div class="portal-module-grid">
+      <div class="form-field"><label for="arena-name">Seu nome</label><input id="arena-name" required minlength="2"></div>
+      <div class="form-field"><label for="arena-phone">Telefone com DDD</label><input id="arena-phone" type="tel" autocomplete="tel" required></div>
+      <div class="form-field"><label for="arena-email">E-mail (opcional)</label><input id="arena-email" type="email" autocomplete="email"></div>
+    </div>
+    <p>Nome e telefone com DDD são obrigatórios. Seu histórico será vinculado ao contato; dados já cadastrados só podem ser corrigidos pelo estabelecimento.</p>
+    <div class="form-field"><label for="arena-notes">Observações</label><input id="arena-notes"></div>
+    {% if arena_deposit_available %}<fieldset class="form-field"><legend>Pagamento</legend><label><input type="radio" name="arena-payment" value="onsite" checked> Pagar na unidade</label> <label><input type="radio" name="arena-payment" value="pix"> Sinal por Pix (exige e-mail)</label></fieldset>{% endif %}
+    <div id="arena-feedback" role="status" aria-live="polite"></div><div class="form-actions"><button class="button primary" type="submit">Confirmar reserva</button></div>
+  </form></div>
+  {% else %}<div class="panel"><p>As quadras ainda não foram cadastradas. Volte em breve para consultar horários.</p></div>{% endif %}
+  {% else %}<div class="panel"><p>As reservas online desta arena ainda não estão disponíveis. Entre em contato com o estabelecimento para consultar horários.</p></div>{% endif %}
+</section>
+{% else %}
+<section class="shell section" id="agendar">
+  <div class="section-head"><span class="eyebrow">{{ booking_wording.0 }}</span><h2>{{ booking_wording.1 }}</h2></div>
+  <div class="panel">
+    <form id="public-booking" class="portal-form">{% csrf_token %}
+      <div class="portal-module-grid">
+        <div class="form-field"><label for="booking-unit">Unidade</label><select id="booking-unit" required>{% for unit in units %}<option value="{{ unit.pk }}" {% if selected_unit.pk == unit.pk %}selected{% endif %}>{{ unit.name }}{% if unit.city %} · {{ unit.city }}{% endif %}{% if unit.state %}/{{ unit.state }}{% endif %}</option>{% endfor %}</select><small>Você pode trocar a unidade antes de confirmar o agendamento.</small></div>
+        <div class="form-field"><label for="booking-service">{{ booking_wording.2 }}</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
+        <div class="form-field"><label for="booking-professional">Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" data-unit-id="{{ professional.unit_id|default:'' }}" data-all-services="{{ professional.public_all_services|yesno:'true,false' }}" data-service-ids="{{ professional.public_service_ids }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
+        <div class="form-field"><label for="booking-date">Data</label><input id="booking-date" type="date" required></div>
+      </div>
+      {% if online_payment_choices %}<fieldset class="form-field"><legend>Como deseja pagar?</legend><div class="booking-slots">
+        {% if payment_settings.allow_pay_on_site %}<label class="button ghost"><input type="radio" name="payment_choice" value="on_site" checked> Pagar na unidade</label>{% endif %}
+        {% if online_payment_available and payment_settings.allow_partial_payment %}<label class="button ghost"><input type="radio" name="payment_choice" value="partial" {% if not payment_settings.allow_pay_on_site %}checked{% endif %}> Sinal de {{ payment_settings.deposit_percent }}% por Pix</label>{% endif %}
+        {% if online_payment_available and payment_settings.allow_full_payment %}<label class="button ghost"><input type="radio" name="payment_choice" value="full" {% if not payment_settings.allow_pay_on_site and not payment_settings.allow_partial_payment %}checked{% endif %}> Pagar o total por Pix</label>{% endif %}
+      </div><small>O agendamento é confirmado agora. O Pix só consta como pago após a confirmação do banco.</small></fieldset>{% elif not booking_payment_available %}<p class="flash error">O estabelecimento ainda precisa configurar uma forma de pagamento para receber agendamentos online.</p>{% endif %}
+      <div class="form-field booking-times"><label id="booking-slot-label">Horários disponíveis</label><p class="booking-times-hint">Toque em um horário para selecioná-lo. Os horários disponíveis aparecem após escolher serviço e data.</p><input type="hidden" id="booking-slot"><div id="booking-slots" class="booking-slots" role="group" aria-labelledby="booking-slot-label"></div><small id="booking-slot-status" role="status" aria-live="polite">Escolha o serviço e a data para ver os horários.</small></div>
+      <div class="portal-module-grid" style="margin-top:14px">
+        <div class="form-field"><label for="booking-name">Seu nome</label><input id="booking-name" autocomplete="name" required minlength="2"></div>
+        <div class="form-field"><label for="booking-phone">Telefone com DDD</label><input id="booking-phone" type="tel" autocomplete="tel" required aria-describedby="customer-identity-hint"></div>
+        <div class="form-field"><label for="booking-email">E-mail (opcional)</label><input id="booking-email" type="email" autocomplete="email"></div>
+        <div class="form-field"><label for="booking-notes">Observações</label><input id="booking-notes"></div>
+      </div>
+      <p id="customer-identity-hint">Nome e telefone são obrigatórios. Use seu próprio número. Se o contato já estiver cadastrado, seu histórico será preservado; para corrigir dados existentes, fale com o estabelecimento.</p>
+      {% if products %}
+      <div id="booking-product-selection" class="booking-product-selection" hidden>
+        <strong>Produtos reservados para este agendamento</strong>
+        <div id="booking-product-selection-list" class="booking-product-selection__list"></div>
+        <small>A reserva é de 1 unidade por produto e não altera o valor do serviço nem o Pix do agendamento. O pagamento do produto é feito diretamente ao estabelecimento.</small>
+      </div>
+      {% endif %}
+      {% if segment == 'auto' %}<div class="portal-module-grid"><div class="form-field"><label for="booking-plate">Placa do veículo</label><input id="booking-plate" autocomplete="off" maxlength="8" placeholder="ABC1D23" required></div><div class="form-field"><label for="booking-vehicle-model">Modelo do veículo</label><input id="booking-vehicle-model" maxlength="100" placeholder="Ex.: Onix" required></div></div>{% endif %}
+      <div id="booking-feedback" role="status" aria-live="polite" style="margin-top:12px"></div>
+      {% if waitlist_enabled %}<div id="booking-waitlist" class="panel" hidden><h3>Sem horários? Entre na lista de espera</h3><p>Usaremos o nome e o contato informados acima para avisar se surgir uma vaga nesta data.</p><button type="button" class="button" id="booking-waitlist-submit">Entrar na lista de espera</button></div>{% endif %}
+      <div class="form-actions"><button class="button primary" type="submit" {% if not booking_payment_available %}disabled{% endif %}>Confirmar agendamento</button></div>
+    </form>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+
+{% if segment != 'arena' %}
+<section class="shell section" id="servicos">
+  <div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha o atendimento.</h2><p>Clique em um serviço para adicioná-lo ao seu agendamento.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for service in services %}
+    <button type="button" class="public-choice-card public-service-card{% if not tenant.public_booking_enabled %} public-choice-card--disabled{% endif %}" {% if tenant.public_booking_enabled %}data-select-service="{{ service.pk }}"{% else %}disabled{% endif %} aria-label="{% if tenant.public_booking_enabled %}Adicionar {{ service.name }} ao agendamento{% else %}{{ service.name }}{% endif %}">
+      <span>{{ service.duration_minutes }} min</span>
+      <h3>{{ service.name }}</h3>
+      <p>{{ service.description }}</p>
+      <strong>R$ {{ service.price }}</strong>
+      <span class="public-choice-card__action">{% if tenant.public_booking_enabled %}Selecionar e agendar →{% else %}Agendamento online indisponível{% endif %}</span>
+    </button>
+    {% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if segment != 'arena' and professionals and not selected_professional %}
+<section class="shell section" id="profissionais">
+  <div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais de {{ selected_unit.name|default:tenant.name }}.</h2><p>Clique no profissional para abrir a agenda exclusiva dele.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for professional in professionals %}
+      {% if professional.public_slug %}
+      <a class="public-choice-card public-professional-card" href="{% url 'professional-public' public_slug professional.public_slug %}" aria-label="Abrir agenda de {{ professional.name }}">
+        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% endif %}
+        <span>{{ professional.specialty|default:"Profissional" }}</span>
+        <h3>{{ professional.name }}</h3>
+        <span class="public-choice-card__action">Ver agenda e horários →</span>
+      </a>
+      {% else %}
+      <article class="public-choice-card public-professional-card public-choice-card--disabled">
+        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% endif %}
+        <span>{{ professional.specialty|default:"Profissional" }}</span>
+        <h3>{{ professional.name }}</h3>
+        <span class="public-choice-card__action">Agenda exclusiva indisponível</span>
+      </article>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if courts %}<section class="shell section" id="quadras"><div class="section-head"><span class="eyebrow">ARENA</span><h2>Quadras e espaços</h2></div><div class="segment-grid">{% for court in courts %}<article><h3>{{ court.name }}</h3><p>{{ court.description }}</p><span>{% if court.indoor %}Coberta{% else %}Ao ar livre{% endif %}{% if court.lighting %} · Iluminação{% endif %}{% if court.surface %} · {{ court.surface }}{% endif %}</span>{% if tenant.public_booking_enabled and arena_access_enabled %}<p><a href="#agendar" data-select-court="{{ court.pk }}">Ver horários e reservar →</a></p>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+
+{% if segment == 'saude' %}<section class="shell section"><article class="panel"><span class="eyebrow">ATENDIMENTO DE SAÚDE</span><h2>Suas informações de saúde são protegidas</h2><p>Agende sua consulta com um profissional. O prontuário clínico só pode ser acessado por pessoas autorizadas do estabelecimento.</p></article></section>{% endif %}
+
+{% if products %}
+<section class="shell section" id="produtos">
+  <div class="section-head"><span class="eyebrow">PRODUTOS</span><h2>Reserve produtos junto com seu horário.</h2><p>A reserva separa 1 unidade para retirada no atendimento. O produto não é cobrado antecipadamente junto com o serviço.</p></div>
+  <div class="segment-grid public-choice-grid">
+    {% for product in products %}
+    <article class="public-choice-card public-product-card{% if product.public_available_stock <= 0 %} public-choice-card--disabled{% endif %}" data-product-card="{{ product.pk }}" data-unit-id="{{ product.unit_id|default:'' }}">
+      <span>{{ product.category|default:"Produto" }}</span>
+      <h3>{{ product.name }}</h3>
+      <p>{{ product.description }}</p>
+      <strong>R$ {{ product.sale_price }}</strong>
+      {% if product.public_available_stock > 0 and tenant.public_booking_enabled %}
+        <button type="button" class="button ghost public-product-reserve" data-reserve-product="{{ product.pk }}" data-product-name="{{ product.name|escape }}" data-product-price="{{ product.sale_price|floatformat:"2u" }}">Reservar com o agendamento</button>
+      {% elif product.public_available_stock > 0 %}
+        <span class="public-choice-card__action">Disponível no estabelecimento</span>
+      {% else %}
+        <span class="public-choice-card__action">Sem estoque para reserva</span>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if packages %}
+<section class="shell section" id="pacotes"><div class="section-head"><span class="eyebrow">PACOTES</span><h2>Pacotes disponíveis.</h2></div><div class="segment-grid">{% for package in packages %}<article><span>Pacote</span><h3>{{ package.name }}</h3><p>{{ package.description }}</p><strong>R$ {{ package.price }}</strong></article>{% endfor %}</div></section>
+{% endif %}
+
+{% if memberships %}
+<section class="shell section" id="assinaturas"><div class="section-head"><span class="eyebrow">ASSINATURAS</span><h2>Planos recorrentes disponíveis.</h2></div><div class="segment-grid">{% for membership in memberships %}<article><span>Assinatura</span><h3>{{ membership.name }}</h3><p>{{ membership.description }}</p><strong>R$ {{ membership.price }}</strong><p>Renovação recorrente · validade de {{ membership.validity_days }} dias por ciclo.</p></article>{% endfor %}</div></section>
+{% endif %}
+
+{% if loyalty %}
+<section class="shell section" id="fidelidade"><article class="panel"><span class="eyebrow">FIDELIDADE</span><h2>Programa de fidelidade ativo</h2><p>Acumule pontos nos atendimentos e aproveite recompensas oferecidas por {{ tenant.name }}.</p></article></section>
+{% endif %}
+
+{% if reviews %}
+<section class="shell section" id="avaliacoes"><div class="section-head"><span class="eyebrow">AVALIAÇÕES</span><h2>Avaliações dos clientes.</h2><p>Exibimos somente nome, data e nota.</p></div><div class="segment-grid">{% for review in reviews %}<article class="public-review-card"><h3>{{ review.customer_name }}</h3><p>{{ review.created_at|date:"d/m/Y" }}</p><div class="public-rating" aria-label="Nota {{ review.rating }} de 5"><span>{{ review.rating }}/5</span><div class="public-rating__track"><i style="width:{% widthratio review.rating 5 100 %}%"></i></div></div></article>{% endfor %}</div></section>
+{% endif %}
+
+{% if units %}
+<section class="shell section" id="unidades">
+  <div class="section-head"><span class="eyebrow">UNIDADES</span><h2>Escolha onde deseja ser atendido.</h2><p id="nearest-unit-status">Se você permitir a localização do dispositivo, destacamos automaticamente a unidade mais próxima.</p></div>
+  <div class="segment-grid" id="public-units-grid">
+    {% for unit in units %}
+    <article tabindex="0" role="group" aria-label="Unidade {{ unit.name }}" class="public-unit-card{% if selected_unit.pk == unit.pk %} is-selected{% endif %}" data-unit-card="{{ unit.pk }}" data-lat="{% if unit.latitude != None %}{{ unit.latitude|floatformat:"7u" }}{% endif %}" data-lng="{% if unit.longitude != None %}{{ unit.longitude|floatformat:"7u" }}{% endif %}">
+      <span class="public-unit-badge">{% if unit.is_primary %}Principal{% else %}Unidade{% endif %}</span>
+      <span class="public-nearest-badge" hidden>Mais próxima</span>
+      <h3>{{ unit.name }}</h3>
+      {% if unit.public_notes %}<p>{{ unit.public_notes }}</p>{% endif %}
+      <p>{{ unit.address }} {{ unit.address_number }}{% if unit.address_complement %} · {{ unit.address_complement }}{% endif %}{% if unit.district %}<br>{{ unit.district }}{% endif %}{% if unit.city %}<br>{{ unit.city }}/{{ unit.state }}{% endif %}{% if unit.postal_code %} · CEP {{ unit.postal_code }}{% endif %}</p>
+      {% if unit.phone or unit.whatsapp or unit.email %}<p>{% if unit.phone %}Telefone: {{ unit.phone }}{% endif %}{% if unit.whatsapp %}<br>WhatsApp: {{ unit.whatsapp }}{% endif %}{% if unit.email %}<br>E-mail: {{ unit.email }}{% endif %}</p>{% endif %}
+      {% if unit.public_hours %}<div class="public-unit-hours"><strong>Funcionamento</strong>{% for hour in unit.public_hours %}<p{% if hour.is_today %} class="is-today"{% endif %}><span>{{ hour.weekday_label }}{% if hour.is_today %} · Hoje{% endif %}</span><b>{% if hour.closed %}Fechado{% else %}{{ hour.opens_at|time:"H:i" }}–{{ hour.closes_at|time:"H:i" }}{% endif %}</b></p>{% endfor %}</div>{% endif %}
+      {% if unit.amenities %}<div><strong>Comodidades</strong><p>{% for item in unit.amenities %}<span class="public-meta-chip">{{ item }}</span>{% endfor %}</p></div>{% endif %}
+      {% if unit.payment_methods %}<div><strong>Formas de pagamento</strong><p>{% for item in unit.payment_methods %}<span class="public-meta-chip">{{ item }}</span>{% endfor %}</p></div>{% endif %}
+      {% if unit.instagram or unit.facebook or unit.tiktok or unit.website %}<p class="public-unit-socials">{% if unit.public_instagram_url %}<a href="{{ unit.public_instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}{% if unit.facebook %} <a href="{{ unit.facebook }}" target="_blank" rel="noopener">Facebook</a>{% endif %}{% if unit.public_tiktok_url %} <a href="{{ unit.public_tiktok_url }}" target="_blank" rel="noopener">TikTok</a>{% endif %}{% if unit.website %} <a href="{{ unit.website }}" target="_blank" rel="noopener">Site</a>{% endif %}</p>{% endif %}
+      {% if unit.map_url %}<a href="{{ unit.map_url }}" target="_blank" rel="noopener">Ver localização →</a>{% elif unit.latitude and unit.longitude %}<a href="https://www.google.com/maps/search/?api=1&query={{ unit.latitude|floatformat:"7u" }},{{ unit.longitude|floatformat:"7u" }}" target="_blank" rel="noopener">Ver localização →</a>{% endif %}
+      {% if tenant.public_booking_enabled %}<p><a class="button ghost" href="/p/{{ public_slug }}/?unit={{ unit.pk }}#agendar" data-select-unit="{{ unit.pk }}">Agendar nesta unidade →</a></p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if tenant.public_booking_enabled %}
+<script src="{% static 'js/booking-slots.js' %}"></script>
+{% if segment == 'arena' and arena_access_enabled and courts %}
+<script src="{% static 'js/arena-booking.js' %}" defer></script>
+{% elif segment != 'arena' %}
+<script>
+(() => {
+  const form=document.getElementById('public-booking');
+  const unit=document.getElementById('booking-unit');
+  const service=document.getElementById('booking-service');
+  const professional=document.getElementById('booking-professional');
+  const date=document.getElementById('booking-date');
+  const slot=document.getElementById('booking-slot');
+  const feedback=document.getElementById('booking-feedback');
+  let bookingAttemptKey='';
+  let bookingAttemptPayload='';
+  const selectedProducts=new Map();
+  const productSelection=document.getElementById('booking-product-selection');
+  const productSelectionList=document.getElementById('booking-product-selection-list');
+  const csrf=form.querySelector('[name=csrfmiddlewaretoken]').value;
+  const today=new Date(); date.min=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+  const waitlist=document.getElementById('booking-waitlist');
+  const picker=createBookingSlotPicker({container:document.getElementById('booking-slots'),input:slot,status:document.getElementById('booking-slot-status'),onAvailability:count=>{if(waitlist)waitlist.hidden=count!==0;}});
+  if(waitlist)document.getElementById('booking-waitlist-submit').addEventListener('click',async()=>{
+    const name=document.getElementById('booking-name').value.trim(),phone=document.getElementById('booking-phone').value.trim(),email=document.getElementById('booking-email').value.trim();
+    if(!name || !phone){feedback.textContent='Informe seu nome e telefone com DDD para entrar na lista.';return;}
+    const button=document.getElementById('booking-waitlist-submit');button.disabled=true;
+    try{
+      const response=await fetch('/api/public/{{ public_slug }}/waitlist/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf},body:JSON.stringify({unit_id:unit.value,service_id:service.value,professional_id:professional.value,date:date.value,name,phone,email})});
+      const data=await response.json();feedback.textContent=data.detail||'Não foi possível entrar na lista de espera.';
+      if(!response.ok)button.disabled=false;else waitlist.hidden=true;
+    }catch{feedback.textContent='Não foi possível enviar o pedido. Tente novamente.';button.disabled=false;}
+  });
+
+  function renderProductSelection(){
+    if(!productSelection || !productSelectionList)return;
+    productSelectionList.replaceChildren();
+    for(const [id,item] of selectedProducts){
+      const row=document.createElement('span');
+      row.className='booking-product-chip';
+      row.textContent=item.name+' · '+new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(item.price));
+      const remove=document.createElement('button');
+      remove.type='button';remove.setAttribute('aria-label','Remover '+item.name);remove.textContent='×';
+      remove.addEventListener('click',()=>{
+        selectedProducts.delete(id);
+        const button=document.querySelector('[data-reserve-product="'+id+'"]');
+        if(button){button.classList.remove('is-selected');button.textContent='Reservar com o agendamento';}
+        renderProductSelection();
+      });
+      row.append(remove);productSelectionList.append(row);
+    }
+    productSelection.hidden=selectedProducts.size===0;
+  }
+
+  document.querySelectorAll('[data-select-unit]').forEach(link=>{
+    link.addEventListener('click',()=>{
+      window.location.assign('/p/{{ public_slug }}/?unit='+encodeURIComponent(link.dataset.selectUnit)+'#agendar');
+      return;
+    });
+  });
+
+  document.querySelectorAll('[data-select-service]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      service.value=button.dataset.selectService;
+      service.dispatchEvent(new Event('change',{bubbles:true}));
+      document.getElementById('agendar').scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
+
+  document.querySelectorAll('[data-reserve-product]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      const id=button.dataset.reserveProduct;
+      if(selectedProducts.has(id)){
+        selectedProducts.delete(id);
+        button.classList.remove('is-selected');
+        button.textContent='Reservar com o agendamento';
+      }else{
+        selectedProducts.set(id,{name:button.dataset.productName,price:button.dataset.productPrice});
+        button.classList.add('is-selected');
+        button.textContent='Reservado ✓';
+      }
+      renderProductSelection();
+    });
+  });
+
+  function applyUnitFilter(){
+    const unitId=unit.value;
+    for(const option of professional.options){
+      if(!option.value)continue;
+      const sameUnit=!unitId || option.dataset.unitId===unitId;
+      const serviceEligible=!service.value||option.dataset.allServices==='true'||option.dataset.serviceIds.split(',').includes(service.value);
+      const eligible=sameUnit&&serviceEligible;
+      option.hidden=!eligible;option.disabled=!eligible;
+      if(!eligible&&option.selected)professional.value='';
+    }
+    document.querySelectorAll('[data-product-card]').forEach(card=>{
+      const productUnit=card.dataset.unitId||'';
+      const visible=!productUnit || productUnit===unitId;
+      card.hidden=!visible;
+      if(!visible){
+        const id=card.dataset.productCard;
+        if(selectedProducts.has(id)){
+          selectedProducts.delete(id);
+          const button=card.querySelector('[data-reserve-product]');
+          if(button){button.classList.remove('is-selected');button.textContent='Reservar com o agendamento';}
+        }
+      }
+    });
+    renderProductSelection();
+    const url=new URL(window.location.href);
+    if(unitId)url.searchParams.set('unit',unitId);else url.searchParams.delete('unit');
+    history.replaceState(null,'',url.pathname+url.search+url.hash);
+  }
+
+  function loadSlots(){
+    if(!service.value || !date.value){picker.reset('Escolha o serviço e a data para ver os horários.');return;}
+    const query=new URLSearchParams({unit_id:unit.value,service_id:service.value,date:date.value});
+    if(professional.value)query.set('professional_id',professional.value);
+    picker.load('/api/public/{{ public_slug }}/availability/?'+query.toString());
+  }
+  unit.addEventListener('change',()=>{window.location.assign('/p/{{ public_slug }}/?unit='+encodeURIComponent(unit.value)+'#agendar');});
+  service.addEventListener('change',()=>{applyUnitFilter();loadSlots();});
+  professional.addEventListener('change',loadSlots);
+  date.addEventListener('change',loadSlots);
+  const explicitUnit=new URLSearchParams(window.location.search).has('unit') || {% if selected_professional %}true{% else %}false{% endif %};
+  applyUnitFilter();
+
+  const unitCards=[...document.querySelectorAll('[data-unit-card]')];
+  unitCards.forEach(card=>{
+    const select=()=>window.location.assign('/p/{{ public_slug }}/?unit='+encodeURIComponent(card.dataset.unitCard)+'#agendar');
+    card.addEventListener('click',event=>{if(!event.target.closest('a,button'))select();});
+    card.addEventListener('keydown',event=>{if(event.target===card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();select();}});
+  });
+  const distanceKm=(a,b,c,d)=>{
+    const R=6371,toRad=value=>value*Math.PI/180;
+    const dLat=toRad(c-a),dLng=toRad(d-b);
+    const x=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLng/2)**2;
+    return 2*R*Math.asin(Math.sqrt(x));
+  };
+  const highlightNearest=(latitude,longitude)=>{
+    const candidates=unitCards.map(card=>({
+      card,
+      id:card.dataset.unitCard,
+      lat:Number(card.dataset.lat),
+      lng:Number(card.dataset.lng)
+    })).filter(item=>item.card.dataset.lat!==''&&item.card.dataset.lng!==''&&Number.isFinite(item.lat)&&Number.isFinite(item.lng));
+    if(!candidates.length)return;
+    candidates.sort((left,right)=>distanceKm(latitude,longitude,left.lat,left.lng)-distanceKm(latitude,longitude,right.lat,right.lng));
+    candidates.forEach(item=>{
+      const distance=distanceKm(latitude,longitude,item.lat,item.lng);
+      const label=document.createElement('p');
+      label.textContent=distance.toLocaleString('pt-BR',{maximumFractionDigits:1})+' km de você';
+      item.card.querySelector('h3').after(label);
+    });
+    const nearest=candidates[0];
+    unitCards.forEach(card=>card.querySelector('.public-nearest-badge')?.setAttribute('hidden',''));
+    nearest.card.querySelector('.public-nearest-badge')?.removeAttribute('hidden');
+    document.getElementById('public-units-grid')?.prepend(nearest.card);
+    const status=document.getElementById('nearest-unit-status');
+    if(status)status.textContent='Unidade mais próxima: '+nearest.card.querySelector('h3')?.textContent+'. Você pode trocar a unidade antes de confirmar.';
+    if(!explicitUnit && unit && unit.value!==nearest.id){
+      unit.value=nearest.id;
+      unit.dispatchEvent(new Event('change',{bubbles:true}));
+      unitCards.forEach(card=>card.classList.toggle('is-selected',card.dataset.unitCard===nearest.id));
+    }
+  };
+  if(unitCards.length>1 && navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      position=>highlightNearest(position.coords.latitude,position.coords.longitude),
+      ()=>{},
+      {enableHighAccuracy:false,timeout:5000,maximumAge:300000}
+    );
+  }
+
+  form.addEventListener('submit',async event=>{
+    event.preventDefault(); feedback.textContent='Confirmando...';
+    if(!slot.value){feedback.innerHTML='<div class="flash error">Selecione um horário disponível.</div>';return;}
+    const payload={
+      unit_id:unit.value,service_id:service.value,professional_id:professional.value,starts_at:slot.value,
+      name:document.getElementById('booking-name').value,
+      phone:document.getElementById('booking-phone').value,
+      email:document.getElementById('booking-email').value,
+      notes:document.getElementById('booking-notes').value,
+      {% if segment == 'auto' %}vehicle_plate:document.getElementById('booking-plate').value,
+      vehicle_model:document.getElementById('booking-vehicle-model').value,{% endif %}
+      payment_choice:form.querySelector('input[name="payment_choice"]:checked')?.value||'on_site',
+      professional_link:{% if selected_professional %}true{% else %}false{% endif %},
+      product_ids:[...selectedProducts.keys()].map(Number)
+    };
+    if(!payload.phone){feedback.textContent='Informe telefone com DDD.';return;}
+    const submit=form.querySelector('button[type=submit]');submit.disabled=true;
+    try {
+    const serializedPayload=JSON.stringify(payload);
+    if(!bookingAttemptKey || bookingAttemptPayload!==serializedPayload){
+      bookingAttemptPayload=serializedPayload;
+      bookingAttemptKey=(window.crypto&&crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'booking-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    }
+    const response=await fetch('/api/public/{{ public_slug }}/book/',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json','X-CSRFToken':csrf,
+        'Idempotency-Key':bookingAttemptKey
+      },
+      body:serializedPayload
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok){feedback.textContent=data.detail||'Não foi possível agendar.';submit.disabled=false;return;}
+    feedback.replaceChildren();
+    const confirmation=document.createElement('section');confirmation.className='booking-confirmation';confirmation.setAttribute('role','status');
+    const title=document.createElement('strong');title.textContent='Agendamento confirmado!';confirmation.append(title);
+    const when=new Intl.DateTimeFormat('pt-BR',{timeZone:data.timezone,dateStyle:'full',timeStyle:'short'}).format(new Date(data.starts_at));
+    const price=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(data.service.price));
+    for(const text of ['Unidade: '+data.unit.name,'Serviço: '+data.service.name,'Data e horário: '+when,'Profissional: '+data.professional.name,'Valor do serviço: '+price]){const line=document.createElement('p');line.textContent=text;confirmation.append(line);}
+    if(data.reserved_products?.length){
+      const products=document.createElement('p');
+      products.textContent='Produtos reservados: '+data.reserved_products.map(item=>item.name).join(', ')+'. Pagamento dos produtos no estabelecimento.';
+      confirmation.append(products);
+    }
+    if(data.customer_reused){const hint=document.createElement('p');hint.textContent='Seu contato foi vinculado ao cadastro existente. O nome e os dados já cadastrados foram preservados para manter seu histórico. Para corrigi-los, fale com o estabelecimento.';confirmation.append(hint);}
+    const link=document.createElement('a');link.className='button primary';link.href=data.manage_url;link.textContent=payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix';confirmation.append(link);feedback.append(confirmation);confirmation.scrollIntoView({block:'nearest',behavior:'smooth'});
+    } catch {feedback.textContent='Não foi possível confirmar o agendamento. Consulte seus agendamentos antes de tentar novamente.';submit.disabled=false;}
+  });
+})();
+</script>
+{% endif %}
+{% endif %}
+<script>
+if(!document.getElementById('public-booking')){
+  const cards=[...document.querySelectorAll('[data-unit-card]')];
+  cards.forEach(card=>{
+    const select=()=>window.location.assign('/p/{{ public_slug }}/?unit='+encodeURIComponent(card.dataset.unitCard)+'#unidades');
+    card.addEventListener('click',event=>{if(!event.target.closest('a,button'))select();});
+    card.addEventListener('keydown',event=>{if(event.target===card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();select();}});
+  });
+  if(!new URLSearchParams(location.search).has('unit')&&navigator.geolocation&&cards.length>1){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const rad=x=>x*Math.PI/180;
+      const candidates=cards.filter(c=>c.dataset.lat!==''&&c.dataset.lng!=='').map(card=>{
+        const lat=Number(card.dataset.lat),lng=Number(card.dataset.lng);
+        const x=Math.sin(rad(lat-pos.coords.latitude)/2)**2+Math.cos(rad(pos.coords.latitude))*Math.cos(rad(lat))*Math.sin(rad(lng-pos.coords.longitude)/2)**2;
+        return {card,distance:2*6371*Math.asin(Math.sqrt(Math.min(1,x)))};
+      }).sort((a,b)=>a.distance-b.distance);
+      if(candidates.length)location.replace('/p/{{ public_slug }}/?unit='+encodeURIComponent(candidates[0].card.dataset.unitCard));
+    },()=>{},{timeout:5000,maximumAge:300000});
+  }
+}
+</script>
+{% endblock %}

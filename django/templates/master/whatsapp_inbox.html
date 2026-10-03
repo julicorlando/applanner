@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp do Master — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">ATENDIMENTO DA PLATAFORMA</span><h1>WhatsApp do Master</h1><p>Atenda empresas cadastradas e novos contatos em uma caixa de entrada separada dos estabelecimentos.</p></div></div>
+  <div class="chat-shell"><aside class="chat-sidebar"><h2>Conversas</h2><form method="get" class="portal-search"><input name="q" value="{{ q }}" placeholder="Buscar nome, empresa ou número" aria-label="Buscar conversas"><button class="button ghost">Buscar</button></form>{% for row in rows %}<a class="chat-contact" href="{% url 'master-whatsapp-conversation' row.pk %}"><span class="chat-avatar">{{ row.contact_name|default:row.wa_id|slice:':1'|upper }}</span><span><strong>{{ row.contact_name|default:row.wa_id }}</strong><small>{{ row.tenant.name|default:'Novo contato' }} · {{ row.last_message_at|date:'d/m H:i' }}</small></span></a>{% empty %}<p class="empty">Nenhuma conversa ainda.</p>{% endfor %}</aside><div class="chat-main"><div class="panel" style="margin:16px">
+    <h2>Conectar o número do Master</h2><p><a class="button ghost" href="{% url 'master-whatsapp-flow' %}">Configurar fluxo de atendimento →</a></p>
+    {% if configured %}
+      <p id="wa-state" class="wa-connection" role="status" aria-live="polite">Consultando conexão...</p>
+      <p id="wa-delivery" class="wa-delivery" role="status" aria-live="polite"></p>
+      <img id="wa-qr" alt="QR code para vincular o WhatsApp do Master" style="display:none;width:min(320px,100%);height:auto">
+      <p>Abra o WhatsApp no celular → <strong>Aparelhos conectados</strong> → <strong>Conectar aparelho</strong> e leia o código acima. Ele expira e se atualiza automaticamente.</p>
+      <form method="post" action="{% url 'master-whatsapp-connect' %}" style="display:inline">{% csrf_token %}<button class="button primary">Gerar QR code</button></form>
+      <form method="post" action="{% url 'master-whatsapp-disconnect' %}" style="display:inline" onsubmit="return confirm('Desvincular o WhatsApp do Master?')">{% csrf_token %}<button class="button ghost">Desvincular</button></form>
+    {% else %}<p>Defina <code>MASTER_WHATSAPP_GATEWAY_TOKEN</code> nas variáveis do Coolify e publique novamente para ativar o pareamento.</p>{% endif %}
+  </div>
+  <div class="panel" style="margin:16px"><h2>Contatos cadastrados</h2><p>Empresas e leads que autorizaram contato. Escolha um contato para abrir o atendimento.</p>
+    <h3>Empresas</h3>{% for contact in companies %}<form method="post" class="module-row">{% csrf_token %}<input type="hidden" name="tenant_id" value="{{ contact.pk }}"><strong>{{ contact.name }}</strong><small>{{ contact.phone }}</small><button class="button ghost" type="submit">Conversar</button></form>{% empty %}<p class="empty">Nenhuma empresa com telefone.</p>{% endfor %}
+    <h3>Leads com consentimento</h3>{% for contact in leads %}<form method="post" class="module-row">{% csrf_token %}<input type="hidden" name="lead_id" value="{{ contact.pk }}"><strong>{{ contact.name }}</strong><small>{{ contact.phone }}</small><button class="button ghost" type="submit">Conversar</button></form>{% empty %}<p class="empty">Nenhum lead apto para contato.</p>{% endfor %}
+  </div>
+  <div class="panel" style="margin:16px"><h2>Iniciar conversa</h2><p>Use o número com código do país e DDD. Exemplo: 5581999999999.</p><form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="start-phone">WhatsApp</label><input id="start-phone" name="phone" type="tel" required></div><div class="form-field"><label for="start-name">Nome (opcional)</label><input id="start-name" name="name"></div><div class="form-actions"><button class="button primary">Abrir atendimento</button></div></form></div>
+</div></div>
+</section>
+{% if configured %}<script>
+(() => {
+  const status=document.getElementById('wa-state'), delivery=document.getElementById('wa-delivery'), image=document.getElementById('wa-qr');
+  let revision;
+  async function update(){
+    try{
+      const response=await fetch('{% url "master-whatsapp-status" %}',{cache:'no-store'});
+      const data=await response.json();
+      const labels={connected:'Conectado. Você já pode responder às empresas.',qr:'Aguardando leitura do QR code.',connecting:'Conectando ao WhatsApp...',disconnected:'Desconectado. Clique em Gerar QR code.',unavailable:'Serviço indisponível.'};
+      status.textContent=data.error||labels[data.state]||'Consultando conexão...';
+      delivery.textContent=data.callbackError|| (data.pending ? `${data.pending} resposta(s) aguardando entrega ao painel.` : 'Respostas recebidas sincronizadas com o painel.');
+      delivery.classList.toggle('warning',Boolean(data.pending||data.callbackError));
+      if(revision!==undefined&&revision!==data.inbox_revision&&!document.getElementById('start-phone').value.trim())location.reload();
+      revision=data.inbox_revision;
+      image.style.display=data.qr?.startsWith('data:image/png;base64,')?'block':'none';
+      if(image.style.display==='block')image.src=data.qr;else image.removeAttribute('src');
+    }catch{status.textContent='Não foi possível consultar a conexão.';image.style.display='none';}
+  }
+  update();setInterval(update,5000);
+})();
+</script>{% endif %}
+{% endblock %}

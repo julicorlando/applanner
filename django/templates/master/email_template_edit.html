@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ spec.label }} — E-mail Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-email-templates' %}">← Modelos de e-mail</a><span class="eyebrow">PERSONALIZAÇÃO</span><h1>{{ spec.label }}</h1><p>Edite o assunto e o texto. As variáveis serão preenchidas com os dados reais no momento do envio.</p></div></div>
+  <article class="panel"><h2>Variáveis disponíveis</h2><p>{% for variable in spec.variables %}<code style="display:inline-block;margin:0 7px 7px 0;padding:5px 9px;border-radius:8px;background:#edf0ff">{% templatetag openvariable %}{{ variable }}{% templatetag closevariable %}</code>{% endfor %}</p><p>Obrigatórias na mensagem: {% for variable in spec.required %}<code>{% templatetag openvariable %}{{ variable }}{% templatetag closevariable %}</code>{% if not forloop.last %}, {% endif %}{% endfor %}. Para escrever chaves comuns, use <code>{% templatetag openbrace %}{% templatetag openbrace %}</code> e <code>{% templatetag closebrace %}{% templatetag closebrace %}</code>.</p></article>
+  <article class="panel" style="margin-top:18px"><h2>Conteúdo do e-mail</h2><form method="post" class="portal-form">{% csrf_token %}
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    <p class="payment-hint">O ApPlanner formata esta mensagem para texto e HTML. Não insira código HTML; os dados serão escapados automaticamente.</p><button type="submit" class="button primary">Salvar modelo</button>
+  </form></article>
+  {% if customized %}<form method="post" style="margin-top:18px">{% csrf_token %}<input type="hidden" name="action" value="reset"><button type="submit" class="button ghost">Restaurar texto padrão</button></form>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% load static %}
+{% load l10n %}
+{% block title %}Painel · {{ tenant.name }}{% endblock %}
+{% block content %}
+<div class="shell dashboard">
+  <div class="dashboard-head">
+    <div>
+      <span class="eyebrow">VISÃO DE HOJE</span>
+      <h1>{{ tenant.name }}</h1>
+      <p>{% if arena_mode %}Acompanhe suas quadras e reservas.{% else %}{{ today_pending }} compromisso{{ today_pending|pluralize }} pendente{{ today_pending|pluralize }} ou confirmado{{ today_pending|pluralize }} hoje.{% endif %}</p>
+    </div>
+    <div class="dashboard-head-actions">
+      {% if multiunit_dashboard %}
+      <form method="get" class="portal-search" aria-label="Filtrar painel por unidade">
+        <label>Unidade
+          <select name="unit" onchange="this.form.submit()">
+            <option value="">Todas as unidades</option>
+            {% for unit in active_units %}<option value="{{ unit.pk }}"{% if selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}
+          </select>
+        </label>
+      </form>
+      {% endif %}
+      <a class="button ghost" href="/app/">Ver todos os módulos</a>
+      <div class="status-pill">{{ subscription.get_status_display|default:"Operação ativa" }}</div>
+    </div>
+  </div>
+
+  {% if arena_category and not arena_mode %}
+  <section class="panel" role="status"><h2>Reservas da Arena ainda não liberadas</h2><p>Peça ao Master para ativar o módulo Arena nos acessos desta empresa. A página pública não aceitará reservas até essa liberação.</p></section>
+  {% elif arena_mode %}
+  {% if not courts_count or not arena_has_hours or not arena_has_prices %}
+  <section class="panel" role="status"><h2>Prepare a Arena para receber reservas</h2>
+    <p>Para publicar horários, cadastre uma quadra ativa, os dias e horários de funcionamento e uma regra de preço.</p>
+    <div class="dashboard-actions">
+      {% if not courts_count %}<a class="button" href="{% url 'portal-resource-create' 'arena' 'quadras' %}">Cadastrar quadra</a>{% endif %}
+      {% if not arena_has_hours %}<a class="button" href="{% url 'portal-resource-create' 'arena' 'horarios-quadras' %}">Cadastrar horários</a>{% endif %}
+      {% if not arena_has_prices %}<a class="button" href="{% url 'portal-resource-create' 'arena' 'precos' %}">Cadastrar preço</a>{% endif %}
+    </div>
+  </section>
+  {% endif %}
+  {% endif %}
+
+  <section class="metric-grid">
+    <article><span>{% if arena_mode %}Reservas hoje{% else %}Agenda hoje{% endif %}</span><strong>{% if arena_mode %}{{ arena_today_total }}{% else %}{{ today_total }}{% endif %}</strong><small>{% if arena_mode %}{{ arena_today_pending }} confirmadas ou aguardando Pix{% else %}{{ today_pending }} próximos{% endif %}</small></article>
+    <article><span>Clientes ativos</span><strong>{{ customers }}</strong><small>base do estabelecimento</small></article>
+    <article><span>{% if arena_mode %}Quadras{% else %}Equipe{% endif %}</span><strong>{% if arena_mode %}{{ courts_count }}{% else %}{{ professionals }}{% endif %}</strong><small>{% if arena_mode %}quadras ativas{% else %}profissionais ativos{% endif %}</small></article>
+    <article><span>{{ revenue_period_label }}</span><strong>R$ {{ net_revenue|floatformat:2 }}</strong><small>receitas menos despesas pagas</small></article>
+  </section>
+  {% if can_manage_finance %}<section class="finance-month-strip" aria-label="Resumo financeiro do mês"><article class="finance-detail finance-gross"><span>Receitas brutas</span><strong>R$ {{ gross_revenue|floatformat:2|localize }}</strong><small>Total recebido no mês</small></article><article class="finance-detail finance-expenses"><span>Despesas</span><strong>R$ {{ expenses|floatformat:2|localize }}</strong><small>Saídas pagas no mês</small></article><article class="finance-detail finance-net"><span>Líquido</span><strong>R$ {{ net_revenue|floatformat:2|localize }}</strong><small>Receitas menos despesas</small><a href="{% url 'finance-summary' %}">Ver receitas e despesas <span aria-hidden="true">→</span></a></article></section>{% endif %}
+  {% if multiunit_dashboard and can_manage_finance %}
+  <section class="panel" style="margin-bottom:16px">
+    <div class="panel-head"><div><span class="eyebrow">MULTIUNIDADE</span><h2>Comparativo por unidade</h2><p>Resultados do mês corrente. O resultado líquido considera receitas e despesas pagas vinculadas à unidade.</p></div></div>
+    <div class="table-card">
+      <table class="portal-table">
+        <thead><tr><th>Unidade</th><th>Agendamentos</th><th>Concluídos</th><th>Cancel./faltas</th><th>Receita</th><th>Despesas</th><th>Resultado</th><th>Ticket médio</th><th></th></tr></thead>
+        <tbody>
+          {% for row in unit_performance %}
+          <tr>
+            <td><strong>{{ row.unit.name }}</strong>{% if row.unit.is_primary %}<br><small>Principal</small>{% endif %}</td>
+            <td>{{ row.appointments }}</td>
+            <td>{{ row.completed }}</td>
+            <td>{{ row.cancelled }}</td>
+            <td>R$ {{ row.gross|floatformat:2|localize }}</td>
+            <td>R$ {{ row.expenses|floatformat:2|localize }}</td>
+            <td><strong>R$ {{ row.net|floatformat:2|localize }}</strong></td>
+            <td>R$ {{ row.average_ticket|floatformat:2|localize }}</td>
+            <td class="table-actions"><a href="?unit={{ row.unit.pk }}">Ver painel</a><a href="{% url 'portal-resource-list' 'agenda' 'agendamentos' %}?unit={{ row.unit.pk }}">Agenda</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+  <section class="dashboard-actions" aria-label="Ações frequentes">
+    {% if segment_module %}<a class="button primary" href="{% url 'portal-resource-list' segment_module.slug segment_module.resources.0.slug %}">Abrir {{ segment_module.title }}</a>{% endif %}
+    {% if arena_mode %}<a class="button primary" href="{% url 'portal-resource-create' 'arena' 'reservas' %}">+ Nova reserva</a><a class="button" href="{% url 'portal-resource-list' 'arena' 'reservas' %}">Ver reservas</a><a class="button" href="{% url 'portal-resource-list' 'arena' 'quadras' %}">Quadras</a>{% elif can_manage_agenda %}<a class="button primary" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">+ Novo agendamento</a><a class="button" href="{% url 'portal-resource-list' 'agenda' 'agendamentos' %}">Abrir agenda</a><a class="button" href="{% url 'portal-resource-create' 'agenda' 'clientes' %}">Cadastrar cliente</a><a class="button" href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}">Equipe e acessos</a>{% endif %}
+    {% if can_manage_finance %}<a class="button" href="{% url 'finance-summary' %}">Receitas e despesas</a><a class="button" href="{% url 'finance-pos' %}">Abrir PDV</a>{% elif can_sell_products %}<a class="button" href="{% url 'portal-resource-list' 'financeiro' 'produtos' %}">Produtos</a><a class="button" href="{% url 'finance-pos' %}">Vender produto</a>{% endif %}
+    {% if referral_campaign %}<a class="button primary" href="{% url 'engagement-referrals' %}">Indique e ganhe</a>{% endif %}
+    <a class="button" href="{% url 'tenant-branding' %}">Minha página pública</a>
+  </section>
+
+  <section class="module-launcher">
+    <div class="panel-head module-launcher-head">
+      <div><span class="eyebrow">OPERAÇÃO</span><h2>Acesse cada área do ApPlanner</h2></div>
+      <a href="/app/">Central operacional →</a>
+    </div>
+    <div class="module-launcher-grid">
+      {% for item in available_modules %}<a href="{% url 'portal-resource-list' item.slug item.resources.0.slug %}"><span>{{ forloop.counter|stringformat:'02d' }}</span><strong>{{ item.title }}</strong><small>{{ item.description }}</small></a>{% empty %}<p class="empty">Nenhum módulo liberado para seu usuário e plano.</p>{% endfor %}
+      <a href="{% url 'tenant-branding' %}"><span>★</span><strong>Minha página pública</strong><small>Logo, capa, apresentação e agendamentos</small></a>
+    </div>
+  </section>
+
+  {% if behavior_enabled %}
+  <section class="panel" style="margin-bottom:16px">
+    <div class="panel-head">
+      <div><span class="eyebrow">INTELIGÊNCIA DE RETORNO</span><h2>Clientes para reativar</h2></div>
+      <a href="{% url 'engagement-intelligence' %}">Ver todos →</a>
+    </div>
+    <div class="appointment-list">
+      {% for row in return_intelligence_rows %}
+      <div class="appointment-row">
+        <time>{% if row.next_expected_date %}{{ row.next_expected_date|date:"d/m" }}{% else %}Retorno{% endif %}</time>
+        <div><strong>{{ row.customer.name }}</strong><span>{{ row.visits_count }} visitas · confiança {{ row.confidence_score }}%</span></div>
+        {% if row.contact_blocked %}
+          <span class="status-pill">Contatado nas últimas 24h</span>
+        {% else %}
+          <form method="post" action="{% url 'engagement-intelligence' %}">{% csrf_token %}<input type="hidden" name="action" value="contact"><input type="hidden" name="customer" value="{{ row.customer_id }}"><button class="button ghost" type="submit">Perguntar se quer agendar</button></form>
+        {% endif %}
+      </div>
+      {% empty %}<p class="empty">Nenhum retorno previsto para os próximos dias.</p>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="dashboard-grid">
+    <section class="panel">
+      <div class="panel-head"><h2>{% if arena_mode %}Próximas reservas{% else %}Próximos atendimentos{% endif %}</h2><a href="{% if arena_mode %}{% url 'portal-resource-list' 'arena' 'reservas' %}{% else %}/app/agenda/agendamentos/{% endif %}">Ver todos →</a></div>
+      <nav class="actions" aria-label="Visões da agenda"><a href="{% if arena_mode %}/app/arena/reservas/{% else %}/app/agenda/agendamentos/{% endif %}?period=upcoming">Próximos</a><a href="{% if arena_mode %}/app/arena/reservas/{% else %}/app/agenda/agendamentos/{% endif %}?period=cancelled">Cancelados</a><a href="{% if arena_mode %}/app/arena/reservas/{% else %}/app/agenda/agendamentos/{% endif %}?period=history">Histórico</a></nav>
+      <div class="appointment-list dashboard-appointment-list" data-live-agenda="painel-hoje">
+        {% if arena_mode %}
+          {% for item in arena_upcoming %}
+          <article class="appointment-row dashboard-appointment-card">
+            <time class="dashboard-appointment-time" datetime="{{ item.starts_at|date:'c' }}">
+              <span>{{ item.starts_at|date:"d/m" }}</span>
+              <strong>{{ item.starts_at|date:"H:i" }}</strong>
+            </time>
+            <div class="dashboard-appointment-main">
+              <div class="dashboard-appointment-title"><strong>{{ item.customer_display_name }}</strong><em class="appointment-status appointment-status--{{ item.status }}">{{ item.get_status_display }}</em></div>
+              <span class="dashboard-appointment-meta">{{ item.court.name }}</span>
+            </div>
+          </article>
+          {% empty %}<p class="empty">Nenhuma reserva futura.</p>{% endfor %}
+        {% else %}
+          {% for item in next_appointments %}
+          <article class="appointment-row dashboard-appointment-card">
+            <time class="dashboard-appointment-time" datetime="{{ item.starts_at|date:'c' }}">
+              <span>{{ item.starts_at|date:"d/m" }}</span>
+              <strong>{{ item.starts_at|date:"H:i" }}</strong>
+            </time>
+            <div class="dashboard-appointment-main">
+              <div class="dashboard-appointment-title">
+                <strong>{{ item.customer_display_name }}</strong>
+                <em class="appointment-status appointment-status--{{ item.status }}">{{ item.get_status_display }}</em>
+              </div>
+              {% include "portal/customer_name_difference.html" with appointment=item only %}
+              <span class="dashboard-appointment-meta">{% if item.unit %}{{ item.unit.name }} · {% endif %}{{ item.service.name }}{% if item.professional %} · {{ item.professional.name }}{% endif %}</span>
+            </div>
+          </article>
+          {% empty %}<p class="empty">Nenhum atendimento futuro pendente ou confirmado.</p>{% endfor %}
+        {% endif %}
+      </div>
+    </section>
+    <aside class="panel modules-panel">
+      <div class="panel-head"><h2>Módulos do plano</h2></div>
+      {% for link in modules %}<div class="module-row"><span></span><b>{{ link.module.name }}</b></div>{% empty %}<p class="empty">Os módulos do plano aparecerão aqui.</p>{% endfor %}
+    </aside>
+  </div>
+</div>
+<script src="{% static 'js/live-agenda.js' %}" defer></script>
+{% endblock %}

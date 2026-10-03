@@ -1,0 +1,33 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.sqlite3
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+staticfiles/
+media/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Legacy runtime secrets and generated artifacts
+config/app.php
+config/database.php
+error_log*
+*.bak
+*.bak-*
+*.backup*
+storage/backups/
+storage/logs/
+
+# Dumps reais usados apenas em homologação local
+django/legacy-dumps/

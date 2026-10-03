@@ -1,0 +1,63 @@
+services:
+  legacy-db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${LEGACY_CLONE_DATABASE:-appnannerbr_planner}
+      MARIADB_USER: ${LEGACY_CLONE_USER:-legacy}
+      MARIADB_PASSWORD: ${LEGACY_CLONE_PASSWORD:-legacy-local-2026}
+      MARIADB_ROOT_PASSWORD: ${LEGACY_CLONE_ROOT_PASSWORD:-legacy-root-local-2026}
+    volumes:
+      - legacy_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u${LEGACY_CLONE_USER:-legacy} -p${LEGACY_CLONE_PASSWORD:-legacy-local-2026} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  migration-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MIGRATION_POSTGRES_DB:-applanner_migration}
+      POSTGRES_USER: ${MIGRATION_POSTGRES_USER:-applanner_migration}
+      POSTGRES_PASSWORD: ${MIGRATION_POSTGRES_PASSWORD:-migration-local-2026}
+    volumes:
+      - migration_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MIGRATION_POSTGRES_USER:-applanner_migration} -d ${MIGRATION_POSTGRES_DB:-applanner_migration}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  web:
+    environment:
+      DATABASE_URL: postgresql://${MIGRATION_POSTGRES_USER:-applanner_migration}:${MIGRATION_POSTGRES_PASSWORD:-migration-local-2026}@migration-db:5432/${MIGRATION_POSTGRES_DB:-applanner_migration}
+      LEGACY_MYSQL_HOST: legacy-db
+      LEGACY_MYSQL_PORT: 3306
+      LEGACY_MYSQL_DATABASE: ${LEGACY_CLONE_DATABASE:-appnannerbr_planner}
+      LEGACY_MYSQL_USER: ${LEGACY_CLONE_USER:-legacy}
+      LEGACY_MYSQL_PASSWORD: ${LEGACY_CLONE_PASSWORD:-legacy-local-2026}
+    depends_on:
+      migration-db:
+        condition: service_healthy
+      legacy-db:
+        condition: service_healthy
+
+  worker:
+    environment:
+      DATABASE_URL: postgresql://${MIGRATION_POSTGRES_USER:-applanner_migration}:${MIGRATION_POSTGRES_PASSWORD:-migration-local-2026}@migration-db:5432/${MIGRATION_POSTGRES_DB:-applanner_migration}
+    depends_on:
+      migration-db:
+        condition: service_healthy
+
+  beat:
+    environment:
+      DATABASE_URL: postgresql://${MIGRATION_POSTGRES_USER:-applanner_migration}:${MIGRATION_POSTGRES_PASSWORD:-migration-local-2026}@migration-db:5432/${MIGRATION_POSTGRES_DB:-applanner_migration}
+    depends_on:
+      migration-db:
+        condition: service_healthy
+
+volumes:
+  legacy_mysql_data:
+  migration_postgres_data:

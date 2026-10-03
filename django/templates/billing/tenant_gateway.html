@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Cadastro bancário — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div>
+      <a class="back-link" href="{% url 'portal-home' %}">← Operação</a>
+      <span class="eyebrow">RECEBIMENTOS</span>
+      <h1>Cadastro bancário</h1>
+      <p>Cadastre uma ou mais contas da empresa e, se desejar, conecte um provedor de cobrança online para Pix e pagamentos no agendamento.</p>
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <article class="panel">
+      <div class="panel-head"><div><span class="eyebrow">CONTAS</span><h2>Contas cadastradas</h2></div></div>
+      {% for account in banks %}
+      <div class="module-row">
+        <span></span>
+        <div style="flex:1">
+          <strong>{{ account.bank_name }}{% if account.bank_code %} · {{ account.bank_code }}{% endif %}</strong>
+          <small>{{ account.holder_name }}{% if account.account_last4 %} · conta •••• {{ account.account_last4 }}{% endif %}{% if account.pix_key_last4 %} · Pix •••• {{ account.pix_key_last4 }}{% endif %}{% if account.is_primary %} · Principal{% endif %}</small>
+        </div>
+        {% if not account.is_primary %}
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="bank_primary"><input type="hidden" name="bank_account" value="{{ account.pk }}"><button class="nav-link" type="submit">Tornar principal</button></form>
+        {% endif %}
+        <form method="post" onsubmit="return confirm('Remover esta conta bancária?')">{% csrf_token %}<input type="hidden" name="action" value="bank_remove"><input type="hidden" name="bank_account" value="{{ account.pk }}"><button class="nav-link danger-action" type="submit">Remover</button></form>
+      </div>
+      {% empty %}<p class="empty">Nenhuma conta bancária cadastrada.</p>{% endfor %}
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><div><span class="eyebrow">NOVA CONTA</span><h2>Adicionar banco</h2></div></div>
+      <form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="bank_add">
+        {{ bank_form.non_field_errors }}
+        {% for field in bank_form %}
+        <div class="form-field {% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}
+        </div>
+        {% endfor %}
+        <p>Dados sensíveis da conta e da chave Pix são armazenados de forma criptografada.</p>
+        <button class="button primary" type="submit">Cadastrar conta</button>
+      </form>
+    </article>
+  </div>
+
+  <article class="panel" style="margin-top:16px">
+    <div class="panel-head"><div><span class="eyebrow">COBRANÇA ONLINE</span><h2>Integração de pagamento</h2></div></div>
+    {% for connection in connections %}
+      <p><strong>{{ connection.get_environment_display }}</strong>: {{ connection.get_status_display }}{% if connection.last_tested_at %} · validado em {{ connection.last_tested_at|date:'d/m/Y H:i' }}{% endif %}</p>
+    {% empty %}<p>Nenhum provedor de cobrança online conectado.</p>{% endfor %}
+
+    <h3>Pix no agendamento público</h3>
+    <p>Ative somente se quiser oferecer sinal ou pagamento total antes da visita.</p>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="booking_payments">
+      <label style="display:flex;gap:10px;align-items:center">
+        <input type="checkbox" name="enabled" {% if schedule_settings.online_booking_payments_enabled %}checked{% endif %} {% if not connected %}disabled{% endif %}>
+        Oferecer Pix ao agendar
+      </label>
+      <p><button class="button primary" type="submit">Salvar opção</button></p>
+    </form>
+    {% if not connected %}<p>Conecte um provedor de cobrança online para liberar esta função.</p>{% endif %}
+    <a class="button ghost" href="{% url 'portal-resource-list' 'agenda' 'configuracao' %}">Configurar sinal e formas de pagamento</a>
+  </article>
+
+  {% if connected and not show_form %}
+  <article class="panel" style="margin-top:16px">
+    <h2>Provedor conectado</h2>
+    <p>A integração automática está ativa para as cobranças online da empresa.</p>
+    <p>URL técnica de notificações: <code>{{ webhook_url }}</code></p>
+    <a class="button" href="?alterar=1">Alterar credenciais</a>
+  </article>
+  {% else %}
+  <article class="panel" style="margin-top:16px">
+    <h2>Conectar provedor de cobrança online</h2>
+    <p>Use as credenciais do provedor atualmente suportado pela integração. O cadastro bancário acima é independente e aceita qualquer banco ou instituição.</p>
+    <p>URL técnica de notificações: <code>{{ webhook_url }}</code></p>
+    <form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="provider_connect">
+      {{ form.non_field_errors }}
+      {% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
+      <p>As chaves são criptografadas e não aparecem novamente nesta página.</p>
+      <button class="button primary" type="submit">Testar e conectar</button>
+    </form>
+  </article>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Orçamento #{{ estimate.pk }} — ApPlanner Auto{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading">
+    <div><span class="eyebrow">ORÇAMENTO AUTOMOTIVO</span><h1>{{ estimate.job.vehicle }}</h1><p>{{ estimate.job.appointment.customer }}</p></div>
+    <strong style="font-size:2rem">R$ {{ estimate.total_amount }}</strong>
+  </div>
+  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+  <article class="panel">
+    <h2>Itens</h2>
+    {% for item in estimate.items.all %}
+      <div class="module-row"><span></span><div style="flex:1"><strong>{{ item.description }}</strong><small>{{ item.quantity }} × R$ {{ item.unit_price }}</small></div><b>R$ {{ item.total_amount }}</b></div>
+    {% empty %}<p class="empty">Nenhum item.</p>{% endfor %}
+    <div class="module-row"><span></span><div style="flex:1"><strong>Total</strong></div><b>R$ {{ estimate.total_amount }}</b></div>
+  </article>
+  <article class="panel" style="margin-top:14px">
+    <p>Status: <strong>{{ estimate.get_status_display }}</strong></p>
+    {% if estimate.status == "sent" or estimate.status == "draft" %}
+    <form method="post" class="portal-form">{% csrf_token %}
+      <div class="form-field"><label>Observação</label><textarea name="customer_note" rows="4"></textarea></div>
+      <div class="form-actions">
+        <button class="button primary" name="action" value="approve">Aprovar orçamento</button>
+        <button class="button ghost" name="action" value="reject">Rejeitar</button>
+      </div>
+    </form>
+    {% elif estimate.status == "approved" %}<div class="status-pill">Orçamento aprovado</div>{% endif %}
+  </article>
+</section>
+{% endblock %}

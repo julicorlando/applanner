@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Preparar minha empresa · ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow onboarding-page">
+  <div class="portal-heading"><div><span class="eyebrow">PRIMEIROS PASSOS</span><h1>Vamos preparar {{ tenant.name }}.</h1><p>Etapa {{ progress|add:1 }} de {{ total }} · {{ label }}. Suas respostas ficam salvas a cada etapa.</p></div></div>
+  <div class="onboarding-progress" role="progressbar" aria-label="Progresso do cadastro" aria-valuemin="0" aria-valuemax="{{ total }}" aria-valuenow="{{ progress }}"><span style="width:{% widthratio progress total 100 %}%"></span></div>
+  <div class="onboarding-card panel"><h2>{{ label }}</h2>
+    {% if step == 'verification' %}
+      <p>Confirme o e-mail <strong>{{ request.user.email }}</strong> para proteger sua conta e concluir a configuração.</p>
+      {% if verified or email_waived %}<p class="flash success">{% if verified %}E-mail confirmado.{% else %}Confirmação por e-mail dispensada pelo Master para este cadastro. O endereço de e-mail continua sem verificação.{% endif %} Você já pode concluir e escolher se deseja publicar sua página.</p>
+        <form method="post" class="portal-form">{% csrf_token %}<div class="form-field checkbox-field"><label for="publish">Publicar agora a página da empresa no diretório e aceitar agendamentos conforme suas configurações</label><input id="publish" type="checkbox" name="publish" checked></div><button class="button primary">Concluir cadastro</button></form>
+      {% else %}<p>O sistema só publicará sua página após a confirmação ou uma dispensa expressa pelo Master. Se o e-mail não chegar, contate o suporte.</p><form method="post" action="{% url 'accounts:send-verification' %}">{% csrf_token %}<button class="button primary">Enviar link de confirmação</button></form>{% endif %}
+      <p><a href="{% url 'accounts:two-factor-setup' %}">Ativar verificação em duas etapas →</a></p>
+    {% else %}
+      <form method="post" enctype="multipart/form-data" class="portal-form">{% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+        {% for field in form %}<div class="form-field {% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+        <div class="form-actions"><button type="submit" class="button primary">Salvar e continuar →</button></div>
+      </form>
+      {% if step == 'professional_done' %}<p class="empty">Você pode cadastrar outros profissionais e fotos depois de concluir estas etapas.</p>{% endif %}
+      {% if step == 'branding_done' %}<p class="empty">Logo e capa são opcionais. Sua página não será publicada antes da confirmação do e-mail.</p>{% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

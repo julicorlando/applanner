@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Meu agendamento — {{ appointment.tenant.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">MEU AGENDAMENTO</span><h1>{{ appointment.service.name }}</h1><p>{{ appointment.tenant.name }}</p></div><div class="status-pill">{{ appointment.get_status_display }}</div></div>
+  <article class="panel">
+    <div class="appointment-row"><time>{{ appointment.starts_at|date:"d/m H:i" }}</time><div><strong>{{ appointment.professional.name|default:"Profissional a definir" }}</strong><span>{{ appointment.customer_name_snapshot|default:"Cliente" }}</span></div><em>R$ {{ appointment.service_price_snapshot|default:appointment.service.price }}</em></div>
+    {% if appointment.product_reservations.all %}
+    <div class="booking-product-selection" style="margin-top:16px">
+      <strong>Produtos reservados</strong>
+      <div class="booking-product-selection__list">
+        {% for reservation in appointment.product_reservations.all %}
+        <span class="booking-product-chip">{{ reservation.product.name }} · 1 un · R$ {{ reservation.unit_price_snapshot }}</span>
+        {% endfor %}
+      </div>
+      <small>{% if appointment.status == 'cancelled' or appointment.status == 'no_show' or appointment.status == 'completed' %}A reserva de estoque não permanece ativa após o encerramento deste agendamento.{% else %}Os produtos ficam separados para retirada no atendimento e são pagos diretamente ao estabelecimento.{% endif %}</small>
+    </div>
+    {% endif %}
+    {% if rating_token %}<p>Atendimento concluído. Conte como foi sua experiência.</p><a class="button primary" href="{% url 'public-appointment-rating' rating_token %}">Dar nota de 1 a 5</a>{% endif %}
+  </article>
+  {% if appointment.booking_payment != 'on_site' %}
+  <article class="panel" style="margin-top:14px"><h2>Pagamento por Pix</h2>
+    <p>{% if appointment.booking_payment == 'partial' %}Sinal{% else %}Valor total{% endif %}: <strong>R$ {{ payment_amount|floatformat:2 }}</strong>. A confirmação do pagamento ocorre após o retorno do Mercado Pago.</p>
+    {% if payment.status == 'paid' %}<p class="flash success">Pagamento confirmado.</p>
+    {% elif payment and payment.status == 'pending' or payment and payment.status == 'created' %}
+      {% if payment.pix_copy_paste %}<label class="form-field">Código Pix copia e cola<textarea readonly rows="4" onclick="this.select()">{{ payment.pix_copy_paste }}</textarea></label>{% endif %}
+      {% if payment.pix_qr_code %}<img alt="QR code para pagamento Pix" style="width:220px;height:220px" src="data:image/png;base64,{{ payment.pix_qr_code }}">{% endif %}
+      {% if payment.checkout_url %}<p><a class="button" href="{{ payment.checkout_url }}" rel="noopener" target="_blank">Abrir pagamento</a></p>{% endif %}
+      <p>Status: {{ payment.get_status_display }}. Atualize esta página após pagar.</p>
+    {% elif can_pay %}
+      <form method="post">{% csrf_token %}<button class="button primary" name="action" value="pay">Gerar Pix de R$ {{ payment_amount|floatformat:2 }}</button></form>
+    {% else %}<p>{{ payment_reason }} Entre em contato com {{ appointment.tenant.name }}.</p>{% endif %}
+  </article>
+  {% endif %}
+  {% if capabilities.can_reschedule %}
+  <article class="panel" style="margin-top:14px">
+    <h2>Remarcar</h2>
+    <form method="post" class="portal-form" id="reschedule-form">{% csrf_token %}<input type="hidden" name="action" value="reschedule">
+      <div class="form-field"><label for="manage-professional">Profissional</label><select name="professional_id" id="manage-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" {% if professional.pk == appointment.professional_id %}selected{% endif %}>{{ professional.name }}</option>{% endfor %}</select></div>
+      <div class="form-field"><label for="manage-date">Data</label><input id="manage-date" type="date" required></div>
+      <div class="form-field"><label id="manage-slot-label">Horários disponíveis</label><input type="hidden" id="manage-slot" name="starts_at"><div id="manage-slots" class="booking-slots" role="group" aria-labelledby="manage-slot-label"></div><small id="manage-slot-status" role="status" aria-live="polite">Escolha a data para ver os horários.</small></div>
+      <button class="button primary" id="manage-submit" type="submit" disabled>Confirmar remarcação</button>
+    </form>
+  </article>
+  {% endif %}
+  {% if capabilities.can_cancel %}
+  <article class="panel" style="margin-top:14px"><form method="post" onsubmit="return confirm('Cancelar este agendamento?')">{% csrf_token %}<input type="hidden" name="action" value="cancel"><button class="button ghost">Cancelar agendamento</button></form></article>
+  {% endif %}
+  {% if capabilities.cancel_reason or capabilities.reschedule_reason %}
+  <article class="panel" style="margin-top:14px" aria-labelledby="manage-policy-title">
+    <h2 id="manage-policy-title">Opções de alteração</h2>
+    {% if capabilities.cancel_reason %}<p>{{ capabilities.cancel_reason }}</p>{% endif %}
+    {% if capabilities.reschedule_reason %}<p>{{ capabilities.reschedule_reason }}</p>{% endif %}
+    <p>Precisa de ajuda? Entre em contato com {{ appointment.tenant.name }}.</p>
+    {% if appointment.tenant.phone %}<p>Telefone: {{ appointment.tenant.phone }}</p>{% endif %}
+    {% if appointment.tenant.email %}<p>E-mail: {{ appointment.tenant.email }}</p>{% endif %}
+  </article>
+  {% endif %}
+</section>
+{% if capabilities.can_reschedule %}
+<script src="{% static 'js/booking-slots.js' %}"></script>
+<script>
+(() => {
+ const date=document.getElementById('manage-date'), prof=document.getElementById('manage-professional'), slots=document.getElementById('manage-slot');
+ const submit=document.getElementById('manage-submit');
+ const today=new Date();date.min=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+ const picker=createBookingSlotPicker({container:document.getElementById('manage-slots'),input:slots,status:document.getElementById('manage-slot-status'),onChange:selected=>{submit.disabled=!selected;}});
+ function load(){
+   if(!date.value){picker.reset('Escolha a data para ver os horários.');return;}
+   const q=new URLSearchParams({service_id:'{{ appointment.service_id }}',date:date.value});
+   if(prof.value)q.set('professional_id',prof.value);
+   picker.load('/api/public/{{ appointment.tenant.public_slug|default:appointment.tenant.slug }}/availability/?'+q);
+ }
+ date.addEventListener('change',load);prof.addEventListener('change',load);
+ document.getElementById('reschedule-form').addEventListener('submit',event=>{if(!slots.value)event.preventDefault();});
+})();
+</script>
+{% endif %}
+{% endblock %}

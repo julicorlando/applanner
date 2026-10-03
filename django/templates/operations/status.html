@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Status dos serviços — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">STATUS</span><h1>Status dos serviços ApPlanner</h1><p>Última verificação: {{ checked_at|date:"d/m/Y H:i:s" }}.</p></div></div>
+  <article class="panel">
+    <h2>{% if overall == "operational" %}Todos os serviços principais estão operacionais{% elif overall == "degraded" %}Há serviços com funcionamento degradado{% else %}Há indisponibilidade em serviços{% endif %}</h2>
+    {% for service in services %}
+    <div class="module-row">
+      <span></span>
+      <div style="flex:1"><strong>{{ service.label }}</strong><small>{{ service.detail }}</small></div>
+      <span class="status-pill">{% if service.state == "operational" %}Operacional{% elif service.state == "degraded" %}Degradado{% elif service.state == "outage" %}Indisponível{% else %}Não configurado{% endif %}</span>
+    </div>
+    {% endfor %}
+  </article>
+  <article class="panel" style="margin-top:16px">
+    <h2>Incidentes em andamento</h2>
+    {% for incident in incidents %}
+      <div class="module-row"><span></span><div><strong>{{ incident.title }}</strong><small>{{ incident.get_severity_display }} · atualizado em {{ incident.last_seen_at|date:"d/m/Y H:i" }}</small></div></div>
+    {% empty %}<p class="empty">Nenhum incidente operacional em andamento.</p>{% endfor %}
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}ApPlanner — mais agendamentos, menos horários vazios{% endblock %}
+{% block content %}
+<section class="marketing-hero shell">
+  <div class="hero-copy">
+    <span class="eyebrow hero-badge">✦ PARA QUEM QUER VENDER MAIS E ATENDER MELHOR</span>
+    <h1>{{ platform_branding.hero_title|default:"Transforme horários livres em clientes." }}</h1>
+    <p class="lead">{{ platform_branding.hero_description|default:"Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar." }} Experimente grátis pelo período indicado no plano escolhido.</p>
+    <div class="actions">
+      <a class="button primary" href="#planos">Começar meu teste grátis →</a>
+      <a class="button ghost" href="#como-funciona">Ver como funciona</a>
+      <a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
+      <a class="button ghost" href="/account/login/">Já tenho conta</a>
+    </div>
+    <div class="trust-row">
+      <span>✓ Sem cartão quando o plano permitir</span><span>✓ Cancele quando quiser</span><span>✓ Plano por segmento</span>
+    </div>
+  </div>
+    <div class="product-window product-window--live" aria-label="Demonstração ilustrativa do painel ApPlanner com agenda em movimento">
+    <div class="window-head">
+      <span></span><span></span><span></span>
+      <b class="preview-live-status"><i aria-hidden="true"></i>Demonstração ao vivo</b>
+    </div>
+    <div class="window-stats">
+      <div><small>Agenda</small><strong>✓</strong><span>horários online</span></div>
+      <div><small>Ocupação</small><strong>↗</strong><span>visão da equipe</span></div>
+      <div><small>Receita</small><strong>↑</strong><span>visão em tempo real</span></div>
+    </div>
+    <div class="agenda-preview-viewport" aria-hidden="true">
+      <div class="agenda-preview agenda-preview--live" data-live-preview>
+        <div><time>09:00</time><span class="event"><b>Cliente confirmado</b><small>Corte · João</small></span></div>
+        <div><time>10:30</time><span class="event accent"><b>Próximo horário</b><small>Pagamento integrado</small></span></div>
+        <div><time>14:00</time><span class="event"><b>Agendamento online</b><small>Barba · Carlos</small></span></div>
+        <div><time>15:30</time><span class="event"><b>Novo cliente</b><small>Reserva recebida pelo link</small></span></div>
+      </div>
+    </div>
+  </div>
+  <script src="{% static 'js/home-live-preview.js' %}" defer></script>
+</section>
+
+<section class="shell section sales-steps" id="como-funciona"><div class="section-head"><span class="eyebrow">CONFIGURAÇÃO SIMPLES</span><h2>Comece em 3 passos.</h2><p>Do cadastro ao primeiro atendimento: tudo em um só lugar.</p></div><div class="segment-grid">
+  <article><span>01</span><h3>Escolha o plano</h3><p>Selecione um plano pronto ou monte uma combinação de módulos para sua empresa.</p></article>
+  <article><span>02</span><h3>Prepare sua equipe</h3><p>Cadastre os serviços, os profissionais, os horários e sua página pública.</p></article>
+  <article><span>03</span><h3>Receba agendamentos</h3><p>Compartilhe o link, acompanhe a agenda e gerencie pagamentos e relacionamento.</p></article>
+</div></section>
+
+<section class="shell section" id="planos">
+  <div class="section-head"><span class="eyebrow">ESCOLHA COMO COMEÇAR</span><h2>Planos para o seu momento.</h2><p>Preços e condições definidos no painel Master. O teste grátis depende do plano escolhido.</p></div>
+  <div class="pricing-grid">
+    {% for plan in plans %}
+    <article class="pricing-card {% if plan.featured %}featured{% endif %}">
+      {% if plan.featured %}<span class="status-pill">Em destaque</span>{% endif %}
+      <h3>{{ plan.name }}</h3><p>{{ plan.description }}</p>
+      <div class="price-line"><small>R$</small><strong>{{ plan.monthly_price }}</strong><span>/mês</span></div>
+      {% if plan.trial_days %}<p class="trial-highlight">{{ plan.trial_days }} dias grátis{% if plan.trial_without_card %} · sem cartão{% endif %}</p>{% endif %}
+      <a class="button primary" href="{% url 'billing-signup' %}?plan={{ plan.pk }}">{% if plan.trial_days %}Começar teste grátis{% else %}Escolher plano{% endif %}</a>
+    </article>
+    {% empty %}<p>Os planos estarão disponíveis em breve. <a href="{% url 'billing-custom-plan' %}">Solicite uma proposta personalizada</a>.</p>{% endfor %}
+    {% if medical_plan %}<article class="pricing-card" aria-label="{{ medical_plan.name }} indisponível"><span class="status-pill">Em preparação</span><h3>{{ medical_plan.name }}</h3><p>Este segmento ainda não aceita novas inscrições.</p></article>{% endif %}
+  </div>
+  <p style="margin-top:24px"><a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu: selecione as funções →</a></p>
+</section>
+
+<section class="shell section" id="noticias"><div class="section-head"><span class="eyebrow">NOVIDADES</span><h2>Notícias e ideias para seu negócio.</h2></div><div class="segment-grid">{% for post in posts %}<article class="news-card">{% if post.cover %}<img src="{% url 'public-blog-image' post.pk %}" alt="Capa de {{ post.title }}" loading="lazy">{% endif %}<span>{{ post.published_at|date:"d/m/Y" }}</span><h3>{{ post.title }}</h3><p>{{ post.excerpt }}</p><a href="{% url 'blog-post' post.slug %}">Ler notícia →</a></article>{% empty %}<p class="empty">Novidades em breve.</p>{% endfor %}</div></section>
+<section class="proof-strip">
+  <div class="shell proof-grid">
+    <div><strong>Uma base</strong><span>para agenda e operação</span></div>
+    <div><strong>Módulos</strong><span>que acompanham cada segmento</span></div>
+    <div><strong>Automação</strong><span>sem perder o atendimento humano</span></div>
+    <div><strong>Dados</strong><span>isolados por estabelecimento</span></div>
+  </div>
+</section>
+
+<section class="shell section" id="segmentos">
+  <div class="section-head">
+    <span class="eyebrow">DO AGENDAMENTO À OPERAÇÃO</span>
+    <h2>O ApPlanner muda com o seu negócio.</h2>
+    <p>Ative apenas o que faz sentido e mantenha uma experiência consistente para equipe e clientes.</p>
+  </div>
+  <div class="segment-grid">
+    <article><span>01</span><h3>Barbearias & Salões</h3><p>Agenda, fila, comandas, metas, comissão, produtos e recorrência.</p></article>
+    <article><span>02</span><h3>Arenas & Quadras</h3><p>Reservas, mensalistas, rachas, escolinha, torneios e preço dinâmico.</p></article>
+    <article><span>03</span><h3>Estética & Auto</h3><p>Boxes, OS, inspeção, materiais, orçamento, fotos e CRM de retorno.</p></article>
+    {% if medical_segment_visible %}<article><span>04</span><h3>Clínicas</h3><p>Agenda profissional, prontuário criptografado, lembretes e consentimentos.</p></article>{% endif %}
+  </div>
+</section>
+
+<section class="shell section feature-band">
+  <div><span class="eyebrow">POR TRÁS DA EXPERIÊNCIA</span><h2>Feito para operar, não só para parecer bonito.</h2></div>
+  <div class="feature-list">
+    <p><b>Pagamentos</b><span>Pix, cartão tokenizado, recorrência e conciliação.</span></p>
+    <p><b>Relacionamento</b><span>WhatsApp, e-mail, CRM, fidelidade e campanhas.</span></p>
+    <p><b>Gestão</b><span>Financeiro, estoque, comissões e indicadores.</span></p>
+    <p><b>Segurança</b><span>2FA, RBAC, auditoria, LGPD e isolamento multi-tenant.</span></p>
+  </div>
+</section>
+
+{% if faqs %}
+<section class="shell section" id="faq">
+  <div class="section-head"><span class="eyebrow">DÚVIDAS FREQUENTES</span><h2>FAQ</h2><p>Respostas rápidas sobre cadastro, planos, pagamentos e uso do ApPlanner.</p></div>
+  <div class="faq-list">
+    {% for item in faqs %}
+    <details class="panel faq-item">
+      <summary>{{ item.question }}</summary>
+      <div>{{ item.answer|linebreaks }}</div>
+    </details>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="shell section legal-home-links" aria-labelledby="legal-home-title">
+  <div class="section-head"><span class="eyebrow">TRANSPARÊNCIA</span><h2 id="legal-home-title">Políticas e termos</h2><p>Consulte as regras aplicáveis à plataforma, às empresas e aos clientes finais.</p></div>
+  <div class="segment-grid">
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'privacidade' %}"><strong>Política de Privacidade</strong><span>Como dados pessoais são tratados no ApPlanner.</span></a>
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'termos-empresas' %}"><strong>Termos de Uso · Empresas</strong><span>Regras para estabelecimentos e responsáveis pela conta.</span></a>
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'termos-clientes' %}"><strong>Termos de Uso · Clientes</strong><span>Regras para quem agenda pelos links públicos.</span></a>
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'cancelamento-empresas' %}"><strong>Cancelamento · Empresas</strong><span>Assinatura, encerramento e exclusão da conta.</span></a>
+    <a class="panel legal-link-card" href="{% url 'legal-public-document' 'cancelamento-clientes' %}"><strong>Cancelamento · Clientes</strong><span>Cancelamento e reagendamento de serviços.</span></a>
+  </div>
+</section>
+
+<section class="shell closing">
+  <span class="eyebrow">APPLANNER</span>
+  <h2>{{ platform_branding.closing_title|default:"Organize hoje. Escale amanhã." }}</h2>
+  <a class="button primary light" href="/planos/">Escolher um plano</a>
+</section>
+{% endblock %}

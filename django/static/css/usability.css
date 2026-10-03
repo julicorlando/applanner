@@ -1,0 +1,323 @@
+/* Native choices must remain readable regardless of the browser's popup theme. */
+select, .portal-search select, .form-field select { color: var(--ink); background-color: var(--paper); }
+select option, select optgroup { color: var(--ink); background-color: var(--paper); }
+.portal-search select { min-height: 44px; padding: 10px 12px; border: 1px solid #cbd5e5; border-radius: 10px; font: inherit; }
+.operation-quick-links { display: none; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.operation-dashboard.is-simplified .operation-quick-links { display: flex; }
+.operation-dashboard.is-simplified .portal-module-card { min-height: 0; padding: 18px; }
+.operation-dashboard.is-simplified .portal-module-card > p,
+.operation-dashboard.is-simplified .operation-module-top { display: none; }
+.operation-dashboard.is-simplified .portal-module-card h3 { margin: 0 0 12px; }
+@media (max-width: 700px) {
+  .operation-quick-links { display: flex; }
+  .operation-dashboard .portal-module-card { min-height: 0; padding: 16px; }
+  .operation-dashboard .portal-module-card > p,
+  .operation-dashboard .operation-module-top { display: none; }
+}
+
+/* Public booking: a clear, responsive confirmation summary. */
+.booking-confirmation { padding: clamp(18px, 4vw, 30px); border: 1px solid var(--accent, #30c5ca); border-radius: 18px; background: var(--panel, #14213a); color: var(--text, #f5f7fc); box-shadow: 0 12px 32px rgba(0,0,0,.15); overflow-wrap: anywhere; }
+.booking-confirmation > strong { display: block; font-size: clamp(1.3rem, 4vw, 1.8rem); margin-bottom: 16px; }
+.booking-confirmation p { margin: 10px 0; line-height: 1.6; }
+.booking-confirmation .button { margin-top: 16px; white-space: normal; }
+
+
+/* Directory: the whole establishment card is actionable, with a stronger booking CTA. */
+.directory-card { position: relative; overflow: hidden; cursor: pointer; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.directory-card:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--accent, #5b5cf0) 48%, var(--line, #dfe5f0)); box-shadow: 0 18px 42px rgba(0,0,0,.16); }
+.directory-card:focus-within { outline: 3px solid color-mix(in srgb, var(--accent, #5b5cf0) 42%, transparent); outline-offset: 3px; }
+.directory-card__overlay { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
+.directory-card__content { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; align-items: flex-start; }
+.segment-grid .directory-card h3 { margin: 28px 0 10px; font-size: clamp(1.15rem, 2vw, 1.35rem); line-height: 1.25; }
+.segment-grid .directory-card p { margin-top: 0; }
+.segment-grid .directory-card__segment { font-size: .72rem; letter-spacing: .02em; color: var(--muted, #697386); }
+.directory-card__location { margin-bottom: 22px; }
+.segment-grid .directory-card__cta { display: inline-flex; align-items: center; gap: 9px; margin-top: auto; padding: 11px 16px; border-radius: 999px; background: var(--accent, #5b5cf0); color: #fff; font-size: .8rem; font-weight: 800; box-shadow: 0 8px 22px color-mix(in srgb, var(--accent, #5b5cf0) 28%, transparent); }
+.directory-card:hover .directory-card__cta { filter: brightness(1.08); }
+
+/* Dashboard: scan-friendly upcoming appointments with separated date, customer and status. */
+.dashboard-appointment-list { display: grid; gap: 12px; margin-top: 16px; }
+.dashboard-appointment-card { grid-template-columns: 92px minmax(0,1fr); gap: 16px; align-items: stretch; padding: 14px; border: 1px solid var(--line, #e6e8ee); border-radius: 16px; background: color-mix(in srgb, var(--paper, #fff) 96%, var(--accent, #5b5cf0)); }
+.dashboard-appointment-card:first-child { border-top: 1px solid var(--line, #e6e8ee); }
+.dashboard-appointment-time { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 72px; padding: 10px 8px; border-radius: 13px; background: color-mix(in srgb, var(--accent, #5b5cf0) 12%, var(--paper, #fff)); color: inherit; }
+.dashboard-appointment-time span { font-size: .72rem; font-weight: 750; color: var(--muted, #697386); }
+.dashboard-appointment-time strong { margin-top: 4px; font-size: 1.15rem; letter-spacing: -.02em; }
+.dashboard-appointment-main { min-width: 0; display: grid; align-content: center; gap: 6px; }
+.appointment-row .dashboard-appointment-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.dashboard-appointment-title > strong { min-width: 0; font-size: .95rem; line-height: 1.3; overflow-wrap: anywhere; }
+.dashboard-appointment-meta { font-size: .78rem; color: var(--muted, #697386); line-height: 1.45; }
+.appointment-status { flex: 0 0 auto; display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent, #5b5cf0) 24%, transparent); background: color-mix(in srgb, var(--accent, #5b5cf0) 10%, transparent); color: inherit; font-size: .69rem; font-weight: 800; font-style: normal; }
+.appointment-status--confirmed { border-color: rgba(70,190,120,.32); background: rgba(70,190,120,.12); color: #3fc77a; }
+.appointment-status--pending,
+.appointment-status--pending_payment { border-color: rgba(235,174,62,.34); background: rgba(235,174,62,.12); color: #dca431; }
+
+@media (max-width: 560px) {
+  .dashboard-appointment-card { grid-template-columns: 72px minmax(0,1fr); padding: 11px; gap: 11px; }
+  .dashboard-appointment-time { min-height: 66px; }
+  .appointment-row .appointment-status { display: inline-flex; }
+  .appointment-row .dashboard-appointment-title { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .segment-grid .directory-card__cta { width: 100%; justify-content: center; }
+}
+
+
+/* Master destructive actions stay visually distinct without breaking compact tables. */
+.table-actions form { display: inline-block; margin-left: 10px; }
+.table-actions .nav-link { font-weight: 750; }
+.table-actions .danger-action { color: #d85050; }
+
+
+/* Página pública da empresa: capa ampla e arredondada + foto de perfil circular. */
+.tenant-hero{padding:28px 0;background:var(--tenant-bg,#f7f8fb)}
+.tenant-hero .tenant-hero__content{
+  width:min(1500px,calc(100% - 48px));
+  min-height:390px;
+  padding:clamp(34px,5vw,72px);
+  border-radius:30px;
+  overflow:hidden;
+  position:relative;
+  isolation:isolate;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.tenant-hero--has-cover .tenant-hero__content{
+  background:#12213e;
+  box-shadow:0 22px 56px rgba(0,0,0,.18);
+}
+.tenant-hero .tenant-cover{
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  opacity:1;
+  border-radius:inherit;
+}
+.tenant-hero--has-cover .tenant-hero__content::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(90deg,rgba(6,15,34,.82) 0%,rgba(8,18,40,.57) 48%,rgba(8,18,40,.28) 100%);
+}
+.tenant-profile-logo{
+  width:96px;
+  height:96px;
+  flex:0 0 96px;
+  display:block;
+  object-fit:cover;
+  object-position:center;
+  border-radius:50%;
+  margin:0 0 18px;
+  border:3px solid rgba(255,255,255,.82);
+  background:#fff;
+  box-shadow:0 10px 30px rgba(0,0,0,.28);
+}
+.tenant-hero--has-cover .eyebrow,
+.tenant-hero--has-cover h1{color:#f5f9ff}
+.tenant-hero--has-cover p{color:#d6e2f2}
+.tenant-hero--has-cover .button.ghost{
+  color:#fff;
+  border-color:rgba(255,255,255,.34);
+  background:rgba(5,14,32,.34);
+  backdrop-filter:blur(8px);
+}
+
+@media(max-width:700px){
+  .tenant-hero{padding:16px 0}
+  .tenant-hero .tenant-hero__content{
+    width:min(100% - 30px,1500px);
+    min-height:430px;
+    padding:28px 22px;
+    border-radius:22px;
+    justify-content:flex-end;
+  }
+  .tenant-profile-logo{
+    width:82px;
+    height:82px;
+    flex-basis:82px;
+  }
+  .tenant-hero--has-cover .tenant-hero__content::after{
+    background:linear-gradient(0deg,rgba(6,15,34,.88) 0%,rgba(8,18,40,.50) 62%,rgba(8,18,40,.22) 100%);
+  }
+}
+
+
+/* Home: agenda ilustrativa com movimento contínuo de novos agendamentos. */
+.product-window--live{position:relative;overflow:hidden}
+.preview-live-status{display:inline-flex!important;align-items:center;gap:7px;color:#dcecff!important}
+.preview-live-status i{width:8px;height:8px;border-radius:50%;background:#52d273;box-shadow:0 0 0 0 rgba(82,210,115,.45);animation:preview-live-pulse 1.8s ease-out infinite}
+.agenda-preview-viewport{height:194px;overflow:hidden;position:relative}
+.agenda-preview--live{will-change:transform}
+.agenda-preview--live>div{min-height:56px}
+.agenda-preview--live .event{transition:background .25s ease,border-color .25s ease,box-shadow .25s ease,transform .25s ease}
+.agenda-preview--live .event.accent{box-shadow:0 8px 24px rgba(18,107,130,.2)}
+.agenda-preview--live .preview-new-event{animation:preview-event-enter .5s cubic-bezier(.2,.8,.2,1)}
+.product-window--live::after{content:"";position:absolute;pointer-events:none;left:22px;right:22px;bottom:22px;height:34px;background:linear-gradient(180deg,transparent,#0f1426 88%);opacity:.7;border-radius:0 0 16px 16px}
+
+@keyframes preview-live-pulse{
+  0%{box-shadow:0 0 0 0 rgba(82,210,115,.45)}
+  70%{box-shadow:0 0 0 7px rgba(82,210,115,0)}
+  100%{box-shadow:0 0 0 0 rgba(82,210,115,0)}
+}
+@keyframes preview-event-enter{
+  from{opacity:0;transform:translateY(18px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@media(prefers-reduced-motion:reduce){
+  .preview-live-status i,.agenda-preview--live .preview-new-event{animation:none}
+  .agenda-preview--live{transition:none!important;transform:none!important}
+}
+@media(max-width:560px){
+  .agenda-preview-viewport{height:188px}
+  .preview-live-status{font-size:.67rem}
+}
+
+
+/* Página pública: cards acionáveis de serviço, profissional e produto. */
+.public-choice-grid{align-items:stretch}
+.public-choice-card{
+  position:relative;
+  min-height:240px;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  padding:27px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:var(--paper);
+  color:var(--ink);
+  text-align:left;
+  text-decoration:none;
+  font:inherit;
+  cursor:pointer;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+.public-choice-card:hover,
+.public-choice-card:focus-visible{
+  transform:translateY(-4px);
+  border-color:color-mix(in srgb,var(--accent) 55%,var(--line));
+  box-shadow:0 16px 38px rgba(0,0,0,.14);
+  outline:none;
+}
+.public-choice-card>span:first-child{font-size:.7rem;color:var(--muted)}
+.public-choice-card h3{font-size:1.18rem;margin:42px 0 12px}
+.public-choice-card p{font-size:.88rem;color:var(--muted);line-height:1.65;margin:0 0 16px}
+.public-choice-card strong{margin-top:auto}
+.public-choice-card__action{
+  display:inline-flex;
+  margin-top:18px;
+  font-size:.78rem!important;
+  font-weight:800;
+  color:var(--accent)!important;
+}
+.public-choice-card--disabled{opacity:.58;cursor:default}
+.public-choice-card--disabled:hover{transform:none;box-shadow:none;border-color:var(--line)}
+.public-professional-card__photo{
+  width:82px;
+  height:82px;
+  object-fit:cover;
+  border-radius:50%;
+  border:2px solid color-mix(in srgb,var(--accent) 36%,transparent);
+  box-shadow:0 8px 22px rgba(0,0,0,.14);
+}
+.public-professional-card h3{margin-top:24px}
+.public-product-card .public-product-reserve{
+  width:100%;
+  margin-top:18px;
+  position:relative;
+  z-index:1;
+}
+.public-product-reserve.is-selected{
+  background:color-mix(in srgb,var(--accent) 18%,var(--paper));
+  border-color:var(--accent);
+  color:var(--ink);
+}
+.booking-product-selection{
+  padding:16px;
+  border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));
+  border-radius:14px;
+  background:color-mix(in srgb,var(--accent) 7%,var(--paper));
+}
+.booking-product-selection>strong{display:block;margin-bottom:10px}
+.booking-product-selection>small{display:block;margin-top:10px;color:var(--muted);line-height:1.5}
+.booking-product-selection__list{display:flex;flex-wrap:wrap;gap:8px}
+.booking-product-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--paper);
+  font-size:.76rem;
+  font-weight:700;
+}
+.booking-product-chip button{
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  font-size:1rem;
+  cursor:pointer;
+  line-height:1;
+  padding:0 2px;
+}
+@media(max-width:560px){
+  .public-choice-card{min-height:210px;padding:22px}
+  .public-choice-card h3{margin-top:28px}
+}
+
+
+/* Atendimento: produtos que o cliente reservou como interesse de compra. */
+.reserved-product-interest{
+  margin:18px 0;
+  padding:18px;
+  border:1px solid color-mix(in srgb,var(--accent) 34%,var(--line));
+  border-radius:16px;
+  background:color-mix(in srgb,var(--accent) 7%,var(--paper));
+}
+.reserved-product-interest h2{margin:6px 0 8px;font-size:1.08rem}
+.reserved-product-interest>p{margin:0 0 14px;color:var(--muted);line-height:1.55}
+.reserved-product-interest__grid{display:grid;gap:9px}
+.reserved-product-interest__item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--paper);
+}
+.reserved-product-interest__item div{display:grid;gap:3px}
+.reserved-product-interest__item small{color:var(--muted)}
+.reserved-products-sale-field{
+  padding:16px;
+  border:1px solid color-mix(in srgb,var(--accent) 28%,var(--line));
+  border-radius:14px;
+}
+.reserved-products-sale-field>div{display:grid;gap:8px;margin-top:8px}
+.reserved-products-sale-field label:has(input[type="checkbox"]){
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  cursor:pointer;
+}
+.reserved-products-sale-field input[type="checkbox"]{width:auto;margin:0}
+@media(max-width:560px){
+  .reserved-product-interest__item{align-items:flex-start;flex-direction:column;gap:7px}
+}
+
+/* Native popup colors must match the control, including Windows dark mode. */
+body select,body select option,body select optgroup{color:var(--ink)!important;background-color:var(--paper)!important}
+[hidden]{display:none!important}
+.public-unit-card{cursor:pointer}

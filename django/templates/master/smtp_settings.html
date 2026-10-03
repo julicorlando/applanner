@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}E-mail SMTP — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">COMUNICAÇÃO DA PLATAFORMA</span><h1>E-mail e SMTP</h1><p>Configure o envio de confirmações, recuperação de conta e mensagens da plataforma.</p></div></div>
+  {% if not backend_supported %}<p class="panel">O backend de e-mail definido no Coolify não usa o SMTP do painel. Defina <code>EMAIL_BACKEND=applanner.email_backend.PlatformEmailBackend</code> e publique novamente antes de testar.</p>{% endif %}
+  <article class="panel" style="margin-bottom:18px"><h2>Estado</h2><p>{% if configured and configured.enabled %}Configuração SMTP ativa{% else %}Configuração SMTP inativa{% endif %}{% if configured %} · atualizada em {{ configured.updated_at|date:'d/m/Y H:i' }}{% endif %}</p>{% if configured %}<p>Servidor: <strong>{{ configured.host }}:{{ configured.port }}</strong> · Segurança: <strong>{% if configured.use_ssl %}SSL direto{% elif configured.use_tls %}STARTTLS{% else %}sem criptografia{% endif %}</strong> · Credenciais: <strong>{% if configured.username and has_password %}cadastradas{% else %}não cadastradas{% endif %}</strong> · Remetente: <strong>{{ configured.from_email }}</strong></p>{% endif %}<p>A senha é armazenada criptografada e nunca volta ao formulário. Para mantê-la, deixe o campo de senha vazio. Para trocá-la, digite uma nova.</p></article>
+  <article class="panel" style="margin-bottom:18px">
+    <div class="panel-head"><div><span class="eyebrow">ENTREGABILIDADE</span><h2>SPF, DKIM e DMARC</h2></div></div>
+    {% if dns_health %}
+      <div class="module-row"><span></span><div><strong>SPF · {{ dns_health.domain }}</strong><small>Autoriza os servidores que podem enviar em nome do domínio.</small></div><span class="status-pill">{% if dns_health.spf %}Encontrado{% else %}Pendente{% endif %}</span></div>
+      <div class="module-row"><span></span><div><strong>DKIM · {{ dns_health.selector }}._domainkey.{{ dns_health.domain }}</strong><small>Assina as mensagens para provar a origem e integridade do e-mail.</small></div><span class="status-pill">{% if dns_health.dkim %}Encontrado{% else %}Pendente{% endif %}</span></div>
+      <div class="module-row"><span></span><div><strong>DMARC · _dmarc.{{ dns_health.domain }}</strong><small>Define a política contra falsificação e permite relatórios de autenticação.</small></div><span class="status-pill">{% if dns_health.dmarc %}Encontrado{% else %}Pendente{% endif %}</span></div>
+      <p class="payment-hint">O ApPlanner apenas verifica os registros públicos. SPF, DKIM e DMARC precisam ser publicados no provedor DNS do domínio conforme os dados fornecidos pelo seu serviço de e-mail.</p>
+    {% else %}<p>Salve um remetente para verificar a autenticação do domínio.</p>{% endif %}
+    <div class="metric-grid">
+      <article><span>Falhas/rejeições em 24h</span><strong>{{ recent_email_failures }}</strong></article>
+      <article><span>Contatos marcados como bounce</span><strong>{{ bounced_contacts }}</strong></article>
+    </div>
+    <p class="payment-hint">Rejeições SMTP imediatas são monitoradas pelo sistema. Bounces assíncronos dependem do retorno disponibilizado pelo provedor de e-mail.</p>
+  </article>
+  <article class="panel"><h2>Servidor de envio</h2><form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="save">
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}<div class="form-field {% if field.field.widget.input_type == 'checkbox' %}checkbox-field{% endif %}">{{ field.label_tag }}{{ field }}{% if field.name == 'password' and has_password %}<small>Senha cadastrada. Deixe vazio para manter.</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    <p class="payment-hint">Para a porta 587, marque STARTTLS e desmarque SSL direto. Para a porta 465, marque SSL direto e desmarque STARTTLS. Use o endereço completo da caixa postal como usuário e como remetente, caso o provedor exija. Não use a porta IMAP/POP3 para envio.</p><button type="submit" class="button primary">Salvar configuração</button>
+  </form></article>
+  {% if configured and configured.enabled %}<article class="panel" style="margin-top:18px"><h2>Testar entrega</h2><p>Envie uma mensagem de teste ao seu e-mail Master: <strong>{{ request.user.email }}</strong>.</p><form method="post">{% csrf_token %}<input type="hidden" name="action" value="test"><button class="button ghost" type="submit">Enviar e-mail de teste</button></form></article>{% endif %}
+</section>
+{% endblock %}

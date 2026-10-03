@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Master — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><span class="eyebrow">VISÃO GERAL · MASTER</span><h1>Central da plataforma</h1><p>Planos, empresas, comunicação e operação em um único lugar.</p></div><a class="button primary" href="{% url 'master-resource-list' 'planos' %}">Gerenciar planos <span aria-hidden="true">↗</span></a></div>
+  <div class="metric-grid" style="margin-bottom:22px">
+    <article><span>Planos à venda</span><strong>{{ public_plans }}</strong><small>Ativos e visíveis para novos clientes</small></article>
+    <article><span>Funções disponíveis</span><strong>{{ active_modules }}</strong><small>Módulos ativos no catálogo</small></article>
+  </div>
+  <section class="master-shortcuts" aria-labelledby="master-shortcuts-title">
+    <div class="section-heading"><div><span class="eyebrow">ACESSO RÁPIDO</span><h2 id="master-shortcuts-title">O que você quer fazer?</h2></div></div>
+    <div class="shortcut-grid">
+      <a href="{% url 'master-homepage' %}"><span class="shortcut-icon" aria-hidden="true">✦</span><strong>Editar página inicial</strong><small>Logo, textos e apresentação pública</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-resource-list' 'blog' %}"><span class="shortcut-icon" aria-hidden="true">▤</span><strong>Publicar notícia</strong><small>Conteúdo para o blog da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-platform-payment' %}"><span class="shortcut-icon" aria-hidden="true">◈</span><strong>Receber assinaturas</strong><small>Mercado Pago da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-smtp-settings' %}"><span class="shortcut-icon" aria-hidden="true">✉</span><strong>Configurar e-mail</strong><small>SMTP e teste de envio</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-email-templates' %}"><span class="shortcut-icon" aria-hidden="true">✎</span><strong>Modelos de e-mail</strong><small>Mensagens automáticas da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-marketing' %}"><span class="shortcut-icon" aria-hidden="true">◎</span><strong>Criar campanha</strong><small>Contatos autorizados e entregas</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-whatsapp' %}"><span class="shortcut-icon" aria-hidden="true">◌</span><strong>Atender no WhatsApp</strong><small>Caixa de entrada e QR code</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-whatsapp-flow' %}"><span class="shortcut-icon" aria-hidden="true">◇</span><strong>Editar fluxo</strong><small>Automação do WhatsApp Master</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-resource-list' 'onboarding' %}"><span class="shortcut-icon" aria-hidden="true">✓</span><strong>Verificar empresas</strong><small>Cadastro e publicação</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+  <section class="master-start" aria-labelledby="master-start-title">
+    <div class="section-heading"><span class="eyebrow">CONFIGURAÇÃO</span><h2 id="master-start-title">Primeiros passos</h2><p>Prepare o catálogo e as empresas para começar a vender.</p></div>
+    <div class="shortcut-grid master-start-grid">
+      <a href="{% url 'master-resource-list' 'planos' %}"><span class="shortcut-icon" aria-hidden="true">01</span><strong>Configure os planos</strong><small>Preços, teste grátis e visibilidade pública</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-resource-list' 'modulos' %}"><span class="shortcut-icon" aria-hidden="true">02</span><strong>Revise os módulos</strong><small>Defina as funções disponíveis em cada plano</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-resource-list' 'empresas' %}"><span class="shortcut-icon" aria-hidden="true">03</span><strong>Publique as empresas</strong><small>Confira cadastro, perfil e página pública</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-resource-list' 'conexoes-pagamento' %}"><span class="shortcut-icon" aria-hidden="true">04</span><strong>Verifique os pagamentos</strong><small>Conexões e integrações das empresas</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+    </div>
+    <div class="master-start-actions"><a href="{% url 'billing-plans' %}" target="_blank" rel="noopener">Ver página de vendas ↗</a><a href="{% url 'master-chatbot' %}">Configurar fluxo do chatbot ↗</a></div>
+  </section>
+
+  <section class="master-catalog" aria-labelledby="master-catalog-title">
+    <div class="master-catalog-heading"><div><span class="eyebrow">TODAS AS FUNÇÕES</span><h2 id="master-catalog-title">Encontre o que precisa</h2><p>Busque pelo nome da função ou navegue pelas áreas da plataforma.</p></div></div>
+    <div class="master-search"><label for="master-function-search">Buscar funções</label><div class="master-search-field"><span aria-hidden="true">⌕</span><input id="master-function-search" type="search" placeholder="Ex.: planos, empresas, WhatsApp, pagamentos" autocomplete="off" aria-controls="master-function-groups"><button type="button" id="master-search-clear" hidden>Limpar busca</button></div><p id="master-search-status" role="status" aria-live="polite"></p></div>
+    <nav class="shortcut-grid master-category-grid" id="master-category-grid" aria-label="Categorias de funções">
+      <a href="#master-group-quick"><span class="shortcut-icon" aria-hidden="true">00</span><strong>Configurações rápidas</strong><small>Página inicial, e-mail e atendimento</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      {% for group in groups %}<a href="#master-group-{{ forloop.counter }}"><span class="shortcut-icon" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</span><strong>{{ group.title }}</strong><small>{{ group.cards|length }} áreas para gerenciar</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>{% endfor %}
+    </nav>
+    <div id="master-function-groups">
+      <section class="master-function-group" id="master-group-quick" data-master-group>
+        <div class="master-function-heading"><div><span class="eyebrow">ACESSO DIRETO</span><h3>Configurações rápidas</h3></div><span>7 funções</span></div>
+        <div class="shortcut-grid master-function-grid">
+          <a href="{% url 'master-homepage' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">✦</span><strong>Editar página inicial</strong><small>Logo e textos do site</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-smtp-settings' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">✉</span><strong>Configurar e-mail SMTP</strong><small>Envio e teste de e-mail</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-email-templates' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">✎</span><strong>Modelos de e-mail</strong><small>Personalizar mensagens</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-whatsapp' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">◌</span><strong>WhatsApp Master</strong><small>Conversas e QR code</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-whatsapp-flow' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">◇</span><strong>Fluxo do WhatsApp</strong><small>Automação do atendimento</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-marketing' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">◎</span><strong>Campanhas de e-mail</strong><small>Captação e envios</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-chatbot' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">◈</span><strong>Fluxo do chatbot</strong><small>Atendimento automatizado</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+        </div>
+      </section>
+      {% for group in groups %}<section class="master-function-group" id="master-group-{{ forloop.counter }}" data-master-group>
+        <div class="master-function-heading"><div><span class="eyebrow">ÁREA {{ forloop.counter|stringformat:"02d" }}</span><h3>{{ group.title }}</h3></div><span>{{ group.cards|length }} {{ group.cards|length|pluralize:"função,funções" }}</span></div>
+        <div class="shortcut-grid master-function-grid">{% for item in group.cards %}<a class="master-function-card" href="{% url 'master-resource-list' item.slug %}" data-master-function><span class="shortcut-icon" aria-hidden="true">↗</span><strong>{{ item.title }}</strong><small>{{ item.count }} registros</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>{% endfor %}</div>
+      </section>{% endfor %}
+    </div>
+    <p id="master-search-empty" class="panel master-search-empty" hidden>Nenhuma função encontrada. Tente outro termo ou limpe a busca.</p>
+  </section>
+</section>
+<script src="{% static 'js/master-functions.js' %}" defer></script>
+{% endblock %}
