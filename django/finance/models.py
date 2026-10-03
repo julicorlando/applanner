@@ -33,6 +33,9 @@ class FinancialTransaction(TimeStampedModel):
         CANCELLED="cancelled","Cancelado"
 
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="financial_transactions")
+    unit=models.ForeignKey(
+        "tenants.Unit",null=True,blank=True,on_delete=models.SET_NULL,related_name="financial_transactions"
+    )
     appointment=models.ForeignKey("scheduling.Appointment",null=True,blank=True,on_delete=models.SET_NULL,related_name="financial_transactions")
     category=models.ForeignKey(FinancialCategory,null=True,blank=True,on_delete=models.SET_NULL,related_name="transactions")
     source_type=models.CharField(max_length=40,blank=True)
@@ -58,6 +61,7 @@ class FinancialTransaction(TimeStampedModel):
         indexes=[
             models.Index(fields=["tenant","status","due_at"]),
             models.Index(fields=["tenant","source_type","source_id"]),
+            models.Index(fields=["tenant","unit","status","paid_at"],name="finance_tx_unit_paid_idx"),
         ]
 
 
