@@ -14,7 +14,7 @@ from .models import Appointment,AppointmentRescheduleHistory,Professional
 
 
 def _appointment(token,lock=False):
-    qs=Appointment.objects.select_related("tenant","customer","service")
+    qs=Appointment.objects.select_related("tenant","customer","service","professional").prefetch_related("product_reservations__product")
     if lock:
         qs=qs.select_for_update()
     return get_object_or_404(qs,customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest())
