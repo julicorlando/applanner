@@ -8,7 +8,7 @@ from core.branding import public_platform_logo, public_tenant_image, public_prof
 from tenants.onboarding import onboarding
 from communications.views import marketing_click, marketing_open, marketing_unsubscribe, whatsapp_webhook
 from communications.tenant_whatsapp import tenant_whatsapp_receive
-from contenthub.views import blog_post, landing, public_directory, public_directory_page
+from contenthub.views import blog_post, faq_page, landing, public_directory, public_directory_page
 from scheduling.public_views import appointment_page
 from scheduling.ratings import public_rating
 from scheduling.public_api import (
@@ -43,6 +43,7 @@ urlpatterns = [
     path("app/", include("core.portal_urls")),
     path("commercial/", include("commercial.urls")),
     path("master/", include("core.master_urls")),
+    path("faq/", faq_page, name="faq-public"),
     path("directory/", public_directory_page, name="public-directory"),
     path("api/directory/", public_directory, name="public-directory-api"),
     path("estabelecimentos/", public_directory_page, name="public-directory-page"),
