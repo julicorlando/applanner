@@ -98,6 +98,25 @@ def _role_resource_write(user,module_slug,resource_slug):
     return (module_slug,resource_slug) in RECEPTION_WRITE_RESOURCES
 
 
+def _unit_billing_notice(tenant,module_slug,resource_slug):
+    if (module_slug,resource_slug)!=("agenda","unidades"):
+        return ""
+    from billing.models import TenantModuleAddon
+    addon=TenantModuleAddon.objects.filter(
+        tenant=tenant,module__slug="multiunit",module__per_unit_billing=True,
+        status=TenantModuleAddon.Status.ACTIVE,
+    ).select_related("module").first()
+    if not addon or addon.module.addon_monthly_price is None:
+        return ""
+    count=tenant.units.filter(active=True).count()
+    return (
+        f"O módulo Multiunidade é cobrado por unidade ativa: R$ "
+        f"{addon.module.addon_monthly_price:.2f} por unidade. "
+        f"Atualmente há {count} unidade(s). Ao cadastrar, ativar, desativar ou remover uma unidade, "
+        "o valor da assinatura será recalculado automaticamente."
+    )
+
+
 def _feature_allowed(user,tenant,module_slug,resource_slug):
     if tenant and segment_enabled(tenant,"arena") and module_slug=="agenda" and resource_slug in {
         "agendamentos","profissionais","servicos","expedientes","intervalos","folgas",
@@ -1264,6 +1283,7 @@ def resource_create(request,module_slug,resource_slug):
         "resource_slug":resource_slug,"resource":resource,"form":form,
         "title":f"Novo — {resource['title']}",
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
+        "unit_billing_notice":_unit_billing_notice(tenant,module_slug,resource_slug),
     })
 
 
@@ -1307,6 +1327,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
         "professional_existing_active":model._meta.label_lower=="scheduling.professional" and obj.active,
         "appointment_identity":obj if model._meta.label_lower=="scheduling.appointment" else None,
+        "unit_billing_notice":_unit_billing_notice(tenant,module_slug,resource_slug),
     })
 
 
