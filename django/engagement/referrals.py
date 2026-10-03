@@ -46,10 +46,11 @@ def referral_redirect(request,code):
         ReferralProfile.objects.select_related("user"),referral_code=code,active=True
     )
     user=profile.user
+    company_roles={"owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager"}
     allowed=bool(
         campaign and user.tenant_id and (
             (user.role=="professional" and campaign.professional_referrals_enabled)
-            or (user.role!="professional" and campaign.company_referrals_enabled)
+            or (user.role in company_roles and campaign.company_referrals_enabled)
         )
     )
     if not allowed:
