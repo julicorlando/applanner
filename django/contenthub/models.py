@@ -31,6 +31,7 @@ class PlatformHomepage(models.Model):
     hero_title=models.CharField(max_length=160,default="Transforme horários livres em clientes.")
     hero_description=models.CharField(max_length=400,default="Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar.")
     closing_title=models.CharField(max_length=160,default="Organize hoje. Escale amanhã.")
+    medical_segment_visible=models.BooleanField(default=False)
     updated_at=models.DateTimeField(auto_now=True)
 
 
@@ -61,3 +62,16 @@ class PublicReview(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["tenant","active","created_at"],name="content_review_tenant_idx")]
+
+
+class FAQItem(TimeStampedModel):
+    question=models.CharField(max_length=220)
+    answer=models.TextField()
+    sort_order=models.PositiveSmallIntegerField(default=0)
+    active=models.BooleanField(default=True)
+
+    class Meta:
+        ordering=["sort_order","id"]
+
+    def __str__(self):
+        return self.question
