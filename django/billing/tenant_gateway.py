@@ -69,7 +69,7 @@ def tenant_gateway(request):
     if not tenant or tenant.deleted_at:
         raise PermissionDenied("Selecione uma empresa ativa.")
 
-    webhook_url=request.build_absolute_uri(f"/webhooks/tenant/mercadopago/{tenant.slug}/")
+    webhook_url=request.build_absolute_uri(f"/webhooks/tenant/pagamentos/{tenant.slug}/")
     connections=TenantPaymentConnection.objects.filter(
         tenant=tenant,provider="mercadopago"
     ).order_by("environment")
