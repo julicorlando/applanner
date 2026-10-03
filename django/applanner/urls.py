@@ -42,6 +42,7 @@ urlpatterns = [
     path("app/comunicacao/", include("communications.urls")),
     path("app/", include("core.portal_urls")),
     path("commercial/", include("commercial.urls")),
+    path("", include("growth.urls")),
     path("master/", include("core.master_urls")),
     path("faq/", faq_page, name="faq-public"),
     path("directory/", public_directory_page, name="public-directory"),
