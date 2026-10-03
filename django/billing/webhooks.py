@@ -141,6 +141,12 @@ def _reconcile_platform(event,gateway,data,resource_id):
         ).first()
         if charge:
             payment=charge.payment
+            if charge.status!="pending" or payment.status==Payment.Status.CANCELLED:
+                event.status=WebhookEvent.Status.PROCESSED
+                event.processed_at=timezone.now()
+                event.error_message=""
+                event.save(update_fields=["status","processed_at","error_message"])
+                return
             if order.get("external_reference")!=payment.provider_reference or order.get("currency_id")!="BRL":
                 raise ValueError("Pedido Pix não corresponde à cobrança registrada.")
             details=(order.get("transactions") or {}).get("payments") or []
