@@ -61,3 +61,30 @@ class PublicReview(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["tenant","active","created_at"],name="content_review_tenant_idx")]
+
+
+class FAQItem(TimeStampedModel):
+    question=models.CharField(max_length=220)
+    answer=models.TextField()
+    category=models.CharField(max_length=80,blank=True)
+    sort_order=models.PositiveSmallIntegerField(default=0)
+    active=models.BooleanField(default=True)
+
+    class Meta:
+        ordering=["sort_order","question"]
+
+    def __str__(self):
+        return self.question
+
+
+class PlatformFeatureFlag(TimeStampedModel):
+    key=models.SlugField(max_length=80,unique=True)
+    label=models.CharField(max_length=160)
+    description=models.CharField(max_length=500,blank=True)
+    enabled=models.BooleanField(default=False)
+
+    class Meta:
+        ordering=["label"]
+
+    def __str__(self):
+        return self.label
