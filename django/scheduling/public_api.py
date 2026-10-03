@@ -10,14 +10,14 @@ from django.core.exceptions import ValidationError
 from .customer_identity import contact_values, resolve_customer
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q,Sum
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import permissions, status, throttling
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from tenants.models import Tenant
+from tenants.models import Tenant,Unit
 from .availability import AvailabilityService
 from .models import (
     Appointment, AppointmentRescheduleHistory, Customer, Professional, Service,
@@ -45,17 +45,21 @@ class PublicWaitlistAPIView(APIView):
         except PermissionDenied:
             return Response({"detail":"A lista de espera não está disponível neste plano."},status=403)
         try:
+            unit=_selected_unit(tenant,request.data.get("unit_id"),lock=True)
+            if not unit:
+                raise ValueError
             service=Service.objects.get(tenant=tenant,pk=int(request.data["service_id"]),active=True)
             day=date.fromisoformat(str(request.data["date"]))
             professional_id=str(request.data.get("professional_id") or "").strip()
-            professional=(Professional.objects.get(tenant=tenant,pk=int(professional_id),active=True)
-                          if professional_id else None)
+            professional=(Professional.objects.get(
+                tenant=tenant,unit=unit,pk=int(professional_id),active=True
+            ) if professional_id else None)
         except (KeyError,ValueError,TypeError,Service.DoesNotExist,Professional.DoesNotExist):
             return Response({"detail":"Serviço, profissional ou data inválidos."},status=400)
         if day<timezone.localdate() or day>timezone.localdate()+timedelta(days=90):
             return Response({"detail":"Escolha uma data entre hoje e os próximos 90 dias."},status=400)
         availability=AvailabilityService()
-        candidates=[professional] if professional else _candidate_professionals(tenant,service)
+        candidates=[professional] if professional else _candidate_professionals(tenant,service,unit)
         if any(availability.professional_offers(tenant,item.pk,service.pk) and availability.slots(
             tenant=tenant,service_id=service.pk,professional_id=item.pk,day=day,public_rules=True,
         ) for item in candidates):
@@ -64,8 +68,10 @@ class PublicWaitlistAPIView(APIView):
             customer,reused=resolve_customer(tenant,request.data.get("name"),request.data.get("phone"),request.data.get("email"))
         except ValidationError as exc:
             return Response({"detail":" ".join(exc.messages)},status=400)
-        entry,created=WaitlistEntry.objects.get_or_create(tenant=tenant,customer=customer,service=service,
-            professional=professional,preferred_date=day,status=WaitlistEntry.Status.WAITING)
+        entry,created=WaitlistEntry.objects.get_or_create(
+            tenant=tenant,unit=unit,customer=customer,service=service,
+            professional=professional,preferred_date=day,status=WaitlistEntry.Status.WAITING
+        )
         return Response({"detail":"Você entrou na lista de espera. O estabelecimento entrará em contato se surgir um horário.",
             "id":entry.pk},status=201 if created else 200)
 
@@ -80,6 +86,19 @@ def _tenant(slug):
     ).first()
 
 
+def _selected_unit(tenant,raw=None,*,lock=False):
+    qs=Unit.objects.filter(tenant=tenant,active=True)
+    if lock:
+        qs=qs.select_for_update()
+    value=str(raw or "").strip()
+    if value:
+        try:
+            return qs.get(pk=int(value))
+        except (TypeError,ValueError,Unit.DoesNotExist):
+            return None
+    return qs.order_by("-is_primary","name","pk").first()
+
+
 def _parse_start(tenant,value):
     tz=ZoneInfo(tenant.timezone or "America/Recife")
     start=datetime.fromisoformat(str(value))
@@ -88,12 +107,13 @@ def _parse_start(tenant,value):
     return start.astimezone(tz)
 
 
-def _candidate_professionals(tenant,service):
+def _candidate_professionals(tenant,service,unit=None):
     # Keep this queryset lockable on PostgreSQL. Service eligibility is checked
     # by AvailabilityService before a candidate is exposed or selected.
-    return Professional.objects.filter(
-        tenant=tenant,active=True
-    ).order_by("name","pk")
+    qs=Professional.objects.filter(tenant=tenant,active=True)
+    if unit:
+        qs=qs.filter(unit=unit)
+    return qs.order_by("name","pk")
 
 
 class PublicAvailabilityAPIView(APIView):
@@ -112,6 +132,9 @@ class PublicAvailabilityAPIView(APIView):
                 {"detail":"Informe service_id e date=YYYY-MM-DD."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        unit=_selected_unit(tenant,request.query_params.get("unit_id"))
+        if not unit:
+            return Response({"detail":"Unidade não encontrada."},status=status.HTTP_404_NOT_FOUND)
         service=Service.objects.filter(pk=service_id,tenant=tenant,active=True).first()
         if not service:
             return Response({"detail":"Serviço não encontrado."},status=status.HTTP_404_NOT_FOUND)
@@ -124,7 +147,7 @@ class PublicAvailabilityAPIView(APIView):
             except ValueError:
                 return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
             professional=Professional.objects.filter(
-                pk=professional_id,tenant=tenant,active=True
+                pk=professional_id,tenant=tenant,unit=unit,active=True
             ).first()
             if not professional or not availability.professional_offers(
                 tenant,professional.pk,service.pk
@@ -139,12 +162,13 @@ class PublicAvailabilityAPIView(APIView):
                 slot["professional_name"]=professional.name
             return Response({
                 "date":day.isoformat(),"auto_professional":False,
+                "unit":{"id":unit.pk,"name":unit.name},
                 "professional":{"id":professional.pk,"name":professional.name},
                 "slots":slots,
             })
 
         combined={}
-        for professional in _candidate_professionals(tenant,service):
+        for professional in _candidate_professionals(tenant,service,unit):
             for slot in availability.slots(
                 tenant=tenant,service_id=service.pk,professional_id=professional.pk,
                 day=day,public_rules=True,
@@ -160,7 +184,10 @@ class PublicAvailabilityAPIView(APIView):
                 if current is None or professional.name.lower()<current["professional_name"].lower():
                     combined[slot["value"]]=candidate
         slots=sorted(combined.values(),key=lambda item:item["value"])
-        return Response({"date":day.isoformat(),"auto_professional":True,"slots":slots})
+        return Response({
+            "date":day.isoformat(),"auto_professional":True,
+            "unit":{"id":unit.pk,"name":unit.name},"slots":slots,
+        })
 
 
 def _booking_idempotency_key(request):
@@ -174,6 +201,7 @@ def _booking_idempotency_key(request):
 
 def _booking_fingerprint(data):
     normalized={
+        "unit_id":str(data.get("unit_id") or ""),
         "service_id":str(data.get("service_id") or ""),
         "professional_id":str(data.get("professional_id") or ""),
         "starts_at":str(data.get("starts_at") or ""),
@@ -205,6 +233,10 @@ def _booking_response(request,appointment,*,replay=False,customer_reused=True):
             "duration_minutes":appointment.service.duration_minutes,
         },
         "timezone":appointment.tenant.timezone or "America/Recife",
+        "unit":{
+            "id":appointment.unit_id,
+            "name":appointment.unit.name if appointment.unit else "",
+        },
         "customer_reused":customer_reused,
         "professional":{
             "id":appointment.professional_id,
@@ -231,7 +263,7 @@ def _booking_replay(request,tenant,key,fingerprint):
     if not key:
         return None
     appointment=Appointment.objects.select_related(
-        "tenant","service","professional"
+        "tenant","unit","service","professional"
     ).filter(tenant=tenant,idempotency_key=key).first()
     if not appointment:
         return None
@@ -263,6 +295,9 @@ class PublicBookingAPIView(APIView):
         if replay:
             return replay
         try:
+            unit=_selected_unit(tenant,data.get("unit_id"),lock=True)
+            if not unit:
+                raise ValueError
             service=Service.objects.get(pk=int(data["service_id"]),tenant=tenant,active=True)
             starts_at=_parse_start(tenant,data["starts_at"])
         except (KeyError,TypeError,ValueError,Service.DoesNotExist):
@@ -276,7 +311,7 @@ class PublicBookingAPIView(APIView):
         if requested_professional:
             try:
                 professional=Professional.objects.select_for_update().get(
-                    pk=int(requested_professional),tenant=tenant,active=True
+                    pk=int(requested_professional),tenant=tenant,unit=unit,active=True
                 )
             except (ValueError,Professional.DoesNotExist):
                 return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
@@ -295,7 +330,7 @@ class PublicBookingAPIView(APIView):
                 )
         else:
             # Lock candidates and pick the first one that remains free.
-            for candidate in _candidate_professionals(tenant,service).select_for_update():
+            for candidate in _candidate_professionals(tenant,service,unit).select_for_update():
                 replay=_booking_replay(request,tenant,idempotency_key,fingerprint)
                 if replay:
                     return replay
@@ -352,7 +387,7 @@ class PublicBookingAPIView(APIView):
             locked=list(
                 Product.objects.select_for_update().filter(
                     tenant=tenant,active=True,pk__in=product_ids,
-                )
+                ).filter(Q(unit__isnull=True)|Q(unit=unit))
             )
             by_id={product.pk:product for product in locked}
             if len(by_id)!=len(product_ids):
@@ -400,7 +435,7 @@ class PublicBookingAPIView(APIView):
 
         token=secrets.token_urlsafe(32)
         appointment=Appointment.objects.create(
-            tenant=tenant,customer=customer,professional=professional,service=service,
+            tenant=tenant,unit=unit,customer=customer,professional=professional,service=service,
             customer_name_snapshot=name,
             vehicle=vehicle,
             service_price_snapshot=service.price,starts_at=starts_at,ends_at=ends_at,
@@ -444,7 +479,7 @@ class CustomerAppointmentAPIView(APIView):
     def _appointment(self,token):
         digest=hashlib.sha256(token.encode()).hexdigest()
         return Appointment.objects.select_related(
-            "tenant","customer","professional","service"
+            "tenant","unit","customer","professional","service"
         ).prefetch_related("product_reservations__product").filter(
             customer_manage_token_hash=digest
         ).first()
@@ -467,6 +502,7 @@ class CustomerAppointmentAPIView(APIView):
             "id":appointment.pk,"status":appointment.status,
             "starts_at":appointment.starts_at.isoformat(),"ends_at":appointment.ends_at.isoformat(),
             "service_id":appointment.service_id,"service":appointment.service.name,
+            "unit_id":appointment.unit_id,"unit":appointment.unit.name if appointment.unit else None,
             "professional_id":appointment.professional_id,
             "professional":appointment.professional.name if appointment.professional else None,
             "reserved_products":[
@@ -484,7 +520,7 @@ class CustomerAppointmentAPIView(APIView):
     @transaction.atomic
     def patch(self,request,token):
         appointment=Appointment.objects.select_for_update().select_related(
-            "tenant","service","professional"
+            "tenant","unit","service","professional"
         ).filter(customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest()).first()
         if not appointment:
             return Response({"detail":"Agendamento não encontrado."},status=status.HTTP_404_NOT_FOUND)
@@ -502,7 +538,7 @@ class CustomerAppointmentAPIView(APIView):
         if raw_prof:
             try:
                 professional=Professional.objects.select_for_update().get(
-                    pk=int(raw_prof),tenant=appointment.tenant,active=True
+                    pk=int(raw_prof),tenant=appointment.tenant,unit=appointment.unit,active=True
                 )
             except (ValueError,Professional.DoesNotExist):
                 return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
@@ -517,7 +553,7 @@ class CustomerAppointmentAPIView(APIView):
                 return Response({"detail":"Horário indisponível."},status=status.HTTP_409_CONFLICT)
         else:
             for candidate in _candidate_professionals(
-                appointment.tenant,appointment.service
+                appointment.tenant,appointment.service,appointment.unit
             ).select_for_update():
                 if not availability.professional_offers(
                     appointment.tenant,candidate.pk,appointment.service_id
