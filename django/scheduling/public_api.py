@@ -182,7 +182,7 @@ class PublicAvailabilityAPIView(APIView):
                 slot["professional_name"]=professional.name
             return Response({
                 "date":day.isoformat(),"auto_professional":False,
-                "unit":{"id":unit.pk,"name":unit.name},
+                "unit":{"id":unit.pk if unit else None,"name":unit.name if unit else ""},
                 "professional":{"id":professional.pk,"name":professional.name},
                 "slots":slots,
             })
@@ -206,7 +206,7 @@ class PublicAvailabilityAPIView(APIView):
         slots=sorted(combined.values(),key=lambda item:item["value"])
         return Response({
             "date":day.isoformat(),"auto_professional":True,
-            "unit":{"id":unit.pk,"name":unit.name},"slots":slots,
+            "unit":{"id":unit.pk if unit else None,"name":unit.name if unit else ""},"slots":slots,
         })
 
 
