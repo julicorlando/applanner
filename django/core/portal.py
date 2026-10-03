@@ -726,6 +726,15 @@ def _model_form(model, resource, *args, tenant=None, **kwargs):
         fields.remove("vehicle")
     Form=modelform_factory(model,form=OperationModelForm,fields=fields,widgets=_widgets_for(model,fields))
     form=Form(*args,tenant=tenant,**kwargs)
+    if tenant and "unit" in form.fields and model._meta.label_lower in {
+        "scheduling.appointment","finance.financialtransaction"
+    }:
+        units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
+        if units:
+            form.fields["unit"].required=True
+            if not form.is_bound and not getattr(form.instance,"unit_id",None):
+                form.fields["unit"].initial=units[0].pk
+            form.fields["unit"].help_text="A unidade define a agenda e os indicadores financeiros deste lançamento."
     if model._meta.label_lower=="scheduling.customer" and "phone" in form.fields:
         form.fields["phone"].required=True
         form.fields["phone"].label="Telefone com DDD"
@@ -789,12 +798,18 @@ def _save_special(obj, *, resource, request, tenant, is_new):
         obj.created_by=request.user
 
     if special=="appointment":
+        if not obj.unit_id:
+            obj.unit=tenant.units.filter(active=True).order_by("-is_primary","name").first()
+        if obj.professional_id and obj.professional.unit_id and obj.unit_id!=obj.professional.unit_id:
+            raise ValidationError({"professional":"O profissional selecionado pertence a outra unidade."})
         if obj.service_id and obj.starts_at:
             obj.ends_at=obj.starts_at+timedelta(minutes=obj.service.duration_minutes)
             obj.service_price_snapshot=obj.service.price
         if is_new:
             obj.created_by=request.user
     elif special=="financial_transaction":
+        if not obj.unit_id:
+            obj.unit=tenant.units.filter(active=True).order_by("-is_primary","name").first()
         if obj.status==obj.Status.PAID and not obj.paid_at:
             obj.paid_at=timezone.now()
     elif special=="barber_queue":
