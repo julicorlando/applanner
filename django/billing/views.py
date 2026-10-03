@@ -560,13 +560,16 @@ def subscription_modules(request):
         ModuleRequest.objects.filter(
             tenant=tenant,status__in=[
                 ModuleRequest.Status.PENDING,ModuleRequest.Status.APPROVED,
-                ModuleRequest.Status.AWAITING_PAYMENT,ModuleRequest.Status.ACTIVE,
+                ModuleRequest.Status.AWAITING_PAYMENT,ModuleRequest.Status.PAYMENT_FAILED,
             ]
         ).values_list("module_id",flat=True)
     )
+    professional_extra_id=Module.objects.filter(slug="professional-extra").values_list("pk",flat=True).first()
+    repeatable_ids={professional_extra_id} if professional_extra_id else set()
+    blocked_ids=(plan_module_ids|active_ids)-repeatable_ids
     available=list(Module.objects.filter(
         active=True,addon_sellable=True
-    ).exclude(pk__in=plan_module_ids|active_ids|pending_ids).order_by("sort_order","name"))
+    ).exclude(pk__in=blocked_ids|pending_ids).order_by("sort_order","name"))
     for module in available:
         module.current_monthly_price=module_monthly_price(module,tenant)
         module.current_unit_count=tenant.units.filter(active=True).count() if module.per_unit_billing else None
