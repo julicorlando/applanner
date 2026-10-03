@@ -76,6 +76,14 @@ def _tenant_dashboard(request):
         modules.extend(row for row in plan_modules if row.module_id not in known)
     modules=[row for row in modules if module_enabled(tenant,row.module.slug)]
 
+    from engagement.referrals import active_referral_campaign
+    referral_campaign=active_referral_campaign()
+    company_referral_roles={"owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager"}
+    if referral_campaign and (
+        request.user.role not in company_referral_roles or not referral_campaign.company_referrals_enabled
+    ):
+        referral_campaign=None
+
     available=available_modules(request.user,tenant)
     segment_module=next((item for item in available if item["slug"] in {"auto","saude","arena","barbearia"}),None)
     arena_mode=segment_enabled(tenant,"arena")
@@ -124,6 +132,7 @@ def _tenant_dashboard(request):
         "arena_upcoming":arena_upcoming,
         "arena_today_total":arena_today_total,"arena_today_pending":arena_today_pending,
         "courts_count":courts_count,
+        "referral_campaign":referral_campaign,
     })
 
 
