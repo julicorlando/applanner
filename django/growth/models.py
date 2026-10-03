@@ -110,6 +110,16 @@ class PlatformReferral(models.Model):
     class Meta:
         indexes=[models.Index(fields=["status","created_at"],name="growth_ref_status_idx")]
 
+    @property
+    def pix_key_display(self):
+        if not self.pix_key_encrypted:
+            return ""
+        from core.crypto import decrypt_text
+        try:
+            return decrypt_text(self.pix_key_encrypted)
+        except Exception:
+            return "Não foi possível descriptografar"
+
     def __str__(self):
         return f"{self.referrer_user} → {self.referred_tenant}"
 
