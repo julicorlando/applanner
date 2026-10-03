@@ -64,3 +64,84 @@ select option, select optgroup { color: #172033; background-color: #fff; }
 .table-actions form { display: inline-block; margin-left: 10px; }
 .table-actions .nav-link { font-weight: 750; }
 .table-actions .danger-action { color: #d85050; }
+
+
+/* Página pública da empresa: capa ampla e arredondada + foto de perfil circular. */
+.tenant-hero{padding:28px 0;background:var(--tenant-bg,#f7f8fb)}
+.tenant-hero .tenant-hero__content{
+  width:min(1500px,calc(100% - 48px));
+  min-height:390px;
+  padding:clamp(34px,5vw,72px);
+  border-radius:30px;
+  overflow:hidden;
+  position:relative;
+  isolation:isolate;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.tenant-hero--has-cover .tenant-hero__content{
+  background:#12213e;
+  box-shadow:0 22px 56px rgba(0,0,0,.18);
+}
+.tenant-hero .tenant-cover{
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  opacity:1;
+  border-radius:inherit;
+}
+.tenant-hero--has-cover .tenant-hero__content::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(90deg,rgba(6,15,34,.82) 0%,rgba(8,18,40,.57) 48%,rgba(8,18,40,.28) 100%);
+}
+.tenant-profile-logo{
+  width:96px;
+  height:96px;
+  flex:0 0 96px;
+  display:block;
+  object-fit:cover;
+  object-position:center;
+  border-radius:50%;
+  margin:0 0 18px;
+  border:3px solid rgba(255,255,255,.82);
+  background:#fff;
+  box-shadow:0 10px 30px rgba(0,0,0,.28);
+}
+.tenant-hero--has-cover .eyebrow,
+.tenant-hero--has-cover h1{color:#f5f9ff}
+.tenant-hero--has-cover p{color:#d6e2f2}
+.tenant-hero--has-cover .button.ghost{
+  color:#fff;
+  border-color:rgba(255,255,255,.34);
+  background:rgba(5,14,32,.34);
+  backdrop-filter:blur(8px);
+}
+
+@media(max-width:700px){
+  .tenant-hero{padding:16px 0}
+  .tenant-hero .tenant-hero__content{
+    width:min(100% - 30px,1500px);
+    min-height:430px;
+    padding:28px 22px;
+    border-radius:22px;
+    justify-content:flex-end;
+  }
+  .tenant-profile-logo{
+    width:82px;
+    height:82px;
+    flex-basis:82px;
+  }
+  .tenant-hero--has-cover .tenant-hero__content::after{
+    background:linear-gradient(0deg,rgba(6,15,34,.88) 0%,rgba(8,18,40,.50) 62%,rgba(8,18,40,.22) 100%);
+  }
+}

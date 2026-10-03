@@ -3,10 +3,10 @@
 {% block title %}{{ tenant.public_seo_title|default:tenant.name }}{% endblock %}
 {% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
 {% block content %}
-<section class="tenant-hero" style="--tenant-accent:{{ tenant.public_accent_color|default:tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}">
-  <div class="shell">
+<section class="tenant-hero{% if tenant.cover %} tenant-hero--has-cover{% endif %}" style="--tenant-accent:{{ tenant.public_accent_color|default:tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}">
+  <div class="shell tenant-hero__content">
     {% if tenant.public_announcement %}<div class="tenant-announcement">{{ tenant.public_announcement }}</div>{% endif %}
-    {% if tenant.logo %}<img src="{% url 'public-tenant-image' tenant.pk 'logo' %}" alt="{{ tenant.name }}" style="max-height:72px;max-width:190px;margin-bottom:18px">{% endif %}
+    {% if tenant.logo %}<img class="tenant-profile-logo" src="{% url 'public-tenant-image' tenant.pk 'logo' %}" alt="Foto de perfil de {{ tenant.name }}">{% endif %}
     {% if tenant.cover %}<img class="tenant-cover" src="{% url 'public-tenant-image' tenant.pk 'cover' %}" alt="Capa de {{ tenant.name }}">{% endif %}
     {% if selected_professional and selected_professional.photo %}<img class="professional-avatar" src="{% url 'public-professional-image' selected_professional.pk %}" alt="Foto de {{ selected_professional.name }}">{% endif %}
     <span class="eyebrow">{{ tenant.category|default:"AGENDE ONLINE" }}</span>
