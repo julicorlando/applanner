@@ -211,10 +211,15 @@ def custom_plan(request):
     form=CustomPlanForm(request.POST or None)
     if request.method=="POST" and form.is_valid():
         data=form.cleaned_data
+        context=acquisition_context(request)
         Lead.objects.create(
             name=data["name"],business_type=data["business_type"],
             email=data["email"],phone=data["phone"],
-            source="custom_plan",consent_granted=True,
+            source=(context.get("source") or "organic")[:80],
+            source_medium=(context.get("medium") or "")[:80],
+            source_campaign=(context.get("campaign") or "")[:120],
+            referrer_user_id=request.session.get("referral_user_id") or None,
+            consent_granted=True,
             consent_at=timezone.now(),consent_version="custom_plan_v1",
             consent_purpose="Contato comercial para proposta de plano personalizado",
             notes="Módulos solicitados: "+", ".join(module.name for module in data["modules"]),
