@@ -6,13 +6,13 @@
   <div class="segment-grid">
     {% for card in cards %}
     <article class="directory-card">
-      <a class="directory-card__overlay" href="{% url 'tenant-public' card.tenant.public_slug|default:card.tenant.slug %}" aria-label="Abrir página de {{ card.tenant.name }} e agendar"></a>
+      <a class="directory-card__overlay" href="{% url 'tenant-public' card.tenant.public_slug|default:card.tenant.slug %}?unit={{ card.unit.pk }}#agendar" aria-label="Abrir {{ card.display_name }} e agendar"></a>
       <div class="directory-card__content">
         {% if card.tenant.logo %}<img class="professional-avatar" src="{% url 'public-tenant-image' card.tenant.pk 'logo' %}" alt="Logo de {{ card.tenant.name }}" loading="lazy">{% endif %}
         <span class="directory-card__segment">{{ card.tenant.category_label }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
-        <h3>{{ card.tenant.name }}</h3>
+        <h3>{{ card.display_name }}</h3>
         <p>{{ card.tenant.description|truncatechars:180 }}</p>
-        {% with unit=card.nearest_unit %}{% if unit %}<p class="directory-card__location">{{ unit.city }}{% if unit.state %}/{{ unit.state }}{% endif %}{% if unit.district %} · {{ unit.district }}{% endif %}</p>{% endif %}{% endwith %}
+        {% with unit=card.unit %}<p class="directory-card__location">{{ unit.city }}{% if unit.state %}/{{ unit.state }}{% endif %}{% if unit.district %} · {{ unit.district }}{% endif %}{% if unit.address %}<br>{{ unit.address }}{% if unit.address_number %}, {{ unit.address_number }}{% endif %}{% endif %}</p>{% endwith %}
         <span class="directory-card__cta">Abrir página e agendar <span aria-hidden="true">→</span></span>
       </div>
     </article>
