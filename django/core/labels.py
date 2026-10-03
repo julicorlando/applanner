@@ -141,6 +141,7 @@ FIELD_LABELS = {
     "sku": "Código do produto", "slot_interval_minutes": "Passo dos horários disponíveis (minutos)",
     "slug": "Identificador", "sort_order": "Ordem de exibição", "source": "Origem",
     "source_medium": "Canal de origem", "source_campaign": "Campanha de origem",
+    "referred_tenant": "Empresa indicada",
     "referrer_user": "Indicado por", "converted_tenant": "Empresa convertida",
     "per_unit_billing": "Cobrança por unidade",
     "question": "Pergunta", "answer": "Resposta",
