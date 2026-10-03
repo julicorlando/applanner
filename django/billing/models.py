@@ -9,6 +9,7 @@ class Module(models.Model):
     description=models.CharField(max_length=500,blank=True)
     addon_monthly_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
     addon_sellable=models.BooleanField(default=False)
+    per_unit_billing=models.BooleanField(default=False)
     sort_order=models.SmallIntegerField(default=0)
     active=models.BooleanField(default=True)
 
