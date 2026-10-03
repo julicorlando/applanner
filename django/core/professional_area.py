@@ -297,3 +297,64 @@ def professional_appointment(request,pk):
         "can_settle":appointment.status in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
             Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS} and appointment.starts_at<=timezone.now(),
     })
+
+
+@login_required
+def reception_appointment(request,pk):
+    if request.user.role!="reception" or not request.user.tenant_id:
+        raise PermissionDenied("Área exclusiva da recepção.")
+    appointment=get_object_or_404(
+        Appointment.objects.select_related("customer","service","professional")
+        .prefetch_related("product_reservations__product"),
+        pk=pk,tenant_id=request.user.tenant_id,
+    )
+    if not appointment.professional_id:
+        messages.error(request,"Defina um profissional antes de finalizar este atendimento.")
+        return redirect("portal-resource-edit","agenda","agendamentos",appointment.pk)
+    professional=appointment.professional
+    from billing.models import TenantPaymentTransaction
+    paid=TenantPaymentTransaction.objects.filter(
+        tenant=appointment.tenant,reference_type="appointment",reference_id=appointment.pk,
+        status=TenantPaymentTransaction.Status.PAID,
+    ).order_by("-paid_at").first()
+    prepaid_full=bool(paid and appointment.booking_payment==Appointment.BookingPayment.FULL)
+
+    if request.method=="POST" and request.POST.get("action")=="message":
+        try:
+            send_prepared_message(appointment,request.POST.get("kind",""),request.user)
+        except ValueError as exc:
+            messages.error(request,str(exc))
+        else:
+            messages.success(request,"Mensagem enviada ao cliente.")
+        return redirect("reception-appointment",pk=appointment.pk)
+
+    form=SettlementForm(
+        request.POST or None,tenant=appointment.tenant,appointment=appointment,
+        prepaid_full=prepaid_full,
+    )
+    if request.method=="POST" and form.is_valid():
+        try:
+            settle_appointment(
+                appointment_id=appointment.pk,professional=professional,user=request.user,
+                attended=form.cleaned_data["outcome"]=="completed",
+                payment_method=form.cleaned_data["payment_method"] or ("pix" if prepaid_full else ""),
+                reserved_product_ids=[item.pk for item in form.cleaned_data["reserved_products"]],
+                product_id=form.cleaned_data["product"].pk if form.cleaned_data["product"] else None,
+                quantity=form.cleaned_data["quantity"],
+            )
+        except (ValidationError,Appointment.DoesNotExist) as exc:
+            form.add_error(None,exc)
+        else:
+            messages.success(request,"Atendimento finalizado pela recepção. Serviço e vendas foram registrados.")
+            return redirect("portal-resource-list","agenda","agendamentos")
+
+    return render(request,"portal/professional_appointment.html",{
+        "professional":professional,"appointment":appointment,"form":form,
+        "reserved_product_reservations":list(appointment.product_reservations.all()),
+        "paid_booking_payment":paid,"prepaid_full":prepaid_full,
+        "reception_mode":True,
+        "can_settle":appointment.status in {
+            Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
+            Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
+        } and appointment.starts_at<=timezone.now(),
+    })
