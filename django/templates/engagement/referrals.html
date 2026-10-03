@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Indique e ganhe — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div><a class="back-link" href="/">← Painel</a><span class="eyebrow">INDICAÇÕES</span><h1>Indique e ganhe</h1>
+      {% if campaign %}<p>{{ campaign.name }} · recompensa após {{ campaign.qualification_payments }} pagamentos da empresa indicada.</p>{% else %}<p>Não há campanha ativa neste momento.</p>{% endif %}
+    </div>
+  </div>
+
+  {% if allowed and profile %}
+  <article class="panel">
+    <h2>Seu link de indicação</h2>
+    <p>Compartilhe este link. A origem ficará registrada automaticamente no funil do ApPlanner.</p>
+    <div class="form-field"><label for="referral-link">Link</label><input id="referral-link" type="text" readonly value="{{ referral_url }}"></div>
+    <button class="button primary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('referral-link').value)">Copiar link</button>
+    {% if kind == 'company' %}
+      <p class="payment-hint">Quando a empresa indicada atingir a quantidade de pagamentos exigida pela campanha, o desconto será aplicado automaticamente à assinatura da sua empresa.</p>
+    {% else %}
+      <p class="payment-hint">Quando a empresa indicada atingir a quantidade de pagamentos exigida, você receberá um e-mail para cadastrar sua chave Pix.</p>
+    {% endif %}
+  </article>
+  {% endif %}
+
+  <article class="panel" style="margin-top:16px">
+    <h2>Minhas indicações</h2>
+    {% for reward in rewards %}
+      <div class="module-row">
+        <span></span>
+        <div style="flex:1">
+          <strong>{{ reward.referred_tenant.name }}</strong>
+          <small>{{ reward.get_status_display }} · {{ reward.qualified_payment_count }}/{{ reward.campaign.qualification_payments }} pagamentos{% if reward.reward_amount %} · R$ {{ reward.reward_amount }}{% endif %}</small>
+        </div>
+      </div>
+      {% if reward.status == 'pix_required' %}
+      <form method="post" class="portal-form" style="margin:8px 0 18px">{% csrf_token %}
+        <input type="hidden" name="reward" value="{{ reward.pk }}">
+        <div class="form-field"><label for="pix-{{ reward.pk }}">Chave Pix para receber a recompensa</label><input id="pix-{{ reward.pk }}" name="pix_key" required autocomplete="off"></div>
+        <button class="button primary" type="submit">Enviar chave Pix</button>
+      </form>
+      {% endif %}
+    {% empty %}<p class="empty">Nenhuma indicação convertida ainda.</p>{% endfor %}
+  </article>
+</section>
+{% endblock %}
