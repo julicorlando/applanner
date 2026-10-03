@@ -148,7 +148,7 @@ select option, select optgroup { color: #172033; background-color: #fff; }
 
 
 /* Home: agenda ilustrativa com movimento contínuo de novos agendamentos. */
-.product-window--live{overflow:hidden}
+.product-window--live{position:relative;overflow:hidden}
 .preview-live-status{display:inline-flex!important;align-items:center;gap:7px;color:#dcecff!important}
 .preview-live-status i{width:8px;height:8px;border-radius:50%;background:#52d273;box-shadow:0 0 0 0 rgba(82,210,115,.45);animation:preview-live-pulse 1.8s ease-out infinite}
 .agenda-preview-viewport{height:194px;overflow:hidden;position:relative}
