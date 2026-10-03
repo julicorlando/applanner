@@ -262,6 +262,11 @@ def onboarding(request):
                 obj.tenant=tenant
                 obj.is_primary=True
                 obj.save()
+                try:
+                    from .geocoding import enrich_unit_from_postal_code
+                    enrich_unit_from_postal_code(obj)
+                except Exception:
+                    pass
             elif step=="service_done":
                 obj=form.save(commit=False)
                 obj.tenant=tenant
