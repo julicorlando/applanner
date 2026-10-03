@@ -27,6 +27,16 @@ class Lead(TimeStampedModel):
     business_type=models.CharField(max_length=100)
     estimated_value=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
     source=models.CharField(max_length=80,default="public_interest_form")
+    source_medium=models.CharField(max_length=80,blank=True)
+    source_campaign=models.CharField(max_length=120,blank=True)
+    referrer_user=models.ForeignKey(
+        settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="referred_commercial_leads",
+    )
+    converted_tenant=models.ForeignKey(
+        "tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="originating_commercial_leads",
+    )
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.NEW,db_index=True)
     assigned_to=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="commercial_leads")
     assigned_at=models.DateTimeField(null=True,blank=True)
