@@ -166,6 +166,7 @@ class PublicSignupTests(TestCase):
             "plan":self.plan.pk,
             "billing_cycle":Subscription.BillingCycle.MONTHLY,
             "business_name":"Barbearia Teste",
+            "postal_code":"55819000",
             "category":"barbearia",
             "owner_name":"Responsável",
             "email":"owner-signup@example.com",
@@ -198,7 +199,7 @@ class PublicSignupTests(TestCase):
         self.assertContains(self.client.get(url),"E-mail de quem pagará")
         data={"plan":self.plan.pk,"proposal_token":proposal.public_token,
             "billing_cycle":Subscription.BillingCycle.MONTHLY,"business_name":"Nova barbearia",
-            "category":"barbearia","owner_name":"Comprador","email":"buyer@example.test",
+            "postal_code":"55819000","category":"barbearia","owner_name":"Comprador","email":"buyer@example.test",
             "password":"StrongPassword!123","password_confirm":"StrongPassword!123"}
         wrong=self.client.post("/cadastro/",{**data,"email":"outro@example.test"})
         self.assertEqual(wrong.status_code,200)
