@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from .customer_identity import contact_values, resolve_customer
 
 from django.db import transaction
+from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import permissions, status, throttling
@@ -240,6 +241,44 @@ class PublicBookingAPIView(APIView):
         if payment_choice!=Appointment.BookingPayment.ON_SITE and payment_amount<Decimal("0.01"):
             return Response({"detail":"O valor do Pix deve ser maior que zero."},status=400)
 
+        raw_product_ids=data.get("product_ids") or []
+        if not isinstance(raw_product_ids,(list,tuple)):
+            return Response({"detail":"Seleção de produtos inválida."},status=400)
+        try:
+            product_ids=list(dict.fromkeys(int(value) for value in raw_product_ids))
+        except (TypeError,ValueError):
+            return Response({"detail":"Seleção de produtos inválida."},status=400)
+        if len(product_ids)>12:
+            return Response({"detail":"Selecione no máximo 12 produtos por agendamento."},status=400)
+
+        selected_products=[]
+        if product_ids:
+            from finance.models import Product,ProductReservation
+            locked=list(
+                Product.objects.select_for_update().filter(
+                    tenant=tenant,active=True,pk__in=product_ids,
+                )
+            )
+            by_id={product.pk:product for product in locked}
+            if len(by_id)!=len(product_ids):
+                return Response({"detail":"Um dos produtos selecionados não está disponível."},status=400)
+            active_product_statuses=[
+                Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
+                Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
+            ]
+            for product_id in product_ids:
+                product=by_id[product_id]
+                reserved=ProductReservation.objects.filter(
+                    product=product,
+                    appointment__status__in=active_product_statuses,
+                ).aggregate(total=Sum("quantity"))["total"] or Decimal("0")
+                if product.stock-reserved<Decimal("1"):
+                    return Response(
+                        {"detail":f'O produto "{product.name}" não possui estoque disponível para reserva.'},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                selected_products.append(product)
+
         from billing.segment_access import segment_enabled
         vehicle_plate=""
         vehicle_model=""
@@ -277,6 +316,25 @@ class PublicBookingAPIView(APIView):
             customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest(),
             customer_manage_token_encrypted=encrypt_text(token),
         )
+        reserved_products=[]
+        if selected_products:
+            from finance.models import ProductReservation
+            reservations=[
+                ProductReservation(
+                    tenant=tenant,appointment=appointment,product=product,
+                    quantity=Decimal("1"),unit_price_snapshot=product.sale_price,
+                )
+                for product in selected_products
+            ]
+            ProductReservation.objects.bulk_create(reservations)
+            reserved_products=[
+                {
+                    "id":product.pk,"name":product.name,
+                    "quantity":"1.000","price":str(product.sale_price),
+                }
+                for product in selected_products
+            ]
+
         manage_path=reverse("public-appointment-page",args=[token])
         return Response(
             {
@@ -287,6 +345,7 @@ class PublicBookingAPIView(APIView):
                 "timezone":tenant.timezone or "America/Recife",
                 "customer_reused":reused,
                 "professional":{"id":professional.pk,"name":professional.name},
+                "reserved_products":reserved_products,
                 "manage_token":token,
                 "manage_url":request.build_absolute_uri(manage_path),
             },
@@ -302,7 +361,9 @@ class CustomerAppointmentAPIView(APIView):
         digest=hashlib.sha256(token.encode()).hexdigest()
         return Appointment.objects.select_related(
             "tenant","customer","professional","service"
-        ).filter(customer_manage_token_hash=digest).first()
+        ).prefetch_related("product_reservations__product").filter(
+            customer_manage_token_hash=digest
+        ).first()
 
     def _capabilities(self,appointment):
         schedule=AvailabilityService().settings(appointment.tenant)
@@ -324,6 +385,15 @@ class CustomerAppointmentAPIView(APIView):
             "service_id":appointment.service_id,"service":appointment.service.name,
             "professional_id":appointment.professional_id,
             "professional":appointment.professional.name if appointment.professional else None,
+            "reserved_products":[
+                {
+                    "id":reservation.product_id,
+                    "name":reservation.product.name,
+                    "quantity":str(reservation.quantity),
+                    "price":str(reservation.unit_price_snapshot),
+                }
+                for reservation in appointment.product_reservations.all()
+            ],
             **self._capabilities(appointment),
         })
 
