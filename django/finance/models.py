@@ -138,6 +138,7 @@ class Sale(models.Model):
     discount=models.DecimalField(max_digits=10,decimal_places=2,default=0)
     total=models.DecimalField(max_digits=10,decimal_places=2)
     payment_method=models.CharField(max_length=40)
+    idempotency_key=models.CharField(max_length=100,blank=True)
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.COMPLETED)
     cancel_reason=models.CharField(max_length=500,blank=True)
     cancelled_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="sales_cancelled")
@@ -145,6 +146,13 @@ class Sale(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        constraints=[
+            models.UniqueConstraint(
+                fields=["tenant","idempotency_key"],
+                condition=~models.Q(idempotency_key=""),
+                name="uq_sale_idempotency",
+            ),
+        ]
         indexes=[models.Index(fields=["tenant","created_at"])]
 
 
