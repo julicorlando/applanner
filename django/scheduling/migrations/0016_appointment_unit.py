@@ -11,9 +11,10 @@ def backfill_units(apps,schema_editor):
         if not primary:
             continue
         Professional.objects.filter(tenant_id=tenant_id,unit__isnull=True).update(unit_id=primary.pk)
-        Appointment.objects.filter(
+        for appointment in Appointment.objects.filter(
             tenant_id=tenant_id,unit__isnull=True,professional__unit__isnull=False
-        ).update(unit_id=models.F("professional__unit"))
+        ).select_related("professional").iterator():
+            Appointment.objects.filter(pk=appointment.pk).update(unit_id=appointment.professional.unit_id)
         Appointment.objects.filter(tenant_id=tenant_id,unit__isnull=True).update(unit_id=primary.pk)
 
 
