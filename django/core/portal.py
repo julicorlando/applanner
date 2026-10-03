@@ -68,6 +68,36 @@ CATALOG_LINKS={
 }
 
 
+RECEPTION_VISIBLE_RESOURCES={
+    "agenda":{"agendamentos","clientes","profissionais","servicos","unidades","expedientes","intervalos","folgas","configuracao"},
+    "financeiro":{"produtos","pdv"},
+    "barbearia":{"fila","comandas"},
+    "arena":{"reservas","espera-arena","quadras","modalidades","horarios-quadras","bloqueios"},
+    "auto":{"veiculos","ordens","orcamentos","crm"},
+    "relacionamento":{"inteligencia","espera"},
+    "comunicacao":{"whatsapp"},
+    "suporte":set(),
+}
+RECEPTION_WRITE_RESOURCES={
+    ("agenda","agendamentos"),("agenda","clientes"),("agenda","expedientes"),
+    ("agenda","intervalos"),("agenda","folgas"),("financeiro","produtos"),
+    ("financeiro","pdv"),("relacionamento","espera"),
+}
+
+
+def _role_resource_visible(user,module_slug,resource_slug):
+    if user.is_superuser or user.role!="reception":
+        return True
+    allowed=RECEPTION_VISIBLE_RESOURCES.get(module_slug)
+    return allowed is not None and resource_slug in allowed
+
+
+def _role_resource_write(user,module_slug,resource_slug):
+    if user.is_superuser or user.role!="reception":
+        return True
+    return (module_slug,resource_slug) in RECEPTION_WRITE_RESOURCES
+
+
 def _feature_allowed(user,tenant,module_slug,resource_slug):
     if tenant and segment_enabled(tenant,"arena") and module_slug=="agenda" and resource_slug in {
         "agendamentos","profissionais","servicos","expedientes","intervalos","folgas",
@@ -1036,6 +1066,8 @@ def available_modules(user,tenant):
             continue
         resources=[]
         for resource_slug,resource in module["resources"].items():
+            if not _role_resource_visible(user,slug,resource_slug):
+                continue
             if not _feature_allowed(user,tenant,slug,resource_slug):
                 continue
             resources.append({"slug":resource_slug,"title":resource["title"]})
@@ -1063,6 +1095,8 @@ def resource_list(request,module_slug,resource_slug):
     if not module_for_access: raise Http404
     _require_module_access(request.user,module_for_access,_tenant(request),module_slug,resource_slug)
     module,resource,model=_resource(module_slug,resource_slug)
+    if not _role_resource_visible(request.user,module_slug,resource_slug):
+        raise PermissionDenied("A recepção possui apenas os acessos operacionais autorizados.")
     if resource.get("custom_list")=="arena_games":
         return redirect("arena-games")
     if resource.get("custom_list")=="arena_commands":
@@ -1141,8 +1175,8 @@ def resource_list(request,module_slug,resource_slug):
         "headers":_headers(model,columns),"rows":rows,"q":q,
         "customer_column":columns.index("customer") if model._meta.label_lower=="scheduling.appointment" else None,
         "agenda_filters":agenda_filters,"period":period,"status_filter":status,"status_choices":status_choices,
-        "can_create":resource.get("create",True) or bool(resource.get("custom_create")),
-        "can_edit":resource.get("edit",True),
+        "can_create":_role_resource_write(request.user,module_slug,resource_slug) and (resource.get("create",True) or bool(resource.get("custom_create"))),
+        "can_edit":_role_resource_write(request.user,module_slug,resource_slug) and resource.get("edit",True),
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
         "can_manage_professionals":request.user.is_superuser or request.user.role in {
             "owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager"
@@ -1160,6 +1194,8 @@ def resource_create(request,module_slug,resource_slug):
     if tenant is None:
         return redirect("portal-home")
     module,resource,model=_resource(module_slug,resource_slug)
+    if not _role_resource_visible(request.user,module_slug,resource_slug) or not _role_resource_write(request.user,module_slug,resource_slug):
+        raise PermissionDenied("A recepção pode consultar esta área, mas não alterá-la.")
     custom=resource.get("custom_create")
 
     if custom=="barber_command":
@@ -1202,6 +1238,9 @@ def resource_create(request,module_slug,resource_slug):
         if not resource.get("create",True):
             raise PermissionDenied
         form=_model_form(model,resource,request.POST or None,request.FILES or None,tenant=tenant)
+        if request.user.role=="reception" and model._meta.label_lower=="finance.product":
+            form.fields.pop("commission_type",None)
+            form.fields.pop("commission_value",None)
         if resource.get("special")=="support_ticket":
             form.fields.pop("priority",None)
             form.fields.pop("status",None)
@@ -1238,10 +1277,15 @@ def resource_edit(request,module_slug,resource_slug,pk):
     if tenant is None:
         return redirect("portal-home")
     module,resource,model=_resource(module_slug,resource_slug)
+    if not _role_resource_visible(request.user,module_slug,resource_slug) or not _role_resource_write(request.user,module_slug,resource_slug):
+        raise PermissionDenied("A recepção pode consultar esta área, mas não alterá-la.")
     if not resource.get("edit",True):
         raise PermissionDenied
     obj=get_object_or_404(_tenant_queryset(model,tenant),pk=pk)
     form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant)
+    if request.user.role=="reception" and model._meta.label_lower=="finance.product":
+        form.fields.pop("commission_type",None)
+        form.fields.pop("commission_value",None)
     if request.method=="POST" and form.is_valid():
         obj=form.save(commit=False)
         obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=False)
