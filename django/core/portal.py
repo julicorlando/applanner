@@ -158,9 +158,20 @@ PORTAL_MODULES = {
             "unidades": {
                 "model": "tenants.Unit",
                 "title": "Unidades",
-                "fields": ["name","address","address_number","district","city","state","postal_code","phone","whatsapp","email","is_primary","active"],
+                "fields": [
+                    "name","address","address_number","address_complement","district","city","state","postal_code",
+                    "latitude","longitude","phone","whatsapp","email","instagram","facebook","tiktok","website",
+                    "map_url","amenities","payment_methods","public_notes","is_primary","active"
+                ],
                 "columns": ["name","city","state","phone","is_primary","active"],
                 "order": "-is_primary,name",
+            },
+            "horarios-unidades": {
+                "model": "tenants.UnitBusinessHours",
+                "title": "Horários das unidades",
+                "fields": ["unit","weekday","opens_at","closes_at","closed","active"],
+                "columns": ["unit","weekday","opens_at","closes_at","closed","active"],
+                "order": "unit__name,weekday",
             },
             "expedientes": {
                 "model": "scheduling.ProfessionalAvailability",

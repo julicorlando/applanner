@@ -105,6 +105,41 @@ class Unit(TimeStampedModel):
         return f"{self.tenant} — {self.name}"
 
 
+class UnitBusinessHours(TimeStampedModel):
+    tenant=models.ForeignKey(Tenant,on_delete=models.CASCADE,related_name="unit_business_hours")
+    unit=models.ForeignKey(Unit,on_delete=models.CASCADE,related_name="business_hours")
+    weekday=models.PositiveSmallIntegerField()
+    opens_at=models.TimeField(null=True,blank=True)
+    closes_at=models.TimeField(null=True,blank=True)
+    closed=models.BooleanField(default=False)
+    active=models.BooleanField(default=True)
+
+    class Meta:
+        ordering=["weekday"]
+        constraints=[
+            models.UniqueConstraint(fields=["unit","weekday"],name="uq_unit_business_hours_day"),
+            models.CheckConstraint(
+                condition=models.Q(weekday__gte=1,weekday__lte=7),
+                name="unit_business_hours_weekday_iso",
+            ),
+        ]
+        indexes=[models.Index(fields=["tenant","unit","active"],name="unit_hours_tenant_unit_idx")]
+
+    def clean(self):
+        super().clean()
+        from django.core.exceptions import ValidationError
+        if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
+            raise ValidationError("A unidade precisa pertencer à mesma empresa.")
+        if not self.closed:
+            if not self.opens_at or not self.closes_at:
+                raise ValidationError("Informe abertura e fechamento, ou marque o dia como fechado.")
+            if self.closes_at<=self.opens_at:
+                raise ValidationError("O horário de fechamento deve ser posterior ao de abertura.")
+
+    def __str__(self):
+        return f"{self.unit} — dia {self.weekday}"
+
+
 class TenantOnboarding(models.Model):
     tenant=models.OneToOneField(Tenant,primary_key=True,on_delete=models.CASCADE,related_name="onboarding")
     required=models.BooleanField(default=False)

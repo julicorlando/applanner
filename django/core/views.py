@@ -240,6 +240,7 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
     from billing.entitlements import active_subscription,module_enabled
     from contenthub.models import PublicReview
     from engagement.models import ServicePackage,TenantLoyaltySettings
+    from zoneinfo import ZoneInfo
     from finance.models import Product
     from scheduling.availability import AvailabilityService
     from scheduling.models import Appointment
@@ -257,7 +258,25 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         offered=professional.services.filter(tenant=tenant,active=True)
         if professional.services_restricted or professional.services.exists():
             services=offered.order_by("name")[:100]
-    units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
+    units=list(
+        tenant.units.filter(active=True)
+        .prefetch_related("business_hours")
+        .order_by("-is_primary","name")
+    )
+    tenant_today=timezone.now().astimezone(
+        ZoneInfo(tenant.timezone or "America/Recife")
+    ).date()
+    weekday_labels={
+        1:"Segunda-feira",2:"Terça-feira",3:"Quarta-feira",4:"Quinta-feira",
+        5:"Sexta-feira",6:"Sábado",7:"Domingo",
+    }
+    for unit in units:
+        rows=[row for row in unit.business_hours.all() if row.active]
+        rows.sort(key=lambda row:row.weekday)
+        for row in rows:
+            row.weekday_label=weekday_labels.get(row.weekday,str(row.weekday))
+            row.is_today=row.weekday==tenant_today.isoweekday()
+        unit.public_hours=rows
     if selected_unit is None:
         selected_unit=(professional.unit if professional and professional.unit_id else (units[0] if units else None))
     active_product_appointment_statuses=[
@@ -278,7 +297,11 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         product.public_available_stock=max(
             Decimal("0"),product.stock-(product.reserved_stock or Decimal("0")),
         )
-    packages=ServicePackage.objects.filter(tenant=tenant,active=True).order_by("name")[:24]
+    package_catalog=list(
+        ServicePackage.objects.filter(tenant=tenant,active=True).order_by("name")[:48]
+    )
+    packages=[item for item in package_catalog if not item.recurring][:24]
+    memberships=[item for item in package_catalog if item.recurring][:24]
     reviews=PublicReview.objects.filter(tenant=tenant,active=True).order_by("-created_at")[:12]
     loyalty=TenantLoyaltySettings.objects.filter(tenant=tenant,enabled=True).first()
     payment_settings=AvailabilityService().settings(tenant)
@@ -303,7 +326,8 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
     return {
         "tenant":tenant,"services":services,"professionals":professionals,"units":units,
         "selected_unit":selected_unit,
-        "products":products,"packages":packages,"reviews":reviews,"loyalty":loyalty,
+        "products":products,"packages":packages,"memberships":memberships,
+        "reviews":reviews,"loyalty":loyalty,
         "public_slug":tenant.public_slug or tenant.slug,"selected_professional":professional,
         "waitlist_enabled":not active_subscription(tenant) or module_enabled(tenant,"waitlist"),
         "payment_settings":payment_settings,"online_payment_available":gateway_connected,
