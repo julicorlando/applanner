@@ -80,3 +80,4 @@ select option,select optgroup{background:var(--paper);color:var(--ink)}
 .product-window .event.accent strong{color:#fff!important}
 .window-stats span,.window-stats small,.event small,.agenda-preview time{color:var(--muted)}
 .event.accent small{color:#e7edf6}
+:root[data-theme="dark"] .platform-logo-official{filter:brightness(0) invert(1);opacity:.94}
