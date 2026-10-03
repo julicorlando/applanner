@@ -248,6 +248,7 @@ class PlatformSMTPSettings(models.Model):
     username=models.CharField(max_length=255,blank=True)
     password_encrypted=models.TextField(blank=True)
     from_email=models.EmailField()
+    dkim_selector=models.CharField(max_length=80,blank=True,default="default")
     use_tls=models.BooleanField(default=True)
     use_ssl=models.BooleanField(default=False)
     enabled=models.BooleanField(default=False)
