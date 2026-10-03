@@ -139,6 +139,7 @@ class Sale(models.Model):
     total=models.DecimalField(max_digits=10,decimal_places=2)
     payment_method=models.CharField(max_length=40)
     idempotency_key=models.CharField(max_length=100,blank=True)
+    idempotency_fingerprint=models.CharField(max_length=64,blank=True)
     status=models.CharField(max_length=16,choices=Status.choices,default=Status.COMPLETED)
     cancel_reason=models.CharField(max_length=500,blank=True)
     cancelled_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="sales_cancelled")
