@@ -1,15 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Assinatura — ApPlanner{% endblock %}
+{% block title %}Plano e pagamentos — ApPlanner{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
-  <div class="portal-heading"><div><span class="eyebrow">ASSINATURA</span><h1>Seu plano</h1></div></div>
+  <div class="portal-heading"><div><span class="eyebrow">ASSINATURA</span><h1>Plano e pagamentos</h1><p>Veja exatamente o que compõe sua mensalidade, histórico de pagamentos e notas fiscais.</p></div></div>
   <article class="panel">
     {% if subscription %}
       <h2>{{ subscription.plan.name }}</h2>
       <div class="module-row"><span></span><div><strong>Status</strong><small>{{ subscription.get_status_display }}</small></div></div>
       <div class="module-row"><span></span><div><strong>Ciclo</strong><small>{{ subscription.get_billing_cycle_display }}</small></div></div>
+      {% if current_breakdown %}
+      <h3>Composição da cobrança atual</h3>
+      <div class="module-row"><span></span><div><strong>Plano-base · {{ current_breakdown.plan.name }}</strong><small>R$ {{ current_breakdown.plan.amount }} por ciclo {{ current_breakdown.cycle_label|lower }}. Este é o valor do plano antes dos módulos adicionais.</small></div></div>
+      {% for item in current_breakdown.addons %}
+      <div class="module-row"><span></span><div><strong>{{ item.name }}</strong><small>
+        {% if item.slug == "multiunit" %}Multiunidade: R$ {{ item.unit_price }} por unidade ativa · {{ current_breakdown.active_units }} unidade{{ current_breakdown.active_units|pluralize }} · R$ {{ item.cycle_total }} neste ciclo. Cada unidade adicional ativa libera mais 3 vagas de profissionais.
+        {% elif item.slug == "professional-extra" %}{{ item.quantity }} vaga{{ item.quantity|pluralize }} extra{{ item.quantity|pluralize }} de profissional contratada{{ item.quantity|pluralize }} · R$ {{ item.cycle_total }} neste ciclo.
+        {% else %}{% if item.quantity > 1 %}{{ item.quantity }} × {% endif %}R$ {{ item.monthly }}/mês · R$ {{ item.cycle_total }} neste ciclo.
+        {% endif %}
+      </small></div></div>
+      {% endfor %}
+      {% if current_breakdown.adjustment != "0.00" %}<div class="module-row"><span></span><div><strong>Ajuste, crédito ou desconto contratual</strong><small>R$ {{ current_breakdown.adjustment }} aplicado ao total contratado.</small></div></div>{% endif %}
+      <div class="module-row"><span></span><div><strong>Total do ciclo</strong><small>R$ {{ current_breakdown.total }} · este é o valor utilizado para a próxima cobrança enquanto sua contratação não mudar.</small></div></div>
+      {% else %}
       <div class="module-row"><span></span><div><strong>Valor contratado atualizado</strong><small>R$ {{ subscription.contracted_price }}</small></div></div>
-      {% if subscription.addon_contracted_price %}<div class="module-row"><span></span><div><strong>Módulos adicionais no ciclo</strong><small>R$ {{ subscription.addon_contracted_price }}</small></div></div>{% endif %}
+      {% endif %}
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
       {% if subscription.status == 'trial' or subscription.status == 'past_due' %}
         {% if pix_charge %}<p>Seu Pix aguarda pagamento até {{ pix_charge.expires_at|date:'d/m/Y H:i' }}.</p><a class="button primary" href="{% url 'billing-subscription-pix' %}">Ver QR code e Pix copia e cola</a>
@@ -34,6 +48,40 @@
     {% if professional_capacity.exceeded %}<p role="status">A equipe atual ultrapassa o limite. Os profissionais existentes foram preservados; para ativar novos, desative alguém ou solicite uma ampliação ao Master.</p>{% elif professional_capacity.available != None %}<p>{{ professional_capacity.available }} vagas disponíveis para ativação.</p>{% endif %}
     <div class="form-actions"><a class="button" href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}">Gerenciar profissionais</a><a class="button" href="{% url 'billing-subscription-modules' %}">Contratar +1 profissional</a></div>
   </article>{% endif %}
+  <article class="panel" style="margin-top:16px">
+    <div class="panel-head"><div><span class="eyebrow">HISTÓRICO</span><h2>Pagamentos e notas fiscais</h2><p>Cada linha representa um ciclo efetivamente pago. A NFe é vinculada ao mês de referência do pagamento.</p></div></div>
+    {% for payment in payment_history %}
+    <div class="module-row" style="align-items:flex-start">
+      <span></span>
+      <div style="flex:1">
+        <strong>{{ payment.reference_month|date:"m/Y" }} · R$ {{ payment.amount }}</strong>
+        <small>{{ payment.method_label }}{% if payment.paid_at %} · pago em {{ payment.paid_at|date:"d/m/Y H:i" }}{% endif %}</small>
+        {% with breakdown=payment.charge_breakdown %}
+          <details style="margin-top:6px"><summary>Ver detalhamento desta cobrança</summary>
+            <p>Plano {{ breakdown.plan.name }}: R$ {{ breakdown.plan.amount }}</p>
+            {% for item in breakdown.addons %}<p>{{ item.name }}{% if item.quantity > 1 %} · {{ item.quantity }} unidade{{ item.quantity|pluralize }}/vaga{{ item.quantity|pluralize }}{% endif %}: R$ {{ item.cycle_total }}</p>{% endfor %}
+            {% if breakdown.adjustment != "0.00" %}<p>Ajuste/crédito/desconto: R$ {{ breakdown.adjustment }}</p>{% endif %}
+            <p><strong>Total: R$ {{ payment.amount }}</strong></p>
+          </details>
+        {% endwith %}
+      </div>
+      <div class="table-actions">
+        {% if payment.fiscal_request %}
+          {% if payment.fiscal_request.status == "issued" %}
+            <a class="button ghost" href="{% url 'billing-nfe-download' payment.fiscal_request.pk 'pdf' %}">Baixar NFe</a>
+            {% if payment.fiscal_request.xml_file %}<a href="{% url 'billing-nfe-download' payment.fiscal_request.pk 'xml' %}">Baixar XML</a>{% endif %}
+          {% elif payment.fiscal_request.status == "requested" %}
+            <span class="status-pill">NFe solicitada</span>
+          {% else %}
+            <span class="status-pill">{{ payment.fiscal_request.get_status_display }}</span>
+          {% endif %}
+        {% elif can_request_nfe %}
+          <form method="post" action="{% url 'billing-nfe-request' payment.pk %}">{% csrf_token %}<button class="button ghost" type="submit">Solicitar NFe</button></form>
+        {% endif %}
+      </div>
+    </div>
+    {% empty %}<p class="empty">Os pagamentos confirmados aparecerão aqui por mês de referência.</p>{% endfor %}
+  </article>
   {% if can_manage %}<article class="panel" style="margin-top:16px"><h2>Gerenciar conta</h2>
     {% if subscription and subscription.status != 'cancelled' %}<form method="post" action="{% url 'billing-subscription-cancel' %}" onsubmit="return confirm('Cancelar a assinatura agora? A cobrança recorrente será encerrada e o acesso ao plano será afetado.')">{% csrf_token %}<label for="cancel-password">Confirme sua senha para cancelar a assinatura</label><input id="cancel-password" name="password" type="password" required autocomplete="current-password"><button class="button" type="submit">Cancelar assinatura</button></form>{% endif %}
     <h3>Solicitar exclusão da conta</h3><p>O pedido será analisado pela equipe, incluindo dados de clientes, histórico financeiro e obrigações de conservação. Esta ação não cancela a assinatura automaticamente; cancele-a acima se desejar interromper cobranças.</p>
