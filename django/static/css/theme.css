@@ -77,7 +77,7 @@ select option,select optgroup{background:var(--paper);color:var(--ink)}
 .button:not(.primary):not(.light):hover,.theme-toggle:hover{background:var(--soft)!important}
 .product-window .event{background:var(--soft)!important;color:var(--ink)!important}
 .product-window .event.accent{background:var(--action)!important;color:#fff!important}
-.product-window .event.accent strong{color:#fff!important}
+.product-window .event.accent :is(b,strong){color:#fff!important}
 .window-stats span,.window-stats small,.event small,.agenda-preview time{color:var(--muted)}
 .event.accent small{color:#e7edf6}
 :root[data-theme="dark"] .platform-logo-official{filter:brightness(0) invert(1);opacity:.94}
