@@ -195,6 +195,49 @@ class Payment(TimeStampedModel):
         indexes=[models.Index(fields=["purpose","reference_id","status"])]
 
 
+class FiscalDocumentRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        REQUESTED="requested","Solicitada"
+        ISSUED="issued","NFe disponível"
+        REJECTED="rejected","Não emitida"
+
+    tenant=models.ForeignKey(
+        "tenants.Tenant",on_delete=models.CASCADE,related_name="fiscal_document_requests"
+    )
+    subscription=models.ForeignKey(
+        Subscription,on_delete=models.PROTECT,related_name="fiscal_document_requests"
+    )
+    payment=models.OneToOneField(
+        Payment,on_delete=models.PROTECT,related_name="fiscal_document_request"
+    )
+    reference_month=models.DateField(db_index=True)
+    amount=models.DecimalField(max_digits=10,decimal_places=2)
+    charge_breakdown=models.JSONField(default=dict,blank=True)
+    status=models.CharField(
+        max_length=16,choices=Status.choices,default=Status.REQUESTED,db_index=True
+    )
+    requested_by=models.ForeignKey(
+        settings.AUTH_USER_MODEL,on_delete=models.PROTECT,
+        related_name="fiscal_documents_requested",
+    )
+    requested_at=models.DateTimeField()
+    invoice_number=models.CharField(max_length=80,blank=True)
+    pdf_file=models.FileField(upload_to="billing/nfe/pdf/%Y/%m/",blank=True)
+    xml_file=models.FileField(upload_to="billing/nfe/xml/%Y/%m/",blank=True)
+    uploaded_by=models.ForeignKey(
+        settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,
+        related_name="fiscal_documents_uploaded",
+    )
+    uploaded_at=models.DateTimeField(null=True,blank=True)
+    master_note=models.CharField(max_length=500,blank=True)
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["tenant","-reference_month"],name="billing_nfe_tenant_month_idx"),
+            models.Index(fields=["status","requested_at"],name="billing_nfe_status_req_idx"),
+        ]
+
+
 class SubscriptionHistory(models.Model):
     subscription=models.ForeignKey(Subscription,on_delete=models.CASCADE,related_name="history")
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="subscription_history")
