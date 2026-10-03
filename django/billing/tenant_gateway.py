@@ -77,10 +77,16 @@ def tenant_gateway(request):
     banks=TenantBankAccount.objects.filter(tenant=tenant,active=True).order_by("-is_primary","bank_name","id")
     schedule_settings,_=TenantScheduleSettings.objects.get_or_create(tenant=tenant)
     action=request.POST.get("action") if request.method=="POST" else ""
+    legacy_provider_post=bool(
+        request.method=="POST" and not action and request.POST.get("access_token")
+    )
+    if legacy_provider_post:
+        action="provider_connect"
 
-    bank_form=BankAccountForm(request.POST or None,prefix="bank")
+    bank_form=BankAccountForm(request.POST or None if action=="bank_add" else None,prefix="bank")
     provider_form=TenantGatewayForm(
-        request.POST or None if action=="provider_connect" else None,prefix="provider"
+        request.POST or None if action=="provider_connect" else None,
+        prefix=None if legacy_provider_post else "provider",
     )
 
     if request.method=="POST" and action=="bank_add" and bank_form.is_valid():
