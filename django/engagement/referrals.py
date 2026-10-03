@@ -100,9 +100,13 @@ def create_referral_reward_from_signup(request,tenant):
         campaign=campaign,referred_tenant=tenant,
         defaults={"referrer_user":referrer,"referrer_kind":kind},
     )
-    ReferralVisit.objects.filter(
+    visit=ReferralVisit.objects.filter(
         referrer_user=referrer,converted_tenant__isnull=True
-    ).order_by("-clicked_at").update(converted_tenant=tenant,converted_at=timezone.now())
+    ).order_by("-clicked_at").first()
+    if visit:
+        visit.converted_tenant=tenant
+        visit.converted_at=timezone.now()
+        visit.save(update_fields=["converted_tenant","converted_at"])
     return reward
 
 
@@ -211,10 +215,11 @@ def referrals(request):
         ReferralReward.ReferrerKind.PROFESSIONAL
         if user.role=="professional" else ReferralReward.ReferrerKind.COMPANY
     )
+    company_roles={"owner","manager","tenant-admin","barber-manager","arena-manager","auto-manager"}
     allowed=bool(
         campaign and (
             (kind==ReferralReward.ReferrerKind.PROFESSIONAL and campaign.professional_referrals_enabled)
-            or (kind==ReferralReward.ReferrerKind.COMPANY and campaign.company_referrals_enabled)
+            or (kind==ReferralReward.ReferrerKind.COMPANY and user.role in company_roles and campaign.company_referrals_enabled)
         )
     )
     profile=ensure_referral_profile(user) if allowed else None
