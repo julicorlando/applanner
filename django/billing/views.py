@@ -235,7 +235,7 @@ def custom_plan(request):
 
 
 def signup(request):
-    from growth.attribution import capture_attribution,record_acquisition
+    from growth.attribution import acquisition_context,capture_attribution,record_acquisition
     capture_attribution(request)
     plan_id=request.POST.get("plan") if request.method=="POST" else request.GET.get("plan")
     plan_id=plan_id if plan_id and plan_id.isascii() and plan_id.isdigit() and len(plan_id)<=19 and int(plan_id)<=2**63-1 else None
