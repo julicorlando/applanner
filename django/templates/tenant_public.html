@@ -183,6 +183,8 @@
   const date=document.getElementById('booking-date');
   const slot=document.getElementById('booking-slot');
   const feedback=document.getElementById('booking-feedback');
+  let bookingAttemptKey='';
+  let bookingAttemptPayload='';
   const selectedProducts=new Map();
   const productSelection=document.getElementById('booking-product-selection');
   const productSelectionList=document.getElementById('booking-product-selection-list');
@@ -279,8 +281,20 @@
     if(!payload.phone){feedback.textContent='Informe telefone com DDD.';return;}
     const submit=form.querySelector('button[type=submit]');submit.disabled=true;
     try {
+    const serializedPayload=JSON.stringify(payload);
+    if(!bookingAttemptKey || bookingAttemptPayload!==serializedPayload){
+      bookingAttemptPayload=serializedPayload;
+      bookingAttemptKey=(window.crypto&&crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'booking-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    }
     const response=await fetch('/api/public/{{ public_slug }}/book/',{
-      method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf},body:JSON.stringify(payload)
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json','X-CSRFToken':csrf,
+        'Idempotency-Key':bookingAttemptKey
+      },
+      body:serializedPayload
     });
     const data=await response.json().catch(()=>({}));
     if(!response.ok){feedback.textContent=data.detail||'Não foi possível agendar.';submit.disabled=false;return;}
