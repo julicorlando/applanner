@@ -71,17 +71,14 @@ class Professional(TimeStampedModel):
         super().clean()
         from billing.entitlements import validate_professional_capacity
         validate_professional_capacity(self)
+        if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa."})
 
     class Meta:
         constraints=[
             models.UniqueConstraint(fields=["tenant","public_slug"],name="uq_professional_public_slug"),
         ]
-
-    def clean(self):
-        super().clean()
-        if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
-            from django.core.exceptions import ValidationError
-            raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa."})
 
     def __str__(self):
         return self.name
@@ -258,7 +255,7 @@ class Appointment(TimeStampedModel):
 
     def clean(self):
         super().clean()
-        if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
+        if self.unit_id and self.unit.tenant_id!=self.tenant_id:
             from django.core.exceptions import ValidationError
             raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa do agendamento."})
         if self.professional_id and self.professional.unit_id and self.unit_id and self.professional.unit_id!=self.unit_id:
