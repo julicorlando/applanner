@@ -65,6 +65,8 @@ class SignupForm(forms.Form):
         required=False,initial="card",label="Como deseja pagar",
     )
     business_name=forms.CharField(max_length=150,label="Nome do negócio")
+    postal_code=forms.CharField(max_length=10,label="CEP da empresa",
+        help_text="Usaremos o CEP para posicionar sua unidade no Explorar e mostrar sua empresa para clientes próximos.")
     category=forms.CharField(max_length=60,label="Segmento",widget=forms.Select(choices=[
         ("","Selecione"),("barbearia","Barbearia"),("salao","Salão de beleza"),
         ("estetica","Estética"),("auto","Lava-jato e automotivo"),
@@ -95,6 +97,13 @@ class SignupForm(forms.Form):
         if selected_plan:
             self.fields["plan"].initial=selected_plan
             self.fields["category"].widget.choices=plan_categories(selected_plan,self.category_options)
+
+    def clean_postal_code(self):
+        import re
+        value=re.sub(r"\D","",self.cleaned_data["postal_code"])
+        if len(value)!=8:
+            raise forms.ValidationError("Informe um CEP brasileiro com 8 dígitos.")
+        return value
 
     def clean_email(self):
         email=self.cleaned_data["email"].strip().lower()
@@ -251,8 +260,9 @@ def signup(request):
                 status=Tenant.Status.TRIAL if trial_days else Tenant.Status.ACTIVE,
                 public_enabled=False,public_booking_enabled=True,
             )
-            Unit.objects.create(
+            unit=Unit.objects.create(
                 tenant=tenant,name=data["business_name"],is_primary=True,
+                postal_code=data["postal_code"],
                 email=data["email"],phone=data["phone"],active=True,
             )
             TenantOnboarding.objects.create(tenant=tenant,required=True)
@@ -277,6 +287,9 @@ def signup(request):
                 proposal.tenant=tenant
                 proposal.save(update_fields=["tenant","updated_at"])
             record_acquisition(request,"CompleteRegistration",tenant=tenant,user=user,segment=data["category"])
+            transaction.on_commit(lambda unit_id=unit.pk: __import__(
+                "tenants.tasks",fromlist=["geocode_unit_from_postal_code"]
+            ).geocode_unit_from_postal_code.delay(unit_id))
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version
 
