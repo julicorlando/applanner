@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}ApPlanner — mais agendamentos, menos horários vazios{% endblock %}
 {% block content %}
 <section class="marketing-hero shell">
@@ -16,19 +17,26 @@
       <span>✓ Sem cartão quando o plano permitir</span><span>✓ Cancele quando quiser</span><span>✓ Plano por segmento</span>
     </div>
   </div>
-    <div class="product-window" aria-label="Exemplo ilustrativo do painel ApPlanner">
-    <div class="window-head"><span></span><span></span><span></span><b>Hoje</b></div>
+    <div class="product-window product-window--live" aria-label="Demonstração ilustrativa do painel ApPlanner com agenda em movimento">
+    <div class="window-head">
+      <span></span><span></span><span></span>
+      <b class="preview-live-status"><i aria-hidden="true"></i>Demonstração ao vivo</b>
+    </div>
     <div class="window-stats">
       <div><small>Agenda</small><strong>✓</strong><span>horários online</span></div>
       <div><small>Ocupação</small><strong>↗</strong><span>visão da equipe</span></div>
       <div><small>Receita</small><strong>↑</strong><span>visão em tempo real</span></div>
     </div>
-    <div class="agenda-preview">
-      <div><time>09:00</time><span class="event"><b>Cliente confirmado</b><small>Serviço · Profissional</small></span></div>
-      <div><time>10:30</time><span class="event accent"><b>Próximo horário</b><small>Pagamento integrado</small></span></div>
-      <div><time>14:00</time><span class="event"><b>Operação organizada</b><small>Lembretes automáticos</small></span></div>
+    <div class="agenda-preview-viewport" aria-hidden="true">
+      <div class="agenda-preview agenda-preview--live" data-live-preview>
+        <div><time>09:00</time><span class="event"><b>Cliente confirmado</b><small>Corte · João</small></span></div>
+        <div><time>10:30</time><span class="event accent"><b>Próximo horário</b><small>Pagamento integrado</small></span></div>
+        <div><time>14:00</time><span class="event"><b>Agendamento online</b><small>Barba · Carlos</small></span></div>
+        <div><time>15:30</time><span class="event"><b>Novo cliente</b><small>Reserva recebida pelo link</small></span></div>
+      </div>
     </div>
   </div>
+  <script src="{% static 'js/home-live-preview.js' %}" defer></script>
 </section>
 
 <section class="shell section sales-steps" id="como-funciona"><div class="section-head"><span class="eyebrow">CONFIGURAÇÃO SIMPLES</span><h2>Comece em 3 passos.</h2><p>Do cadastro ao primeiro atendimento: tudo em um só lugar.</p></div><div class="segment-grid">
