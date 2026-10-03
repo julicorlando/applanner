@@ -2,7 +2,13 @@
 {% block title %}Estabelecimentos — ApPlanner{% endblock %}
 {% block content %}
 <section class="shell portal-page">
-  <div class="portal-heading"><div><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Encontre estabelecimentos.</h1><p>Veja empresas com página pública e agendamento pelo ApPlanner.</p><p id="location-status" role="status"></p></div><button class="button ghost" id="nearby" type="button">{% if located %}Atualizar localização{% else %}Encontrar perto de mim{% endif %}</button></div>
+  <div class="portal-heading"><div><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Encontre estabelecimentos.</h1><p>Veja empresas com página pública e agendamento pelo ApPlanner. A ordem pode usar a localização do seu dispositivo ou um CEP informado por você.</p><p id="location-status" role="status"></p></div><button class="button ghost" id="nearby" type="button">{% if located %}Atualizar localização{% else %}Encontrar perto de mim{% endif %}</button></div>
+  <form class="portal-search directory-postal-search" method="get">
+    <label for="directory-cep">Buscar por CEP</label>
+    <input id="directory-cep" name="cep" inputmode="numeric" maxlength="9" value="{{ postal_code }}" placeholder="00000-000" aria-describedby="directory-cep-help">
+    <button class="button" type="submit">Ordenar por proximidade</button>
+    <small id="directory-cep-help">Use o CEP quando não quiser ou não puder liberar a localização do navegador.</small>
+  </form>
   <div class="segment-grid">
     {% for card in cards %}
     <article class="directory-card">
