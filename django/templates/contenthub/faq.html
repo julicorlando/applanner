@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Perguntas frequentes — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">AJUDA</span><h1>Perguntas frequentes</h1><p>Respostas rápidas sobre cadastro, planos, agendamentos e operação.</p></div></div>
+  <div class="faq-list">
+    {% for item in faqs %}
+    <details class="panel faq-item"{% if forloop.first %} open{% endif %}>
+      <summary>{{ item.question }}</summary>
+      <div class="faq-answer">{{ item.answer|linebreaks }}</div>
+    </details>
+    {% empty %}<article class="panel"><p>Nenhuma pergunta publicada no momento.</p></article>{% endfor %}
+  </div>
+</section>
+{% endblock %}
