@@ -1,20 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Mercado Pago da plataforma — Master{% endblock %}
+{% block title %}provedor de cobrança da plataforma — Master{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
-  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">COBRANÇAS DA PLATAFORMA</span><h1>Mercado Pago do ApPlanner</h1><p>Configure o recebimento das assinaturas dos estabelecimentos. As conexões de pagamento de cada estabelecimento são independentes.</p></div></div>
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">COBRANÇAS DA PLATAFORMA</span><h1>provedor de cobrança do ApPlanner</h1><p>Configure o recebimento das assinaturas dos estabelecimentos. As conexões de pagamento de cada estabelecimento são independentes.</p></div></div>
   <article class="panel" style="margin-bottom:16px">
     <h2>Situação atual</h2>
     {% for gateway in gateways %}
       <p><strong>{{ gateway.get_environment_display }}</strong>: {% if gateway.active and gateway.last_test_status == 'validated' %}Ativo e validado{% elif gateway.active %}Ativo, ainda não validado{% else %}Inativo{% endif %}{% if gateway.last_tested_at %} · último teste {{ gateway.last_tested_at|date:'d/m/Y H:i' }}{% endif %}</p>
-    {% empty %}<p>Nenhuma conexão cadastrada. O botão de pagamento mostrará erro até configurar e validar o Mercado Pago.</p>{% endfor %}
+    {% empty %}<p>Nenhuma conexão cadastrada. O botão de pagamento mostrará erro até configurar e validar o provedor.</p>{% endfor %}
   </article>
   {% if connected and not show_form %}
-  <article class="panel"><h2>Como funciona o recebimento</h2><ol><li>Uma empresa escolhe um plano e cartão ou Pix.</li><li>O Mercado Pago gera a cobrança na conta da plataforma.</li><li>A confirmação do pagamento chega pelo webhook cadastrado e atualiza a assinatura.</li></ol><p>URL do webhook: <code>{{ webhook_url }}</code></p><a class="button" href="?alterar=1">Alterar banco ou credenciais</a></article>
+  <article class="panel"><h2>Como funciona o recebimento</h2><ol><li>Uma empresa escolhe um plano e cartão ou Pix.</li><li>O provedor de cobrança gera a cobrança na conta da plataforma.</li><li>A confirmação do pagamento chega pelo webhook cadastrado e atualiza a assinatura.</li></ol><p>URL do webhook: <code>{{ webhook_url }}</code></p><a class="button" href="?alterar=1">Alterar banco ou credenciais</a></article>
   {% else %}<article class="panel">
     <h2>Cadastrar ou substituir credenciais</h2>
-    <p>Crie uma aplicação em Mercado Pago Developers. Selecione <strong>Testes</strong> para homologação e <strong>Produção</strong> apenas quando estiver pronto para cobranças reais. Obtenha a chave secreta na configuração de notificações Webhooks da mesma aplicação.</p>
-    <p>URL para cadastrar nas notificações Webhooks do Mercado Pago: <code>{{ webhook_url }}</code>. Ative as notificações de <strong>Orders, pagamentos e assinaturas</strong> na aplicação. A URL deve usar HTTPS.</p>
+    <p>Crie uma aplicação em provedor de cobrança Developers. Selecione <strong>Testes</strong> para homologação e <strong>Produção</strong> apenas quando estiver pronto para cobranças reais. Obtenha a chave secreta na configuração de notificações Webhooks da mesma aplicação.</p>
+    <p>URL para cadastrar nas notificações webhooks do provedor: <code>{{ webhook_url }}</code>. Ative as notificações de <strong>Orders, pagamentos e assinaturas</strong> na aplicação. A URL deve usar HTTPS.</p>
     <form method="post" class="portal-form">{% csrf_token %}
       {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
       {% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% if field.errors %}<div class="field-error">{{ field.errors }}</div>{% endif %}</div>{% endfor %}
