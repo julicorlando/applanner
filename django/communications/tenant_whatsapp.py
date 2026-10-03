@@ -151,12 +151,26 @@ def send_prepared_message(appointment,kind,user):
     if not TenantWhatsAppConnection.objects.filter(tenant=appointment.tenant,enabled=True).exists():
         raise ValueError("Conecte o WhatsApp da empresa antes de enviar.")
     body=appointment_text(appointment,kind)
+    contact_reservation=None
+    if kind=="reminder":
+        from engagement.contacting import reserve_contact_window
+        contact_reservation=reserve_contact_window(
+            appointment.tenant,appointment.customer,user,"appointment_reminder"
+        )
+        if not contact_reservation:
+            raise ValueError("Este cliente já recebeu uma mensagem nas últimas 24 horas.")
     conversation,_=WhatsAppConversation.objects.get_or_create(tenant=appointment.tenant,wa_id=number,
         defaults={"customer":appointment.customer,"contact_name":appointment.customer_display_name,
                   "last_message_at":timezone.now()})
     if conversation.context.get("cancel_requested_appointment_id")==appointment.pk:
         raise ValueError("O cliente pediu cancelamento. Resolva o pedido antes de enviar outra mensagem.")
-    sent=gateway(appointment.tenant,"POST","send",{"to":number,"text":body})
+    try:
+        sent=gateway(appointment.tenant,"POST","send",{"to":number,"text":body})
+    except Exception:
+        if contact_reservation:
+            from engagement.contacting import release_contact_window
+            release_contact_window(contact_reservation)
+        raise
     conversation.appointment=appointment
     conversation.customer=appointment.customer
     conversation.status=WhatsAppConversation.Status.BOT
@@ -186,7 +200,23 @@ def send_appointment_notification(notification):
         notification.save(update_fields=["status"])
         return ""
     body=appointment_text(appointment,kind)
-    sent=gateway(appointment.tenant,"POST","send",{"to":number,"text":body})
+    contact_reservation=None
+    if kind=="reminder":
+        from engagement.contacting import reserve_contact_window
+        contact_reservation=reserve_contact_window(
+            appointment.tenant,appointment.customer,None,"appointment_reminder"
+        )
+        if not contact_reservation:
+            notification.status=Notification.Status.SKIPPED
+            notification.save(update_fields=["status"])
+            return ""
+    try:
+        sent=gateway(appointment.tenant,"POST","send",{"to":number,"text":body})
+    except Exception:
+        if contact_reservation:
+            from engagement.contacting import release_contact_window
+            release_contact_window(contact_reservation)
+        raise
     conversation,_=WhatsAppConversation.objects.get_or_create(tenant=appointment.tenant,wa_id=number,
         defaults={"customer":appointment.customer,"contact_name":appointment.customer_display_name,
                   "last_message_at":timezone.now()})
