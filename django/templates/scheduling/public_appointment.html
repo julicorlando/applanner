@@ -6,6 +6,17 @@
   <div class="portal-heading"><div><span class="eyebrow">MEU AGENDAMENTO</span><h1>{{ appointment.service.name }}</h1><p>{{ appointment.tenant.name }}</p></div><div class="status-pill">{{ appointment.get_status_display }}</div></div>
   <article class="panel">
     <div class="appointment-row"><time>{{ appointment.starts_at|date:"d/m H:i" }}</time><div><strong>{{ appointment.professional.name|default:"Profissional a definir" }}</strong><span>{{ appointment.customer_name_snapshot|default:"Cliente" }}</span></div><em>R$ {{ appointment.service_price_snapshot|default:appointment.service.price }}</em></div>
+    {% if appointment.product_reservations.all %}
+    <div class="booking-product-selection" style="margin-top:16px">
+      <strong>Produtos reservados</strong>
+      <div class="booking-product-selection__list">
+        {% for reservation in appointment.product_reservations.all %}
+        <span class="booking-product-chip">{{ reservation.product.name }} · 1 un · R$ {{ reservation.unit_price_snapshot }}</span>
+        {% endfor %}
+      </div>
+      <small>{% if appointment.status == 'cancelled' or appointment.status == 'no_show' or appointment.status == 'completed' %}A reserva de estoque não permanece ativa após o encerramento deste agendamento.{% else %}Os produtos ficam separados para retirada no atendimento e são pagos diretamente ao estabelecimento.{% endif %}</small>
+    </div>
+    {% endif %}
     {% if rating_token %}<p>Atendimento concluído. Conte como foi sua experiência.</p><a class="button primary" href="{% url 'public-appointment-rating' rating_token %}">Dar nota de 1 a 5</a>{% endif %}
   </article>
   {% if appointment.booking_payment != 'on_site' %}
