@@ -58,3 +58,64 @@ class PublicContentTranslation(models.Model):
 
     class Meta:
         constraints=[models.UniqueConstraint(fields=["tenant","locale","content_key"],name="uq_public_translation")]
+
+
+class ReferralCampaign(models.Model):
+    class RewardType(models.TextChoices):
+        FIXED="fixed","Valor fixo"
+        PERCENT="percent","Percentual"
+
+    name=models.CharField(max_length=160)
+    active=models.BooleanField(default=False,db_index=True)
+    company_reward_type=models.CharField(max_length=12,choices=RewardType.choices,default=RewardType.FIXED)
+    company_reward_value=models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    professional_reward_amount=models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    payment_threshold=models.PositiveSmallIntegerField(default=2)
+    starts_at=models.DateTimeField(null=True,blank=True)
+    ends_at=models.DateTimeField(null=True,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="referral_campaigns_created")
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+
+class PlatformReferral(models.Model):
+    class Status(models.TextChoices):
+        PENDING="pending","Aguardando pagamentos"
+        QUALIFIED="qualified","Qualificada"
+        AWAITING_PIX="awaiting_pix","Aguardando chave Pix"
+        READY="ready","Pronta para pagamento"
+        PAID="paid","Paga"
+        CANCELLED="cancelled","Cancelada"
+
+    campaign=models.ForeignKey(ReferralCampaign,on_delete=models.PROTECT,related_name="referrals")
+    referrer_user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="platform_referrals")
+    referrer_tenant=models.ForeignKey("tenants.Tenant",null=True,blank=True,on_delete=models.SET_NULL,related_name="referrals_made")
+    referrer_professional=models.ForeignKey("scheduling.Professional",null=True,blank=True,on_delete=models.SET_NULL,related_name="platform_referrals")
+    referred_tenant=models.OneToOneField("tenants.Tenant",on_delete=models.CASCADE,related_name="platform_referral")
+    code_snapshot=models.CharField(max_length=32)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PENDING,db_index=True)
+    payment_count=models.PositiveSmallIntegerField(default=0)
+    company_discount_amount=models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    professional_reward_amount=models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    pix_key_encrypted=models.TextField(blank=True)
+    pix_requested_at=models.DateTimeField(null=True,blank=True)
+    qualified_at=models.DateTimeField(null=True,blank=True)
+    paid_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["status","created_at"],name="growth_ref_status_idx")]
+
+    def __str__(self):
+        return f"{self.referrer_user} → {self.referred_tenant}"
+
+
+class ReferralPaymentCredit(models.Model):
+    referral=models.ForeignKey(PlatformReferral,on_delete=models.CASCADE,related_name="payment_credits")
+    payment=models.OneToOneField("billing.Payment",on_delete=models.CASCADE,related_name="referral_credit")
+    created_at=models.DateTimeField(auto_now_add=True)
+
