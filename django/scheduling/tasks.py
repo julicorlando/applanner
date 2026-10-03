@@ -74,7 +74,8 @@ def queue_appointment_reminders():
 
     queued=0
     for appointment in appointments:
-        settings_obj,_=TenantScheduleSettings.objects.get_or_create(tenant=appointment.tenant)
+        from .availability import AvailabilityService
+        settings_obj=AvailabilityService().settings(appointment.tenant,unit=appointment.unit)
         delta=appointment.starts_at-now
 
         if settings_obj.reminder_24h_enabled and timedelta(hours=23,minutes=50)<=delta<=timedelta(hours=24,minutes=10):

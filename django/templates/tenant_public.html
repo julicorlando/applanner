@@ -4,13 +4,23 @@
 {% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
 {% block content %}
 <style>
+:root{--tenant-accent:{{ tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}}
+body:has(.tenant-hero){background:var(--tenant-bg);color:var(--tenant-text)}
+body:has(.tenant-hero) .section,body:has(.tenant-hero) .panel,body:has(.tenant-hero) .segment-grid>article,body:has(.tenant-hero) .public-choice-card{background:var(--tenant-bg);color:var(--tenant-text)}
+body:has(.tenant-hero) :is(h1,h2,h3,p,label,small,strong,.eyebrow){color:var(--tenant-text)}
+body:has(.tenant-hero) .button.primary{background:var(--tenant-accent)!important;border-color:var(--tenant-accent)!important;color:#fff!important}
+body:has(.tenant-hero) .tenant-hero{background:var(--tenant-bg);color:var(--tenant-text)}
+body:has(.tenant-hero) .tenant-hero p{color:var(--tenant-text)}
+body:has(.tenant-hero) .form-field :is(input:not([type=checkbox]),textarea){background:var(--tenant-bg);color:var(--tenant-text)}
+body:has(.tenant-hero) .button.ghost{background:var(--tenant-bg);color:var(--tenant-text)}
+
 .public-cover-links{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1rem}.public-cover-links a,.public-meta-chip{display:inline-flex;padding:.42rem .7rem;border:1px solid color-mix(in srgb,var(--tenant-accent,#2563eb) 28%,transparent);border-radius:999px;text-decoration:none}.public-unit-card{position:relative}.public-unit-card.is-selected{outline:2px solid var(--tenant-accent,#2563eb);outline-offset:2px}.public-nearest-badge{margin-left:.4rem;font-weight:700}.public-unit-hours p{display:flex;justify-content:space-between;gap:1rem;margin:.35rem 0}.public-unit-hours .is-today{font-weight:700}.public-rating{display:grid;gap:.35rem}.public-rating__track{height:.55rem;border-radius:999px;background:#e5e7eb;overflow:hidden}.public-rating__track i{display:block;height:100%;background:var(--tenant-accent,#2563eb);border-radius:inherit}.public-unit-socials a{margin-right:.7rem}
 </style>
 <section class="tenant-hero{% if tenant.cover %} tenant-hero--has-cover{% endif %}" style="--tenant-accent:{{ tenant.public_accent_color|default:tenant.primary_color }};--tenant-bg:{{ tenant.background_color }};--tenant-text:{{ tenant.text_color }}">
   <div class="shell tenant-hero__content">
     {% if tenant.public_announcement %}<div class="tenant-announcement">{{ tenant.public_announcement }}</div>{% endif %}
-    {% if tenant.logo %}<img class="tenant-profile-logo" src="{% url 'public-tenant-image' tenant.pk 'logo' %}" alt="Foto de perfil de {{ tenant.name }}">{% endif %}
-    {% if tenant.cover %}<img class="tenant-cover" src="{% url 'public-tenant-image' tenant.pk 'cover' %}" alt="Capa de {{ tenant.name }}">{% endif %}
+    {% if tenant.logo %}<img class="tenant-profile-logo" src="{% url 'public-tenant-image' tenant.pk 'logo' %}?unit={{ selected_unit.pk }}" alt="Foto de perfil de {{ tenant.name }}">{% endif %}
+    {% if tenant.cover %}<img class="tenant-cover" src="{% url 'public-tenant-image' tenant.pk 'cover' %}?unit={{ selected_unit.pk }}" alt="Capa de {{ tenant.name }}">{% endif %}
     {% if selected_professional and selected_professional.photo %}<img class="professional-avatar" src="{% url 'public-professional-image' selected_professional.pk %}" alt="Foto de {{ selected_professional.name }}">{% endif %}
     <span class="eyebrow">{{ tenant.category|default:"AGENDE ONLINE" }}</span>
     {% if selected_professional %}
@@ -21,6 +31,7 @@
       <p>{{ tenant.public_subheadline|default:tenant.description }}</p>
     {% endif %}
     <div class="actions"><a class="button primary" href="#agendar">{{ tenant.public_cta_label|default:"Agendar agora" }}</a><a class="button ghost" href="{% if segment == 'arena' %}#quadras{% else %}#servicos{% endif %}">{% if segment == 'arena' %}Ver quadras{% else %}Ver serviços{% endif %}</a></div>
+    {% if selected_unit %}<p><strong>Unidade selecionada: {{ selected_unit.name }}</strong> · <a href="#unidades">Escolher outra unidade</a></p>{% endif %}
     <nav class="public-cover-links" aria-label="Conteúdo do estabelecimento">
       {% if segment != 'arena' and services %}<a href="#servicos">Serviços</a>{% endif %}
       {% if segment != 'arena' and professionals and not selected_professional %}<a href="#profissionais">Profissionais</a>{% endif %}
@@ -120,7 +131,7 @@
 
 {% if segment != 'arena' and professionals and not selected_professional %}
 <section class="shell section" id="profissionais">
-  <div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais disponíveis.</h2><p>Clique no profissional para abrir a agenda exclusiva dele.</p></div>
+  <div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais de {{ selected_unit.name|default:tenant.name }}.</h2><p>Clique no profissional para abrir a agenda exclusiva dele.</p></div>
   <div class="segment-grid public-choice-grid">
     {% for professional in professionals %}
       {% if professional.public_slug %}
@@ -191,7 +202,7 @@
   <div class="section-head"><span class="eyebrow">UNIDADES</span><h2>Escolha onde deseja ser atendido.</h2><p id="nearest-unit-status">Se você permitir a localização do dispositivo, destacamos automaticamente a unidade mais próxima.</p></div>
   <div class="segment-grid" id="public-units-grid">
     {% for unit in units %}
-    <article class="public-unit-card{% if selected_unit.pk == unit.pk %} is-selected{% endif %}" data-unit-card="{{ unit.pk }}" data-lat="{% if unit.latitude != None %}{{ unit.latitude|floatformat:"7u" }}{% endif %}" data-lng="{% if unit.longitude != None %}{{ unit.longitude|floatformat:"7u" }}{% endif %}">
+    <article tabindex="0" role="group" aria-label="Unidade {{ unit.name }}" class="public-unit-card{% if selected_unit.pk == unit.pk %} is-selected{% endif %}" data-unit-card="{{ unit.pk }}" data-lat="{% if unit.latitude != None %}{{ unit.latitude|floatformat:"7u" }}{% endif %}" data-lng="{% if unit.longitude != None %}{{ unit.longitude|floatformat:"7u" }}{% endif %}">
       <span class="public-unit-badge">{% if unit.is_primary %}Principal{% else %}Unidade{% endif %}</span>
       <span class="public-nearest-badge" hidden>Mais próxima</span>
       <h3>{{ unit.name }}</h3>
@@ -202,8 +213,8 @@
       {% if unit.amenities %}<div><strong>Comodidades</strong><p>{% for item in unit.amenities %}<span class="public-meta-chip">{{ item }}</span>{% endfor %}</p></div>{% endif %}
       {% if unit.payment_methods %}<div><strong>Formas de pagamento</strong><p>{% for item in unit.payment_methods %}<span class="public-meta-chip">{{ item }}</span>{% endfor %}</p></div>{% endif %}
       {% if unit.instagram or unit.facebook or unit.tiktok or unit.website %}<p class="public-unit-socials">{% if unit.public_instagram_url %}<a href="{{ unit.public_instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}{% if unit.facebook %} <a href="{{ unit.facebook }}" target="_blank" rel="noopener">Facebook</a>{% endif %}{% if unit.public_tiktok_url %} <a href="{{ unit.public_tiktok_url }}" target="_blank" rel="noopener">TikTok</a>{% endif %}{% if unit.website %} <a href="{{ unit.website }}" target="_blank" rel="noopener">Site</a>{% endif %}</p>{% endif %}
-      {% if unit.map_url %}<a href="{{ unit.map_url }}" target="_blank" rel="noopener">Ver localização →</a>{% elif unit.latitude and unit.longitude %}<a href="https://www.google.com/maps/search/?api=1&query={{ unit.latitude }},{{ unit.longitude }}" target="_blank" rel="noopener">Ver localização →</a>{% endif %}
-      {% if tenant.public_booking_enabled %}<p><a class="button ghost" href="#agendar" data-select-unit="{{ unit.pk }}">Agendar nesta unidade →</a></p>{% endif %}
+      {% if unit.map_url %}<a href="{{ unit.map_url }}" target="_blank" rel="noopener">Ver localização →</a>{% elif unit.latitude and unit.longitude %}<a href="https://www.google.com/maps/search/?api=1&query={{ unit.latitude|floatformat:"7u" }},{{ unit.longitude|floatformat:"7u" }}" target="_blank" rel="noopener">Ver localização →</a>{% endif %}
+      {% if tenant.public_booking_enabled %}<p><a class="button ghost" href="/p/{{ public_slug }}/?unit={{ unit.pk }}#agendar" data-select-unit="{{ unit.pk }}">Agendar nesta unidade →</a></p>{% endif %}
     </article>
     {% endfor %}
   </div>
@@ -266,8 +277,8 @@
 
   document.querySelectorAll('[data-select-unit]').forEach(link=>{
     link.addEventListener('click',()=>{
-      unit.value=link.dataset.selectUnit;
-      unit.dispatchEvent(new Event('change',{bubbles:true}));
+      window.location.assign('/p/{{ public_slug }}/?unit='+encodeURIComponent(link.dataset.selectUnit)+'#agendar');
+      return;
     });
   });
 
@@ -330,14 +341,19 @@
     if(professional.value)query.set('professional_id',professional.value);
     picker.load('/api/public/{{ public_slug }}/availability/?'+query.toString());
   }
-  unit.addEventListener('change',()=>{applyUnitFilter();unitCards.forEach(card=>card.classList.toggle('is-selected',card.dataset.unitCard===unit.value));loadSlots();});
+  unit.addEventListener('change',()=>{window.location.assign('/p/{{ public_slug }}/?unit='+encodeURIComponent(unit.value)+'#agendar');});
   service.addEventListener('change',()=>{applyUnitFilter();loadSlots();});
   professional.addEventListener('change',loadSlots);
   date.addEventListener('change',loadSlots);
+  const explicitUnit=new URLSearchParams(window.location.search).has('unit') || {% if selected_professional %}true{% else %}false{% endif %};
   applyUnitFilter();
 
   const unitCards=[...document.querySelectorAll('[data-unit-card]')];
-  const explicitUnit=new URLSearchParams(window.location.search).has('unit');
+  unitCards.forEach(card=>{
+    const select=()=>window.location.assign('/p/{{ public_slug }}/?unit='+encodeURIComponent(card.dataset.unitCard)+'#agendar');
+    card.addEventListener('click',event=>{if(!event.target.closest('a,button'))select();});
+    card.addEventListener('keydown',event=>{if(event.target===card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();select();}});
+  });
   const distanceKm=(a,b,c,d)=>{
     const R=6371,toRad=value=>value*Math.PI/180;
     const dLat=toRad(c-a),dLng=toRad(d-b);
@@ -350,9 +366,15 @@
       id:card.dataset.unitCard,
       lat:Number(card.dataset.lat),
       lng:Number(card.dataset.lng)
-    })).filter(item=>Number.isFinite(item.lat)&&Number.isFinite(item.lng));
+    })).filter(item=>item.card.dataset.lat!==''&&item.card.dataset.lng!==''&&Number.isFinite(item.lat)&&Number.isFinite(item.lng));
     if(!candidates.length)return;
     candidates.sort((left,right)=>distanceKm(latitude,longitude,left.lat,left.lng)-distanceKm(latitude,longitude,right.lat,right.lng));
+    candidates.forEach(item=>{
+      const distance=distanceKm(latitude,longitude,item.lat,item.lng);
+      const label=document.createElement('p');
+      label.textContent=distance.toLocaleString('pt-BR',{maximumFractionDigits:1})+' km de você';
+      item.card.querySelector('h3').after(label);
+    });
     const nearest=candidates[0];
     unitCards.forEach(card=>card.querySelector('.public-nearest-badge')?.setAttribute('hidden',''));
     nearest.card.querySelector('.public-nearest-badge')?.removeAttribute('hidden');
@@ -427,4 +449,25 @@
 </script>
 {% endif %}
 {% endif %}
+<script>
+if(!document.getElementById('public-booking')){
+  const cards=[...document.querySelectorAll('[data-unit-card]')];
+  cards.forEach(card=>{
+    const select=()=>window.location.assign('/p/{{ public_slug }}/?unit='+encodeURIComponent(card.dataset.unitCard)+'#unidades');
+    card.addEventListener('click',event=>{if(!event.target.closest('a,button'))select();});
+    card.addEventListener('keydown',event=>{if(event.target===card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();select();}});
+  });
+  if(!new URLSearchParams(location.search).has('unit')&&navigator.geolocation&&cards.length>1){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const rad=x=>x*Math.PI/180;
+      const candidates=cards.filter(c=>c.dataset.lat!==''&&c.dataset.lng!=='').map(card=>{
+        const lat=Number(card.dataset.lat),lng=Number(card.dataset.lng);
+        const x=Math.sin(rad(lat-pos.coords.latitude)/2)**2+Math.cos(rad(pos.coords.latitude))*Math.cos(rad(lat))*Math.sin(rad(lng-pos.coords.longitude)/2)**2;
+        return {card,distance:2*6371*Math.asin(Math.sqrt(Math.min(1,x)))};
+      }).sort((a,b)=>a.distance-b.distance);
+      if(candidates.length)location.replace('/p/{{ public_slug }}/?unit='+encodeURIComponent(candidates[0].card.dataset.unitCard));
+    },()=>{},{timeout:5000,maximumAge:300000});
+  }
+}
+</script>
 {% endblock %}

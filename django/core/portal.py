@@ -151,7 +151,7 @@ PORTAL_MODULES = {
             "servicos": {
                 "model": "scheduling.Service",
                 "title": "Serviços",
-                "fields": ["name","description","duration_minutes","price","active"],
+                "fields": ["unit","name","description","duration_minutes","price","active"],
                 "columns": ["name","duration_minutes","price","active"],
                 "order": "name",
             },
@@ -729,7 +729,7 @@ def _widgets_for(model, fields):
     return widgets
 
 
-def _model_form(model, resource, *args, tenant=None, **kwargs):
+def _model_form(model, resource, *args, tenant=None, unit=None, **kwargs):
     from core.labels import field_label
     from core.operation_forms import OperationModelForm
     fields=list(resource["fields"])
@@ -737,13 +737,22 @@ def _model_form(model, resource, *args, tenant=None, **kwargs):
         fields.remove("vehicle")
     Form=modelform_factory(model,form=OperationModelForm,fields=fields,widgets=_widgets_for(model,fields))
     form=Form(*args,tenant=tenant,**kwargs)
+    if unit:
+        from core.unit_scope import scope_queryset
+        for name,field in form.fields.items():
+            if getattr(field,"queryset",None) is not None:
+                field.queryset=scope_queryset(field.queryset,unit)
+        if "unit" in form.fields:
+            form.fields["unit"].queryset=tenant.units.filter(pk=unit.pk,active=True)
+            form.fields["unit"].initial=unit.pk
+            form.fields["unit"].required=True
     if tenant and "unit" in form.fields and model._meta.label_lower in {
         "scheduling.appointment","finance.financialtransaction"
     }:
         units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
         if units:
             form.fields["unit"].required=True
-            if not form.is_bound and not getattr(form.instance,"unit_id",None):
+            if not unit and not form.is_bound and not getattr(form.instance,"unit_id",None):
                 form.fields["unit"].initial=units[0].pk
             form.fields["unit"].help_text="A unidade define a agenda e os indicadores financeiros deste lançamento."
     if model._meta.label_lower=="scheduling.customer" and "phone" in form.fields:
@@ -1005,7 +1014,9 @@ def home(request):
             "route":route if route in routes else None,"gateway":module.slug=="banking_integrations" and
                 (request.user.is_superuser or request.user.role=="owner"),
             "documentation":module.slug=="api"})
-    public_professionals=(tenant.professionals.filter(active=True,public_slug__isnull=False)
+    from core.unit_scope import selected_unit
+    unit=selected_unit(request,tenant)
+    public_professionals=(tenant.professionals.filter(active=True,public_slug__isnull=False,**({"unit":unit} if unit else {}))
                           .exclude(public_slug="").order_by("name") if tenant.public_enabled else [])
     return render(request,"portal/home.html",{
         "tenant":tenant,"modules":modules,"contracted_modules":contracted,
@@ -1163,14 +1174,13 @@ def resource_list(request,module_slug,resource_slug):
     qs=_tenant_queryset(model,tenant)
     if model._meta.label_lower=="scheduling.appointment":
         qs=qs.select_related("customer","service","professional","vehicle").prefetch_related("product_reservations__product")
-    selected_unit=(request.GET.get("unit") or "").strip()
-    unit_choices=[]
-    if _field(model,"unit"):
-        unit_choices=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
-        if selected_unit.isdigit() and any(str(row.pk)==selected_unit for row in unit_choices):
-            qs=qs.filter(unit_id=int(selected_unit))
-        else:
-            selected_unit=""
+    from core.unit_scope import selected_unit as resolve_unit,scope_queryset
+    unit=resolve_unit(request,tenant)
+    if model._meta.label_lower=="scheduling.tenantschedulesettings" and unit:
+        return redirect(reverse("unit-schedule-settings")+f"?unit={unit.pk}")
+    qs=scope_queryset(qs,unit)
+    selected_unit=str(unit.pk) if unit else ""
+    unit_choices=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
     q=(request.GET.get("q") or "").strip()
     if q:
         lookup=Q()
@@ -1282,7 +1292,8 @@ def resource_create(request,module_slug,resource_slug):
     else:
         if not resource.get("create",True):
             raise PermissionDenied
-        form=_model_form(model,resource,request.POST or None,request.FILES or None,tenant=tenant)
+        from core.unit_scope import selected_unit
+        form=_model_form(model,resource,request.POST or None,request.FILES or None,tenant=tenant,unit=selected_unit(request,tenant))
         if request.user.role=="reception" and model._meta.label_lower=="finance.product":
             form.fields.pop("commission_type",None)
             form.fields.pop("commission_value",None)
@@ -1298,6 +1309,9 @@ def resource_create(request,module_slug,resource_slug):
                         obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
                     obj.full_clean()
                     obj.save()
+                    if model._meta.label_lower=="tenants.unit" and obj.postal_code and (obj.latitude is None or obj.longitude is None):
+                        from tenants.tasks import queue_unit_geocoding
+                        transaction.on_commit(lambda unit_id=obj.pk:queue_unit_geocoding(unit_id))
                     form.save_m2m()
                 messages.success(request,f"{resource['title']}: cadastro criado.")
                 return redirect("portal-resource-list",module_slug=module_slug,resource_slug=resource_slug)
@@ -1327,8 +1341,10 @@ def resource_edit(request,module_slug,resource_slug,pk):
         raise PermissionDenied("A recepção pode consultar esta área, mas não alterá-la.")
     if not resource.get("edit",True):
         raise PermissionDenied
-    obj=get_object_or_404(_tenant_queryset(model,tenant),pk=pk)
-    form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant)
+    from core.unit_scope import selected_unit,scope_queryset
+    unit=selected_unit(request,tenant)
+    obj=get_object_or_404(scope_queryset(_tenant_queryset(model,tenant),unit),pk=pk)
+    form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant,unit=unit)
     if request.user.role=="reception" and model._meta.label_lower=="finance.product":
         form.fields.pop("commission_type",None)
         form.fields.pop("commission_value",None)

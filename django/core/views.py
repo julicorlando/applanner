@@ -289,6 +289,20 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         unit.public_hours=rows
     if selected_unit is None:
         selected_unit=(professional.unit if professional and professional.unit_id else (units[0] if units else None))
+    if selected_unit:
+        professionals=[item for item in professionals if item.unit_id==selected_unit.pk]
+        services=[item for item in services if item.unit_id in (None,selected_unit.pk)]
+        from copy import copy
+        tenant=copy(tenant)
+        allowed={"description","public_headline","public_subheadline","public_cta_label",
+                 "public_announcement","primary_color","background_color","text_color"}
+        for key,value in (selected_unit.public_settings or {}).items():
+            if key in allowed and value:
+                setattr(tenant,key,value)
+        if selected_unit.logo:
+            tenant.logo=selected_unit.logo
+        if selected_unit.cover:
+            tenant.cover=selected_unit.cover
     active_product_appointment_statuses=[
         Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
         Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
@@ -303,6 +317,8 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         )
         .order_by("name")[:24]
     )
+    if selected_unit:
+        products=[item for item in products if item.unit_id in (None,selected_unit.pk)]
     for product in products:
         product.public_available_stock=max(
             Decimal("0"),product.stock-(product.reserved_stock or Decimal("0")),

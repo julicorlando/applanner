@@ -85,6 +85,10 @@ class Unit(TimeStampedModel):
     amenities=models.JSONField(default=list,blank=True)
     payment_methods=models.JSONField(default=list,blank=True)
     public_notes=models.CharField(max_length=500,blank=True)
+    logo=models.ImageField(upload_to="unit/logo/",blank=True)
+    cover=models.ImageField(upload_to="unit/cover/",blank=True)
+    public_settings=models.JSONField(default=dict,blank=True)
+    schedule_overrides=models.JSONField(default=dict,blank=True)
     is_primary=models.BooleanField(default=False)
     active=models.BooleanField(default=True)
 

@@ -48,3 +48,12 @@ def geocode_unit_from_postal_code(self,unit_id):
         Unit.objects.filter(pk=unit.pk).update(**updates,updated_at=timezone.now())
         return "updated"
     return "no_coordinates"
+
+
+def queue_unit_geocoding(unit_id):
+    """Schedule address resolution after commit without blocking a saved unit."""
+    try:
+        geocode_unit_from_postal_code.delay(unit_id)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Não foi possível enfileirar a localização da unidade %s",unit_id)

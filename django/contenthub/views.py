@@ -45,7 +45,7 @@ def _distance_km(lat1,lon1,lat2,lon2):
     a1,a2=math.radians(float(lat1)),math.radians(float(lat2))
     dlat=a2-a1
     dlon=math.radians(float(lon2)-float(lon1))
-    value=math.sin(dlat/2)**2+math.cos(a1)*math.cos(a2)*math.sin(dlon/2)**2
+    value=min(1.0,max(0.0,math.sin(dlat/2)**2+math.cos(a1)*math.cos(a2)*math.sin(dlon/2)**2))
     return radius*2*math.atan2(math.sqrt(value),math.sqrt(1-value))
 
 
@@ -81,6 +81,7 @@ def public_directory_page(request):
                 "display_name":tenant.name if display_primary else f"{tenant.name} · {unit.name}",
             })
     if latitude is not None:
+        cards=[row for row in cards if row["distance_km"] is not None and row["distance_km"]<=30]
         cards.sort(key=lambda row:(row["distance_km"] is None,row["distance_km"] or 0,row["display_name"]))
     else:
         cards.sort(key=lambda row:(row["tenant"].name,not row["unit"].is_primary,row["unit"].name))

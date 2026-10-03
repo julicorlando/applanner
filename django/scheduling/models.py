@@ -35,11 +35,18 @@ class Customer(TimeStampedModel):
 
 class Service(TimeStampedModel):
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="services")
+    unit=models.ForeignKey("tenants.Unit",null=True,blank=True,on_delete=models.PROTECT,related_name="services")
     name=models.CharField(max_length=150)
     description=models.TextField(blank=True)
     duration_minutes=models.PositiveSmallIntegerField()
     price=models.DecimalField(max_digits=10,decimal_places=2,default=0)
     active=models.BooleanField(default=True)
+
+    def clean(self):
+        super().clean()
+        if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa."})
 
     def __str__(self):
         return self.name
@@ -69,6 +76,12 @@ class Professional(TimeStampedModel):
         constraints=[
             models.UniqueConstraint(fields=["tenant","public_slug"],name="uq_professional_public_slug"),
         ]
+
+    def clean(self):
+        super().clean()
+        if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa."})
 
     def __str__(self):
         return self.name
@@ -245,7 +258,7 @@ class Appointment(TimeStampedModel):
 
     def clean(self):
         super().clean()
-        if self.unit_id and self.unit.tenant_id!=self.tenant_id:
+        if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
             from django.core.exceptions import ValidationError
             raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa do agendamento."})
         if self.professional_id and self.professional.unit_id and self.unit_id and self.professional.unit_id!=self.unit_id:
