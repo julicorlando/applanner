@@ -178,7 +178,7 @@ def _platform_dashboard(request):
     })
 
 
-def _public_tenant_context(tenant,professional=None):
+def _public_tenant_context(tenant,professional=None,selected_unit=None):
     from billing.entitlements import active_subscription,module_enabled
     from contenthub.models import PublicReview
     from engagement.models import ServicePackage,TenantLoyaltySettings
@@ -188,7 +188,9 @@ def _public_tenant_context(tenant,professional=None):
     from billing.payment_services import has_connected_tenant_gateway
 
     services=tenant.services.filter(active=True).order_by("name")[:100]
-    professionals=list(tenant.professionals.filter(active=True).prefetch_related("services").order_by("name")[:100])
+    professionals=list(
+        tenant.professionals.filter(active=True).select_related("unit").prefetch_related("services").order_by("name")[:100]
+    )
     for item in professionals:
         offered=list(item.services.all())
         item.public_all_services=not item.services_restricted and not offered
@@ -197,13 +199,15 @@ def _public_tenant_context(tenant,professional=None):
         offered=professional.services.filter(tenant=tenant,active=True)
         if professional.services_restricted or professional.services.exists():
             services=offered.order_by("name")[:100]
-    units=tenant.units.filter(active=True).order_by("-is_primary","name")
+    units=list(tenant.units.filter(active=True).order_by("-is_primary","name"))
+    if selected_unit is None:
+        selected_unit=(professional.unit if professional and professional.unit_id else (units[0] if units else None))
     active_product_appointment_statuses=[
         Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
         Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
     ]
     products=list(
-        Product.objects.filter(tenant=tenant,active=True)
+        Product.objects.filter(tenant=tenant,active=True).select_related("unit")
         .annotate(
             reserved_stock=Sum(
                 "reservations__quantity",
@@ -240,6 +244,7 @@ def _public_tenant_context(tenant,professional=None):
         "barbearia":("AGENDAMENTO NA BARBEARIA","Escolha o serviço e o profissional para seu atendimento.","Serviço")}
     return {
         "tenant":tenant,"services":services,"professionals":professionals,"units":units,
+        "selected_unit":selected_unit,
         "products":products,"packages":packages,"reviews":reviews,"loyalty":loyalty,
         "public_slug":tenant.public_slug or tenant.slug,"selected_professional":professional,
         "waitlist_enabled":not active_subscription(tenant) or module_enabled(tenant,"waitlist"),
@@ -254,7 +259,7 @@ def _public_tenant_context(tenant,professional=None):
 
 
 def tenant_public(request,slug=None):
-    from tenants.models import Tenant
+    from tenants.models import Tenant,Unit
     if slug:
         tenant=get_object_or_404(
             Tenant.objects.filter(Q(public_slug=slug)|Q(public_slug__isnull=True,slug=slug)),
@@ -265,7 +270,14 @@ def tenant_public(request,slug=None):
         tenant=getattr(request,"tenant",None)
         if not tenant or tenant.status not in [Tenant.Status.TRIAL,Tenant.Status.ACTIVE] or not tenant.public_enabled:
             return render(request,"home.html")
-    return render(request,"tenant_public.html",_public_tenant_context(tenant))
+    selected_unit=None
+    raw=(request.GET.get("unit") or "").strip()
+    if raw.isdigit():
+        selected_unit=Unit.objects.filter(pk=int(raw),tenant=tenant,active=True).first()
+    return render(
+        request,"tenant_public.html",
+        _public_tenant_context(tenant,selected_unit=selected_unit),
+    )
 
 
 def professional_public(request,slug,professional_slug):
@@ -280,7 +292,8 @@ def professional_public(request,slug,professional_slug):
         Professional,tenant=tenant,active=True,public_slug=professional_slug,
     )
     return render(
-        request,"tenant_public.html",_public_tenant_context(tenant,professional=professional)
+        request,"tenant_public.html",
+        _public_tenant_context(tenant,professional=professional,selected_unit=professional.unit),
     )
 
 
