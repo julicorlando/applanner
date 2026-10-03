@@ -13,9 +13,12 @@ def public_directory(request):
     ).prefetch_related("units").order_by("name")[:200]
     data=[]
     for tenant in rows:
-        for unit in tenant.units.filter(active=True).order_by("-is_primary","name"):
+        active_units=list(tenant.units.filter(active=True).order_by("-is_primary","name","pk"))
+        has_primary=any(unit.is_primary for unit in active_units)
+        for index,unit in enumerate(active_units):
+            display_primary=unit.is_primary or (not has_primary and index==0)
             data.append({
-                "name":tenant.name if unit.is_primary else f"{tenant.name} · {unit.name}",
+                "name":tenant.name if display_primary else f"{tenant.name} · {unit.name}",
                 "tenant_name":tenant.name,
                 "unit":{"id":unit.pk,"name":unit.name,"city":unit.city,"state":unit.state,
                         "latitude":unit.latitude,"longitude":unit.longitude,"phone":unit.phone,
@@ -65,14 +68,17 @@ def public_directory_page(request):
 
     cards=[]
     for tenant in rows[:300]:
-        for unit in tenant.units.filter(active=True).order_by("-is_primary","name"):
+        active_units=list(tenant.units.filter(active=True).order_by("-is_primary","name","pk"))
+        has_primary=any(unit.is_primary for unit in active_units)
+        for index,unit in enumerate(active_units):
+            display_primary=unit.is_primary or (not has_primary and index==0)
             distance=None
             if latitude is not None and unit.latitude is not None and unit.longitude is not None:
                 distance=_distance_km(latitude,longitude,unit.latitude,unit.longitude)
             cards.append({
                 "tenant":tenant,"unit":unit,"nearest_unit":unit,
                 "distance_km":distance,
-                "display_name":tenant.name if unit.is_primary else f"{tenant.name} · {unit.name}",
+                "display_name":tenant.name if display_primary else f"{tenant.name} · {unit.name}",
             })
     if latitude is not None:
         cards.sort(key=lambda row:(row["distance_km"] is None,row["distance_km"] or 0,row["display_name"]))

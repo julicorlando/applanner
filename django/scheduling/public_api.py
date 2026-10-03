@@ -45,15 +45,17 @@ class PublicWaitlistAPIView(APIView):
         except PermissionDenied:
             return Response({"detail":"A lista de espera não está disponível neste plano."},status=403)
         try:
-            unit=_selected_unit(tenant,request.data.get("unit_id"),lock=True)
-            if not unit:
+            raw_unit=request.data.get("unit_id")
+            unit=_selected_unit(tenant,raw_unit,lock=True)
+            if _unit_selection_invalid(tenant,raw_unit,unit):
                 raise ValueError
             service=Service.objects.get(tenant=tenant,pk=int(request.data["service_id"]),active=True)
             day=date.fromisoformat(str(request.data["date"]))
             professional_id=str(request.data.get("professional_id") or "").strip()
-            professional=(Professional.objects.get(
-                tenant=tenant,unit=unit,pk=int(professional_id),active=True
-            ) if professional_id else None)
+            professional=(
+                _professional_queryset_for_unit(tenant,unit).get(pk=int(professional_id))
+                if professional_id else None
+            )
         except (KeyError,ValueError,TypeError,Service.DoesNotExist,Professional.DoesNotExist):
             return Response({"detail":"Serviço, profissional ou data inválidos."},status=400)
         if day<timezone.localdate() or day>timezone.localdate()+timedelta(days=90):
@@ -99,6 +101,23 @@ def _selected_unit(tenant,raw=None,*,lock=False):
     return qs.order_by("-is_primary","name","pk").first()
 
 
+def _unit_selection_invalid(tenant,raw,unit):
+    """Reject an invalid explicit unit, but keep legacy tenants without units operable."""
+    value=str(raw or "").strip()
+    if value:
+        return unit is None
+    return unit is None and Unit.objects.filter(tenant=tenant,active=True).exists()
+
+
+def _professional_queryset_for_unit(tenant,unit,*,lock=False):
+    qs=Professional.objects.filter(tenant=tenant,active=True)
+    if unit is not None:
+        qs=qs.filter(unit=unit)
+    if lock:
+        qs=qs.select_for_update()
+    return qs
+
+
 def _parse_start(tenant,value):
     tz=ZoneInfo(tenant.timezone or "America/Recife")
     start=datetime.fromisoformat(str(value))
@@ -132,8 +151,9 @@ class PublicAvailabilityAPIView(APIView):
                 {"detail":"Informe service_id e date=YYYY-MM-DD."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        unit=_selected_unit(tenant,request.query_params.get("unit_id"))
-        if not unit:
+        raw_unit=request.query_params.get("unit_id")
+        unit=_selected_unit(tenant,raw_unit)
+        if _unit_selection_invalid(tenant,raw_unit,unit):
             return Response({"detail":"Unidade não encontrada."},status=status.HTTP_404_NOT_FOUND)
         service=Service.objects.filter(pk=service_id,tenant=tenant,active=True).first()
         if not service:
@@ -146,8 +166,8 @@ class PublicAvailabilityAPIView(APIView):
                 professional_id=int(raw_professional)
             except ValueError:
                 return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
-            professional=Professional.objects.filter(
-                pk=professional_id,tenant=tenant,unit=unit,active=True
+            professional=_professional_queryset_for_unit(tenant,unit).filter(
+                pk=professional_id
             ).first()
             if not professional or not availability.professional_offers(
                 tenant,professional.pk,service.pk
@@ -295,8 +315,9 @@ class PublicBookingAPIView(APIView):
         if replay:
             return replay
         try:
-            unit=_selected_unit(tenant,data.get("unit_id"),lock=True)
-            if not unit:
+            raw_unit=data.get("unit_id")
+            unit=_selected_unit(tenant,raw_unit,lock=True)
+            if _unit_selection_invalid(tenant,raw_unit,unit):
                 raise ValueError
             service=Service.objects.get(pk=int(data["service_id"]),tenant=tenant,active=True)
             starts_at=_parse_start(tenant,data["starts_at"])
@@ -310,9 +331,9 @@ class PublicBookingAPIView(APIView):
         source=Appointment.Source.PUBLIC
         if requested_professional:
             try:
-                professional=Professional.objects.select_for_update().get(
-                    pk=int(requested_professional),tenant=tenant,unit=unit,active=True
-                )
+                professional=_professional_queryset_for_unit(
+                    tenant,unit,lock=True
+                ).get(pk=int(requested_professional))
             except (ValueError,Professional.DoesNotExist):
                 return Response({"detail":"Profissional inválido."},status=status.HTTP_400_BAD_REQUEST)
             replay=_booking_replay(request,tenant,idempotency_key,fingerprint)

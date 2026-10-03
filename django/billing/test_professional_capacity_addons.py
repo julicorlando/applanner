@@ -105,7 +105,7 @@ class ProfessionalCapacityAddonTests(TestCase):
 
         # O Master altera o preço do próximo +1 sem reprecificar retroativamente o já contratado.
         self.extra.addon_monthly_price=Decimal("9.90")
-        self.extra.save(update_fields=["addon_monthly_price","updated_at"])
+        self.extra.save(update_fields=["addon_monthly_price"])
 
         second=self._approve_extra()
         self.assertNotEqual(first.pk,second.pk)
