@@ -13,6 +13,7 @@ from billing.models import (
 from billing.module_services import module_monthly_price, sync_per_unit_addon_pricing
 from contenthub.models import FAQItem, PlatformHomepage
 from core.portal import _role_resource_visible, _role_resource_write
+from accounts.route_middleware import _reception_mutation_allowed
 from growth.attribution import infer_attribution
 from communications.models import Notification
 from engagement.models import ReferralIncentiveCampaign, ReferralReward
@@ -144,6 +145,10 @@ class ReceptionPolicyTests(TestCase):
         self.assertTrue(_role_resource_write(reception,"arena","espera-arena"))
         self.assertFalse(_role_resource_write(reception,"financeiro","lancamentos"))
         self.assertFalse(_role_resource_write(reception,"agenda","profissionais"))
+        self.assertTrue(_reception_mutation_allowed("/app/financeiro/pdv/"))
+        self.assertTrue(_reception_mutation_allowed("/app/relacionamento/inteligencia/"))
+        self.assertFalse(_reception_mutation_allowed("/app/auto/os/10/acao/"))
+        self.assertFalse(_reception_mutation_allowed("/app/barbearia/comandas/10/acao/"))
 
 
 class ProfessionalReturnScopeTests(TestCase):
