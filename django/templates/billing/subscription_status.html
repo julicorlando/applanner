@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load display_pt %}
 {% block title %}Plano e pagamentos — ApPlanner{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
@@ -10,19 +11,21 @@
       <div class="module-row"><span></span><div><strong>Ciclo</strong><small>{{ subscription.get_billing_cycle_display }}</small></div></div>
       {% if current_breakdown %}
       <h3>Composição da cobrança atual</h3>
-      <div class="module-row"><span></span><div><strong>Plano-base · {{ current_breakdown.plan.name }}</strong><small>R$ {{ current_breakdown.plan.amount }} por ciclo {{ current_breakdown.cycle_label|lower }}. Este é o valor do plano antes dos módulos adicionais.</small></div></div>
+      <p>Os valores abaixo representam sua contratação. O preço divulgado nos planos é o catálogo atual para novas contratações; alterações no catálogo não alteram automaticamente o valor contratado.</p>
+      {% if current_breakdown.different_catalog_price %}<p role="status">Sua conta possui um valor-base contratado de R$ {{ current_breakdown.plan.amount|money_pt }}. O valor-base atual no catálogo para o mesmo ciclo é R$ {{ current_breakdown.catalog_price|money_pt }}. Módulos e ajustes estão detalhados abaixo.</p>{% endif %}
+      <div class="module-row"><span></span><div><strong>Plano-base · {{ current_breakdown.plan.name }}</strong><small>R$ {{ current_breakdown.plan.amount|money_pt }} por ciclo {{ current_breakdown.cycle_label|lower }}. Este é o valor do plano antes dos módulos adicionais.</small></div></div>
       {% for item in current_breakdown.addons %}
       <div class="module-row"><span></span><div><strong>{{ item.name }}</strong><small>
-        {% if item.slug == "multiunit" %}Multiunidade: R$ {{ item.unit_price }} por unidade ativa · {{ current_breakdown.active_units }} unidade{{ current_breakdown.active_units|pluralize }} · R$ {{ item.cycle_total }} neste ciclo. Cada unidade adicional ativa libera mais 3 vagas de profissionais.
-        {% elif item.slug == "professional-extra" %}{{ item.quantity }} vaga{{ item.quantity|pluralize }} extra{{ item.quantity|pluralize }} de profissional contratada{{ item.quantity|pluralize }} · R$ {{ item.cycle_total }} neste ciclo.
-        {% else %}{% if item.quantity > 1 %}{{ item.quantity }} × {% endif %}R$ {{ item.monthly }}/mês · R$ {{ item.cycle_total }} neste ciclo.
+        {% if item.slug == "multiunit" %}Multiunidade: R$ {{ item.unit_price|money_pt }} por unidade ativa · {{ current_breakdown.active_units }} unidade{{ current_breakdown.active_units|pluralize }} · R$ {{ item.cycle_total|money_pt }} neste ciclo. Cada unidade adicional ativa libera mais 3 vagas de profissionais.
+        {% elif item.slug == "professional-extra" %}{{ item.quantity }} vaga{{ item.quantity|pluralize }} extra{{ item.quantity|pluralize }} de profissional contratada{{ item.quantity|pluralize }} · R$ {{ item.cycle_total|money_pt }} neste ciclo.
+        {% else %}{% if item.quantity > 1 %}{{ item.quantity }} × {% endif %}R$ {{ item.monthly|money_pt }}/mês · R$ {{ item.cycle_total|money_pt }} neste ciclo.
         {% endif %}
       </small></div></div>
       {% endfor %}
-      {% if current_breakdown.adjustment != "0.00" %}<div class="module-row"><span></span><div><strong>Ajuste, crédito ou desconto contratual</strong><small>R$ {{ current_breakdown.adjustment }} aplicado ao total contratado.</small></div></div>{% endif %}
-      <div class="module-row"><span></span><div><strong>Total do ciclo</strong><small>R$ {{ current_breakdown.total }} · este é o valor utilizado para a próxima cobrança enquanto sua contratação não mudar.</small></div></div>
+      {% if current_breakdown.adjustment != "0.00" %}<div class="module-row"><span></span><div><strong>Ajuste, crédito ou desconto contratual</strong><small>R$ {{ current_breakdown.adjustment|money_pt }} aplicado ao total contratado.</small></div></div>{% endif %}
+      <div class="module-row"><span></span><div><strong>Total do ciclo</strong><small>R$ {{ current_breakdown.total|money_pt }} · este é o valor utilizado para a próxima cobrança enquanto sua contratação não mudar.</small></div></div>
       {% else %}
-      <div class="module-row"><span></span><div><strong>Valor contratado atualizado</strong><small>R$ {{ subscription.contracted_price }}</small></div></div>
+      <div class="module-row"><span></span><div><strong>Valor contratado atualizado</strong><small>R$ {{ subscription.contracted_price|money_pt }}</small></div></div>
       {% endif %}
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
       {% if subscription.status == 'trial' or subscription.status == 'past_due' %}
@@ -54,14 +57,14 @@
     <div class="module-row" style="align-items:flex-start">
       <span></span>
       <div style="flex:1">
-        <strong>{{ payment.reference_month|date:"m/Y" }} · R$ {{ payment.amount }}</strong>
+        <strong>{{ payment.reference_month|date:"m/Y" }} · R$ {{ payment.amount|money_pt }}</strong>
         <small>{{ payment.method_label }}{% if payment.paid_at %} · pago em {{ payment.paid_at|date:"d/m/Y H:i" }}{% endif %}</small>
         {% with breakdown=payment.charge_breakdown %}
           <details style="margin-top:6px"><summary>Ver detalhamento desta cobrança</summary>
-            <p>Plano {{ breakdown.plan.name }}: R$ {{ breakdown.plan.amount }}</p>
-            {% for item in breakdown.addons %}<p>{{ item.name }}{% if item.quantity > 1 %} · {{ item.quantity }} unidade{{ item.quantity|pluralize }}/vaga{{ item.quantity|pluralize }}{% endif %}: R$ {{ item.cycle_total }}</p>{% endfor %}
-            {% if breakdown.adjustment != "0.00" %}<p>Ajuste/crédito/desconto: R$ {{ breakdown.adjustment }}</p>{% endif %}
-            <p><strong>Total: R$ {{ payment.amount }}</strong></p>
+            <p>Plano {{ breakdown.plan.name }}: R$ {{ breakdown.plan.amount|money_pt }}</p>
+            {% for item in breakdown.addons %}<p>{{ item.name }}{% if item.quantity > 1 %} · {{ item.quantity }} unidade{{ item.quantity|pluralize }}/vaga{{ item.quantity|pluralize }}{% endif %}: R$ {{ item.cycle_total|money_pt }}</p>{% endfor %}
+            {% if breakdown.adjustment != "0.00" %}<p>Ajuste/crédito/desconto: R$ {{ breakdown.adjustment|money_pt }}</p>{% endif %}
+            <p><strong>Total: R$ {{ payment.amount|money_pt }}</strong></p>
           </details>
         {% endwith %}
       </div>

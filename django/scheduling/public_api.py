@@ -135,6 +135,35 @@ def _candidate_professionals(tenant,service,unit=None):
     return qs.order_by("name","pk")
 
 
+def _next_availability(request, tenant, service, unit, professionals, day):
+    """Optional, bounded forward search; uses the same rules as booking."""
+    if request.query_params.get("suggest_next") != "1":
+        return {}
+    availability=AvailabilityService()
+    tz=ZoneInfo(tenant.timezone or "America/Recife")
+    today=timezone.now().astimezone(tz).date()
+    first=max(day+timedelta(days=1),today)
+    end=min(first+timedelta(days=29),today+timedelta(days=availability.settings(tenant,unit).maximum_days_ahead))
+    cursor=first
+    candidates_by_weekday={}
+    for professional in professionals:
+        if not availability.professional_offers(tenant,professional.pk,service.pk):
+            continue
+        for weekday in professional.availability.filter(tenant=tenant,active=True).values_list("weekday",flat=True):
+            candidates_by_weekday.setdefault(weekday,[]).append(professional)
+    while cursor<=end:
+        candidates=[]
+        for professional in candidates_by_weekday.get(cursor.isoweekday(),[]):
+            slots=availability.slots(tenant,service.pk,professional.pk,cursor,public_rules=True,limit=1)
+            if slots:
+                candidates.append(slots[0])
+        if candidates:
+            slot=min(candidates,key=lambda item:item["value"])
+            return {"next_available":{"date":cursor.isoformat(),"date_label":cursor.strftime("%d/%m/%Y"),"label":slot["label"]}}
+        cursor+=timedelta(days=1)
+    return {"next_available":None,"next_search_end":end.strftime("%d/%m/%Y")}
+
+
 class PublicAvailabilityAPIView(APIView):
     permission_classes=[permissions.AllowAny]
     throttle_classes=[PublicBookingThrottle]
@@ -181,6 +210,7 @@ class PublicAvailabilityAPIView(APIView):
                 slot["professional_id"]=professional.pk
                 slot["professional_name"]=professional.name
             return Response({
+                **(_next_availability(request,tenant,service,unit,[professional],day) if not slots else {}),
                 "date":day.isoformat(),"auto_professional":False,
                 "unit":{"id":unit.pk if unit else None,"name":unit.name if unit else ""},
                 "professional":{"id":professional.pk,"name":professional.name},
@@ -205,6 +235,7 @@ class PublicAvailabilityAPIView(APIView):
                     combined[slot["value"]]=candidate
         slots=sorted(combined.values(),key=lambda item:item["value"])
         return Response({
+            **(_next_availability(request,tenant,service,unit,_candidate_professionals(tenant,service,unit),day) if not slots else {}),
             "date":day.isoformat(),"auto_professional":True,
             "unit":{"id":unit.pk if unit else None,"name":unit.name if unit else ""},"slots":slots,
         })

@@ -105,7 +105,7 @@ class AvailabilityService:
             conflicts=conflicts.exclude(pk=exclude_appointment_id)
         return not conflicts.exists()
 
-    def slots(self,tenant,service_id,professional_id,day,public_rules=True):
+    def slots(self,tenant,service_id,professional_id,day,public_rules=True,limit=96):
         service=self.service(tenant,service_id)
         if not service or not self.professional_offers(tenant,professional_id,service_id):
             return []
@@ -139,6 +139,6 @@ class AvailabilityService:
                     "label":cursor.strftime("%H:%M"),
                 })
             cursor+=step
-            if len(slots)>=96:
+            if len(slots)>=limit:
                 break
         return slots

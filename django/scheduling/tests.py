@@ -76,6 +76,52 @@ class PublicBookingFlowTests(TestCase):
             )
             self.professionals.append(professional)
 
+    def test_next_date_suggestion_respects_conflicts_and_booking_window(self):
+        from .models import TenantScheduleSettings
+        day=self.day-timedelta(days=1)
+        query={"service_id":self.service.pk,"professional_id":self.professionals[0].pk,
+            "date":day.isoformat(),"suggest_next":"1"}
+        url=f"/api/public/{self.tenant.public_slug}/availability/"
+        response=self.client.get(url,query)
+        self.assertEqual(response.status_code,200)
+        self.assertFalse(response.json()["slots"])
+        self.assertEqual(response.json()["next_available"]["date"],self.day.isoformat())
+        customer=Customer.objects.create(tenant=self.tenant,name="Ocupado")
+        Appointment.objects.create(tenant=self.tenant,customer=customer,professional=self.professionals[0],service=self.service,
+            starts_at=datetime.combine(self.day,time(8),tzinfo=ZoneInfo("America/Recife")),
+            ends_at=datetime.combine(self.day,time(9),tzinfo=ZoneInfo("America/Recife")),status="confirmed")
+        self.assertEqual(self.client.get(url,query).json()["next_available"]["label"],"09:00")
+        schedule,_=TenantScheduleSettings.objects.get_or_create(tenant=self.tenant)
+        schedule.maximum_days_ahead=0
+        schedule.save()
+        self.assertIsNone(self.client.get(url,query).json()["next_available"])
+
+    def test_next_date_respects_unit_closure(self):
+        from tenants.models import Unit,UnitBusinessHours
+        unit=Unit.objects.create(tenant=self.tenant,name="Unidade fechada")
+        self.service.unit=unit
+        self.service.save()
+        professional=self.professionals[0]
+        professional.unit=unit
+        professional.save()
+        UnitBusinessHours.objects.create(tenant=self.tenant,unit=unit,weekday=self.day.isoweekday(),closed=True)
+        response=self.client.get(f"/api/public/{self.tenant.public_slug}/availability/",
+            {"unit_id":unit.pk,"service_id":self.service.pk,"professional_id":professional.pk,
+                "date":(self.day-timedelta(days=1)).isoformat(),"suggest_next":"1"})
+        self.assertEqual(response.status_code,200)
+        self.assertIsNone(response.json()["next_available"])
+
+    def test_next_date_is_optional_and_filters_ineligible_professionals(self):
+        url=f"/api/public/{self.tenant.public_slug}/availability/"
+        query={"service_id":self.service.pk,"date":(self.day-timedelta(days=1)).isoformat()}
+        self.assertNotIn("next_available",self.client.get(url,query).json())
+        for professional in self.professionals:
+            professional.services.clear()
+            professional.services_restricted=True
+            professional.save()
+        query["suggest_next"]="1"
+        self.assertIsNone(self.client.get(url,query).json()["next_available"])
+
     def test_availability_can_choose_any_professional(self):
         response=self.client.get(
             f"/api/public/{self.tenant.public_slug}/availability/",

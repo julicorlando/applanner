@@ -20,6 +20,41 @@ from finance.models import FinancialCategory,FinancialTransaction
 
 
 class PostDeployFixesTests(TestCase):
+    def test_health_warns_on_legacy_team_over_limit_and_missing_unit_hours(self):
+        from core.portal import operation_health
+        from tenants.models import Unit,UnitBusinessHours
+        self.limited_plan(limit=1)
+        unit=Unit.objects.create(tenant=self.tenant,name="Centro")
+        checks={item["key"]:item for item in operation_health(self.tenant)}
+        self.assertFalse(checks["team"]["ok"])
+        self.assertIn("2 ativos para 1 autorizados",checks["team"]["detail"])
+        self.assertFalse(checks["unit_hours"]["ok"])
+        UnitBusinessHours.objects.create(tenant=self.tenant,unit=unit,weekday=4,opens_at=time(9),closes_at=time(18))
+        self.assertTrue({item["key"]:item for item in operation_health(self.tenant)}["unit_hours"]["ok"])
+
+    def test_failed_reactivation_describes_saved_inactive_state(self):
+        self.limited_plan()
+        inactive=Professional.objects.create(tenant=self.tenant,name="Inativo",active=False)
+        response=self.client.post(reverse("portal-resource-edit",args=["agenda","profissionais",inactive.pk]),
+            {"name":"Inativo","active":"on","all_services":"on","service_selection":"on"})
+        self.assertContains(response,"Limite de 2 profissionais ativos atingido")
+        self.assertNotContains(response,"Você pode editar este profissional ativo")
+        inactive.refresh_from_db()
+        self.assertFalse(inactive.active)
+
+    def test_billing_explains_catalog_price_without_changing_contract(self):
+        subscription=self.limited_plan()
+        subscription.plan.monthly_price=Decimal("99.90")
+        subscription.plan.save()
+        subscription.base_contracted_price=Decimal("29.90")
+        subscription.contracted_price=Decimal("29.90")
+        subscription.save()
+        response=self.client.get(reverse("billing-subscription-status"))
+        self.assertContains(response,"valor-base contratado de R$ 29,90")
+        self.assertContains(response,"catálogo para o mesmo ciclo é R$ 99,90")
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.contracted_price,Decimal("29.90"))
+
     def limited_plan(self, limit=2):
         plan=Plan.objects.create(name="Plano com limite",slug="quota-test",features={"professionals":limit})
         return Subscription.objects.create(tenant=self.tenant,plan=plan,started_at=timezone.now(),status="trial",

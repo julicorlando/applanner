@@ -234,7 +234,7 @@
   const csrf=form.querySelector('[name=csrfmiddlewaretoken]').value;
   const today=new Date(); date.min=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
   const waitlist=document.getElementById('booking-waitlist');
-  const picker=createBookingSlotPicker({container:document.getElementById('booking-slots'),input:slot,status:document.getElementById('booking-slot-status'),onAvailability:count=>{if(waitlist)waitlist.hidden=count!==0;}});
+  const picker=createBookingSlotPicker({container:document.getElementById('booking-slots'),input:slot,status:document.getElementById('booking-slot-status'),onAvailability:count=>{if(waitlist)waitlist.hidden=count!==0;},onNextDate:nextDate=>{date.value=nextDate;loadSlots();}});
   if(waitlist)document.getElementById('booking-waitlist-submit').addEventListener('click',async()=>{
     const name=document.getElementById('booking-name').value.trim(),phone=document.getElementById('booking-phone').value.trim(),email=document.getElementById('booking-email').value.trim();
     if(!name || !phone){feedback.textContent='Informe seu nome e telefone com DDD para entrar na lista.';return;}
@@ -328,7 +328,7 @@
 
   function loadSlots(){
     if(!service.value || !date.value){picker.reset('Escolha o serviço e a data para ver os horários.');return;}
-    const query=new URLSearchParams({unit_id:unit.value,service_id:service.value,date:date.value});
+    const query=new URLSearchParams({unit_id:unit.value,service_id:service.value,date:date.value,suggest_next:'1'});
     if(professional.value)query.set('professional_id',professional.value);
     picker.load('/api/public/{{ public_slug }}/availability/?'+query.toString());
   }
@@ -432,7 +432,7 @@
       products.textContent='Produtos reservados: '+data.reserved_products.map(item=>item.name).join(', ')+'. Pagamento dos produtos no estabelecimento.';
       confirmation.append(products);
     }
-    if(data.customer_reused){const hint=document.createElement('p');hint.textContent='Seu contato foi vinculado ao cadastro existente. O nome e os dados já cadastrados foram preservados para manter seu histórico. Para corrigi-los, fale com o estabelecimento.';confirmation.append(hint);}
+    if(data.customer_reused){const hint=document.createElement('p');hint.textContent='Este telefone já tem cadastro neste estabelecimento. A reserva foi vinculada ao histórico existente sem alterar seus dados. O nome informado nesta reserva também fica disponível para a equipe. Para corrigir o cadastro, fale com o estabelecimento.';confirmation.append(hint);}
     const link=document.createElement('a');link.className='button primary';link.href=data.manage_url;link.textContent=payload.payment_choice==='on_site'?'Abrir meu agendamento':'Abrir agendamento e gerar Pix';confirmation.append(link);feedback.append(confirmation);confirmation.scrollIntoView({block:'nearest',behavior:'smooth'});
     } catch {feedback.textContent='Não foi possível confirmar o agendamento. Consulte seus agendamentos antes de tentar novamente.';submit.disabled=false;}
   });

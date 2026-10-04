@@ -32,3 +32,14 @@ def payment_method_pt(value):
 @register.filter
 def notification_type_pt(value):
     return NOTIFICATION_TYPES.get(str(value or "").lower(), value or "—")
+
+
+@register.filter
+def money_pt(value):
+    """Format numeric values and serialized billing amounts consistently."""
+    from decimal import Decimal, InvalidOperation
+    from django.utils.formats import number_format
+    try:
+        return number_format(Decimal(str(value)), decimal_pos=2, use_l10n=True, force_grouping=True)
+    except (InvalidOperation, TypeError, ValueError):
+        return "—"

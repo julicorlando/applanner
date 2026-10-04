@@ -1022,11 +1022,11 @@ def home(request):
         "tenant":tenant,"modules":modules,"contracted_modules":contracted,
         "public_professionals":public_professionals,
         "arena_mode":segment_enabled(tenant,"arena"),
-        "operation_health":operation_health(tenant),
+        "operation_health":operation_health(tenant,unit),
     })
 
 
-def operation_health(tenant):
+def operation_health(tenant,unit=None):
     """Read-only readiness summary for the owner; never calls external providers."""
     from scheduling.models import Professional,Service,ProfessionalAvailability,TenantScheduleSettings
     from communications.models import TenantWhatsAppConnection
@@ -1035,12 +1035,28 @@ def operation_health(tenant):
     checks=[]
     checks.append({"key":"public","label":"Página pública","ok":bool(tenant.public_enabled and tenant.public_booking_enabled),
         "detail":"Ativa e pronta para receber agendamentos." if tenant.public_enabled and tenant.public_booking_enabled else "Ative a página e o agendamento público.","url":reverse("tenant-branding")})
-    checks.append({"key":"team","label":"Equipe","ok":Professional.objects.filter(tenant=tenant,active=True).exists(),
-        "detail":"Há profissional ativo." if Professional.objects.filter(tenant=tenant,active=True).exists() else "Cadastre pelo menos um profissional.","url":reverse("portal-resource-list",args=["agenda","profissionais"])})
-    checks.append({"key":"services","label":"Serviços","ok":Service.objects.filter(tenant=tenant,active=True).exists(),
-        "detail":"Há serviço ativo." if Service.objects.filter(tenant=tenant,active=True).exists() else "Cadastre pelo menos um serviço.","url":reverse("portal-resource-list",args=["agenda","servicos"])})
-    checks.append({"key":"hours","label":"Horários","ok":ProfessionalAvailability.objects.filter(tenant=tenant,active=True,professional__active=True).exists(),
-        "detail":"Existe horário de atendimento." if ProfessionalAvailability.objects.filter(tenant=tenant,active=True,professional__active=True).exists() else "Defina os horários da equipe.","url":reverse("portal-resource-list",args=["agenda","expedientes"])})
+    capacity=professional_capacity(tenant)
+    team=Professional.objects.filter(tenant=tenant,active=True)
+    services=Service.objects.filter(tenant=tenant,active=True)
+    hours=ProfessionalAvailability.objects.filter(tenant=tenant,active=True,professional__active=True)
+    if unit:
+        team=team.filter(unit=unit)
+        services=services.filter(Q(unit=unit)|Q(unit__isnull=True))
+        hours=hours.filter(professional__unit=unit)
+    team_exists=team.exists()
+    checks.append({"key":"team","label":"Equipe","ok":team_exists and not capacity["exceeded"],
+        "detail":(f"Equipe acima do limite: {capacity['used']} ativos para {capacity['limit']} autorizados. Os cadastros existentes foram preservados; solicite ampliação ou desative um profissional." if capacity["exceeded"] else "Há profissional ativo dentro do limite contratado." if team_exists else "Cadastre pelo menos um profissional."),"url":reverse("portal-resource-list",args=["agenda","profissionais"])})
+    checks.append({"key":"services","label":"Serviços","ok":services.exists(),
+        "detail":"Há serviço ativo." if services.exists() else "Cadastre pelo menos um serviço.","url":reverse("portal-resource-list",args=["agenda","servicos"])})
+    checks.append({"key":"hours","label":"Expedientes dos profissionais","ok":hours.exists(),
+        "detail":"Existe expediente de profissional. A disponibilidade também respeita o funcionamento da unidade, intervalos e bloqueios." if hours.exists() else "Defina os dias e horários de atendimento dos profissionais.","url":reverse("portal-resource-list",args=["agenda","expedientes"])})
+    units=tenant.units.filter(active=True)
+    if unit:
+        units=units.filter(pk=unit.pk)
+    units_without_hours=units.exclude(business_hours__active=True).exists()
+    checks.append({"key":"unit_hours","label":"Funcionamento da unidade" if unit else "Funcionamento das unidades","ok":units.exists() and not units_without_hours,
+        "detail":"Há funcionamento cadastrado nas unidades ativas." if units.exists() and not units_without_hours else "Cadastre o funcionamento de cada unidade. Ele é exibido na página pública e é separado do expediente de cada profissional.",
+        "url":reverse("portal-resource-list",args=["agenda","horarios-unidades"]),"blocking":False})
     payment_ok=bool(settings and settings.allow_pay_on_site) or has_connected_tenant_gateway(tenant)
     checks.append({"key":"payments","label":"Recebimentos","ok":payment_ok,
         "detail":"Pagamento na unidade ou Mercado Pago configurado." if payment_ok else "Permita pagar na unidade ou conecte o Mercado Pago.","url":reverse("tenant-payment-gateway")})
@@ -1056,8 +1072,9 @@ def operation_diagnostics(request):
     if tenant is None:
         return redirect("portal-home")
     require_any_capability(request.user,"agenda.manage")
-    checks=operation_health(tenant)
-    blocking=[item for item in checks if not item["ok"] and item["key"]!="whatsapp"]
+    from core.unit_scope import selected_unit
+    checks=operation_health(tenant,selected_unit(request,tenant))
+    blocking=[item for item in checks if not item["ok"] and item["key"]!="whatsapp" and item.get("blocking",True)]
     return render(request,"portal/diagnostics.html",{"tenant":tenant,"checks":checks,
         "blocking_count":len(blocking),"ready":not blocking})
 
@@ -1341,6 +1358,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
     from core.unit_scope import selected_unit,scope_queryset
     unit=selected_unit(request,tenant)
     obj=get_object_or_404(scope_queryset(_tenant_queryset(model,tenant),unit),pk=pk)
+    professional_existing_active=model._meta.label_lower=="scheduling.professional" and obj.active
     form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant,unit=unit)
     if request.user.role=="reception" and model._meta.label_lower=="finance.product":
         form.fields.pop("commission_type",None)
@@ -1364,7 +1382,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
         "resource_slug":resource_slug,"resource":resource,"form":form,
         "title":f"Editar — {resource['title']}",
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
-        "professional_existing_active":model._meta.label_lower=="scheduling.professional" and obj.active,
+        "professional_existing_active":professional_existing_active,
         "appointment_identity":obj if model._meta.label_lower=="scheduling.appointment" else None,
         "unit_billing_notice":_unit_billing_notice(tenant,module_slug,resource_slug),
     })

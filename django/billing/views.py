@@ -379,6 +379,14 @@ def subscription_status(request):
     if subscription:
         from .breakdown import subscription_charge_breakdown
         current_breakdown=subscription_charge_breakdown(subscription)
+        months=current_breakdown["months"]
+        catalog_price={"monthly":subscription.plan.monthly_price,"quarterly":subscription.plan.quarterly_price,
+            "semiannual":subscription.plan.semiannual_price,"annual":subscription.plan.annual_price}.get(subscription.billing_cycle)
+        if catalog_price is None:
+            catalog_price=subscription.plan.monthly_price*months
+        current_breakdown["catalog_price"]=str(catalog_price)
+        current_breakdown["different_catalog_price"]=Decimal(current_breakdown["plan"]["amount"])!=catalog_price
+
         payment_history=list(
             Payment.objects.filter(
                 tenant=subscription.tenant,subscription=subscription,

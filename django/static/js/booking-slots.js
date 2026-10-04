@@ -1,4 +1,4 @@
-window.createBookingSlotPicker = ({container, input, status, onChange = () => {}, onAvailability = () => {}}) => {
+window.createBookingSlotPicker = ({container, input, status, onChange = () => {}, onAvailability = () => {}, onNextDate = null}) => {
   let requestId = 0;
 
   function reset(message) {
@@ -26,6 +26,16 @@ window.createBookingSlotPicker = ({container, input, status, onChange = () => {}
       onAvailability(slots.length);
       if (!slots.length) {
         status.textContent = 'Não há horários disponíveis nessa data.';
+        if (data.next_available && onNextDate) {
+          const next = document.createElement('button');
+          next.type = 'button';
+          next.className = 'button';
+          next.textContent = `Ver próxima vaga: ${data.next_available.date_label} às ${data.next_available.label}`;
+          next.addEventListener('click', () => onNextDate(data.next_available.date));
+          container.appendChild(next);
+        } else if (data.next_search_end) {
+          status.textContent += ` Não encontramos vagas até ${data.next_search_end}. Tente outro profissional ou entre na lista de espera, se disponível.`;
+        }
         return;
       }
       status.textContent = 'Selecione um horário disponível.';
