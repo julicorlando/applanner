@@ -30,13 +30,23 @@ def reconcile_pix_charge(charge_id, *, gateway=None, provider=None, order=None):
             raise ValueError('Pedido Pix não corresponde à cobrança registrada: identificador do pedido divergente.')
         if order.get('external_reference') != payment.provider_reference:
             raise ValueError('Pedido Pix não corresponde à cobrança registrada: referência da cobrança divergente.')
-        # Orders API identifies the country, while Payments API and some
-        # notification representations supply currency_id. Brazil Orders use BRL.
-        currency = order.get('currency_id')
-        country = order.get('country_code')
-        if (currency and currency != 'BRL') or (country and country != 'BR'):
-            raise ValueError('Pedido Pix não corresponde à cobrança registrada: moeda ou país divergente.')
-        if not currency and country != 'BR':
+        # Mercado Pago documents both BR/BRA and currency_id/currency for
+        # Orders responses. Check every supplied currency; never hide conflicts.
+        def code(value):
+            if value is None:
+                return ''
+            if not isinstance(value,str):
+                return 'INVALIDO'
+            value=value.strip().upper()
+            return value if not value or (value.isascii() and value.isalpha() and len(value)<=3) else 'INVALIDO'
+        country=code(order.get('country_code'))
+        currencies={code(order.get(field)) for field in ('currency_id','currency')}
+        currencies.discard('')
+        brazil=country in {'BR','BRA'}
+        if any(currency!='BRL' for currency in currencies) or (country and not brazil):
+            details=f"país={country or 'não informado'}; moeda={','.join(sorted(currencies)) or 'não informada'}"
+            raise ValueError('Pedido Pix não corresponde à cobrança registrada: moeda ou país divergente ('+details+').')
+        if not currencies and not brazil:
             raise ValueError('Não foi possível validar a moeda do Pix: país e moeda não informados pelo provedor.')
         rows = (order.get('transactions') or {}).get('payments') or []
         paid_rows = [row for row in rows if row.get('status') in {'approved', 'processed'} and

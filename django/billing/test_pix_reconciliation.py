@@ -72,6 +72,48 @@ class PixReconciliationTests(TestCase):
             self.charge.payment.refresh_from_db()
             self.assertEqual(self.charge.payment.status,'pending')
 
+    def test_bra_country_and_currency_field_confirm_existing_paid_pix(self):
+        self.provider.get_order.return_value={**self.brazil_order(),'country_code':'BRA','currency':'BRL'}
+        self.client.force_login(self.owner)
+        with patch('billing.pix_reconciliation.platform_provider',return_value=self.provider):
+            response=self.client.post(self.url,follow=True)
+        self.assertContains(response,'Pix confirmado pelo Mercado Pago')
+        self.charge.payment.refresh_from_db()
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.charge.payment.status,'paid')
+        self.assertEqual(self.subscription.status,'active')
+        self.assertEqual(Payment.objects.count(),1)
+
+    def test_iso3_country_also_confirms_payment_webhook(self):
+        self.provider.get_order.return_value={**self.brazil_order(),'country_code':'BRA','currency':'BRL'}
+        with patch('billing.webhooks.platform_provider',return_value=self.provider):
+            _reconcile_platform(self._event(),self.gateway,{'type':'payment'},'pay-pix-1')
+        self.charge.refresh_from_db()
+        self.assertEqual(self.charge.status,'paid')
+
+    def test_iso3_country_without_currency_and_harmless_formatting(self):
+        self.provider.get_order.return_value={**self.brazil_order(),'country_code':' bra '}
+        with patch('billing.pix_reconciliation.platform_provider',return_value=self.provider):
+            self.assertTrue(reconcile_pix_charge(self.charge.pk))
+
+    def test_both_currency_fields_are_validated_and_foreign_money_rejected(self):
+        for fields in [{'country_code':'BRA','currency':'USD'},
+                {'currency_id':'BRL','currency':'ARS'},{'currency_id':'USD','currency':'BRL'},
+                {'country_code':'ARG','currency':'BRL'},{'country_code':{'unexpected':'BR'}},
+                {'currency':['BRL']},{'country_code':'BRAX'}]:
+            self.provider.get_order.return_value={**self.brazil_order(),**fields}
+            with patch('billing.pix_reconciliation.platform_provider',return_value=self.provider):
+                with self.assertRaises(ValueError):
+                    reconcile_pix_charge(self.charge.pk)
+            self.charge.payment.refresh_from_db()
+            self.assertEqual(self.charge.payment.status,'pending')
+
+    def test_divergence_reports_safe_country_and_currency_codes(self):
+        self.provider.get_order.return_value={**self.brazil_order(),'country_code':'ARG','currency':'ARS'}
+        with patch('billing.pix_reconciliation.platform_provider',return_value=self.provider):
+            with self.assertRaisesMessage(ValueError,'país=ARG; moeda=ARS'):
+                reconcile_pix_charge(self.charge.pk)
+
     def test_payment_notification_also_reconciles_order(self):
         with patch('billing.webhooks.platform_provider', return_value=self.provider):
             _reconcile_platform(self._event(), self.gateway, {'type': 'payment'}, 'pay-pix-1')
