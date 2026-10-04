@@ -1,10 +1,12 @@
 from django.urls import path
+from core.postal_code import postal_code_lookup
 from . import views
 from . import api_access
 
 app_name="accounts"
 
 urlpatterns=[
+    path("endereco/cep/",postal_code_lookup,name="postal-code-lookup"),
     path("documentacao-api/",api_access.documentation,name="documentation"),
     path("documentacao-api/tokens/<int:pk>/revogar/",api_access.revoke_token,name="api-token-revoke"),
     path("login/",views.login_view,name="login"),

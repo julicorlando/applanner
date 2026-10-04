@@ -1309,9 +1309,6 @@ def resource_create(request,module_slug,resource_slug):
                         obj.tenant=type(tenant).objects.select_for_update().get(pk=tenant.pk)
                     obj.full_clean()
                     obj.save()
-                    if model._meta.label_lower=="tenants.unit" and obj.postal_code and (obj.latitude is None or obj.longitude is None):
-                        from tenants.tasks import queue_unit_geocoding
-                        transaction.on_commit(lambda unit_id=obj.pk:queue_unit_geocoding(unit_id))
                     form.save_m2m()
                 messages.success(request,f"{resource['title']}: cadastro criado.")
                 return redirect("portal-resource-list",module_slug=module_slug,resource_slug=resource_slug)

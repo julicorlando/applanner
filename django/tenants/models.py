@@ -105,6 +105,32 @@ class Unit(TimeStampedModel):
             ),
         ]
 
+    def save(self,*args,**kwargs):
+        address_fields=("postal_code","address","address_number","district","city","state")
+        previous=type(self).objects.filter(pk=self.pk).values(*address_fields,"latitude","longitude").first() if self.pk else None
+        update_fields=kwargs.get("update_fields")
+        address_changed=bool(previous and any(
+            getattr(self,field)!=previous[field] and (update_fields is None or field in update_fields)
+            for field in address_fields
+        ))
+        coordinates_changed=bool(previous and any(
+            getattr(self,field)!=previous[field] and (update_fields is None or field in update_fields)
+            for field in ("latitude","longitude")
+        ))
+        if address_changed:
+            self.geocoded_at=None
+            if not coordinates_changed:
+                self.latitude=self.longitude=None
+            if update_fields is not None:
+                kwargs["update_fields"]=set(update_fields)|{"geocoded_at"}
+                if not coordinates_changed:
+                    kwargs["update_fields"]|={"latitude","longitude"}
+        super().save(*args,**kwargs)
+        if self.active and self.postal_code and (self.latitude is None or self.longitude is None):
+            from django.db import transaction
+            from .tasks import queue_unit_geocoding
+            transaction.on_commit(lambda unit_id=self.pk:queue_unit_geocoding(unit_id))
+
     def __str__(self):
         return f"{self.tenant} — {self.name}"
 

@@ -262,9 +262,6 @@ def onboarding(request):
                 obj.tenant=tenant
                 obj.is_primary=True
                 obj.save()
-                transaction.on_commit(lambda unit_id=obj.pk: __import__(
-                    "tenants.tasks",fromlist=["geocode_unit_from_postal_code"]
-                ).geocode_unit_from_postal_code.delay(unit_id))
             elif step=="service_done":
                 obj=form.save(commit=False)
                 obj.tenant=tenant

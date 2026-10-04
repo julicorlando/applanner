@@ -18,6 +18,7 @@
     </article>
     {% empty %}<div class="panel"><p>{% if located %}Nenhuma unidade com localização cadastrada foi encontrada em até 30 km.{% else %}Nenhum estabelecimento está publicado no diretório.{% endif %}</p>{% if request.user.is_superuser %}<p>Ative <strong>Página pública</strong> no cadastro da empresa em <a href="{% url 'master-resource-list' 'empresas' %}">Master → Empresas</a>. Empresas em teste também podem aparecer.</p>{% endif %}</div>{% endfor %}
   </div>
+  {% if located %}<p class="operation-muted"><small>Distâncias aproximadas. Dados de localização: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> e BrasilAPI.</small></p>{% endif %}
 </section>
 <script>
 const nearby=document.getElementById('nearby');
