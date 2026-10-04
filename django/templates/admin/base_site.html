@@ -5,6 +5,7 @@
 <script src="{% static 'js/theme.js' %}"></script>
 {% endblock %}
 {% block extrahead %}{{ block.super }}
+<script src="{% static 'js/postal-code.js' %}" data-postal-code-url="{% url 'accounts:postal-code-lookup' %}" defer></script>
 <style>
 #user-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 #user-tools .theme-toggle{display:grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid currentColor;border-radius:50%;background:transparent;color:inherit;cursor:pointer}
