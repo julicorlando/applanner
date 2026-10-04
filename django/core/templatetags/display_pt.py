@@ -7,6 +7,18 @@ register = template.Library()
 
 
 @register.filter
+def single_checkbox(field):
+    from django.forms import CheckboxInput
+    return isinstance(field.field.widget,CheckboxInput)
+
+
+@register.filter
+def checkbox_group(field):
+    from django.forms import CheckboxSelectMultiple
+    return isinstance(field.field.widget,CheckboxSelectMultiple)
+
+
+@register.filter
 def homologation_record(obj):
     """Visual hint for explicitly named fixtures; does not change business rules."""
     import re

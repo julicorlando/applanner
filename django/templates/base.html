@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="{% static 'css/refresh.css' %}">
   <link rel="stylesheet" href="{% static 'css/nightfall.css' %}">
   <link rel="stylesheet" href="{% static 'css/usability.css' %}">
-  <link rel="stylesheet" href="{% static 'css/theme.css' %}">
+  <link rel="stylesheet" href="{% static 'css/theme.css' %}?v=20261004-billing">
   <script src="{% static 'js/form-validation-pt.js' %}?v=20261004" defer></script>
   <script src="{% static 'js/postal-code.js' %}" data-postal-code-url="{% url 'accounts:postal-code-lookup' %}" defer></script>
 </head>
@@ -71,7 +71,7 @@
   {% if messages %}
   <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
   {% endif %}
-  <main id="conteudo">{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
+  <main id="conteudo">{% include "billing/due_notice.html" %}{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
 {% block content %}{% endblock %}</main>
   <footer class="footer">
     <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>

@@ -5,6 +5,13 @@ from .models import CheckoutSession,Payment,Subscription
 
 
 @shared_task
+def queue_subscription_reminders():
+    from .reminders import queue_subscription_reminder
+    ids=Subscription.objects.exclude(status__in=[Subscription.Status.CANCELLED,Subscription.Status.SUSPENDED]).values_list("pk",flat=True)
+    return sum(queue_subscription_reminder(pk) for pk in ids.iterator())
+
+
+@shared_task
 def expire_checkouts():
     return CheckoutSession.objects.filter(
         status__in=[

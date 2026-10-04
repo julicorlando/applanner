@@ -60,7 +60,7 @@ TEMPLATES=[{
         "django.template.context_processors.request",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
-        "core.branding.platform_branding","core.unit_scope.operation_unit_context","billing.access.trial_prompt",
+        "core.branding.platform_branding","core.unit_scope.operation_unit_context","billing.access.trial_prompt","billing.reminders.payment_reminder",
     ]},
 }]
 DATABASES={"default":env.db("DATABASE_URL")}

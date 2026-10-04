@@ -18,6 +18,7 @@ TASKS=[
     ("Aplicar retenção LGPD de leads","commercial.tasks.enforce_lead_retention",24,"hours"),
     ("Expirar checkouts","billing.tasks.expire_checkouts",10,"minutes"),
     ("Reconciliar assinaturas","billing.tasks.reconcile_subscription_states",1,"hours"),
+    ("Avisar vencimento de assinaturas","billing.tasks.queue_subscription_reminders",1,"hours"),
     ("Health check operacional","operations.tasks.platform_health_check",5,"minutes"),
     ("Processar conversões Meta","growth.tasks.process_meta_conversion_queue",1,"minutes"),
     ("Atualizar métricas Arena","arena.tasks.refresh_arena_customer_metrics",12,"hours"),

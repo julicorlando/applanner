@@ -40,6 +40,13 @@ def send_notification(self,notification_id):
             if notification.scheduled_at and notification.scheduled_at>timezone.now():
                 return
 
+            if notification.template_key=="subscription_due":
+                from billing.reminders import reminder_is_current
+                if not reminder_is_current(notification):
+                    notification.status=Notification.Status.SKIPPED
+                    notification.save(update_fields=["status"])
+                    return
+
             if notification.channel==Notification.Channel.EMAIL:
                 subject=notification.payload.get("subject") or "ApPlanner"
                 text=notification.payload.get("text") or notification.payload.get("message") or ""

@@ -14,9 +14,15 @@ def subscription_allows_access(subscription, now=None):
         return False
     if subscription.trial_ends_at and now < subscription.trial_ends_at:
         return True
+    covered_until=paid_access_until(subscription)
+    return bool(covered_until and now < covered_until)
+
+
+def paid_access_until(subscription):
+    """The same paid cycle deadline used by the access gate and reminders."""
     payment=subscription.payments.filter(tenant_id=subscription.tenant_id,purpose='subscription',status=Payment.Status.PAID).order_by('-paid_at','-pk').first()
     if not payment:
-        return False
+        return None
     paid_at=payment.paid_at or payment.updated_at
     months={'monthly':1,'quarterly':3,'semiannual':6,'annual':12}[subscription.billing_cycle]
     cycle_start=paid_at
@@ -25,7 +31,7 @@ def subscription_allows_access(subscription, now=None):
     covered_until=cycle_start+relativedelta(months=months)
     if subscription.next_billing_at:
         covered_until=max(covered_until,subscription.next_billing_at)
-    return now < covered_until
+    return covered_until
 
 
 def eligible_for_payment(subscription):
