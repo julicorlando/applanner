@@ -210,7 +210,7 @@ def charge_detail(request,pk):
     accounting=(payment.metadata or {}).get('accounting') or {}
     checked=parse_datetime(accounting.get('checked_at','')) if accounting.get('checked_at') else None
     return render(request,'master/charge_detail.html',{'payment':payment,'pix':charge,'accounting':accounting,'accounting_checked':checked,
-        'consultations':AuditLog.objects.filter(entity_type='billing.Payment',entity_id=payment.pk,action='MASTER_PAYMENT_CONSULTED').select_related('user').order_by('-created_at','-pk')[:30],
+        'consultations':AuditLog.objects.filter(entity_type='billing.Payment',entity_id=payment.pk,action__in=['MASTER_PAYMENT_CONSULTED','MASTER_FINANCIAL_RECONCILIATION']).select_related('user').order_by('-created_at','-pk')[:30],
         'events':WebhookEvent.objects.filter(provider=payment.provider,resource_id__in=ids).order_by('-received_at')[:20],
         'can_consult':payment.provider=='mercadopago' and bool(charge or payment.provider_payment_id)})
 

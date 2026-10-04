@@ -47,7 +47,7 @@ def retention_metrics(start,end):
         note=(row.tenant.metadata or {}).get('retention') or {}
         reason=dict(REASONS).get(note.get('reason',''),'Não informado')
         reasons[reason]+=1
-        cancellations.append({'subscription':row,'reason':reason,'notes':note.get('notes','')})
+        cancellations.append({'subscription':row,'reason':reason,'reason_code':note.get('reason',''),'notes':note.get('notes','')})
     mrr=sum(((s.contracted_price / Decimal({'monthly':1,'quarterly':3,'semiannual':6,'annual':12}[s.billing_cycle])
              if s.contracted_price is not None else s.plan.monthly_price)
              for s in current if s.tenant_id in active),Decimal('0'))
@@ -63,7 +63,7 @@ def dashboard(request):
     valid=not form.is_bound or form.is_valid()
     if form.is_bound and valid: start,end=form.cleaned_data['start'],form.cleaned_data['end']
     return render(request,'master/retention.html',{'form':form,'start':start,'end':end,
-        'metrics':retention_metrics(start,end) if valid else None})
+        'metrics':retention_metrics(start,end) if valid else None,'reason_options':REASONS})
 
 @login_required
 @require_POST
@@ -96,6 +96,7 @@ def consult_accounting(request,pk):
         messages.error(request,'Não foi possível confirmar taxas e estornos agora. A conciliação automática tentará novamente.')
     else:
         messages.success(request,'Consulta financeira concluída. Campos não informados pelo provedor continuam pendentes.')
+    payment.refresh_from_db()
     append_audit(request=request,user=request.user,tenant=payment.tenant,action='MASTER_FINANCIAL_RECONCILIATION',
-        entity_type='Payment',entity_id=payment.pk,after={'confirmed':result})
+        entity_type='billing.Payment',entity_id=payment.pk,after={'result':'confirmed' if result else 'failed','status':payment.status})
     return redirect('master-charge-detail',pk=payment.pk)
