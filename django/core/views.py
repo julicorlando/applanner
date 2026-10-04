@@ -219,9 +219,9 @@ def _platform_dashboard(request):
     from tenants.models import Tenant
 
     return render(request,"platform_dashboard.html",{
-        "tenants_total":Tenant.objects.filter(deleted_at__isnull=True).count(),
-        "tenants_active":Tenant.objects.filter(status=Tenant.Status.ACTIVE,deleted_at__isnull=True).count(),
-        "subscriptions_active":Subscription.objects.filter(status=Subscription.Status.ACTIVE,tenant__deleted_at__isnull=True).count(),
+        "tenants_total":Tenant.objects.filter(deleted_at__isnull=True,archived_at__isnull=True).count(),
+        "tenants_active":Tenant.objects.filter(status=Tenant.Status.ACTIVE,deleted_at__isnull=True,archived_at__isnull=True).count(),
+        "subscriptions_active":Subscription.objects.filter(status=Subscription.Status.ACTIVE,tenant__deleted_at__isnull=True,tenant__archived_at__isnull=True).count(),
         "open_leads":Lead.objects.filter(status__in=[
             Lead.Status.NEW,Lead.Status.IN_SERVICE,Lead.Status.CONTACTED,Lead.Status.QUALIFIED
         ]).count(),
@@ -232,7 +232,7 @@ def _platform_dashboard(request):
         "plans_available":Plan.objects.filter(active=True,public_visible=True).count(),
         "tickets_open":SupportTicket.objects.exclude(status__in=[SupportTicket.Status.RESOLVED,SupportTicket.Status.CLOSED]).count(),
         "recent_leads":Lead.objects.order_by("-created_at")[:5],
-        "recent_tenants":Tenant.objects.filter(deleted_at__isnull=True).order_by("-created_at")[:5],
+        "recent_tenants":Tenant.objects.filter(deleted_at__isnull=True,archived_at__isnull=True).order_by("-created_at")[:5],
     })
 
 

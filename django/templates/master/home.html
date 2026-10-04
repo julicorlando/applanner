@@ -4,6 +4,7 @@
 {% block content %}
 <section class="shell portal-page">
   <div class="portal-heading"><div><span class="eyebrow">VISÃO GERAL · MASTER</span><h1>Central da plataforma</h1><p>Planos, empresas, comunicação e operação em um único lugar.</p></div><a class="button primary" href="{% url 'master-resource-list' 'planos' %}">Gerenciar planos <span aria-hidden="true">↗</span></a></div>
+  {% include "master/console_summary.html" %}
   <div class="metric-grid" style="margin-bottom:22px">
     <article><span>Planos à venda</span><strong>{{ public_plans }}</strong><small>Ativos e visíveis para novos clientes</small></article>
     <article><span>Funções disponíveis</span><strong>{{ active_modules }}</strong><small>Módulos ativos no catálogo</small></article>

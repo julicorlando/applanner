@@ -16,6 +16,15 @@ class SubscriptionAccessMiddleware:
         self.get_response=get_response
 
     def __call__(self,request):
+        user=request.user
+        if user.is_authenticated and not user.is_superuser and user.tenant_id and user.tenant.archived_at:
+            if not request.path.startswith(('/static/','/media/','/imagens/','/healthz/','/webhooks/')):
+                try: archive_match=resolve(request.path_info)
+                except Resolver404: archive_match=None
+                if not archive_match or archive_match.view_name not in self.PAYMENT_NAMES|self.AUTH_NAMES:
+                    if request.path.startswith('/api/'):
+                        return JsonResponse({'detail':'Empresa arquivada pelo administrador.','code':'company_archived'},status=403)
+                    return render(request,'master/archived_access.html',status=403)
         if not getattr(settings,'SUBSCRIPTION_ACCESS_ENFORCED',True):
             return self.get_response(request)
         if request.path.startswith(('/static/','/media/','/imagens/','/healthz/','/webhooks/')):

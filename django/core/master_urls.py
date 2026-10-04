@@ -1,5 +1,5 @@
 from django.urls import path
-from . import master
+from . import master, master_console
 from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment
 from .master_email import email_templates,smtp_settings,waive_onboarding_email
@@ -9,6 +9,13 @@ from billing.fiscal import master_fiscal_document
 from finance.platform_dashboard import dashboard as finance_dashboard
 
 urlpatterns=[
+    path("alertas/",master_console.alerts,name="master-alerts"),
+    path("cobrancas/",master_console.charges,name="master-charges"),
+    path("cobrancas/<int:pk>/",master_console.charge_detail,name="master-charge-detail"),
+    path("cobrancas/<int:pk>/consultar/",master_console.charge_consult,name="master-charge-consult"),
+    path("relatorios/",master_console.reports,name="master-reports"),
+    path("empresas/<int:pk>/ficha/",master_console.company_detail,name="master-company-detail"),
+    path("empresas/<int:pk>/<str:action>/confirmar/",master_console.company_lifecycle,name="master-company-lifecycle"),
     path("financeiro/painel/",finance_dashboard,name="master-finance-dashboard"),
     path("empresas/<int:pk>/acessos/",master.tenant_access,name="master-tenant-access"),
     path("empresas/<int:pk>/enviar-termos/",master.send_tenant_terms,name="master-send-tenant-terms"),

@@ -650,7 +650,7 @@ def _tenant(request):
         tenant_id=request.session.get("portal_tenant_id")
         if tenant_id:
             Tenant=apps.get_model("tenants","Tenant")
-            return Tenant.objects.filter(pk=tenant_id).first()
+            return Tenant.objects.filter(pk=tenant_id,deleted_at__isnull=True,archived_at__isnull=True).first()
     return None
 
 
@@ -1009,7 +1009,7 @@ def home(request):
     tenant=_require_tenant(request)
     if tenant is None:
         Tenant=apps.get_model("tenants","Tenant")
-        return render(request,"portal/select_tenant.html",{"tenants":Tenant.objects.order_by("name")})
+        return render(request,"portal/select_tenant.html",{"tenants":Tenant.objects.filter(deleted_at__isnull=True,archived_at__isnull=True).order_by("name")})
 
     modules=available_modules(request.user,tenant)
     from billing.models import Module,TenantModule
@@ -1161,7 +1161,7 @@ def select_tenant(request, tenant_id):
     if not request.user.is_superuser:
         raise PermissionDenied
     Tenant=apps.get_model("tenants","Tenant")
-    tenant=get_object_or_404(Tenant,pk=tenant_id)
+    tenant=get_object_or_404(Tenant,pk=tenant_id,deleted_at__isnull=True,archived_at__isnull=True)
     request.session["portal_tenant_id"]=tenant.pk
     messages.success(request,f"Empresa de homologação: {tenant.name}.")
     return redirect("portal-home")

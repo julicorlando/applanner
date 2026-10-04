@@ -12,6 +12,8 @@ def subscription_allows_access(subscription, now=None):
     now=now or timezone.now()
     if not subscription or subscription.status in {Subscription.Status.CANCELLED,Subscription.Status.SUSPENDED}:
         return False
+    if subscription.tenant.archived_at or subscription.tenant.deleted_at:
+        return False
     if subscription.trial_ends_at and now < subscription.trial_ends_at:
         return True
     covered_until=paid_access_until(subscription)

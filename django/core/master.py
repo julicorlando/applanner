@@ -365,7 +365,7 @@ def _value(obj,name):
 def home(request):
     _guard(request.user)
     cards=[{"slug":slug,"title":cfg["title"],"count":(
-        apps.get_model(cfg["model"]).objects.filter(deleted_at__isnull=True).count()
+        apps.get_model(cfg["model"]).objects.filter(deleted_at__isnull=True,**({"archived_at__isnull":True} if slug=="empresas" else {})).count()
         if slug in {"usuarios","empresas"} else apps.get_model(cfg["model"]).objects.count()
     )} for slug,cfg in MASTER_RESOURCES.items()]
     sections=[
@@ -377,7 +377,9 @@ def home(request):
     assigned=set().union(*(slugs for _,slugs in sections))
     grouped=[{"title":title,"cards":[card for card in cards if card["slug"] in slugs]} for title,slugs in sections]
     grouped.append({"title":"Auditoria e configurações","cards":[card for card in cards if card["slug"] not in assigned]})
+    from .master_console import overview
     return render(request,"master/home.html",{
+        "overview":overview(),
         "cards":cards,"groups":grouped,
         "public_plans":Plan.objects.filter(active=True,public_visible=True,is_custom=False).count(),
         "active_modules":Module.objects.filter(active=True).count(),
@@ -548,6 +550,10 @@ def resource_list(request,slug):
             if f.get_internal_type() in {"CharField","TextField","EmailField","SlugField"}:
                 lookup|=Q(**{f"{f.name}__icontains":q})
         qs=qs.filter(lookup)
+    if slug=="empresas":
+        archive_filter=request.GET.get("archive","")
+        if archive_filter=="archived": qs=qs.filter(archived_at__isnull=False)
+        elif archive_filter!="all": qs=qs.filter(archived_at__isnull=True)
     order=config.get("order")
     if order: qs=qs.order_by(*[x.strip() for x in order.split(",")])
     columns=config["columns"]
@@ -560,7 +566,7 @@ def resource_list(request,slug):
         "solicitacoes-billing":"Pedidos de exclusão podem ser concluídos aqui. Aprovar e excluir desativa a página pública, encerra os acessos dos usuários, cancela a assinatura ativa e envia a confirmação por e-mail ao solicitante.",
         "solicitacoes-lgpd":"Acompanhe pedidos de exportação, correção, exclusão e consentimento. O prazo exibido é um SLA operacional interno; valide a identidade antes de fornecer ou excluir dados.",
     }
-    return render(request,"master/list.html",{"slug":slug,"resource":config,"headers":headers,"rows":rows,"q":q,"help_text":help_text.get(slug)})
+    return render(request,"master/list.html",{"slug":slug,"resource":config,"headers":headers,"rows":rows,"q":q,"archive_filter":request.GET.get("archive",""),"help_text":help_text.get(slug)})
 
 
 @login_required
@@ -578,6 +584,9 @@ def resource_form(request,slug,pk=None):
     if pk is None and not config.get("create",True): raise PermissionDenied
     if pk is not None and not config.get("edit",True): raise PermissionDenied
     obj=get_object_or_404(model,pk=pk,deleted_at__isnull=True) if pk and slug in {"usuarios","empresas"} else (get_object_or_404(model,pk=pk) if pk else None)
+    if slug=="empresas" and obj and obj.archived_at:
+        messages.info(request,"Restaure a empresa na ficha antes de editar suas configurações.")
+        return redirect("master-company-detail",pk=obj.pk)
     if slug=="despesas" and obj and obj.type!="expense":
         raise PermissionDenied("Este registro não é uma despesa.")
     Form=(UserMasterForm if slug=="usuarios" else TenantMasterForm if slug=="empresas" else PlanMasterForm if config.get("special")=="plan"
@@ -631,7 +640,7 @@ def resource_form(request,slug,pk=None):
             form.save_m2m()
             if slug in critical_audit_slugs:
                 append_audit(
-                    tenant=getattr(row,"tenant",None),user=request.user,request=request,
+                    tenant=row if slug=="empresas" else getattr(row,"tenant",None),user=request.user,request=request,
                     action="MASTER_CRITICAL_RESOURCE_UPDATED" if obj else "MASTER_CRITICAL_RESOURCE_CREATED",
                     entity_type=model._meta.label,entity_id=row.pk,
                     before=before_snapshot,after=model_snapshot(row),
@@ -738,7 +747,7 @@ def delete_plan(request,pk):
     return render(request,"master/plan_delete.html",{"plan":plan,"references":references})
 
 
-def _approve_account_deletion(row,actor):
+def _approve_account_deletion(row,actor,*,notify=True):
     """Encerra a operação da empresa preservando somente registros necessários para auditoria."""
     from accounts.models import SecurityEvent,User
     from applanner.transactional_email import queue_email
@@ -757,6 +766,8 @@ def _approve_account_deletion(row,actor):
             raise ValidationError("Esta solicitação já foi analisada.")
 
         tenant=Tenant.objects.select_for_update().get(pk=row.tenant_id)
+        if User.objects.filter(tenant=tenant,is_superuser=True,deleted_at__isnull=True).exists():
+            raise ValidationError("Reatribua os acessos Master vinculados antes de excluir esta empresa.")
         requester_email=row.user.email
         requester_name=row.user.first_name or requester_email.split("@")[0]
         company_name=tenant.name
@@ -803,10 +814,11 @@ def _approve_account_deletion(row,actor):
                 reason="Exclusão da conta aprovada pelo Master",
             )
 
-        queue_email(
-            tenant,requester_email,"account_deletion_approved",
-            {"nome":requester_name,"empresa":company_name},
-        )
+        if notify:
+            queue_email(
+                tenant,requester_email,"account_deletion_approved",
+                {"nome":requester_name,"empresa":company_name},
+            )
 
         tenant.status=Tenant.Status.CANCELLED
         tenant.public_enabled=False
