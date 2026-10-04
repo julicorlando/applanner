@@ -299,6 +299,7 @@ def signup(request):
                 started_at=now,trial_started_at=now if trial_days else None,
                 trial_ends_at=trial_end,trial_days_snapshot=trial_days,
                 next_billing_at=trial_end or now,
+                payment_method=data.get("payment_method") or "card",
             )
             if proposal:
                 proposal.tenant=tenant
@@ -410,6 +411,8 @@ def subscription_status(request):
 
     return render(request,"billing/subscription_status.html",{
         "subscription_payment_required":eligible_for_payment(subscription),
+        "can_configure_card":bool(subscription and subscription.payment_method=="card" and not subscription.provider_subscription_id and subscription.status in {"trial","active","past_due"}),
+        "can_change_payment_method":bool(subscription and request.user.role=="owner" and subscription.status in {"trial","active","past_due"}),
         "subscription":subscription,"pix_charge":pix_charge,
         "professional_capacity":professional_capacity(request.user.tenant,subscription) if request.user.tenant_id and not segment_enabled(request.user.tenant,"arena") else None,
         "pending_deletion":pending_deletion,
@@ -418,6 +421,26 @@ def subscription_status(request):
         "current_breakdown":current_breakdown,
         "payment_history":payment_history,
     })
+
+
+@login_required
+@require_POST
+def subscription_payment_method(request):
+    if not request.user.tenant_id or request.user.role!="owner":
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Somente o titular pode alterar a forma de pagamento da assinatura.")
+    from .payment_method import change_payment_method
+    try:
+        subscription=change_payment_method(tenant_id=request.user.tenant_id,method=request.POST.get("payment_method"),
+            expected_version=int(request.POST.get("payment_method_version","-1")))
+    except (RuntimeError,ValueError) as exc:
+        messages.error(request,"Não foi possível alterar a forma de pagamento: "+str(exc))
+        return redirect("billing-subscription-status")
+    if subscription.payment_method=="card":
+        messages.success(request,"Cartão selecionado. Configure a autorização no pagamento seguro para ativar a cobrança automática. O período já pago será preservado.")
+    else:
+        messages.success(request,"Pix selecionado. Os próximos ciclos serão pagos manualmente. O período já pago foi preservado.")
+    return redirect("billing-subscription-status")
 
 
 @login_required
@@ -537,7 +560,7 @@ def subscription_checkout(request):
         raise PermissionDenied("Somente o responsável pode iniciar o pagamento da assinatura.")
     subscription=Subscription.objects.filter(tenant=request.user.tenant).order_by("-started_at","-pk").first()
     from .access import eligible_for_payment
-    if not eligible_for_payment(subscription):
+    if not eligible_for_payment(subscription) and not (subscription and subscription.payment_method=="card" and subscription.status=="active" and not subscription.provider_subscription_id):
         messages.error(request,"Não há cobrança pendente para esta assinatura.")
         return redirect("billing-subscription-status")
     if PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING,expires_at__gt=timezone.now()).exists():
@@ -553,7 +576,7 @@ def subscription_checkout(request):
         remote=create_platform_subscription(
             subscription=subscription,payer_email=payer_email,
             back_url=request.build_absolute_uri("/billing/assinatura/"),
-            idempotency_key=f"customer-checkout-{subscription.pk}-"+hashlib.sha256(payer_email.encode()).hexdigest()[:16],
+            idempotency_key=f"customer-checkout-{subscription.pk}-v{subscription.payment_method_version}-"+hashlib.sha256(payer_email.encode()).hexdigest()[:16],
         )
     except (RuntimeError,ValueError,ValidationError) as exc:
         messages.error(request,"Não foi possível iniciar o pagamento: "+str(exc))

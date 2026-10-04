@@ -59,6 +59,10 @@ class TenantModule(models.Model):
 
 
 class Subscription(TimeStampedModel):
+    class PaymentMethod(models.TextChoices):
+        CARD="card","Cartão · assinatura automática"
+        PIX="pix","Pix · pagamento por ciclo"
+
     class Status(models.TextChoices):
         TRIAL="trial","Teste"
         ACTIVE="active","Ativa"
@@ -90,6 +94,8 @@ class Subscription(TimeStampedModel):
     provider_environment=models.CharField(max_length=16,blank=True)
     provider_plan_id=models.CharField(max_length=190,blank=True)
     provider_checkout_url=models.URLField(max_length=1000,blank=True)
+    payment_method=models.CharField(max_length=8,choices=PaymentMethod.choices,blank=True,default="")
+    payment_method_version=models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return f"{self.plan.name} · {self.tenant.name}" if self.plan_id and self.tenant_id else "Nova assinatura"

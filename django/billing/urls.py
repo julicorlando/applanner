@@ -7,6 +7,7 @@ urlpatterns=[
     path("planos/monte-o-seu/",views.custom_plan,name="billing-custom-plan"),
     path("cadastro/",views.signup,name="billing-signup"),
     path("billing/assinatura/",views.subscription_status,name="billing-subscription-status"),
+    path("billing/assinatura/forma-pagamento/",views.subscription_payment_method,name="billing-subscription-payment-method"),
     path("billing/assinatura/cancelar/",views.cancel_platform_subscription,name="billing-subscription-cancel"),
     path("billing/conta/solicitar-exclusao/",views.request_account_deletion,name="billing-account-deletion"),
     path("billing/assinatura/pagar/",views.subscription_checkout,name="billing-subscription-checkout"),

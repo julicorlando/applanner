@@ -252,14 +252,17 @@ def _reconcile_platform(event,gateway,data,resource_id):
 
     elif "preapproval" in kind or "preapproval" in action or "subscription" in kind:
         remote=provider.get_subscription(resource_id)
-        subscription=Subscription.objects.filter(
-            provider_subscription_id=resource_id
-        ).first()
-        if subscription:
-            subscription.status=_subscription_status(remote.get("status"))
-            if not subscription.provider_environment:
-                subscription.provider_environment=gateway.environment
-            subscription.save(update_fields=["status","provider_environment","updated_at"])
+        # Serialize with payment-method changes: a detached authorization must
+        # never update the subscription after card-to-Pix cancellation.
+        with transaction.atomic():
+            subscription=Subscription.objects.select_for_update().filter(
+                provider_subscription_id=resource_id
+            ).first()
+            if subscription:
+                subscription.status=_subscription_status(remote.get("status"))
+                if not subscription.provider_environment:
+                    subscription.provider_environment=gateway.environment
+                subscription.save(update_fields=["status","provider_environment","updated_at"])
 
     event.status=WebhookEvent.Status.PROCESSED
     event.processed_at=timezone.now()

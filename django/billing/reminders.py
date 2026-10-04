@@ -43,6 +43,8 @@ def billing_notice(subscription, now=None):
         message=f"Seu teste termina em {label}. Assine para continuar usando o ApPlanner após esse prazo."
     elif subscription.provider_subscription_id:
         message=f"A renovação está prevista para {label}. Confira a forma de pagamento da assinatura automática; o acesso depende da confirmação do pagamento."
+    elif subscription.payment_method=="card":
+        message=f"Seu ciclo vence em {label}. Configure a autorização do cartão em Plano e pagamento para habilitar a renovação automática."
     else:
         message=f"Seu ciclo vence em {label}. No Pix, cada ciclo precisa de um novo pagamento para manter o acesso."
     return {"kind":kind,"deadline":deadline,"days":days,"overdue":overdue,

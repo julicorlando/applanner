@@ -56,21 +56,25 @@ def platform_webhook_secret(gateway):
     return decrypt_text(gateway.webhook_secret_encrypted)
 
 
+@transaction.atomic
 def create_platform_subscription(*,subscription,payer_email,back_url,idempotency_key):
+    subscription=Subscription.objects.select_for_update().select_related("plan","tenant").get(pk=subscription.pk)
+    if subscription.payment_method=="pix":
+        raise ValueError("Selecione cartão em Alterar forma de pagamento antes de continuar.")
+    if subscription.provider_subscription_id:
+        return {"reference":subscription.provider_subscription_id,"init_point":subscription.provider_checkout_url}
+    if PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING,expires_at__gt=timezone.now()).exists():
+        raise ValueError("Existe um Pix pendente. Conclua o pagamento ou aguarde sua expiração antes de configurar o cartão.")
     gateway=PaymentGateway.objects.filter(
         provider="mercadopago",active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED
     ).order_by("-environment").first()
     if not gateway:
         raise RuntimeError("provedor de cobrança da plataforma não está configurado.")
 
-    amount=subscription.contracted_price or subscription.plan.monthly_price
-    if subscription.billing_cycle==Subscription.BillingCycle.QUARTERLY:
-        amount=subscription.plan.quarterly_price or amount
-    elif subscription.billing_cycle==Subscription.BillingCycle.SEMIANNUAL:
-        amount=subscription.plan.semiannual_price or amount
-    elif subscription.billing_cycle==Subscription.BillingCycle.ANNUAL:
-        amount=subscription.plan.annual_price or amount
-
+    amount=subscription.contracted_price
+    if amount is None:
+        months={"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[subscription.billing_cycle]
+        amount=getattr(subscription.plan,{"monthly":"monthly_price","quarterly":"quarterly_price","semiannual":"semiannual_price","annual":"annual_price"}[subscription.billing_cycle]) or subscription.plan.monthly_price*months
     frequency={
         Subscription.BillingCycle.MONTHLY:1,
         Subscription.BillingCycle.QUARTERLY:3,
@@ -78,6 +82,12 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
         Subscription.BillingCycle.ANNUAL:12,
     }[subscription.billing_cycle]
 
+    from .access import paid_access_until
+    now=timezone.now()
+    start_at=paid_access_until(subscription)
+    if subscription.trial_ends_at and subscription.trial_ends_at>now:
+        start_at=max(start_at or subscription.trial_ends_at,subscription.trial_ends_at)
+    start_at=start_at if start_at and start_at>now else None
     remote=platform_provider(gateway).create_subscription(
         reason=f"ApPlanner — {subscription.plan.name}",
         external_reference=f"subscription:{subscription.pk}",
@@ -85,15 +95,19 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
         back_url=back_url,
         amount=Decimal(str(amount)),
         frequency=frequency,
-        trial_days=subscription.trial_days_snapshot or 0,
-        idempotency_key=idempotency_key,
+        trial_days=0,
+        start_at=start_at,
+        idempotency_key=f"{idempotency_key}-method{subscription.payment_method_version}",
     )
+    if not remote.get("reference") or not (remote.get("init_point") or "").startswith("https://"):
+        raise RuntimeError("O provedor não retornou uma autorização segura de cartão.")
     subscription.provider_subscription_id=remote["reference"]
     subscription.provider_environment=gateway.environment
     subscription.provider_plan_id=""
     checkout_url=remote.get("init_point") or ""
     subscription.provider_checkout_url=checkout_url if checkout_url.startswith("https://") else ""
-    subscription.save(update_fields=["provider_subscription_id","provider_environment","provider_plan_id","provider_checkout_url","updated_at"])
+    subscription.payment_method="card"
+    subscription.save(update_fields=["provider_subscription_id","provider_environment","provider_plan_id","provider_checkout_url","payment_method","updated_at"])
     return remote
 
 
@@ -106,6 +120,8 @@ def create_platform_pix_charge(*,subscription,payer_email):
         raise ValueError("Não há cobrança pendente para esta assinatura.")
     if subscription.provider_subscription_id:
         raise ValueError("Há um pagamento por cartão iniciado. Solicite ajuda ao suporte para mudar para Pix.")
+    if subscription.payment_method=="card":
+        raise ValueError("Selecione Pix em Alterar forma de pagamento antes de continuar.")
     previous=PixCharge.objects.select_related("payment").filter(
         subscription=subscription,payment__status=Payment.Status.PENDING,
         expires_at__gt=timezone.now(),
@@ -158,6 +174,8 @@ def create_platform_pix_charge(*,subscription,payer_email):
     payment.provider_status=remote.get("status") or "pending"
     payment.provider_payment_id=remote.get("payment_id") or ""
     payment.save(update_fields=["provider_status","provider_payment_id","updated_at"])
+    subscription.payment_method="pix"
+    subscription.save(update_fields=["payment_method","updated_at"])
     return PixCharge.objects.create(
         public_id=public_id,tenant=subscription.tenant,subscription=subscription,
         checkout_session=checkout,payment=payment,provider_order_id=remote["order_id"],

@@ -72,7 +72,7 @@ class MercadoPagoProvider:
     def test_connection(self):
         return self._request("GET","/users/me")
 
-    def create_subscription(self,*,reason,external_reference,payer_email,back_url,amount,frequency=1,trial_days=0,idempotency_key=""):
+    def create_subscription(self,*,reason,external_reference,payer_email,back_url,amount,frequency=1,trial_days=0,idempotency_key="",start_at=None):
         amount=Decimal(str(amount)).quantize(Decimal("0.01"))
         if amount<=0:
             raise ValueError("Valor da assinatura inválido.")
@@ -89,7 +89,9 @@ class MercadoPagoProvider:
                 "currency_id":"BRL",
             },
         }
-        if trial_days:
+        if start_at:
+            body["auto_recurring"]["start_date"]=start_at.isoformat()
+        elif trial_days:
             body["auto_recurring"]["free_trial"]={
                 "frequency":max(1,int(trial_days)),
                 "frequency_type":"days",

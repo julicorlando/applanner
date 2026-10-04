@@ -28,15 +28,30 @@
       <div class="module-row"><span></span><div><strong>Valor contratado atualizado</strong><small>R$ {{ subscription.contracted_price|money_pt }}</small></div></div>
       {% endif %}
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
-      {% if subscription_payment_required %}
+      <h3>Forma de pagamento</h3>
+      <p>{% if subscription.payment_method %}{{ subscription.get_payment_method_display }}{% else %}Escolha a forma de pagamento ao iniciar a cobrança.{% endif %}</p>
+      {% if can_change_payment_method %}
+      <form method="post" action="{% url 'billing-subscription-payment-method' %}" class="portal-form">
+        {% csrf_token %}<input type="hidden" name="payment_method_version" value="{{ subscription.payment_method_version }}">
+        <label for="subscription-payment-method">Alterar forma de pagamento</label>
+        <select id="subscription-payment-method" name="payment_method" required>
+          <option value="" disabled{% if not subscription.payment_method %} selected{% endif %}>Selecione</option>
+          <option value="card"{% if subscription.payment_method == 'card' %} selected{% endif %}>Cartão · assinatura automática</option>
+          <option value="pix"{% if subscription.payment_method == 'pix' %} selected{% endif %}>Pix · pagamento por ciclo</option>
+        </select>
+        <p>A troca preserva o período já pago. Ao mudar para Pix, a cobrança automática no cartão será encerrada após confirmação do provedor. Ao mudar para cartão, configure a autorização no pagamento seguro; a cobrança começa após o período vigente. Um Pix pendente precisa ser concluído ou expirar antes da troca.</p>
+        <button class="button" type="submit">Confirmar alteração</button>
+      </form>
+      {% endif %}
+      {% if subscription_payment_required or can_configure_card %}
         {% if pix_charge %}<p>Seu Pix aguarda pagamento até {{ pix_charge.expires_at|date:'d/m/Y H:i' }}.</p><a class="button primary" href="{% url 'billing-subscription-pix' %}">Ver QR code e Pix copia e cola</a>
         {% elif subscription.provider_checkout_url %}<p><a class="button primary" href="{{ subscription.provider_checkout_url }}" rel="noopener">Continuar pagamento seguro</a></p>
         {% elif subscription.provider_subscription_id %}<p>A autorização de pagamento já foi iniciada. Solicite ajuda ao suporte para recuperar o link.</p>
         {% else %}<p>Escolha como pagar este ciclo. No cartão, a assinatura é automática; no Pix, você paga cada ciclo separadamente.</p>
         <p class="payment-hint">O pagamento deve ser feito por uma conta diferente daquela que recebe as cobranças.</p>
         <div class="form-actions payment-choices">
-          <form method="post" action="{% url 'billing-subscription-checkout' %}">{% csrf_token %}<label for="card-payer">E-mail do pagador</label><input id="card-payer" type="email" name="payment_email" value="{{ request.user.email }}" required><button class="button primary">Pagar com cartão</button></form>
-          <form method="post" action="{% url 'billing-subscription-pix' %}">{% csrf_token %}<label for="pix-payer">E-mail do pagador</label><input id="pix-payer" type="email" name="payment_email" value="{{ request.user.email }}" required><button class="button">Pagar com Pix</button></form>
+          {% if subscription.payment_method != "pix" %}<form method="post" action="{% url 'billing-subscription-checkout' %}">{% csrf_token %}<label for="card-payer">E-mail do pagador</label><input id="card-payer" type="email" name="payment_email" value="{{ request.user.email }}" required><button class="button primary">{% if can_configure_card %}Configurar cartão{% else %}Pagar com cartão{% endif %}</button></form>{% endif %}
+          {% if subscription.payment_method != "card" %}<form method="post" action="{% url 'billing-subscription-pix' %}">{% csrf_token %}<label for="pix-payer">E-mail do pagador</label><input id="pix-payer" type="email" name="payment_email" value="{{ request.user.email }}" required><button class="button">Pagar com Pix</button></form>{% endif %}
         </div>{% endif %}
       {% endif %}
     {% else %}<p>Nenhuma assinatura encontrada.</p>{% endif %}
