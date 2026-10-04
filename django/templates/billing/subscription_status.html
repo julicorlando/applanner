@@ -28,6 +28,7 @@
       <div class="module-row"><span></span><div><strong>Valor contratado atualizado</strong><small>R$ {{ subscription.contracted_price|money_pt }}</small></div></div>
       {% endif %}
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
+      {% if has_pending_pix %}<form method="post" action="{% url 'billing-subscription-pix-refresh' %}">{% csrf_token %}<button type="submit" class="button">Já paguei · verificar Pix</button></form>{% endif %}
       <h3>Forma de pagamento</h3>
       <p>{% if subscription.payment_method %}{{ subscription.get_payment_method_display }}{% else %}Escolha a forma de pagamento ao iniciar a cobrança.{% endif %}</p>
       {% if can_change_payment_method %}

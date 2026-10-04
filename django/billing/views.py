@@ -414,6 +414,7 @@ def subscription_status(request):
         "can_configure_card":bool(subscription and subscription.payment_method=="card" and not subscription.provider_subscription_id and subscription.status in {"trial","active","past_due"}),
         "can_change_payment_method":bool(subscription and request.user.role=="owner" and subscription.status in {"trial","active","past_due"}),
         "subscription":subscription,"pix_charge":pix_charge,
+        "has_pending_pix":bool(subscription and PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING).exists()),
         "professional_capacity":professional_capacity(request.user.tenant,subscription) if request.user.tenant_id and not segment_enabled(request.user.tenant,"arena") else None,
         "pending_deletion":pending_deletion,
         "can_manage":request.user.tenant_id and request.user.role=="owner",
@@ -549,6 +550,29 @@ def subscription_pix(request):
     if not charge:
         return redirect("billing-subscription-status")
     return render(request,"billing/subscription_pix.html",{"charge":charge,"subscription":subscription})
+
+
+@login_required
+@require_POST
+def subscription_pix_refresh(request):
+    if not request.user.tenant_id or request.user.role not in {"owner","manager"}:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Somente o responsável pode verificar o pagamento da assinatura.")
+    subscription=Subscription.objects.filter(tenant_id=request.user.tenant_id).order_by("-started_at","-pk").first()
+    charge=PixCharge.objects.filter(tenant_id=request.user.tenant_id,subscription=subscription,
+        payment__status=Payment.Status.PENDING).order_by("-created_at").first()
+    if not charge:
+        messages.info(request,"Não há Pix pendente para verificar.")
+    else:
+        try:
+            from .pix_reconciliation import reconcile_pix_charge
+            if reconcile_pix_charge(charge.pk):
+                messages.success(request,"Pix confirmado pelo Mercado Pago. Seu plano e pagamento foram atualizados.")
+            else:
+                messages.info(request,"O Mercado Pago ainda não confirmou este Pix. Aguarde e verifique novamente; não é necessário pagar de novo.")
+        except (RuntimeError,ValueError) as exc:
+            messages.error(request,"Não foi possível consultar o Pix agora: "+str(exc))
+    return redirect("billing-subscription-status")
 
 
 @login_required

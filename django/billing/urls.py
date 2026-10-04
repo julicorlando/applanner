@@ -11,6 +11,7 @@ urlpatterns=[
     path("billing/assinatura/cancelar/",views.cancel_platform_subscription,name="billing-subscription-cancel"),
     path("billing/conta/solicitar-exclusao/",views.request_account_deletion,name="billing-account-deletion"),
     path("billing/assinatura/pagar/",views.subscription_checkout,name="billing-subscription-checkout"),
+    path("billing/assinatura/pix/verificar/",views.subscription_pix_refresh,name="billing-subscription-pix-refresh"),
     path("billing/assinatura/pix/",views.subscription_pix,name="billing-subscription-pix"),
     path("billing/nfe/<int:payment_id>/solicitar/",request_fiscal_document,name="billing-nfe-request"),
     path("billing/nfe/<int:pk>/<str:kind>/",download_fiscal_document,name="billing-nfe-download"),

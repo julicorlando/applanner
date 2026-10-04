@@ -277,6 +277,18 @@ class PlatformFinancialTransaction(TimeStampedModel):
     notes=models.CharField(max_length=500,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="platform_finance_transactions")
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from decimal import Decimal
+        super().clean()
+        errors={}
+        if self.amount is not None and self.amount < Decimal("0.01"):
+            errors["amount"]="Informe um valor maior que zero."
+        if self.category_id and self.type and self.category.type not in {"both",self.type}:
+            errors["category"]="A categoria deve corresponder ao tipo do lançamento."
+        if errors:
+            raise ValidationError(errors)
+
     class Meta:
         indexes=[models.Index(fields=["type","status","due_at"],name="platform_finance_status_idx")]
 

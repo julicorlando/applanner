@@ -6,7 +6,10 @@ from .master_email import email_templates,smtp_settings,waive_onboarding_email
 from communications.master_marketing import campaigns,create_campaign,cancel_campaign,import_contacts
 from billing.fiscal import master_fiscal_document
 
+from finance.platform_dashboard import dashboard as finance_dashboard
+
 urlpatterns=[
+    path("financeiro/painel/",finance_dashboard,name="master-finance-dashboard"),
     path("empresas/<int:pk>/acessos/",master.tenant_access,name="master-tenant-access"),
     path("empresas/<int:pk>/enviar-termos/",master.send_tenant_terms,name="master-send-tenant-terms"),
     path("usuarios/<int:pk>/excluir/",master.remove_user,name="master-user-remove"),

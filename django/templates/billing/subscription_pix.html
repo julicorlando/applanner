@@ -10,6 +10,7 @@
     {% if charge.qr_code %}<div class="form-field"><label for="pix-copy">Pix copia e cola</label><textarea id="pix-copy" rows="4" readonly>{{ charge.qr_code }}</textarea><button type="button" class="button" onclick="navigator.clipboard.writeText(document.getElementById('pix-copy').value).then(()=>this.textContent='Código copiado')">Copiar código Pix</button></div>{% endif %}
     {% if not charge.qr_code_base64 and charge.qr_code %}<p class="payment-hint">O Mercado Pago disponibilizou o código Pix para copiar e colar; use o botão acima no seu aplicativo bancário.</p>{% endif %}
     {% if charge.ticket_url %}<p><a href="{{ charge.ticket_url }}" class="button ghost" rel="noopener noreferrer" target="_blank">Abrir pagamento no Mercado Pago ↗</a></p>{% endif %}
+    <form method="post" action="{% url 'billing-subscription-pix-refresh' %}">{% csrf_token %}<button type="submit" class="button">Já paguei · verificar Pix</button></form>
     <p><a href="{% url 'billing-subscription-status' %}">Verificar situação da assinatura →</a></p>
   </article>
 </section>

@@ -198,6 +198,7 @@ MASTER_RESOURCES={
     "equipe-comercial":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":["commercial_user","tenant","base_amount","commission_percent","commission_amount","status","hold_until"],"columns":["commercial_user","tenant","commission_amount","status","created_at"],"order":"-created_at"},
     "assinaturas":{"model":"billing.Subscription","title":"Assinaturas","fields":["tenant","plan","billing_cycle","contracted_price","status","started_at","trial_ends_at","next_billing_at","provider_customer_id","provider_subscription_id","provider_environment"],"columns":["tenant","plan","billing_cycle","status","next_billing_at"],"order":"-started_at"},
+    "despesas":{"model":"finance.PlatformFinancialTransaction","title":"Despesas da plataforma","fields":["category","description","amount","status","due_at","paid_at","notes"],"columns":["description","amount","status","due_at","paid_at"],"order":"-created_at","special":"platform_expense"},
     "financeiro":{"model":"finance.PlatformFinancialTransaction","title":"Financeiro da plataforma","fields":["category","type","description","amount","status","due_at","paid_at","notes"],"columns":["type","description","amount","status","due_at"],"order":"-created_at","special":"platform_finance"},
     "suporte":{"model":"operations.SupportTicket","title":"Suporte","fields":["tenant","user","category","subject","description","priority","status","assigned_to"],"columns":["protocol","tenant","subject","priority","status","assigned_to"],"order":"-created_at","create":False},
     "incidentes":{"model":"operations.OperationalIncident","title":"Incidentes","fields":["category","severity","title","details","status"],"columns":["severity","title","status","occurrence_count","last_seen_at"],"order":"-last_seen_at","create":False},
@@ -371,7 +372,7 @@ def home(request):
         ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","notas-fiscais","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
         ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","campanhas-indicacao","recompensas-indicacao","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","faq","aquisicao","meta-conversoes"}),
-        ("Suporte e operação",{"suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing","solicitacoes-lgpd"}),
+        ("Suporte e operação",{"despesas","financeiro","suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing","solicitacoes-lgpd"}),
     ]
     assigned=set().union(*(slugs for _,slugs in sections))
     grouped=[{"title":title,"cards":[card for card in cards if card["slug"] in slugs]} for title,slugs in sections]
@@ -538,6 +539,8 @@ def resource_list(request,slug):
     _guard(request.user)
     config,model=_config(slug)
     qs=model.objects.filter(deleted_at__isnull=True) if slug=="usuarios" else model.objects.all()
+    if slug=="despesas":
+        qs=qs.filter(type="expense")
     q=(request.GET.get("q") or "").strip()
     if q:
         lookup=Q()
@@ -575,11 +578,13 @@ def resource_form(request,slug,pk=None):
     if pk is None and not config.get("create",True): raise PermissionDenied
     if pk is not None and not config.get("edit",True): raise PermissionDenied
     obj=get_object_or_404(model,pk=pk,deleted_at__isnull=True) if pk and slug=="usuarios" else (get_object_or_404(model,pk=pk) if pk else None)
+    if slug=="despesas" and obj and obj.type!="expense":
+        raise PermissionDenied("Este registro não é uma despesa.")
     Form=(UserMasterForm if slug=="usuarios" else TenantMasterForm if slug=="empresas" else PlanMasterForm if config.get("special")=="plan"
           else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"])))
     critical_audit_slugs={
         "planos","modulos","assinaturas","cupons","campanhas-indicacao",
-        "operacao","empresas","isencoes-assinaturas","legais",
+        "operacao","empresas","isencoes-assinaturas","legais","despesas","financeiro",
     }
     before_snapshot=model_snapshot(obj) if obj is not None and slug in critical_audit_slugs else None
     form=Form(request.POST or None,request.FILES or None,instance=obj)
@@ -596,7 +601,14 @@ def resource_form(request,slug,pk=None):
             field.input_formats=["%Y-%m-%dT%H:%M","%Y-%m-%d %H:%M:%S"]
     if request.method=="POST" and form.is_valid():
         row=form.save(commit=False)
-        if config.get("special")=="platform_finance" and not row.created_by_id:
+        if config.get("special")=="platform_expense":
+            row.type="expense"
+        if config.get("special") in {"platform_finance","platform_expense"}:
+            if row.status=="paid" and not row.paid_at:
+                row.paid_at=timezone.now()
+            elif row.status!="paid":
+                row.paid_at=None
+        if config.get("special") in {"platform_finance","platform_expense"} and not row.created_by_id:
             row.created_by=request.user
         if config.get("special")=="plan" and row.is_custom and not row.created_by_id:
             row.created_by=request.user

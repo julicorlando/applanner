@@ -11,6 +11,8 @@
   <section class="master-shortcuts" aria-labelledby="master-shortcuts-title">
     <div class="section-heading"><div><span class="eyebrow">ACESSO RÁPIDO</span><h2 id="master-shortcuts-title">O que você quer fazer?</h2></div></div>
     <div class="shortcut-grid">
+      <a href="{% url 'master-finance-dashboard' %}"><span class="shortcut-icon" aria-hidden="true">◈</span><strong>Painel financeiro</strong><small>Receita bruta, lucro líquido e previsão</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+      <a href="{% url 'master-resource-create' 'despesas' %}"><span class="shortcut-icon" aria-hidden="true">+</span><strong>Cadastrar despesa</strong><small>Custos da operação da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
       <a href="{% url 'master-homepage' %}"><span class="shortcut-icon" aria-hidden="true">✦</span><strong>Editar página inicial</strong><small>Logo, textos e apresentação pública</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
       <a href="{% url 'master-resource-list' 'blog' %}"><span class="shortcut-icon" aria-hidden="true">▤</span><strong>Publicar notícia</strong><small>Conteúdo para o blog da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
       <a href="{% url 'master-platform-payment' %}"><span class="shortcut-icon" aria-hidden="true">◈</span><strong>Receber assinaturas</strong><small>Mercado Pago da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>

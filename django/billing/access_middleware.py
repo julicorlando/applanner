@@ -7,7 +7,7 @@ from .access import current_subscription,subscription_allows_access
 
 
 class SubscriptionAccessMiddleware:
-    PAYMENT_NAMES={'billing-subscription-status','billing-subscription-checkout','billing-subscription-pix','billing-subscription-cancel','billing-account-deletion','billing-subscription-payment-method'}
+    PAYMENT_NAMES={'billing-subscription-status','billing-subscription-checkout','billing-subscription-pix','billing-subscription-cancel','billing-account-deletion','billing-subscription-payment-method','billing-subscription-pix-refresh'}
     AUTH_NAMES={'accounts:login','accounts:logout','accounts:two-factor-challenge','accounts:change-password',
                 'accounts:password-reset-request','accounts:password-reset-confirm'}
     PUBLIC_NAMES={'tenant-public','professional-public','public-availability','public-booking','public-waitlist','public-arena-slots','public-arena-book'}

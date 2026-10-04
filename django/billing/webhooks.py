@@ -140,47 +140,8 @@ def _reconcile_platform(event,gateway,data,resource_id):
             provider_order_id=resource_id,payment__environment=gateway.environment,
         ).first()
         if charge:
-            payment=charge.payment
-            if charge.status!="pending" or payment.status==Payment.Status.CANCELLED:
-                event.status=WebhookEvent.Status.PROCESSED
-                event.processed_at=timezone.now()
-                event.error_message=""
-                event.save(update_fields=["status","processed_at","error_message"])
-                return
-            if order.get("external_reference")!=payment.provider_reference or order.get("currency_id")!="BRL":
-                raise ValueError("Pedido Pix não corresponde à cobrança registrada.")
-            details=(order.get("transactions") or {}).get("payments") or []
-            confirmed=order.get("status")=="processed" and any(
-                row.get("status") in {"approved","processed"} and (row.get("payment_method") or {}).get("id")=="pix"
-                for row in details
-            )
-            if confirmed:
-                paid_amount=Decimal(str(order.get("total_paid_amount") or "0"))
-                if paid_amount!=payment.amount:
-                    raise ValueError("Valor do Pix confirmado difere da cobrança.")
-                paid_at=timezone.now()
-                payment.status=Payment.Status.PAID
-                payment.paid_at=payment.paid_at or paid_at
-                payment.provider_status="processed"
-                from .breakdown import subscription_charge_breakdown
-                payment.metadata={
-                    **(payment.metadata or {}),
-                    "breakdown":subscription_charge_breakdown(charge.subscription),
-                }
-                paid_row=next(row for row in details if row.get("status") in {"approved","processed"} and (row.get("payment_method") or {}).get("id")=="pix")
-                payment.provider_payment_id=str(paid_row.get("id") or payment.provider_payment_id)
-                payment.save(update_fields=["status","paid_at","provider_status","provider_payment_id","metadata","updated_at"])
-                charge.status="paid"
-                charge.paid_at=charge.paid_at or paid_at
-                charge.save(update_fields=["status","paid_at","updated_at"])
-                charge.checkout_session.status=CheckoutSession.Status.PAID
-                charge.checkout_session.save(update_fields=["status","updated_at"])
-                subscription=charge.subscription
-                if subscription.status in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
-                    subscription.status=Subscription.Status.ACTIVE
-                    months={"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[subscription.billing_cycle]
-                    subscription.next_billing_at=max(subscription.trial_ends_at or paid_at,paid_at)+relativedelta(months=months)
-                    subscription.save(update_fields=["status","next_billing_at","updated_at"])
+            from .pix_reconciliation import reconcile_pix_charge
+            reconcile_pix_charge(charge.pk, gateway=gateway, provider=provider, order=order)
     elif kind=="payment" or action.startswith("payment."):
         remote=provider.get_payment(resource_id)
         external=str(remote.get("external_reference") or "")
@@ -222,16 +183,21 @@ def _reconcile_platform(event,gateway,data,resource_id):
                     },
                 )
         if payment:
-            if payment.metadata.get("method")=="pix" and external!=payment.provider_reference:
-                raise ValueError("Pagamento Pix não corresponde à cobrança registrada.")
+            if payment.metadata.get("method")=="pix":
+                if external!=payment.provider_reference or payment.environment!=gateway.environment:
+                    raise ValueError("Pagamento Pix não corresponde à cobrança registrada.")
+                charge=PixCharge.objects.filter(payment=payment).first()
+                if charge:
+                    from .pix_reconciliation import reconcile_pix_charge
+                    reconcile_pix_charge(charge.pk,gateway=gateway,provider=provider)
+                event.status=WebhookEvent.Status.PROCESSED
+                event.processed_at=timezone.now()
+                event.error_message=""
+                event.save(update_fields=["status","processed_at","error_message"])
+                return
             payment.provider_payment_id=resource_id
             payment.provider_status=str(remote.get("status") or "")
-            if payment.metadata.get("method")=="pix":
-                # Orders Pix are confirmed using GET /v1/orders/{id}, amount and currency.
-                if payment.status!=Payment.Status.PAID:
-                    payment.status=Payment.Status.PENDING
-            else:
-                payment.status=_payment_status(payment.provider_status)
+            payment.status=_payment_status(payment.provider_status)
             if remote.get("transaction_amount") is not None and payment.metadata.get("method")!="pix":
                 payment.amount=Decimal(str(remote["transaction_amount"]))
             if payment.status==Payment.Status.PAID and payment.metadata.get("method")!="pix":

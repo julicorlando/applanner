@@ -51,3 +51,22 @@ def sync_per_unit_addon_pricing_task(self,tenant_id):
     from .module_services import sync_per_unit_addon_pricing
     row=sync_per_unit_addon_pricing(tenant_id)
     return row.pk if row else None
+
+
+@shared_task
+def reconcile_pending_pix():
+    import logging
+    from datetime import timedelta
+    from .models import PixCharge
+    from .pix_reconciliation import reconcile_pix_charge
+    ids=list(PixCharge.objects.filter(payment__status=Payment.Status.PENDING,
+        created_at__gte=timezone.now()-timedelta(days=7)).order_by("updated_at").values_list("pk",flat=True)[:100])
+    confirmed=0
+    for pk in ids:
+        try:
+            confirmed+=int(reconcile_pix_charge(pk))
+        except (RuntimeError,ValueError):
+            logging.getLogger(__name__).warning("Não foi possível reconciliar a cobrança Pix %s",pk)
+        finally:
+            PixCharge.objects.filter(pk=pk).update(updated_at=timezone.now())
+    return confirmed

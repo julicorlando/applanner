@@ -6,6 +6,7 @@
   <header class="portal-heading operation-heading">
     <div><span class="eyebrow">PAINEL DA EMPRESA</span><h1>{{ tenant.name }}</h1><p>Encontre rapidamente o que precisa para atender seus clientes.</p></div>
     <div class="operation-heading-actions">
+      {% if request.user.is_superuser or request.user.role == 'master' %}<a class="button ghost" href="{% url 'master-resource-create' 'despesas' %}">Despesa da plataforma</a><a class="button ghost" href="{% url 'master-finance-dashboard' %}">Financeiro do Master</a>{% endif %}
       <button class="button ghost portal-view-toggle" id="portal-view-toggle" type="button" aria-pressed="false" aria-controls="operation-dashboard-content"><span aria-hidden="true">◐</span> Visão simplificada</button>
       {% if request.user.is_superuser or request.user.role == 'owner' %}<a class="button ghost" href="{% url 'portal-setup' %}">Configurar minha operação</a>{% endif %}
       {% if arena_mode %}<a class="button primary" href="{% url 'portal-resource-create' 'arena' 'reservas' %}">Nova reserva <span aria-hidden="true">＋</span></a>{% else %}{% for item in modules %}{% if item.slug == 'agenda' %}<a class="button primary" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">Novo agendamento <span aria-hidden="true">＋</span></a>{% endif %}{% endfor %}{% endif %}

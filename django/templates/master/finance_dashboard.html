@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% load display_pt %}
+{% block title %}Painel financeiro — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">FINANCEIRO DA PLATAFORMA</span><h1>Resultado da operação</h1><p>Recebimentos confirmados e despesas da plataforma, atualizados automaticamente.</p></div><a class="button primary" href="{% url 'master-resource-create' 'despesas' %}">Cadastrar despesa</a></div>
+  <form method="get" class="portal-search">{{ form.as_p }}<button class="button" type="submit">Aplicar período</button></form>
+  {% if totals %}
+  <p>{{ start|date:'d/m/Y' }} a {{ end|date:'d/m/Y' }} · valores em reais</p>
+  <div class="metric-grid">
+    <article><span>Receita bruta recebida</span><strong>R$ {{ totals.gross|money_pt }}</strong><small>Pagamentos aprovados e outras receitas pagas</small></article>
+    <article><span>Despesas pagas</span><strong>R$ {{ totals.expenses|money_pt }}</strong><small>Custos efetivamente pagos no período</small></article>
+    <article><span>Lucro líquido realizado</span><strong>R$ {{ totals.net|money_pt }}</strong><small>Receita bruta menos despesas pagas</small></article>
+    <article><span>Previsão de resultado</span><strong>R$ {{ totals.forecast|money_pt }}</strong><small>Realizado + contas a receber − contas a pagar</small></article>
+    <article><span>A receber</span><strong>R$ {{ totals.receivable|money_pt }}</strong><small>Cobranças e receitas pendentes</small></article>
+    <article><span>A pagar</span><strong>R$ {{ totals.payable|money_pt }}</strong><small>Despesas pendentes com vencimento no período</small></article>
+  </div>
+  <article class="panel" style="margin-top:18px"><h2>Como os valores são calculados</h2><p>Assinaturas aprovadas em produção entram automaticamente: R$ {{ totals.approved_income|money_pt }}. Outras receitas pagas cadastradas: R$ {{ totals.manual_income|money_pt }}. Pagamentos de teste, cancelados, recusados ou estornados não entram na receita recebida.</p><p>O resultado considera as despesas cadastradas. Registre também taxas, impostos, comissões e demais custos para que o líquido represente todos os gastos. Cadastre apenas outras receitas; os pagamentos de assinatura já entram automaticamente.</p><p>A previsão considera cobranças existentes e lançamentos pendentes pela data de vencimento. Sem vencimento, utiliza a data do cadastro. Pix expirados ficam fora da previsão. Novas vendas e renovações ainda sem cobrança não são incluídas.</p><div class="form-actions"><a class="button" href="{% url 'master-resource-list' 'despesas' %}">Gerenciar despesas</a><a class="button" href="{% url 'master-resource-list' 'financeiro' %}">Outras receitas e lançamentos</a></div></article>
+  <article class="panel" style="margin-top:18px"><h2>Assinaturas aprovadas</h2><div class="table-card"><table class="portal-table"><thead><tr><th>Empresa</th><th>Pagamento</th><th>Valor</th></tr></thead><tbody>{% for row in totals.payments %}<tr><td>{{ row.tenant.name }}</td><td>{{ row.paid_at|date:'d/m/Y H:i' }}</td><td>R$ {{ row.amount|money_pt }}</td></tr>{% empty %}<tr><td colspan="3">Nenhum recebimento aprovado neste período.</td></tr>{% endfor %}</tbody></table></div></article>
+  <article class="panel" style="margin-top:18px"><h2>Despesas pagas</h2><div class="table-card"><table class="portal-table"><thead><tr><th>Descrição</th><th>Pagamento</th><th>Valor</th><th></th></tr></thead><tbody>{% for row in totals.expenses_list %}<tr><td>{{ row.description }}</td><td>{{ row.paid_at|date:'d/m/Y H:i' }}</td><td>R$ {{ row.amount|money_pt }}</td><td><a href="{% url 'master-resource-edit' 'despesas' row.pk %}">Editar</a></td></tr>{% empty %}<tr><td colspan="4">Nenhuma despesa paga neste período.</td></tr>{% endfor %}</tbody></table></div></article>
+  <p>As listas exibem os 50 registros mais recentes; os totais consideram todos os registros do período.</p>
+  {% endif %}
+</section>
+{% endblock %}
