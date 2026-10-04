@@ -153,3 +153,21 @@ class SubscriptionAccessTests(TestCase):
         self.subscription.save()
         self.assertTrue(eligible_for_payment(self.subscription))
         self.assertContains(self.client.get(reverse('billing-subscription-status')),'Continuar pagamento seguro')
+
+    def test_popup_expiry_label_keeps_tenant_timezone(self):
+        fixed=datetime(2026,10,5,3,30,tzinfo=ZoneInfo('UTC'))
+        self.tenant.timezone='America/Manaus'
+        self.tenant.save()
+        self.subscription.trial_ends_at=fixed+timedelta(days=2)
+        self.subscription.save()
+        with patch('billing.access.timezone.now',return_value=fixed):
+            self.assertContains(self.client.get(reverse('billing-subscription-status')),'06/10/2026 às 23:30')
+
+    def test_billing_screen_cancellation_is_not_disabled_by_payment_lock(self):
+        self.expire()
+        self.owner.set_password('SyntheticTestPassword123!')
+        self.owner.save()
+        self.client.force_login(self.owner)
+        self.client.post(reverse('billing-subscription-cancel'),{'password':'SyntheticTestPassword123!'})
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.status,'cancelled')

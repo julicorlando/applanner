@@ -58,4 +58,4 @@ def trial_prompt(request):
     except ZoneInfoNotFoundError:
         tz=ZoneInfo('America/Recife')
     remaining=(subscription.trial_ends_at.astimezone(tz).date()-timezone.now().astimezone(tz).date()).days
-    return {'trial_subscription_prompt':{'days':remaining,'ends_at':subscription.trial_ends_at.astimezone(tz)}} if remaining in {2,0} else {}
+    return {'trial_subscription_prompt':{'days':remaining,'ends_at':subscription.trial_ends_at.astimezone(tz),'ends_label':subscription.trial_ends_at.astimezone(tz).strftime('%d/%m/%Y às %H:%M')}} if remaining in {2,0} else {}
