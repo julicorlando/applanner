@@ -33,3 +33,11 @@ def subscription_payment_saved(sender,instance,**kwargs):
         lambda: __import__("engagement.tasks",fromlist=["qualify_referral_rewards_task"])
         .qualify_referral_rewards_task.delay(tenant_id)
     )
+
+
+from django.contrib.auth.signals import user_logged_in
+
+@receiver(user_logged_in)
+def mark_trial_prompt(sender,request,user,**kwargs):
+    if request is not None:
+        request.session["trial_prompt_login"]=True

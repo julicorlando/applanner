@@ -101,7 +101,8 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
 def create_platform_pix_charge(*,subscription,payer_email):
     """One-off Pix for the current billing cycle; never authorizes recurring charges."""
     subscription=Subscription.objects.select_for_update().select_related("plan","tenant").get(pk=subscription.pk)
-    if subscription.status not in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
+    from .access import eligible_for_payment
+    if not eligible_for_payment(subscription):
         raise ValueError("Não há cobrança pendente para esta assinatura.")
     if subscription.provider_subscription_id:
         raise ValueError("Há um pagamento por cartão iniciado. Solicite ajuda ao suporte para mudar para Pix.")

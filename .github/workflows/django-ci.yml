@@ -104,4 +104,4 @@ jobs:
       - name: Validate Portuguese browser constraints
         run: node --test tests-js/*.test.cjs
       - name: Run tests
-        run: python manage.py test
+        run: python manage.py test --settings=applanner.test_settings

@@ -26,7 +26,7 @@ class LegalAcceptanceMiddleware:
 
     def __call__(self,request):
         user=getattr(request,"user",None)
-        if user and user.is_authenticated and not request.path.startswith(EXEMPT_PREFIXES):
+        if user and user.is_authenticated and not getattr(request,"billing_locked",False) and not request.path.startswith(EXEMPT_PREFIXES):
             docs=current_documents()
             if docs:
                 accepted=set(LegalAcceptance.objects.filter(

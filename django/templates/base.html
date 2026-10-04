@@ -25,6 +25,7 @@
     </a>
     <nav class="nav">
       {% if request.user.is_authenticated %}
+        {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
         <a href="/">Painel</a>
         {% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a>{% endif %}{% endif %}
         {% if request.user.tenant_id and request.user.role != 'professional' %}<a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}
@@ -32,7 +33,7 @@
         {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
         <a href="/account/2fa/setup/">Segurança</a>
         <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
-        <form method="post" action="/account/logout/" class="nav-form">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form>
+        {% endif %}<form method="post" action="/account/logout/" class="nav-form">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form>
       {% else %}
         <a href="/directory/">Explorar</a>
         <a href="/planos/">Planos</a>
@@ -42,12 +43,13 @@
     </nav>
     <details class="mobile-nav"><summary>Menu</summary><div class="mobile-nav-links">
       {% if request.user.is_authenticated %}
+      {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
       <a href="/">Painel</a>{% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a><a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}{% endif %}
       {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
       {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
       <a href="/account/2fa/setup/">Segurança</a>
       <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
-      <form method="post" action="/account/logout/">{% csrf_token %}<button type="submit">Sair</button></form>
+      {% endif %}<form method="post" action="/account/logout/">{% csrf_token %}<button type="submit">Sair</button></form>
       {% else %}
       <a href="/directory/">Explorar estabelecimentos</a>
       <a href="/planos/">Ver planos</a>
@@ -84,5 +86,6 @@
     </nav>
     <span>© {% now "Y" %} ApPlanner</span>
   </footer>
+  {% include "billing/trial_prompt.html" %}
 </body>
 </html>

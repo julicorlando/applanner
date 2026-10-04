@@ -6,7 +6,7 @@
   <div class="portal-heading"><div><span class="eyebrow">ASSINATURA</span><h1>Plano e pagamentos</h1><p>Veja exatamente o que compõe sua mensalidade, histórico de pagamentos e notas fiscais.</p></div></div>
   <article class="panel">
     {% if subscription %}
-      <h2>{{ subscription.plan.name }}</h2>
+      {% if request.billing_locked %}<p class="flash error" role="alert">Seu acesso está bloqueado. Regularize o pagamento para voltar a usar o sistema. A liberação ocorre após a confirmação do pagamento.</p>{% endif %}<h2>{{ subscription.plan.name }}</h2>
       <div class="module-row"><span></span><div><strong>Status</strong><small>{{ subscription.get_status_display }}</small></div></div>
       <div class="module-row"><span></span><div><strong>Ciclo</strong><small>{{ subscription.get_billing_cycle_display }}</small></div></div>
       {% if current_breakdown %}
@@ -28,7 +28,7 @@
       <div class="module-row"><span></span><div><strong>Valor contratado atualizado</strong><small>R$ {{ subscription.contracted_price|money_pt }}</small></div></div>
       {% endif %}
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
-      {% if subscription.status == 'trial' or subscription.status == 'past_due' %}
+      {% if subscription_payment_required %}
         {% if pix_charge %}<p>Seu Pix aguarda pagamento até {{ pix_charge.expires_at|date:'d/m/Y H:i' }}.</p><a class="button primary" href="{% url 'billing-subscription-pix' %}">Ver QR code e Pix copia e cola</a>
         {% elif subscription.provider_checkout_url %}<p><a class="button primary" href="{{ subscription.provider_checkout_url }}" rel="noopener">Continuar pagamento seguro</a></p>
         {% elif subscription.provider_subscription_id %}<p>A autorização de pagamento já foi iniciada. Solicite ajuda ao suporte para recuperar o link.</p>
@@ -40,9 +40,9 @@
         </div>{% endif %}
       {% endif %}
     {% else %}<p>Nenhuma assinatura encontrada.</p>{% endif %}
-  <div class="form-actions" style="margin-top:18px"><a class="button primary" href="{% url 'billing-subscription-modules' %}">Gerenciar módulos adicionais</a></div>
+  {% if not request.billing_locked %}<div class="form-actions" style="margin-top:18px"><a class="button primary" href="{% url 'billing-subscription-modules' %}">Gerenciar módulos adicionais</a></div>{% endif %}
   </article>
-  {% if professional_capacity %}<article class="panel" style="margin-top:16px"><h2>Equipe e limites contratados</h2>
+  {% if professional_capacity and not request.billing_locked %}<article class="panel" style="margin-top:16px"><h2>Equipe e limites contratados</h2>
     <p><strong>{{ professional_capacity.used }} profissionais ativos</strong>{% if professional_capacity.limit != None %} de {{ professional_capacity.limit }} autorizados{% elif professional_capacity.unlimited %} · Sem limite autorizado pelo Master{% else %} · Limite não definido no catálogo{% endif %}.</p>
     {% if professional_capacity.plan_limit %}<p>Seu plano inclui até {{ professional_capacity.plan_limit }} profissionais ativos.</p>{% endif %}
     {% if professional_capacity.unit_bonus %}<p>Multiunidade: +{{ professional_capacity.unit_bonus }} vagas (3 por cada uma das {{ professional_capacity.additional_units }} unidades adicionais ativas).</p>{% endif %}

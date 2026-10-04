@@ -4,6 +4,7 @@ import secrets
 from datetime import timedelta
 
 from django import forms
+from django.conf import settings
 from django.apps import apps
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
@@ -211,6 +212,10 @@ def api_resource(request,key,pk=None):
         response=JsonResponse({"erro":"Token inválido ou expirado."},status=401)
         response["WWW-Authenticate"]="Bearer"
         return response
+    if getattr(settings,'SUBSCRIPTION_ACCESS_ENFORCED',True) and token.tenant_id and not token.user.is_superuser:
+        from billing.access import current_subscription,subscription_allows_access
+        if not subscription_allows_access(current_subscription(token.tenant)):
+            return JsonResponse({'erro':'Acesso suspenso: regularize o pagamento da assinatura.','code':'subscription_payment_required'},status=402)
     # Read the minute once: add and incr must use the same key even at 00 seconds.
     limit_key=f"api:limit:{token.pk}:{timezone.now().strftime('%Y%m%d%H%M')}"
     if not cache.add(limit_key,1,timeout=75):

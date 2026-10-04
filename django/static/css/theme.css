@@ -81,3 +81,5 @@ select option,select optgroup{background:var(--paper);color:var(--ink)}
 .window-stats span,.window-stats small,.event small,.agenda-preview time{color:var(--muted)}
 .event.accent small{color:#e7edf6}
 :root[data-theme="dark"] .platform-logo-official{filter:brightness(0) invert(1);opacity:.94}
+
+.trial-subscription-dialog{width:min(92vw,520px);padding:28px;border:1px solid var(--line);border-radius:20px;background:var(--paper);color:var(--ink);box-shadow:0 24px 70px #0004}.trial-subscription-dialog::backdrop{background:#0008}.trial-subscription-dialog h2{margin-top:0}.trial-subscription-dialog p{color:var(--muted);line-height:1.6}

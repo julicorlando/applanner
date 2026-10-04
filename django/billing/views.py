@@ -358,11 +358,12 @@ def signup(request):
 
 @login_required
 def subscription_status(request):
+    from .access import eligible_for_payment
     from billing.entitlements import professional_capacity
     from billing.segment_access import segment_enabled
     subscription=(
         Subscription.objects.filter(tenant=request.user.tenant)
-        .select_related("plan").order_by("-started_at").first()
+        .select_related("plan").order_by("-started_at","-pk").first()
         if request.user.tenant_id else None
     )
     pix_charge=(PixCharge.objects.select_related("payment").filter(
@@ -408,6 +409,7 @@ def subscription_status(request):
             payment.fiscal_request=getattr(payment,"fiscal_document_request",None)
 
     return render(request,"billing/subscription_status.html",{
+        "subscription_payment_required":eligible_for_payment(subscription),
         "subscription":subscription,"pix_charge":pix_charge,
         "professional_capacity":professional_capacity(request.user.tenant,subscription) if request.user.tenant_id and not segment_enabled(request.user.tenant,"arena") else None,
         "pending_deletion":pending_deletion,
@@ -429,7 +431,7 @@ def cancel_platform_subscription(request):
         return redirect("billing-subscription-status")
     with transaction.atomic():
         subscription=(Subscription.objects.select_for_update().filter(tenant_id=request.user.tenant_id)
-                      .order_by("-started_at").first())
+                      .order_by("-started_at","-pk").first())
         if not subscription or subscription.status==Subscription.Status.CANCELLED:
             messages.info(request,"Esta assinatura já está cancelada.")
             return redirect("billing-subscription-status")
@@ -504,8 +506,9 @@ def subscription_pix(request):
     if not request.user.tenant_id or request.user.role not in {"owner","manager"}:
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied("Somente o responsável pode iniciar o pagamento da assinatura.")
-    subscription=Subscription.objects.filter(tenant=request.user.tenant).order_by("-started_at").first()
-    if not subscription or subscription.status not in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
+    subscription=Subscription.objects.filter(tenant=request.user.tenant).order_by("-started_at","-pk").first()
+    from .access import eligible_for_payment
+    if not eligible_for_payment(subscription):
         messages.error(request,"Não há cobrança pendente para esta assinatura.")
         return redirect("billing-subscription-status")
     if request.method=="POST":
@@ -532,8 +535,9 @@ def subscription_checkout(request):
     if not request.user.tenant_id or request.user.role not in {"owner","manager"}:
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied("Somente o responsável pode iniciar o pagamento da assinatura.")
-    subscription=Subscription.objects.filter(tenant=request.user.tenant).order_by("-started_at").first()
-    if not subscription or subscription.status not in {Subscription.Status.TRIAL,Subscription.Status.PAST_DUE}:
+    subscription=Subscription.objects.filter(tenant=request.user.tenant).order_by("-started_at","-pk").first()
+    from .access import eligible_for_payment
+    if not eligible_for_payment(subscription):
         messages.error(request,"Não há cobrança pendente para esta assinatura.")
         return redirect("billing-subscription-status")
     if PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING,expires_at__gt=timezone.now()).exists():
@@ -567,7 +571,7 @@ def subscription_modules(request):
         messages.error(request,"Selecione uma empresa.")
         return redirect("billing-subscription-status")
     tenant=request.user.tenant
-    subscription=Subscription.objects.filter(tenant=tenant).select_related("plan").order_by("-started_at").first()
+    subscription=Subscription.objects.filter(tenant=tenant).select_related("plan").order_by("-started_at","-pk").first()
     if not subscription:
         messages.error(request,"Assinatura não encontrada.")
         return redirect("billing-subscription-status")

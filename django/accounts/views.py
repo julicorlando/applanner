@@ -49,6 +49,7 @@ def _record_login_event(request,email,*,user=None,result="failed",reason=""):
 @never_cache
 def login_view(request):
     if request.user.is_authenticated:
+        request.session["trial_prompt_login"]=True
         return redirect(settings.LOGIN_REDIRECT_URL)
     if request.method=="POST":
         email=(request.POST.get("email") or "").strip().lower()
