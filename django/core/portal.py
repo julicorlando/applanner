@@ -708,6 +708,8 @@ def _scope_form(form, tenant):
             form_field.queryset=qs.filter(tenant=tenant)
         elif related._meta.label_lower=="tenants.unit":
             form_field.queryset=qs.filter(tenant=tenant)
+        if related._meta.label_lower=="tenants.unit":
+            form_field.label_from_instance=lambda unit: unit.name
     return form
 
 
@@ -855,6 +857,9 @@ def _save_special(obj, *, resource, request, tenant, is_new):
 
 
 def _value(obj, name):
+    if name=="unit":
+        unit=getattr(obj,"unit",None)
+        return unit.name if unit else "—"
     if name=="customer" and obj._meta.label_lower=="scheduling.appointment":
         return obj.customer_display_name
     if name=="reserved_products" and obj._meta.label_lower=="scheduling.appointment":
@@ -914,6 +919,8 @@ def setup_checklist(request):
     require_any_capability(request.user,"arena.manage" if arena else "agenda.manage")
     module="arena" if arena else "agenda"
     resources=PORTAL_MODULES[module]["resources"]
+    from core.unit_scope import selected_unit,scope_queryset
+    unit=selected_unit(request,tenant)
     _require_module_access(request.user,PORTAL_MODULES[module],tenant,module,
                            "quadras" if arena else "profissionais")
     if arena:
@@ -927,7 +934,7 @@ def setup_checklist(request):
     steps=[]
     for title,resource,filters in definitions:
         model=apps.get_model(resources[resource]["model"])
-        steps.append({"title":title,"done":model.objects.filter(tenant=tenant,**filters).exists(),
+        steps.append({"title":title,"done":scope_queryset(model.objects.filter(tenant=tenant,**filters),unit).exists(),
                       "url":reverse("portal-resource-list",args=[module,resource]),"action":"Configurar"})
     can_publish=request.user.is_superuser or request.user.role=="owner"
     steps.extend([
@@ -942,9 +949,9 @@ def setup_checklist(request):
     if not arena:
         from scheduling.availability import AvailabilityService
         from scheduling.models import Service,ProfessionalAvailability
-        services=list(Service.objects.filter(tenant=tenant,active=True))
-        hours=ProfessionalAvailability.objects.filter(tenant=tenant,active=True,professional__active=True,
-            professional__tenant=tenant).select_related("professional")
+        services=list(scope_queryset(Service.objects.filter(tenant=tenant,active=True),unit))
+        hours=scope_queryset(ProfessionalAvailability.objects.filter(tenant=tenant,active=True,professional__active=True,
+            professional__tenant=tenant),unit).select_related("professional")
         usable=any(AvailabilityService().professional_offers(tenant,h.professional_id,s.pk)
                    and s.duration_minutes <= (datetime.combine(date.today(),h.end_time)-datetime.combine(date.today(),h.start_time)).total_seconds()/60
                    for h in hours for s in services)
@@ -952,8 +959,8 @@ def setup_checklist(request):
         steps[2]["title"]="Defina horários de atendimento compatíveis com os serviços"
     else:
         from arena.models import CourtHours,PriceRule
-        rules=list(PriceRule.objects.filter(tenant=tenant,active=True,court__active=True,court__tenant=tenant))
-        hours=CourtHours.objects.filter(tenant=tenant,active=True,court__active=True,court__tenant=tenant).select_related("court")
+        rules=list(scope_queryset(PriceRule.objects.filter(tenant=tenant,active=True,court__active=True,court__tenant=tenant),unit))
+        hours=scope_queryset(CourtHours.objects.filter(tenant=tenant,active=True,court__active=True,court__tenant=tenant),unit).select_related("court")
         def compatible(hour,rule):
             if hour.court_id!=rule.court_id or (rule.weekday and rule.weekday!=hour.weekday):
                 return False
@@ -980,9 +987,17 @@ def setup_checklist(request):
         ):
             blockers.append({"title":"Configure uma forma de pagamento ou permita pagar na unidade",
                 "url":reverse("tenant-payment-gateway"),"action":"Configurar pagamento"})
-    completed=sum(step["done"] for step in steps)
+    unit_steps=[
+        {"title":"Revise o cadastro da unidade","done":bool(unit and unit.address and unit.city and unit.state),
+         "url":reverse("tenant-branding") if can_publish else "","action":"Revisar unidade"},
+        {"title":"Defina o funcionamento da unidade","done":bool(unit and unit.business_hours.filter(active=True).exists()),
+         "url":reverse("portal-resource-list",args=["agenda","horarios-unidades"]) if has_capability(request.user,"agenda.manage") else "","action":"Configurar funcionamento"},
+    ]
+    guided_steps=unit_steps+(steps if arena else [steps[0],steps[2],steps[1],*steps[3:]])
+    completed=sum(step["done"] for step in guided_steps)
     return render(request,"portal/setup.html",{"tenant":tenant,"steps":steps,"completed":completed,
-                  "progress":round(completed*100/len(steps)),"arena_mode":arena,"blockers":blockers})
+                  "guided_steps":guided_steps,"setup_unit":unit,
+                  "progress":round(completed*100/len(guided_steps)),"arena_mode":arena,"blockers":blockers})
 
 
 @login_required
@@ -1317,6 +1332,13 @@ def resource_create(request,module_slug,resource_slug):
         if resource.get("special")=="support_ticket":
             form.fields.pop("priority",None)
             form.fields.pop("status",None)
+            if request.method=="GET" and request.GET.get("request")=="professional-extra":
+                capacity=professional_capacity(tenant)
+                form.initial.update(category="professional-extra",subject="Solicitação de profissional extra",
+                    description=(f"Solicito análise de +1 vaga de profissional para {tenant.name}. "
+                        f"Equipe atual: {capacity['used']} profissionais ativos; limite: {capacity['limit'] or 'não definido'}. "
+                        "Informe o valor vigente definido pelo Master e as condições antes de qualquer contratação. "
+                        "Unidade e quantidade desejadas: "))
         if request.method=="POST" and form.is_valid():
             obj=form.save(commit=False)
             obj=_save_special(obj,resource=resource,request=request,tenant=tenant,is_new=True)

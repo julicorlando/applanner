@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load display_pt %}
 {% block title %}{{ title }} — ApPlanner{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
@@ -10,8 +11,10 @@
     {% if professional_capacity.overridden %}<p>Liberação especial do Master aplicada.</p>{% endif %}
     {% if professional_existing_active %}<p>Você pode editar este profissional ativo, mesmo que a equipe já ultrapasse o limite.</p>{% elif professional_capacity.available == 0 %}<p>Não há vagas para ativar outro profissional. Desmarque “Ativo” para salvar um perfil inativo, desative alguém da equipe ou solicite ampliação ao Master.</p>{% endif %}
     <p>Profissionais inativos não ocupam vagas.</p><a href="{% url 'billing-subscription-status' %}">Ver meu plano e limites →</a>
+    {% include "portal/professional_extra_link.html" %}
   </aside>{% endif %}
   {% if appointment_identity.customer_name_differs %}<aside class="panel" aria-label="Identificação do cliente" style="margin-bottom:16px"><h2>Identificação do cliente</h2>{% include "portal/customer_name_difference.html" with appointment=appointment_identity only %}<p>O nome informado na reserva é preservado para consulta. O histórico continua vinculado ao cadastro do cliente, identificado pelo telefone; este aviso não altera seus dados.</p></aside>{% endif %}
+  {% if form.instance|homologation_record %}<aside class="panel" role="status"><strong>Registro de homologação</strong><p>Identificado pelo nome do cadastro. Revise antes de usar na operação real.</p></aside>{% endif %}
   <form method="post" enctype="multipart/form-data" class="portal-form panel">
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}

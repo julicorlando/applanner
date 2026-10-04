@@ -6,6 +6,16 @@ from django import template
 register = template.Library()
 
 
+@register.filter
+def homologation_record(obj):
+    """Visual hint for explicitly named fixtures; does not change business rules."""
+    import re
+    values=[getattr(obj,name,"") for name in ("name","customer_name_snapshot","customer_name")]
+    if getattr(getattr(obj,"_meta",None),"label_lower","") in {"scheduling.appointment","arena.reservation"}:
+        values.extend(getattr(getattr(obj,name,None),"name","") for name in ("customer","service","professional"))
+    return any(re.match(r"^(?:Homologa[çc][ãa]o\b|(?:Cliente|Servi[çc]o|Profissional|Corte)\s+QA\b|QA\b)",str(value or ""),re.I) for value in values)
+
+
 PAYMENT_METHODS = {
     "cash": "Dinheiro", "dinheiro": "Dinheiro", "pix": "Pix",
     "card": "Cartão", "credit_card": "Cartão de crédito", "debit_card": "Cartão de débito",

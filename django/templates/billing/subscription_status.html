@@ -49,7 +49,8 @@
     {% if professional_capacity.extra_professionals %}<p>Adicionais contratados: +{{ professional_capacity.extra_professionals }} vaga{{ professional_capacity.extra_professionals|pluralize }} de profissional.</p>{% endif %}
     {% if professional_capacity.overridden %}<p>Esta empresa possui uma liberação especial do Master.</p>{% else %}<p>O limite do plano também vale durante o teste grátis. Profissionais inativos não ocupam vagas.</p>{% endif %}
     {% if professional_capacity.exceeded %}<p role="status">A equipe atual ultrapassa o limite. Os profissionais existentes foram preservados; para ativar novos, desative alguém ou solicite uma ampliação ao Master.</p>{% elif professional_capacity.available != None %}<p>{{ professional_capacity.available }} vagas disponíveis para ativação.</p>{% endif %}
-    <div class="form-actions"><a class="button" href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}">Gerenciar profissionais</a><a class="button" href="{% url 'billing-subscription-modules' %}">Contratar +1 profissional</a></div>
+    <div class="form-actions"><a class="button" href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}">Gerenciar profissionais</a><a class="button" href="{% url 'billing-subscription-modules' %}">Ver módulos adicionais</a></div>
+    {% include "portal/professional_extra_link.html" %}
   </article>{% endif %}
   <article class="panel" style="margin-top:16px">
     <div class="panel-head"><div><span class="eyebrow">HISTÓRICO</span><h2>Pagamentos e notas fiscais</h2><p>Cada linha representa um ciclo efetivamente pago. A NFe é vinculada ao mês de referência do pagamento.</p></div></div>

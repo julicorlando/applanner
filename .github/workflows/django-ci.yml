@@ -98,5 +98,10 @@ jobs:
           python manage.py seed_sales_plans
           python manage.py seed_rbac
           python manage.py seed_periodic_tasks
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Portuguese browser constraints
+        run: node --test tests-js/*.test.cjs
       - name: Run tests
         run: python manage.py test
