@@ -26,6 +26,52 @@ class PixReconciliationTests(TestCase):
         self.provider.get_payment.return_value = {'status': 'approved', 'transaction_amount': '49.90',
             'external_reference': self.charge.payment.provider_reference}
 
+    def brazil_order(self):
+        order=self._order(self.charge)
+        del order['currency_id']
+        order['country_code']='BR'
+        return order
+
+    def test_documented_brazil_order_without_currency_confirms_manual_check(self):
+        self.provider.get_order.return_value=self.brazil_order()
+        self.client.force_login(self.owner)
+        with patch('billing.pix_reconciliation.platform_provider',return_value=self.provider):
+            response=self.client.post(self.url,follow=True)
+        self.assertContains(response,'Pix confirmado pelo Mercado Pago')
+        self.charge.payment.refresh_from_db()
+        self.assertEqual(self.charge.payment.status,'paid')
+
+    def test_documented_brazil_order_confirms_webhook_and_is_idempotent(self):
+        self.provider.get_order.return_value=self.brazil_order()
+        with patch('billing.webhooks.platform_provider',return_value=self.provider):
+            _reconcile_platform(self._event(),self.gateway,{'type':'order'},'order-pix-1')
+        self.subscription.refresh_from_db()
+        deadline=self.subscription.next_billing_at
+        with patch('billing.pix_reconciliation.platform_provider',return_value=self.provider):
+            self.assertTrue(reconcile_pix_charge(self.charge.pk))
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.next_billing_at,deadline)
+
+    def test_country_currency_conflicts_or_absence_never_confirm(self):
+        for values in [{'country_code':'US'},{'country_code':'AR'},
+                {'country_code':None},{'currency_id':'USD'},{'country_code':'US','currency_id':'BRL'}]:
+            self.provider.get_order.return_value={**self.brazil_order(),**values}
+            with patch('billing.pix_reconciliation.platform_provider',return_value=self.provider):
+                with self.assertRaises(ValueError):
+                    reconcile_pix_charge(self.charge.pk)
+            self.charge.payment.refresh_from_db()
+            self.assertEqual(self.charge.payment.status,'pending')
+
+    def test_brazil_order_does_not_bypass_amount_reference_or_id_validation(self):
+        for values in [{'total_paid_amount':'0.01'},{'external_reference':'other-company'},
+                {'id':'other-order'},{'total_paid_amount':'invalid'},{'total_paid_amount':'NaN'}]:
+            self.provider.get_order.return_value={**self.brazil_order(),**values}
+            with patch('billing.pix_reconciliation.platform_provider',return_value=self.provider):
+                with self.assertRaises(ValueError):
+                    reconcile_pix_charge(self.charge.pk)
+            self.charge.payment.refresh_from_db()
+            self.assertEqual(self.charge.payment.status,'pending')
+
     def test_payment_notification_also_reconciles_order(self):
         with patch('billing.webhooks.platform_provider', return_value=self.provider):
             _reconcile_platform(self._event(), self.gateway, {'type': 'payment'}, 'pay-pix-1')

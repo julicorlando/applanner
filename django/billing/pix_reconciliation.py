@@ -1,5 +1,5 @@
 """Verify platform Pix orders using the authenticated provider API."""
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from django.utils import timezone
@@ -26,15 +26,28 @@ def reconcile_pix_charge(charge_id, *, gateway=None, provider=None, order=None):
             return True
         if payment.status in {Payment.Status.CANCELLED, Payment.Status.REFUNDED, Payment.Status.PARTIALLY_REFUNDED}:
             return False
-        if (str(order.get('id') or '') != charge.provider_order_id or
-                order.get('external_reference') != payment.provider_reference or order.get('currency_id') != 'BRL'):
-            raise ValueError('Pedido Pix não corresponde à cobrança registrada.')
+        if str(order.get('id') or '') != charge.provider_order_id:
+            raise ValueError('Pedido Pix não corresponde à cobrança registrada: identificador do pedido divergente.')
+        if order.get('external_reference') != payment.provider_reference:
+            raise ValueError('Pedido Pix não corresponde à cobrança registrada: referência da cobrança divergente.')
+        # Orders API identifies the country, while Payments API and some
+        # notification representations supply currency_id. Brazil Orders use BRL.
+        currency = order.get('currency_id')
+        country = order.get('country_code')
+        if (currency and currency != 'BRL') or (country and country != 'BR'):
+            raise ValueError('Pedido Pix não corresponde à cobrança registrada: moeda ou país divergente.')
+        if not currency and country != 'BR':
+            raise ValueError('Não foi possível validar a moeda do Pix: país e moeda não informados pelo provedor.')
         rows = (order.get('transactions') or {}).get('payments') or []
         paid_rows = [row for row in rows if row.get('status') in {'approved', 'processed'} and
             (row.get('payment_method') or {}).get('id') == 'pix']
         if order.get('status') != 'processed' or not paid_rows:
             return False
-        if Decimal(str(order.get('total_paid_amount') or '0')) != payment.amount:
+        try:
+            paid_amount = Decimal(str(order.get('total_paid_amount') or '0'))
+        except (InvalidOperation, ValueError, TypeError) as exc:
+            raise ValueError('Valor do Pix informado pelo provedor é inválido.') from exc
+        if not paid_amount.is_finite() or paid_amount != payment.amount:
             raise ValueError('Valor do Pix confirmado difere da cobrança.')
         paid_at = timezone.now()
         # Calculate coverage before recording the new payment; retries must not extend it.
