@@ -58,6 +58,14 @@ class MasterOperationalActionTests(TestCase):
         ))
         self.assertEqual(response.status_code,302)
 
+        self.assertEqual(self.client.get(reverse("master-resource-list",args=["empresas"])).context["rows"],[])
+        self.assertEqual(self.client.get(reverse("master-resource-edit",args=["empresas",tenant.pk])).status_code,404)
+        dashboard=self.client.get(reverse("master-home"))
+        self.assertEqual(next(card["count"] for card in dashboard.context["cards"] if card["slug"]=="empresas"),0)
+        platform=self.client.get(reverse("home"))
+        self.assertEqual(platform.context["tenants_total"],0)
+        self.assertEqual(list(platform.context["recent_tenants"]),[])
+
         tenant.refresh_from_db()
         owner.refresh_from_db()
         member.refresh_from_db()

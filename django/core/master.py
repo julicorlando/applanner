@@ -366,7 +366,7 @@ def home(request):
     _guard(request.user)
     cards=[{"slug":slug,"title":cfg["title"],"count":(
         apps.get_model(cfg["model"]).objects.filter(deleted_at__isnull=True).count()
-        if slug=="usuarios" else apps.get_model(cfg["model"]).objects.count()
+        if slug in {"usuarios","empresas"} else apps.get_model(cfg["model"]).objects.count()
     )} for slug,cfg in MASTER_RESOURCES.items()]
     sections=[
         ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","notas-fiscais","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
@@ -538,7 +538,7 @@ def chatbot_flow(request):
 def resource_list(request,slug):
     _guard(request.user)
     config,model=_config(slug)
-    qs=model.objects.filter(deleted_at__isnull=True) if slug=="usuarios" else model.objects.all()
+    qs=model.objects.filter(deleted_at__isnull=True) if slug in {"usuarios","empresas"} else model.objects.all()
     if slug=="despesas":
         qs=qs.filter(type="expense")
     q=(request.GET.get("q") or "").strip()
@@ -577,7 +577,7 @@ def resource_form(request,slug,pk=None):
         return redirect("portal-home")
     if pk is None and not config.get("create",True): raise PermissionDenied
     if pk is not None and not config.get("edit",True): raise PermissionDenied
-    obj=get_object_or_404(model,pk=pk,deleted_at__isnull=True) if pk and slug=="usuarios" else (get_object_or_404(model,pk=pk) if pk else None)
+    obj=get_object_or_404(model,pk=pk,deleted_at__isnull=True) if pk and slug in {"usuarios","empresas"} else (get_object_or_404(model,pk=pk) if pk else None)
     if slug=="despesas" and obj and obj.type!="expense":
         raise PermissionDenied("Este registro não é uma despesa.")
     Form=(UserMasterForm if slug=="usuarios" else TenantMasterForm if slug=="empresas" else PlanMasterForm if config.get("special")=="plan"
