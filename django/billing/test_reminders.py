@@ -98,7 +98,9 @@ class BillingReminderTests(TestCase):
         self.subscription.save()
         self.assertEqual(queue_subscription_reminder(self.subscription.pk,self.now),1)
         self.assertEqual(queue_subscription_reminder(self.subscription.pk,self.now+timedelta(days=1)),0)
+        self.assertEqual(billing_notice(self.subscription,self.now+timedelta(days=1))["title"],"Seu teste grátis termina em 1 dia")
         self.assertEqual(queue_subscription_reminder(self.subscription.pk,self.now+timedelta(days=2)-timedelta(hours=1)),1)
+        self.assertEqual(billing_notice(self.subscription,self.now+timedelta(days=3))["title"],"Seu teste grátis terminou")
         Payment.objects.create(tenant=self.tenant,subscription=self.subscription,amount=99.9,status="paid",paid_at=self.now)
         self.assertIsNone(billing_notice(self.subscription,self.now))
 

@@ -31,9 +31,9 @@ def billing_notice(subscription, now=None):
     if days>3:
         return None
     overdue=deadline<=now
-    title=("Pagamento da assinatura vencido" if overdue else
+    title=(("Seu teste grátis terminou" if kind=="trial" else "Pagamento da assinatura vencido") if overdue else
            "Seu teste grátis termina hoje" if kind=="trial" and days==0 else
-           f"Seu teste grátis termina em {days} dias" if kind=="trial" else
+           f"Seu teste grátis termina em {days} {'dia' if days==1 else 'dias'}" if kind=="trial" else
            "Sua assinatura vence hoje" if days==0 else
            f"Sua assinatura vence em {days} {'dia' if days==1 else 'dias'}")
     label=local_deadline.strftime("%d/%m/%Y às %H:%M")
