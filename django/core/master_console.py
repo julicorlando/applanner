@@ -207,7 +207,9 @@ def charge_detail(request,pk):
     payment=get_object_or_404(Payment.objects.select_related('tenant','subscription'),pk=pk,purpose='subscription')
     charge=PixCharge.objects.filter(payment=payment).first()
     ids=[value for value in [payment.provider_payment_id,charge.provider_order_id if charge else ''] if value]
-    return render(request,'master/charge_detail.html',{'payment':payment,'pix':charge,
+    accounting=(payment.metadata or {}).get('accounting') or {}
+    checked=parse_datetime(accounting.get('checked_at','')) if accounting.get('checked_at') else None
+    return render(request,'master/charge_detail.html',{'payment':payment,'pix':charge,'accounting':accounting,'accounting_checked':checked,
         'consultations':AuditLog.objects.filter(entity_type='billing.Payment',entity_id=payment.pk,action='MASTER_PAYMENT_CONSULTED').select_related('user').order_by('-created_at','-pk')[:30],
         'events':WebhookEvent.objects.filter(provider=payment.provider,resource_id__in=ids).order_by('-received_at')[:20],
         'can_consult':payment.provider=='mercadopago' and bool(charge or payment.provider_payment_id)})
@@ -245,7 +247,9 @@ def reconcile_card(payment):
         payment.provider_status=str(remote.get('status') or '')
         payment.status=new_status
         if new_status=='paid': payment.paid_at=payment.paid_at or approved_at
-        payment.save(update_fields=['provider_status','status','paid_at','updated_at'])
+        from billing.platform_accounting import capture_accounting
+        capture_accounting(payment,remote)
+        payment.save(update_fields=['provider_status','status','paid_at','metadata','updated_at'])
         if subscription and new_status=='paid' and subscription.status in {'trial','active','past_due'}:
             subscription.status='active'
             subscription.save(update_fields=['status','updated_at'])
@@ -299,7 +303,7 @@ def export_report(request,kind,start,end):
     writer=csv.writer(response,delimiter=';')
     def write(row):
         # Prevent spreadsheet formula injection in user-supplied names and notes.
-        writer.writerow(["'"+str(x) if str(x).lstrip().startswith(('=','+','-','@','\t','\r','\n')) else x for x in row])
+        writer.writerow([money(x) if isinstance(x,Decimal) else "'"+str(x) if isinstance(x,str) and str(x).lstrip().startswith(('=','+','-','@','\t','\r','\n')) else x for x in row])
     def money(amount): return f'{amount:.2f}'.replace('.',',')
     def day(value): return timezone.localtime(value).strftime('%d/%m/%Y %H:%M') if hasattr(value,'hour') else str(value or '')
     if kind=='companies':
@@ -314,9 +318,17 @@ def export_report(request,kind,start,end):
     else:
         write(['Origem','Empresa / descrição','Data de pagamento','Valor'])
         if kind=='revenue':
-            qs=Payment.objects.filter(purpose='subscription',subscription__isnull=False,environment='production',status='paid').filter(Q(paid_at__date__range=(start,end))|Q(paid_at__isnull=True,updated_at__date__range=(start,end))).select_related('tenant')
-            for row in qs.order_by('paid_at','pk').iterator(): write(['Assinatura',row.tenant.name,day(row.paid_at or row.updated_at),money(row.amount)])
+            qs=Payment.objects.filter(purpose='subscription',subscription__isnull=False,environment='production',status__in=['paid','partially_refunded','refunded']).filter(Q(paid_at__date__range=(start,end))|Q(paid_at__isnull=True,updated_at__date__range=(start,end))).select_related('tenant')
+            for row in qs.order_by('paid_at','pk').iterator():
+                write(['Assinatura',row.tenant.name,day(row.paid_at or row.updated_at),money(row.amount)])
+                from billing.platform_accounting import accounting_totals
+                adjustments=accounting_totals([row])
+                if adjustments['refunds']: write(['Estorno',row.tenant.name,day(row.paid_at or row.updated_at),-adjustments['refunds']])
+                if adjustments['provider_fees']: write(['Taxa do provedor',row.tenant.name,day(row.paid_at or row.updated_at),-adjustments['provider_fees']])
         qs=PlatformFinancialTransaction.objects.filter(type='income' if kind=='revenue' else 'expense',status='paid').filter(Q(paid_at__date__range=(start,end))|Q(paid_at__isnull=True,updated_at__date__range=(start,end)))
+        if kind=='expenses':
+            linked=Payment.objects.filter(environment='production',purpose='subscription',status__in=['paid','partially_refunded','refunded'],metadata__accounting__fee__isnull=False).exclude(metadata__accounting__fee=None).values_list('pk',flat=True)
+            qs=qs.exclude(provider_fee_payment_id__in=linked)
         for row in qs.order_by('paid_at','pk').iterator(): write(['Lançamento',row.description,day(row.paid_at or row.updated_at),money(row.amount)])
     append_audit(user=request.user,action='MASTER_REPORT_EXPORTED',entity_type='finance.PlatformFinancialTransaction',after={'kind':kind,'start':str(start),'end':str(end)},request=request)
     return response

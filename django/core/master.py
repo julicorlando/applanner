@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from requests.exceptions import RequestException
 
 from billing.models import Module, Plan, PlanModule
-from billing.models import PaymentGateway
+from billing.models import PaymentGateway,Payment
 from billing.payment_services import configure_mercadopago_gateway
 from core.labels import field_label
 from core.audit import append_audit,model_snapshot
@@ -157,6 +157,12 @@ class UserMasterForm(forms.ModelForm):
 
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
+        from accounts.master_access import PLATFORM_ROLES
+        from accounts.permissions import LEGACY_ROLE_CAPABILITIES
+        role_labels={'master':'Master','owner':'Proprietário','manager':'Gestor','reception':'Recepção','professional':'Profissional','commercial':'Comercial','finance':'Financeiro da empresa','barber-manager':'Gestor de barbearia','arena-manager':'Gestor de Arena','auto-manager':'Gestor automotivo','healthcare':'Saúde','tenant-admin':'Administrador da empresa','support':'Suporte','user':'Usuário','staff':'Equipe'}
+        options=[(role,PLATFORM_ROLES[role][0] if role in PLATFORM_ROLES else role_labels.get(role,role)) for role in sorted(set(LEGACY_ROLE_CAPABILITIES)|set(PLATFORM_ROLES)|{'staff',self.instance.role or 'user'})]
+        self.fields['role'].widget=forms.Select(choices=options)
+        self.fields['role'].help_text = 'Para acesso limitado ao Master selecione Financeiro, Suporte ou Comercial da plataforma. Marque Membro da equipe e deixe Empresa vazia.'
         if self.instance.pk:
             self.fields["new_password"].required=False
             self.fields["confirm_password"].required=False
@@ -164,6 +170,11 @@ class UserMasterForm(forms.ModelForm):
 
     def clean(self):
         data=super().clean()
+        from accounts.master_access import PLATFORM_ROLES
+        if data.get('role') in PLATFORM_ROLES and self.instance.is_superuser:
+            self.add_error('role','Crie uma conta interna separada para acesso limitado; esta conta possui privilégios de administrador.')
+        if data.get('role') in PLATFORM_ROLES and (data.get('tenant') or not data.get('is_staff')):
+            self.add_error('role','Perfis da plataforma exigem acesso interno e nenhuma empresa vinculada.')
         password=data.get("new_password")
         confirmation=data.get("confirm_password")
         if password and password!=confirmation:
@@ -198,8 +209,8 @@ MASTER_RESOURCES={
     "equipe-comercial":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":["commercial_user","tenant","base_amount","commission_percent","commission_amount","status","hold_until"],"columns":["commercial_user","tenant","commission_amount","status","created_at"],"order":"-created_at"},
     "assinaturas":{"model":"billing.Subscription","title":"Assinaturas","fields":["tenant","plan","billing_cycle","contracted_price","status","started_at","trial_ends_at","next_billing_at","provider_customer_id","provider_subscription_id","provider_environment"],"columns":["tenant","plan","billing_cycle","status","next_billing_at"],"order":"-started_at"},
-    "despesas":{"model":"finance.PlatformFinancialTransaction","title":"Despesas da plataforma","fields":["category","description","amount","status","due_at","paid_at","notes"],"columns":["description","amount","status","due_at","paid_at"],"order":"-created_at","special":"platform_expense"},
-    "financeiro":{"model":"finance.PlatformFinancialTransaction","title":"Financeiro da plataforma","fields":["category","type","description","amount","status","due_at","paid_at","notes"],"columns":["type","description","amount","status","due_at"],"order":"-created_at","special":"platform_finance"},
+    "despesas":{"model":"finance.PlatformFinancialTransaction","title":"Despesas da plataforma","fields":["category","description","amount","status","due_at","paid_at","notes","provider_fee_payment"],"columns":["description","amount","status","due_at","paid_at"],"order":"-created_at","special":"platform_expense"},
+    "financeiro":{"model":"finance.PlatformFinancialTransaction","title":"Financeiro da plataforma","fields":["category","type","description","amount","status","due_at","paid_at","notes","provider_fee_payment"],"columns":["type","description","amount","status","due_at"],"order":"-created_at","special":"platform_finance"},
     "suporte":{"model":"operations.SupportTicket","title":"Suporte","fields":["tenant","user","category","subject","description","priority","status","assigned_to"],"columns":["protocol","tenant","subject","priority","status","assigned_to"],"order":"-created_at","create":False},
     "incidentes":{"model":"operations.OperationalIncident","title":"Incidentes","fields":["category","severity","title","details","status"],"columns":["severity","title","status","occurrence_count","last_seen_at"],"order":"-last_seen_at","create":False},
     "backups":{"model":"operations.Backup","title":"Backups","fields":[],"columns":["type","scope","status","destination","size_bytes","completed_at"],"order":"-started_at","create":False,"edit":False},
@@ -259,7 +270,8 @@ MASTER_RESOURCES={
 
 
 def _guard(user):
-    if not user.is_superuser:
+    from accounts.master_access import PLATFORM_ROLES
+    if not (user.is_superuser or (user.is_staff and not user.tenant_id and user.role in PLATFORM_ROLES)):
         raise PermissionDenied("Acesso restrito ao Master.")
 
 
@@ -345,7 +357,7 @@ def _value(obj,name):
             return "Indisponível"
     if name=="role" and obj._meta.label_lower=="accounts.user":
         return {"owner":"Responsável","professional":"Profissional","user":"Usuário",
-                "master":"Master","manager":"Gestor","staff":"Equipe"}.get(obj.role,obj.role)
+                "master":"Master","master-finance":"Financeiro da plataforma","master-support":"Suporte da plataforma","master-commercial":"Comercial da plataforma","manager":"Gestor","staff":"Equipe"}.get(obj.role,obj.role)
     getter=getattr(obj,f"get_{name}_display",None)
     if getter:
         try:return getter()
@@ -597,9 +609,14 @@ def resource_form(request,slug,pk=None):
     }
     before_snapshot=model_snapshot(obj) if obj is not None and slug in critical_audit_slugs else None
     form=Form(request.POST or None,request.FILES or None,instance=obj)
+    if config.get("special")=="platform_expense": form.instance.type="expense"
     for name,field in form.fields.items():
         if name not in {"new_password","confirm_password"}:
             field.label=FIELD_LABELS.get(name) or field_label(model,name)
+    if 'provider_fee_payment' in form.fields:
+        field=form.fields['provider_fee_payment']
+        field.queryset=Payment.objects.filter(environment='production',purpose='subscription',status__in=['paid','partially_refunded','refunded']).select_related('tenant')
+        field.label_from_instance=lambda row:f'{row.tenant.name} · cobrança {row.pk} · R$ {row.amount}'
     if slug=="assinaturas":
         form.fields["provider_environment"].widget=forms.Select(choices=[
             ("","Não identificado"),("sandbox","Teste"),("production","Produção"),
@@ -751,7 +768,7 @@ def _approve_account_deletion(row,actor,*,notify=True):
     """Encerra a operação da empresa preservando somente registros necessários para auditoria."""
     from accounts.models import SecurityEvent,User
     from applanner.transactional_email import queue_email
-    from billing.models import PaymentGateway,Subscription,SubscriptionHistory
+    from billing.models import PaymentGateway,Payment,Subscription,SubscriptionHistory
     from billing.payment_services import platform_provider
     from core.models import AuditLog
     from operations.models import BillingSupportRequest,SupportTicket

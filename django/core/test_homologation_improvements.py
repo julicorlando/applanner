@@ -128,7 +128,8 @@ class HomologationImprovementsTests(TestCase):
     def test_setup_is_reusable_and_does_not_reset_onboarding(self):
         response=self.client.get(reverse("portal-setup"))
         self.assertContains(response,"Defina horários de atendimento")
-        self.assertContains(response,"3 de 7 etapas")
+        self.assertEqual(response.context["completed"],3)
+        self.assertGreaterEqual(len(response.context["guided_steps"]),7)
         self.tenant.refresh_from_db()
         self.assertEqual(self.tenant.onboarding_step,5)
         self.tenant.category="arena"

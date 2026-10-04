@@ -18,10 +18,11 @@
   {% if module_slug == 'agenda' and resource_slug == 'agendamentos' or module_slug == 'arena' and resource_slug == 'reservas' %}<p class="payment-hint" id="agenda-live-status" role="status" aria-live="polite">Agenda atualizada automaticamente a cada 15 segundos.</p>{% endif %}
   <div class="table-card">
     <table class="portal-table">
-      <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th></th></tr></thead>
+      <thead><tr>{% if resource_slug == 'clientes' %}<th>Histórico</th>{% endif %}{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th></th></tr></thead>
       <tbody{% if module_slug == 'agenda' and resource_slug == 'agendamentos' or module_slug == 'arena' and resource_slug == 'reservas' %} data-live-agenda="agendamentos"{% endif %}>
       {% for row in rows %}
         <tr>
+          {% if resource_slug == 'clientes' %}<td><a href="{% url 'customer-history' row.obj.pk %}">Histórico e preferências</a></td>{% endif %}
           {% for cell in row.cells %}<td>{{ cell }}{% if customer_column != None and forloop.counter0 == customer_column %}<br>{% include "portal/customer_name_difference.html" with appointment=row.obj only %}{% endif %}</td>{% endfor %}
           <td class="table-actions">
             {% if row.obj|homologation_record %}<span class="status-pill" title="Identificado pelo nome do cadastro. Revise antes de atender.">Homologação</span>{% endif %}

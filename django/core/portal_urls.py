@@ -1,5 +1,5 @@
 from django.urls import path
-from . import portal
+from . import portal, operation_insights
 from .branding import tenant_branding
 from .unit_settings import unit_schedule_settings
 from billing.tenant_gateway import tenant_gateway
@@ -8,6 +8,10 @@ from scheduling.ratings import tenant_ratings
 from engagement.referrals import referrals
 
 urlpatterns = [
+    path('hoje/',operation_insights.today,name='operation-today'),
+    path('hoje/<int:pk>/acao/',operation_insights.appointment_action,name='operation-today-action'),
+    path('indicadores/',operation_insights.performance,name='operation-performance'),
+    path('cliente/<int:pk>/historico/',operation_insights.customer_history,name='customer-history'),
     path("configuracao-unidade/",unit_schedule_settings,name="unit-schedule-settings"),
     path("primeiros-passos/",portal.setup_checklist,name="portal-setup"),
     path("diagnostico/",portal.operation_diagnostics,name="portal-diagnostics"),

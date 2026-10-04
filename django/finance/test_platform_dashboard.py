@@ -33,7 +33,8 @@ class PlatformDashboardTests(TestCase):
 
     def test_realized_and_forecast_use_only_relevant_money(self):
         totals=platform_totals(self.today,self.today)
-        self.assertEqual(totals['gross'],Decimal('105'))
+        self.assertEqual(totals['gross'],Decimal('805'))
+        self.assertEqual(totals['refunds'],Decimal('700'))
         self.assertEqual(totals['net'],Decimal('85'))
         self.assertEqual(totals['forecast'],Decimal('125'))
         self.assertEqual(totals['receivable'],Decimal('50'))

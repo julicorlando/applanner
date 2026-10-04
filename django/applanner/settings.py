@@ -43,6 +43,7 @@ MIDDLEWARE = [
     "billing.access_middleware.SubscriptionAccessMiddleware",
     "accounts.middleware.MustChangePasswordMiddleware",
     "accounts.route_middleware.CapabilityRouteMiddleware",
+    "accounts.master_access.MasterAccessMiddleware",
     "core.middleware.TenantContextMiddleware",
     "legal.middleware.LegalAcceptanceMiddleware",
     "tenants.onboarding_middleware.IncompleteOnboardingMiddleware",

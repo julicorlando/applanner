@@ -6,6 +6,8 @@ from .permissions import has_capability
 
 
 RECEPTION_MUTATION_PREFIXES=(
+    "/app/hoje/",
+    "/app/cliente/",
     "/app/agenda/",
     "/app/financeiro/pdv/",
     "/app/barbearia/fila/",

@@ -993,7 +993,34 @@ def setup_checklist(request):
         {"title":"Defina o funcionamento da unidade","done":bool(unit and unit.business_hours.filter(active=True).exists()),
          "url":reverse("portal-resource-list",args=["agenda","horarios-unidades"]) if has_capability(request.user,"agenda.manage") else "","action":"Configurar funcionamento"},
     ]
-    guided_steps=unit_steps+(steps if arena else [steps[0],steps[2],steps[1],*steps[3:]])
+    extra_steps=[]
+    if unit:
+        extra_steps.append({'title':'Confirme o endereço completo e as coordenadas para o Explorar',
+            'done':bool(unit.postal_code and unit.address and unit.address_number and unit.city and unit.state
+                        and unit.latitude is not None and unit.longitude is not None),
+            'url':reverse('tenant-branding') if can_publish else '', 'action':'Corrigir localização'})
+    if not arena:
+        from scheduling.models import Professional,ProfessionalAvailability,Service
+        from scheduling.availability import AvailabilityService
+        staff=list(scope_queryset(Professional.objects.filter(tenant=tenant,active=True),unit))
+        missing_hours=[p for p in staff if not ProfessionalAvailability.objects.filter(tenant=tenant,professional=p,active=True).exists()]
+        orphan_services=[s for s in scope_queryset(Service.objects.filter(tenant=tenant,active=True),unit)
+            if not any(AvailabilityService().professional_offers(tenant,p.pk,s.pk) for p in staff)]
+        for professional in missing_hours:
+            extra_steps.append({'title':f'{professional.name}: horário de atendimento não cadastrado','done':False,
+                'url':reverse('portal-resource-create',args=['agenda','expedientes']),'action':'Cadastrar horário'})
+        for service in orphan_services:
+            extra_steps.append({'title':f'{service.name}: nenhum profissional habilitado nesta unidade','done':False,
+                'url':reverse('portal-resource-list',args=['agenda','profissionais']),'action':'Vincular profissional'})
+    from billing.payment_services import has_connected_tenant_gateway
+    from scheduling.models import TenantScheduleSettings
+    from scheduling.availability import AvailabilityService
+    scheduling_settings=TenantScheduleSettings.objects.filter(tenant=tenant).first() if not arena else None
+    if scheduling_settings and scheduling_settings.online_booking_payments_enabled:
+        extra_steps.append({'title':'Conecte a conta de recebimento para o pagamento online',
+            'done':has_connected_tenant_gateway(tenant),'url':reverse('tenant-payment-gateway') if can_publish else '',
+            'action':'Configurar recebimentos'})
+    guided_steps=unit_steps+(steps if arena else [steps[0],steps[2],steps[1],*steps[3:]])+extra_steps
     completed=sum(step["done"] for step in guided_steps)
     return render(request,"portal/setup.html",{"tenant":tenant,"steps":steps,"completed":completed,
                   "guided_steps":guided_steps,"setup_unit":unit,

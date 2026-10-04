@@ -213,6 +213,9 @@ def _reconcile_platform(event,gateway,data,resource_id):
                         status=Subscription.Status.ACTIVE,
                         updated_at=timezone.now(),
                     )
+            from .platform_accounting import capture_accounting
+            try: capture_accounting(payment,remote)
+            except ValueError: pass  # Leave accounting unconfirmed; the reconciliation job retries authenticated data.
             payment.metadata={**payment.metadata,"mercadopago":remote}
             payment.save()
 

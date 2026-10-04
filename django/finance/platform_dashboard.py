@@ -31,7 +31,9 @@ def platform_totals(start, end):
         return qs.filter(Q(due_at__range=(start,end)) |
             Q(due_at__isnull=True,created_at__date__range=(start,end)))
     payments = Payment.objects.filter(purpose='subscription', subscription__isnull=False, environment='production')
-    approved = paid_period(payments.filter(status='paid'))
+    approved = paid_period(payments.filter(status__in=['paid','partially_refunded','refunded']))
+    from billing.platform_accounting import accounting_totals
+    accounting=accounting_totals(approved)
     pending = payments.filter(status='pending').filter(Q(due_at__date__range=(start,end)) |
         Q(due_at__isnull=True,created_at__date__range=(start,end)))
     # An expired Pix code is no longer a receivable payable through that charge.
@@ -39,14 +41,17 @@ def platform_totals(start, end):
     ledger = PlatformFinancialTransaction.objects.all()
     manual = total(paid_period(ledger.filter(type='income',status='paid')))
     gross = total(approved)+manual
-    expenses = total(paid_period(ledger.filter(type='expense',status='paid')))
+    fee_ids=payments.filter(status__in=['paid','partially_refunded','refunded'],metadata__accounting__fee__isnull=False).exclude(metadata__accounting__fee=None).values_list('pk',flat=True)
+    expense_rows=paid_period(ledger.filter(type='expense',status='paid')).exclude(provider_fee_payment_id__in=fee_ids)
+    expenses = total(expense_rows)
     receivable = total(pending)+total(due_period(ledger.filter(type='income',status='pending')))
-    payable = total(due_period(ledger.filter(type='expense',status='pending')))
-    return {'gross':gross,'approved_income':total(approved),'manual_income':manual,'expenses':expenses,
-        'net':gross-expenses,'receivable':receivable,'payable':payable,
-        'forecast':gross-expenses+receivable-payable,
+    payable = total(due_period(ledger.filter(type='expense',status='pending').exclude(provider_fee_payment_id__in=fee_ids)))
+    net=gross-expenses-accounting['provider_fees']-accounting['refunds']
+    return {**accounting,'gross':gross,'approved_income':total(approved),'manual_income':manual,'expenses':expenses,
+        'net':net,'receivable':receivable,'payable':payable,
+        'forecast':net+receivable-payable,
         'payments':approved.select_related('tenant').order_by('-paid_at','-pk')[:50],
-        'expenses_list':paid_period(ledger.filter(type='expense',status='paid')).order_by('-paid_at','-pk')[:50]}
+        'expenses_list':expense_rows.order_by('-paid_at','-pk')[:50]}
 
 
 @login_required

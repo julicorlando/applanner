@@ -10,6 +10,7 @@ class Customer(TimeStampedModel):
     phone=models.CharField(max_length=32,blank=True)
     email=models.EmailField(blank=True)
     birth_date=models.DateField(null=True,blank=True)
+    preferences=models.CharField(max_length=1000,blank=True)
     consent_marketing=models.BooleanField(default=False)
     active=models.BooleanField(default=True)
 

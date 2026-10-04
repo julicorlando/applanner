@@ -70,3 +70,28 @@ def reconcile_pending_pix():
         finally:
             PixCharge.objects.filter(pk=pk).update(updated_at=timezone.now())
     return confirmed
+
+
+@shared_task
+def reconcile_platform_finances():
+    import logging
+    from datetime import timedelta
+    from .platform_accounting import reconcile_financial_payment
+    from django.db.models import Q,F
+    threshold=(timezone.now()-timedelta(hours=1)).isoformat()
+    rows=Payment.objects.filter(provider='mercadopago',environment='production',purpose='subscription',
+        status__in=['paid','partially_refunded','refunded']).exclude(provider_payment_id='').filter(
+        Q(metadata__accounting_attempt_at__isnull=True)|Q(metadata__accounting_attempt_at__lt=threshold)).order_by(
+        F('metadata__accounting_attempt_at').asc(nulls_first=True),'pk').values_list('pk',flat=True)[:50]
+    confirmed=0
+    for pk in list(rows):
+        try: confirmed+=int(reconcile_financial_payment(pk))
+        except Exception:
+            logging.getLogger(__name__).warning('Conciliação financeira indisponível para cobrança %s',pk)
+        finally:
+            from django.db import transaction
+            with transaction.atomic():
+                row=Payment.objects.select_for_update().get(pk=pk)
+                row.metadata={**(row.metadata or {}),'accounting_attempt_at':timezone.now().isoformat()}
+                row.save(update_fields=['metadata'])
+    return confirmed

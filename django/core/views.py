@@ -407,6 +407,10 @@ def professional_public(request,slug,professional_slug):
 
 def home(request):
     if request.user.is_authenticated:
+        from accounts.master_access import PLATFORM_ROLES
+        if not request.user.is_superuser and request.user.role in PLATFORM_ROLES:
+            from django.shortcuts import redirect
+            return redirect(PLATFORM_ROLES[request.user.role][1])
         if request.user.tenant_id:
             return _tenant_dashboard(request)
         return _platform_dashboard(request)

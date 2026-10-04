@@ -4,6 +4,7 @@ from django.core.exceptions import FieldDoesNotExist
 
 
 FIELD_LABELS = {
+    "provider_fee_payment": "Pagamento relacionado à taxa do provedor",
     "action": "Ação",
     "active": "Ativo", "address": "Endereço", "address_number": "Número",
     "addon_monthly_price": "Valor mensal adicional", "addon_sellable": "Adicional comercializável",

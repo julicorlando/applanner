@@ -267,6 +267,9 @@ class PlatformFinancialTransaction(TimeStampedModel):
         PAID="paid","Pago"
         CANCELLED="cancelled","Cancelado"
 
+    provider_fee_payment=models.OneToOneField('billing.Payment',null=True,blank=True,on_delete=models.PROTECT,related_name='manual_provider_fee',
+        verbose_name='Pagamento relacionado à taxa do provedor',
+        help_text='Vincule somente uma taxa de pagamento lançada manualmente. Após a conciliação, ela não será descontada duas vezes.')
     category=models.ForeignKey(PlatformFinanceCategory,null=True,blank=True,on_delete=models.SET_NULL,related_name="transactions")
     type=models.CharField(max_length=12,choices=Type.choices)
     description=models.CharField(max_length=190)
@@ -284,6 +287,8 @@ class PlatformFinancialTransaction(TimeStampedModel):
         errors={}
         if self.amount is not None and self.amount < Decimal("0.01"):
             errors["amount"]="Informe um valor maior que zero."
+        if self.provider_fee_payment_id and (self.type!='expense' or self.provider_fee_payment.environment!='production' or self.provider_fee_payment.purpose!='subscription'):
+            errors['provider_fee_payment']='Vincule apenas despesas de taxa a pagamentos de assinatura em produção.'
         if self.category_id and self.type and self.category.type not in {"both",self.type}:
             errors["category"]="A categoria deve corresponder ao tipo do lançamento."
         if errors:
