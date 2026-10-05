@@ -2,6 +2,7 @@ from datetime import time
 from decimal import Decimal
 
 from django.test import TestCase
+from django.templatetags.static import static
 from django.urls import reverse
 
 from contenthub.models import PublicReview
@@ -79,7 +80,7 @@ class PublicMultiunitExperienceTests(TestCase):
         self.assertNotContains(response,"Escolher outra unidade")
         self.assertContains(response,'data-select-service="'+str(service.pk)+'"',count=1)
         self.assertContains(response,'class="topbar public-header"')
-        self.assertContains(response,'js/public-booking.js')
+        self.assertContains(response,static('js/public-booking.js'))
         self.assertContains(response,'data-duration="30"')
 
     def test_public_header_stays_client_focused_for_signed_in_master(self):
