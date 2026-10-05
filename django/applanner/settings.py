@@ -31,6 +31,7 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "operations.telemetry.RuntimeMonitoringMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -155,3 +156,5 @@ LOGIN_REDIRECT_URL="/"
 LOGOUT_REDIRECT_URL="/account/login/"
 
 SUBSCRIPTION_ACCESS_ENFORCED=True
+
+OPERATION_SLOW_REQUEST_MS=2000

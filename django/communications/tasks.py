@@ -32,6 +32,9 @@ def retry_master_chatbot_queue():
 
 @shared_task(bind=True,max_retries=5)
 def send_notification(self,notification_id):
+    import time
+    from operations.telemetry import record_event,trace_id
+    start=time.monotonic();rid=trace_id();tenant_id=None
     try:
         with transaction.atomic():
             notification=Notification.objects.select_for_update().filter(pk=notification_id).first()
@@ -40,6 +43,7 @@ def send_notification(self,notification_id):
             if notification.scheduled_at and notification.scheduled_at>timezone.now():
                 return
 
+            rid=notification.trace_id;tenant_id=notification.tenant_id
             if notification.template_key=="subscription_price_change":
                 from billing.models import SubscriptionPriceChange
                 change=SubscriptionPriceChange.objects.select_related("subscription").filter(pk=notification.payload.get("price_change_id"),subscription__tenant_id=notification.tenant_id).first()
@@ -86,7 +90,9 @@ def send_notification(self,notification_id):
             notification.sent_at=timezone.now()
             notification.error_message=""
             notification.save(update_fields=["status","sent_at","error_message","provider_reference"])
+        record_event(request_id=rid,tenant_id=tenant_id,component="notification",operation=f"send_notification:{notification_id}",duration_ms=(time.monotonic()-start)*1000)
     except Exception as exc:
+        record_event(request_id=rid,tenant_id=tenant_id,component="notification",operation=f"send_notification:{notification_id}",status_code=503,duration_ms=(time.monotonic()-start)*1000,error_type=type(exc).__name__)
         if self.request.retries>=self.max_retries:
             Notification.objects.filter(
                 pk=notification_id,status=Notification.Status.QUEUED

@@ -7,8 +7,8 @@
     <span class="eyebrow">{{ ticket.protocol }} · {{ ticket.get_status_display|upper }}</span>
     <h1>{{ ticket.subject }}</h1><p>{{ ticket.description }}</p>
   </div></div>
-  <div class="panel"><h2>Conversa</h2>
-    {% for msg in ticket.messages.all %}
+  <div class="panel"><p>Responsável: {{ ticket.assigned_to|default:"A definir" }} · Prazo: {{ ticket.due_at|date:"d/m/Y H:i"|default:"A definir" }}</p>{% if ticket.solution %}<h2>Solução aplicada</h2><p>{{ ticket.solution|linebreaksbr }}</p>{% endif %}<h2>Conversa</h2>
+    {% for msg in visible_messages %}
       <div class="module-row"><span></span><div><strong>{{ msg.user }}</strong>
         <small style="display:block;color:var(--muted)">{{ msg.created_at }}</small>
         <p>{{ msg.message|linebreaksbr }}</p>

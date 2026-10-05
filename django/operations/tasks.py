@@ -58,3 +58,16 @@ def scheduled_database_backup():
     backup=create_database_backup()
     expire_old_backups()
     return backup.pk
+
+
+@shared_task
+def prune_runtime_history():
+    from datetime import timedelta
+    from .models import RuntimeEvent
+    cutoff=timezone.now()-timedelta(days=14)
+    removed=0
+    while True:
+        ids=list(RuntimeEvent.objects.filter(created_at__lt=cutoff).values_list('pk',flat=True)[:5000])
+        if not ids: break
+        removed+=RuntimeEvent.objects.filter(pk__in=ids).delete()[0]
+    return removed

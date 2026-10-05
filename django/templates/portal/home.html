@@ -23,7 +23,7 @@
     {% if tenant.public_enabled %}<a class="button" href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">Página pública ↗</a>{% endif %}
     {% if request.user.is_superuser or request.user.role == 'owner' %}<a class="button" href="{% url 'tenant-ratings' %}">Avaliações da equipe</a><a class="button" href="{% url 'tenant-payment-gateway' %}">Recebimentos</a><a class="button" href="{% url 'tenant-whatsapp-settings' %}">WhatsApp</a>{% endif %}
     {% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' %}<a class="button" href="{% url 'reception-access' %}">Cadastrar recepção</a>{% endif %}
-    <a class="button" href="{% url 'portal-diagnostics' %}">Diagnóstico</a>
+    <a class="button" href="{% url 'portal-diagnostics' %}">Diagnóstico</a><a class="button" href="{% url 'communications-deliveries' %}">Notificações aos clientes</a>
   </nav>
   <div class="operation-utilities operation-secondary-content">
     <section class="panel operation-share" aria-labelledby="operation-share-title">

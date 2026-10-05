@@ -80,7 +80,7 @@ def ticket_detail(request,pk):
                 messages.success(request,"Status atualizado.")
         return redirect("support-ticket-detail",pk=ticket.pk)
     return render(request,"operations/ticket_detail.html",{
-        "ticket":ticket,"form":form,"status_choices":SupportTicket.Status.choices,
+        "ticket":ticket,"visible_messages":ticket.messages.filter(is_internal=False).select_related("user"),"form":form,"status_choices":SupportTicket.Status.choices,
         "can_impersonate":request.user.tenant_id is None and has_capability(request.user,"master.support.impersonate"),
         "can_manage_status":request.user.tenant_id is None and has_capability(request.user,"support.manage"),
     })

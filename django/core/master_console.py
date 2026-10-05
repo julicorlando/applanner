@@ -121,7 +121,8 @@ def company_detail(request,pk):
     _guard(request.user)
     from billing.entitlements import professional_capacity
     tenant=get_object_or_404(Tenant,pk=pk)
-    return render(request,'master/company_detail.html',{'company':tenant,
+    from .company_health import company_health
+    return render(request,'master/company_detail.html',{'health':company_health(tenant),'company':tenant,
         'subscription':tenant.subscriptions.select_related('plan').order_by('-started_at','-pk').first(),
         'capacity':professional_capacity(tenant),
         'units':tenant.units.order_by('-active','name'),

@@ -686,7 +686,7 @@ def resource_form(request,slug,pk=None):
                         form.add_error(field if field in form.fields else None,error)
             else:
                 form.add_error(None,exc)
-    return render(request,"master/form.html",{"slug":slug,"resource":config,"form":form,"title":("Editar" if obj else "Novo")+" — "+config["title"]})
+    return render(request,"master/form.html",{"object":obj,"slug":slug,"resource":config,"form":form,"title":("Editar" if obj else "Novo")+" — "+config["title"]})
 
 
 @login_required

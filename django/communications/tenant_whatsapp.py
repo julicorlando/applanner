@@ -273,6 +273,7 @@ def tenant_whatsapp_receive(request):
         WhatsAppMessage.objects.filter(tenant=tenant,provider_message_id=msg_id,
             conversation__wa_id=number,direction=WhatsAppMessage.Direction.OUT).exclude(
             status=WhatsAppMessage.Status.READ).update(status=WhatsAppMessage.Status.READ if status=="read" else WhatsAppMessage.Status.DELIVERED)
+        Notification.objects.filter(tenant=tenant,channel='whatsapp',provider_reference=msg_id,destination=number,delivered_at__isnull=True).update(delivered_at=timezone.now())
         return JsonResponse({"ok":True})
     body=str(data.get("text") or "")[:4096]
     customer=next((candidate for candidate in Customer.objects.filter(

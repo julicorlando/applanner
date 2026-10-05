@@ -29,6 +29,9 @@ class SupportTicket(TimeStampedModel):
     priority=models.CharField(max_length=12,choices=Priority.choices,default=Priority.NORMAL)
     status=models.CharField(max_length=20,choices=Status.choices,default=Status.OPEN,db_index=True)
     assigned_to=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="support_assignments")
+    due_at=models.DateTimeField(null=True,blank=True)
+    solution=models.TextField(blank=True)
+    resolved_at=models.DateTimeField(null=True,blank=True)
     remote_access_allowed=models.BooleanField(default=False)
     remote_access_allowed_at=models.DateTimeField(null=True,blank=True)
     remote_access_revoked_at=models.DateTimeField(null=True,blank=True)
@@ -41,6 +44,7 @@ class SupportMessage(models.Model):
     ticket=models.ForeignKey(SupportTicket,on_delete=models.CASCADE,related_name="messages")
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="support_messages")
     message=models.TextField()
+    is_internal=models.BooleanField(default=False)
     attachment=models.FileField(upload_to="support/",blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
 
@@ -319,3 +323,22 @@ class LegacyMigrationRecord(models.Model):
 
     class Meta:
         ordering=["id"]
+
+
+class TenantActivity(models.Model):
+    tenant=models.OneToOneField('tenants.Tenant',on_delete=models.CASCADE,related_name='operation_activity')
+    last_active_at=models.DateTimeField()
+
+
+class RuntimeEvent(models.Model):
+    request_id=models.UUIDField(db_index=True)
+    tenant=models.ForeignKey('tenants.Tenant',on_delete=models.SET_NULL,null=True,blank=True)
+    component=models.CharField(max_length=30)
+    operation=models.CharField(max_length=120)
+    status_code=models.PositiveIntegerField(default=200)
+    duration_ms=models.PositiveIntegerField(default=0)
+    error_type=models.CharField(max_length=100,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True,db_index=True)
+
+    class Meta:
+        indexes=[models.Index(fields=['component','created_at'],name='ops_runtime_component_idx')]

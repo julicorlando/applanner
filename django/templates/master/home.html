@@ -11,7 +11,7 @@
   </div>
   <section class="master-shortcuts" aria-labelledby="master-shortcuts-title">
     <div class="section-heading"><div><span class="eyebrow">ACESSO RÁPIDO</span><h2 id="master-shortcuts-title">O que você quer fazer?</h2></div></div>
-    <div class="shortcut-grid">
+    <div class="shortcut-grid"><a href="{% url 'master-company-health' %}"><strong>Saúde das empresas</strong><small>Ativação, uso recente e pendências</small></a><a href="{% url 'master-runtime-monitor' %}"><strong>Monitoramento técnico</strong><small>Erros, lentidão, filas e correlação</small></a>
       <a href="{% url 'master-finance-dashboard' %}"><span class="shortcut-icon" aria-hidden="true">◈</span><strong>Painel financeiro</strong><small>Receita bruta, lucro líquido e previsão</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
       <a href="{% url 'master-resource-create' 'despesas' %}"><span class="shortcut-icon" aria-hidden="true">+</span><strong>Cadastrar despesa</strong><small>Custos da operação da plataforma</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
       <a href="{% url 'master-homepage' %}"><span class="shortcut-icon" aria-hidden="true">✦</span><strong>Editar página inicial</strong><small>Logo, textos e apresentação pública</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>

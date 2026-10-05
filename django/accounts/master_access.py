@@ -9,8 +9,8 @@ PLATFORM_ROLES = {
 }
 READ_ROUTES = {
     'master-finance': {'master-finance-dashboard','master-charges','master-charge-detail','master-reports'},
-    'master-support': {'master-alerts'},
-    'master-commercial': {'master-retention'},
+    'master-support': {'master-alerts','master-company-health','master-support-ticket','master-runtime-monitor'},
+    'master-commercial': {'master-retention','master-company-health'},
 }
 RESOURCES = {'master-finance': {'despesas','financeiro'}, 'master-support': {'suporte','incidentes'}, 'master-commercial': set()}
 
@@ -34,6 +34,7 @@ class MasterAccessMiddleware:
             return None
         if user.role=='master-finance' and name in {'master-charge-consult','master-financial-consult'}: return None
         if user.role=='master-commercial' and name=='master-retention-note': return None
+        if user.role=='master-support' and name=='master-support-ticket': return None
         if name in {'master-resource-list','master-resource-create','master-resource-edit'} and kwargs.get('slug') in RESOURCES[user.role]:
             return None
         raise PermissionDenied('Ação restrita à administração da plataforma.')

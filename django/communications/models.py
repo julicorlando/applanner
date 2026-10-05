@@ -3,6 +3,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 from core.models import TimeStampedModel
+from operations.telemetry import trace_id
 
 
 class Notification(models.Model):
@@ -20,6 +21,9 @@ class Notification(models.Model):
         CANCELLED="cancelled","Cancelada"
         SKIPPED="skipped","Ignorada"
 
+    trace_id=models.UUIDField(default=trace_id,db_index=True)
+    manual_retry_count=models.PositiveSmallIntegerField(default=0)
+    last_manual_retry_at=models.DateTimeField(null=True,blank=True)
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="notifications")
     customer=models.ForeignKey("scheduling.Customer",null=True,blank=True,on_delete=models.SET_NULL,related_name="notifications")
     channel=models.CharField(max_length=16,choices=Channel.choices)

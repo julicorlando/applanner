@@ -8,7 +8,15 @@ from billing.fiscal import master_fiscal_document
 
 from finance.platform_dashboard import dashboard as finance_dashboard
 
+from .company_health_views import dashboard as company_health_dashboard
+from operations.master_support import ticket_detail as support_ticket
+
+from operations.monitoring import dashboard as runtime_monitor
+
 urlpatterns=[
+    path("monitoramento/",runtime_monitor,name="master-runtime-monitor"),
+    path("saude-empresas/",company_health_dashboard,name="master-company-health"),
+    path("suporte/<int:pk>/atendimento/",support_ticket,name="master-support-ticket"),
     path("cobrancas/<int:pk>/financeiro/",master_retention.consult_accounting,name="master-financial-consult"),
     path("retencao/",master_retention.dashboard,name="master-retention"),
     path("retencao/<int:pk>/motivo/",master_retention.save_note,name="master-retention-note"),
