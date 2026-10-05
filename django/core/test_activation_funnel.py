@@ -1,6 +1,7 @@
 from datetime import timedelta,time
 from django.test import TestCase,override_settings,Client
 from django.urls import reverse
+from django.templatetags.static import static
 from django.utils import timezone
 from accounts.models import User
 from tenants.models import Tenant,Unit,UnitBusinessHours
@@ -42,7 +43,7 @@ class ActivationFunnelTests(TestCase):
 
     def token(self):
         response=self.client.get(reverse('tenant-public',args=[self.tenant.slug]),{'unit':self.unit.pk})
-        self.assertContains(response,'booking-funnel.js')
+        self.assertContains(response,static('js/booking-funnel.js'))
         return response.context['funnel_token']
 
     def test_visits_and_selections_deduplicate_and_confirmation_cannot_be_forged(self):
