@@ -113,7 +113,8 @@ class CommercialPricingTests(TestCase):
         self.plan.monthly_price=Decimal('120');self.plan.save()
         schedule_plan_renewals(self.plan,self.owner,self.now)
         change=self.sub.price_changes.get()
-        self.assertGreater(change.effective_at,self.now+timedelta(days=30))
+        from dateutil.relativedelta import relativedelta
+        self.assertEqual(change.effective_at,self.sub.trial_ends_at+relativedelta(months=1))
         prepare_price_changes(self.sub,self.now);self.sub.refresh_from_db()
         self.assertEqual(self.sub.contracted_price,Decimal('100'))
 

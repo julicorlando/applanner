@@ -59,7 +59,7 @@ def schedule_plan_renewals(plan,user,now=None):
         from .access import paid_access_until
         effective=paid_access_until(sub) or sub.next_billing_at or sub.trial_ends_at or target
         if not sub.payments.filter(status='paid',purpose='subscription').exists():
-            effective=max(effective,target)+relativedelta(months=CYCLE_MONTHS[sub.billing_cycle])
+            effective+=relativedelta(months=CYCLE_MONTHS[sub.billing_cycle])
         while effective<target: effective+=relativedelta(months=CYCLE_MONTHS[sub.billing_cycle])
         new=cycle_price(plan,sub.billing_cycle)
         regular=sub.regular_base_price if sub.regular_base_price is not None else sub.base_contracted_price
