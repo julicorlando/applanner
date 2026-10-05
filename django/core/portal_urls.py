@@ -7,7 +7,10 @@ from .professional_area import professional_area, professional_access, professio
 from scheduling.ratings import tenant_ratings
 from engagement.referrals import referrals
 
+from .booking_funnel import dashboard as booking_funnel
+
 urlpatterns = [
+    path("funil-agendamento/",booking_funnel,name="booking-funnel"),
     path('hoje/',operation_insights.today,name='operation-today'),
     path('hoje/<int:pk>/acao/',operation_insights.appointment_action,name='operation-today-action'),
     path('indicadores/',operation_insights.performance,name='operation-performance'),

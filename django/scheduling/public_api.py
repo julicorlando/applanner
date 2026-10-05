@@ -519,6 +519,8 @@ class PublicBookingAPIView(APIView):
                 for product in selected_products
             ]
 
+        from core.booking_funnel import record
+        record(request,tenant,appointment.unit,'confirmed')
         return _booking_response(
             request,appointment,replay=False,customer_reused=reused,
         )

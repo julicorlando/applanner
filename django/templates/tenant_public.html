@@ -212,6 +212,7 @@
 </section>
 {% endif %}
 
+{% if funnel_token %}<div id="booking-funnel-tracking" hidden data-token="{{ funnel_token }}" data-url="{% url 'public-booking-funnel' public_slug %}"></div><script src="{% static 'js/booking-funnel.js' %}" defer></script>{% endif %}
 {% if tenant.public_booking_enabled %}
 <script src="{% static 'js/booking-slots.js' %}"></script>
 <script src="{% static 'js/public-booking.js' %}" defer></script>

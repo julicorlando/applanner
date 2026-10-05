@@ -16,6 +16,9 @@
   </header>
 
   <div id="operation-dashboard-content">
+  {% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' %}
+  <section class="panel"><h2>Ativação · {{ activation.unit.name|default:"Cadastre uma unidade" }}</h2><p>{{ activation.completed }} de {{ activation.total }} configurações concluídas.</p><progress value="{{ activation.progress }}" max="100" aria-label="Progresso da ativação">{{ activation.progress }}%</progress><ul>{% for step in activation.pending %}<li><a href="{{ step.url }}">{{ step.title }}</a></li>{% empty %}<li>Configurações cadastradas. Teste um agendamento antes de divulgar.</li>{% endfor %}</ul><a class="button" href="{% url 'portal-setup' %}">Revisar primeiros passos</a> <a class="button" href="{% url 'booking-funnel' %}">Funil de agendamento</a></section>
+  {% endif %}
   <nav class="operation-quick-links" aria-label="Atalhos da operação">
     {% if tenant.public_enabled %}<a class="button" href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">Página pública ↗</a>{% endif %}
     {% if request.user.is_superuser or request.user.role == 'owner' %}<a class="button" href="{% url 'tenant-ratings' %}">Avaliações da equipe</a><a class="button" href="{% url 'tenant-payment-gateway' %}">Recebimentos</a><a class="button" href="{% url 'tenant-whatsapp-settings' %}">WhatsApp</a>{% endif %}

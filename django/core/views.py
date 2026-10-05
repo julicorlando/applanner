@@ -387,10 +387,10 @@ def tenant_public(request,slug=None):
     raw=(request.GET.get("unit") or "").strip()
     if raw.isdigit():
         selected_unit=Unit.objects.filter(pk=int(raw),tenant=tenant,active=True).first()
-    return render(
-        request,"tenant_public.html",
-        _public_tenant_context(tenant,selected_unit=selected_unit),
-    )
+    context=_public_tenant_context(tenant,selected_unit=selected_unit)
+    from .booking_funnel import page_tracking
+    context.update(page_tracking(request,tenant,context.get('selected_unit')))
+    return render(request,'tenant_public.html',context)
 
 
 def professional_public(request,slug,professional_slug):
@@ -404,10 +404,10 @@ def professional_public(request,slug,professional_slug):
     professional=get_object_or_404(
         Professional,tenant=tenant,active=True,public_slug=professional_slug,
     )
-    return render(
-        request,"tenant_public.html",
-        _public_tenant_context(tenant,professional=professional,selected_unit=professional.unit),
-    )
+    context=_public_tenant_context(tenant,professional=professional,selected_unit=professional.unit)
+    from .booking_funnel import page_tracking
+    context.update(page_tracking(request,tenant,context.get('selected_unit')))
+    return render(request,'tenant_public.html',context)
 
 
 def home(request):

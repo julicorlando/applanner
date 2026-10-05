@@ -1043,6 +1043,7 @@ def home(request):
         Tenant=apps.get_model("tenants","Tenant")
         return render(request,"portal/select_tenant.html",{"tenants":Tenant.objects.filter(deleted_at__isnull=True,archived_at__isnull=True).order_by("name")})
 
+    from .activation import activation_status
     modules=available_modules(request.user,tenant)
     from billing.models import Module,TenantModule
     selected=set(TenantModule.objects.filter(tenant=tenant,enabled=True,module__active=True)
@@ -1070,6 +1071,7 @@ def home(request):
         "public_professionals":public_professionals,
         "arena_mode":segment_enabled(tenant,"arena"),
         "operation_health":operation_health(tenant,unit),
+        "activation":activation_status(tenant,unit),
     })
 
 

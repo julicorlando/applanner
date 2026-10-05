@@ -122,6 +122,8 @@ class CourtBookingAPIView(APIView):
                 reservation.cancelled_at=timezone.now()
                 reservation.save(update_fields=["status","cancelled_at","updated_at"])
                 return Response({"detail":"Não foi possível gerar o Pix. Escolha outro horário ou tente novamente."},status=502)
+        from core.booking_funnel import record
+        record(request,tenant,court.unit,'confirmed')
         return Response({
             "detail":"Reserva confirmada." if payment=="onsite" else "Reserva aguardando confirmação do Pix.",
             "court":court.name,"starts_at":reservation.starts_at.isoformat(),

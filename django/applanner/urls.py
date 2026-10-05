@@ -20,7 +20,10 @@ from scheduling.public_api import (
 )
 from arena.public import CourtSlotsAPIView, CourtBookingAPIView, court_reservation_page
 
+from core.booking_funnel import track
+
 urlpatterns = [
+    path("api/public/<slug:slug>/funil/",track,name="public-booking-funnel"),
     path("api/v1/<slug:key>/",api_resource,name="personal-api-list"),
     path("api/v1/<slug:key>/<int:pk>/",api_resource,name="personal-api-detail"),
     path("inicio/",onboarding,name="tenant-onboarding"),

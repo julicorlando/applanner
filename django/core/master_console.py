@@ -57,13 +57,37 @@ def overview():
         'alert_count':len(alert_rows())}
 
 
-def alert_rows():
+def activation_rows():
+    from core.activation import activation_status
+    rows=[]
+    for tenant in companies().filter(status__in=['trial','active']).prefetch_related('units').order_by('name'):
+        units=list(tenant.units.filter(active=True))
+        for unit in units or [None]:
+            status=activation_status(tenant,unit)
+            if not status['ready']: rows.append({'company':tenant,**status})
+    return rows
+
+
+def unreleased_payments():
+    from billing.access import paid_access_until,subscription_allows_access
+    rows=[]
+    for sub in latest_subscriptions().exclude(status='cancelled').select_related('tenant','plan'):
+        until=paid_access_until(sub)
+        if until and until>timezone.now() and (not subscription_allows_access(sub) or sub.tenant.status not in {'active','trial'}):
+            payment=sub.payments.filter(status='paid',purpose='subscription',environment='production').order_by('-paid_at','-pk').first()
+            if payment: rows.append(payment)
+    return rows
+
+
+def alert_rows(activation=None,unreleased=None):
     now=timezone.now()
     rows=[]
     def add(level,title,count,route,args=(),detail=''):
         if count: rows.append({'level':level,'title':title,'count':count,'url':reverse(route,args=args),'detail':detail})
     add('warning','Pix pendentes há mais de uma hora',PixCharge.objects.filter(payment__status='pending',created_at__lt=now-timedelta(hours=1),payment__environment='production',tenant__deleted_at__isnull=True,tenant__archived_at__isnull=True).count(),'master-charges',detail='Inclui códigos expirados: consulte o provedor antes de orientar um novo pagamento.')
     add('danger','Notificações com falha',Notification.objects.filter(status='failed',tenant__deleted_at__isnull=True,tenant__archived_at__isnull=True).count(),'master-alerts',detail='Confira a lista de falhas abaixo e a conexão do canal utilizado.')
+    add('danger','Pagamentos aprovados sem liberação',len(unreleased if unreleased is not None else unreleased_payments()),'master-alerts',detail='Confira as cobranças e a situação de acesso da empresa. Não aprova pagamentos automaticamente.')
+    add('warning','Unidades com configuração incompleta',len(activation if activation is not None else activation_rows()),'master-alerts',detail='Confira as pendências por empresa e unidade abaixo.')
     add('warning','Cobranças vencidas',overdue_payments().count(),'master-charges',detail='Abra as cobranças e filtre por vencidas.')
     add('danger','Incidentes críticos em aberto',OperationalIncident.objects.filter(severity='critical',status__in=['open','acknowledged']).count(),'master-resource-list',('incidentes',))
     backup=Backup.objects.filter(type__in=['database','full'],status='completed').filter(Q(expires_at__isnull=True)|Q(expires_at__gt=now)).order_by('-completed_at').first()
@@ -88,7 +112,8 @@ def alert_rows():
 @login_required
 def alerts(request):
     _guard(request.user)
-    return render(request,'master/alerts.html',{'alerts':alert_rows(),'checked_at':timezone.now(),'failed_notifications':Notification.objects.filter(status='failed',tenant__deleted_at__isnull=True,tenant__archived_at__isnull=True).select_related('tenant').order_by('-created_at')[:50]})
+    activation=activation_rows();unreleased=unreleased_payments()
+    return render(request,'master/alerts.html',{'activation_rows':activation,'unreleased_payments':unreleased,'alerts':alert_rows(activation,unreleased),'checked_at':timezone.now(),'failed_notifications':Notification.objects.filter(status='failed',tenant__deleted_at__isnull=True,tenant__archived_at__isnull=True).select_related('tenant').order_by('-created_at')[:50]})
 
 
 @login_required

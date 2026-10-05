@@ -69,3 +69,16 @@ class AuditLog(models.Model):
 
     def delete(self,*args,**kwargs):
         raise ValidationError("Logs de auditoria são append-only e não podem ser excluídos.")
+
+
+class BookingFunnelEvent(models.Model):
+    """Anonymous daily browser journey; no contact details or network identifiers."""
+    tenant=models.ForeignKey('tenants.Tenant',on_delete=models.CASCADE)
+    unit=models.ForeignKey('tenants.Unit',on_delete=models.CASCADE)
+    journey=models.UUIDField()
+    stage=models.CharField(max_length=16,choices=[('visit','Visita'),('resource','Serviço ou quadra'),('slot','Horário'),('confirmed','Reserva registrada')])
+    created_at=models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['tenant','unit','journey','stage'],name='booking_funnel_unique_stage')]
+        indexes=[models.Index(fields=['tenant','unit','created_at'],name='booking_funnel_period_idx')]
