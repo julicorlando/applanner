@@ -22,6 +22,7 @@ from core.audit import append_audit,model_snapshot
 
 
 FIELD_LABELS={
+    "price_application":"Aplicar alterações de preço",
     "name":"Nome","slug":"Identificador","description":"Descrição","category":"Segmento",
     "monthly_price":"Valor mensal","quarterly_price":"Valor trimestral","semiannual_price":"Valor semestral",
     "annual_price":"Valor anual","trial_days":"Dias de teste grátis","trial_without_card":"Teste sem cartão",
@@ -35,6 +36,10 @@ FIELD_LABELS={
 
 
 class PlanMasterForm(forms.ModelForm):
+    price_application=forms.ChoiceField(required=False,initial="new",label="Aplicar alterações de preço",
+        choices=[("new","Somente novas contratações"),("renewals","Novas contratações e renovações futuras")],
+        help_text="Renovações: aviso por e-mail e no sistema, com pelo menos 30 dias de antecedência. Promoções contratadas são preservadas até seu término. Nenhuma cobrança já emitida é alterada.")
+
     segments=forms.MultipleChoiceField(
         choices=[("barbearia","Barbearia e salão"),("auto","Automotivo e lava-jato"),
                  ("arena","Arena e quadras"),("saude","Clínica e saúde")],
@@ -55,7 +60,7 @@ class PlanMasterForm(forms.ModelForm):
         model=Plan
         fields=[
             "name","slug","description","monthly_price","quarterly_price","semiannual_price",
-            "annual_price","trial_days","trial_without_card","active","public_visible",
+            "annual_price","quarterly_discount","semiannual_discount","annual_discount","promotion_price","promotion_months","promotion_starts_at","promotion_ends_at","trial_days","trial_without_card","active","public_visible",
             "is_custom","featured","sort_order",
         ]
 
@@ -228,6 +233,7 @@ MASTER_RESOURCES={
     "falhas-php-legadas":{"model":"operations.LegacyFailedJobArchive","title":"Falhas da fila PHP","fields":[],"columns":["id","tenant","type","status","attempts","failed_at"],"order":"-id","create":False,"edit":False},
     "migrations-php":{"model":"operations.LegacyMigrationRecord","title":"Migrations PHP legadas","fields":[],"columns":["id","migration","batch","executed_at"],"order":"id","create":False,"edit":False},
     "isencoes-assinaturas":{"model":"billing.SubscriptionExemption","title":"Isenções de assinatura","fields":["tenant","subscription","exemption_type","starts_at","ends_at","reason","status"],"columns":["tenant","subscription","exemption_type","starts_at","ends_at","status"],"order":"-created_at","special":"subscription_exemption"},
+    "reajustes-assinaturas":{"model":"billing.SubscriptionPriceChange","title":"Reajustes agendados","fields":["status"],"columns":["subscription","new_base_price","effective_at","reason","status","applied_at"],"order":"-created_at","create":False,"edit":True},
     "historico-assinaturas":{"model":"billing.SubscriptionHistory","title":"Histórico de assinaturas","fields":[],"columns":["tenant","subscription","from_plan","to_plan","from_status","to_status","reason","created_at"],"order":"-created_at","create":False,"edit":False},
     "addons-modulos":{"model":"billing.TenantModuleAddon","title":"Módulos adicionais contratados","fields":[],"columns":["tenant","module","monthly_price","status","started_at","next_billing_at"],"order":"-created_at","create":False,"edit":False},
     "ajustes-modulos":{"model":"billing.SubscriptionModuleAdjustment","title":"Ajustes de módulos na assinatura","fields":[],"columns":["tenant","subscription","action","previous_amount","new_amount","status","created_at"],"order":"-created_at","create":False,"edit":False},
@@ -381,7 +387,7 @@ def home(request):
         if slug in {"usuarios","empresas"} else apps.get_model(cfg["model"]).objects.count()
     )} for slug,cfg in MASTER_RESOURCES.items()]
     sections=[
-        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","checkouts","cupons","faturas","notas-fiscais","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
+        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","reajustes-assinaturas","checkouts","cupons","faturas","notas-fiscais","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
         ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
         ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","campanhas-indicacao","recompensas-indicacao","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","faq","aquisicao","meta-conversoes"}),
         ("Suporte e operação",{"despesas","financeiro","suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing","solicitacoes-lgpd"}),
@@ -603,12 +609,15 @@ def resource_form(request,slug,pk=None):
         raise PermissionDenied("Este registro não é uma despesa.")
     Form=(UserMasterForm if slug=="usuarios" else TenantMasterForm if slug=="empresas" else PlanMasterForm if config.get("special")=="plan"
           else modelform_factory(model,fields=config["fields"],widgets=_widgets(model,config["fields"])))
+    if slug=="reajustes-assinaturas" and obj and obj.status!="pending":
+        raise PermissionDenied("Somente reajustes pendentes podem ser cancelados.")
     critical_audit_slugs={
-        "planos","modulos","assinaturas","cupons","campanhas-indicacao",
+        "planos","modulos","assinaturas","cupons","campanhas-indicacao","reajustes-assinaturas",
         "operacao","empresas","isencoes-assinaturas","legais","despesas","financeiro",
     }
     before_snapshot=model_snapshot(obj) if obj is not None and slug in critical_audit_slugs else None
     form=Form(request.POST or None,request.FILES or None,instance=obj)
+    if slug=="reajustes-assinaturas": form.fields["status"].choices=[("pending","Manter agendado"),("cancelled","Cancelar reajuste")]
     if config.get("special")=="platform_expense": form.instance.type="expense"
     for name,field in form.fields.items():
         if name not in {"new_password","confirm_password"}:
@@ -662,6 +671,10 @@ def resource_form(request,slug,pk=None):
                     entity_type=model._meta.label,entity_id=row.pk,
                     before=before_snapshot,after=model_snapshot(row),
                 )
+            if slug=="planos" and form.cleaned_data.get("price_application")=="renewals":
+                from billing.commercial_pricing import schedule_plan_renewals
+                count=schedule_plan_renewals(row,request.user)
+                messages.info(request,f"{count} reajuste(s) agendado(s), com aviso aos responsáveis. Contratos com reajuste pendente foram preservados.")
             messages.success(request,"Registro salvo.")
             return redirect("master-resource-list",slug=slug)
         except ValidationError as exc:

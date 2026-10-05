@@ -20,7 +20,8 @@ def subscription_charge_breakdown(subscription):
             "annual":plan.annual_price,
         }
         configured=prices.get(subscription.billing_cycle)
-        base=Decimal(configured if configured is not None else plan.monthly_price*months)
+        from .commercial_pricing import cycle_price
+        base=cycle_price(plan,subscription.billing_cycle)
     base=Decimal(base or 0).quantize(Decimal("0.01"))
 
     addons=[]
@@ -35,11 +36,11 @@ def subscription_charge_breakdown(subscription):
             "monthly":str(monthly),
             "cycle_total":str((monthly*months).quantize(Decimal("0.01"))),
             "per_unit":bool(addon.module.per_unit_billing),
-            "unit_price":str(Decimal(addon.module.addon_monthly_price or 0).quantize(Decimal("0.01"))),
+            "unit_price":str(Decimal(addon.pricing_components[0] if addon.module.per_unit_billing and addon.pricing_components else addon.module.addon_monthly_price or 0).quantize(Decimal("0.01"))),
         })
 
     addon_total=sum((Decimal(item["cycle_total"]) for item in addons),Decimal("0.00"))
-    contracted=Decimal(subscription.contracted_price or (base+addon_total)).quantize(Decimal("0.01"))
+    contracted=Decimal(subscription.contracted_price if subscription.contracted_price is not None else (base+addon_total)).quantize(Decimal("0.01"))
     adjustment=(contracted-base-addon_total).quantize(Decimal("0.01"))
     active_units=subscription.tenant.units.filter(active=True).count()
     return {

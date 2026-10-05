@@ -1,5 +1,7 @@
 from django.conf import settings
 from django.db import models
+from django.core.validators import MinValueValidator,MaxValueValidator
+from decimal import Decimal
 from core.models import TimeStampedModel
 
 
@@ -13,6 +15,15 @@ class Module(models.Model):
     sort_order=models.SmallIntegerField(default=0)
     active=models.BooleanField(default=True)
 
+    def save(self,*args,**kwargs):
+        if self.pk:
+            previous=type(self).objects.filter(pk=self.pk).first()
+            if previous and previous.per_unit_billing and previous.addon_monthly_price is not None and previous.addon_monthly_price!=self.addon_monthly_price:
+                for addon in self.addons.filter(status="active",pricing_components=[]):
+                    addon.pricing_components=[str(previous.addon_monthly_price)]
+                    addon.save(update_fields=["pricing_components","updated_at"])
+        return super().save(*args,**kwargs)
+
     def __str__(self):
         return self.name
 
@@ -25,6 +36,13 @@ class Plan(TimeStampedModel):
     quarterly_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
     semiannual_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
     annual_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    quarterly_discount=models.DecimalField("Desconto trimestral (%)",max_digits=5,decimal_places=2,default=0,blank=True,validators=[MinValueValidator(0),MaxValueValidator(Decimal("99.99"))])
+    semiannual_discount=models.DecimalField("Desconto semestral (%)",max_digits=5,decimal_places=2,default=0,blank=True,validators=[MinValueValidator(0),MaxValueValidator(Decimal("99.99"))])
+    annual_discount=models.DecimalField("Desconto anual (%)",max_digits=5,decimal_places=2,default=0,blank=True,validators=[MinValueValidator(0),MaxValueValidator(Decimal("99.99"))])
+    promotion_price=models.DecimalField("Preço mensal promocional",max_digits=10,decimal_places=2,null=True,blank=True,validators=[MinValueValidator(Decimal("0.01"))])
+    promotion_months=models.PositiveSmallIntegerField("Meses da promoção após o teste",default=0,blank=True)
+    promotion_starts_at=models.DateTimeField("Início da oferta",null=True,blank=True)
+    promotion_ends_at=models.DateTimeField("Fim da oferta para novas contratações",null=True,blank=True)
     trial_days=models.PositiveSmallIntegerField(default=14)
     trial_without_card=models.BooleanField(default=True)
     active=models.BooleanField(default=True)
@@ -35,6 +53,31 @@ class Plan(TimeStampedModel):
     sort_order=models.SmallIntegerField(default=0)
     features=models.JSONField(default=dict,blank=True)
     modules=models.ManyToManyField(Module,through="PlanModule",related_name="plans",blank=True)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        errors={}
+        for cycle in ('monthly','quarterly','semiannual','annual'):
+            value=getattr(self,cycle+'_price')
+            if value is not None and value<0: errors[cycle+'_price']='O preço não pode ser negativo.'
+        for cycle in ('quarterly','semiannual','annual'):
+            if getattr(self,cycle+'_discount',0) and getattr(self,cycle+'_price') is not None:
+                errors[cycle+'_discount']='Deixe o preço fixo deste ciclo vazio para usar o desconto percentual.'
+        if self.promotion_price is not None:
+            if not self.promotion_months: errors['promotion_months']='Informe quantos meses a promoção dura.'
+            if self.promotion_price>=self.monthly_price: errors['promotion_price']='O preço promocional deve ser menor que o preço mensal regular.'
+        elif self.promotion_months: errors['promotion_price']='Informe o preço promocional.'
+        if self.promotion_starts_at and self.promotion_ends_at and self.promotion_ends_at<=self.promotion_starts_at:
+            errors['promotion_ends_at']='O fim da oferta deve ser posterior ao início.'
+        if errors: raise ValidationError(errors)
+
+    def save(self,*args,**kwargs):
+        if self.pk:
+            previous=type(self).objects.filter(pk=self.pk).first()
+            if previous and any(getattr(previous,key)!=getattr(self,key) for key in ('monthly_price','quarterly_price','semiannual_price','annual_price','quarterly_discount','semiannual_discount','annual_discount')):
+                from .commercial_pricing import freeze_plan_contracts
+                freeze_plan_contracts(previous)
+        return super().save(*args,**kwargs)
 
     def __str__(self):
         return self.name
@@ -82,6 +125,9 @@ class Subscription(TimeStampedModel):
     contracted_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
     base_contracted_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
     addon_contracted_price=models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    regular_base_price=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    promotion_ends_at=models.DateTimeField(null=True,blank=True)
+    commercial_snapshot=models.JSONField(default=dict,blank=True)
     status=models.CharField(max_length=20,choices=Status.choices,default=Status.TRIAL,db_index=True)
     started_at=models.DateTimeField()
     trial_started_at=models.DateTimeField(null=True,blank=True)
@@ -616,3 +662,14 @@ class PixCharge(TimeStampedModel):
     status=models.CharField(max_length=16,default="pending",db_index=True)
     expires_at=models.DateTimeField()
     paid_at=models.DateTimeField(null=True,blank=True)
+
+
+class SubscriptionPriceChange(TimeStampedModel):
+    subscription=models.ForeignKey(Subscription,on_delete=models.CASCADE,related_name="price_changes")
+    new_base_price=models.DecimalField("Novo valor base por ciclo",max_digits=10,decimal_places=2,validators=[MinValueValidator(Decimal("0.01"))])
+    effective_at=models.DateTimeField("Renovação a partir de")
+    reason=models.CharField(max_length=16,choices=[("catalog","Reajuste de catálogo"),("promotion","Fim da promoção")])
+    status=models.CharField(max_length=16,choices=[("pending","Agendado"),("applied","Aplicado"),("cancelled","Cancelado")],default="pending")
+    applied_at=models.DateTimeField(null=True,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
+    def __str__(self): return f"{self.subscription} · R$ {self.new_base_price}"

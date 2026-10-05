@@ -29,6 +29,8 @@
       {% endif %}
       {% if subscription.trial_ends_at %}<div class="module-row"><span></span><div><strong>Teste até</strong><small>{{ subscription.trial_ends_at }}</small></div></div>{% endif %}
       {% if has_pending_pix %}<form method="post" action="{% url 'billing-subscription-pix-refresh' %}">{% csrf_token %}<button type="submit" class="button">Já paguei · verificar Pix</button></form>{% endif %}
+      {% for change in price_changes %}<p class="payment-hint">{% if change.reason == 'promotion' %}Fim da promoção{% else %}Reajuste anunciado{% endif %}: valor base de R$ {{ change.new_base_price|money_pt }} por ciclo na renovação a partir de {{ change.effective_at|date:'d/m/Y' }} · {{ change.get_status_display }}. Adicionais são cobrados separadamente.</p>{% endfor %}
+      {% if unit_usage %}<p><strong>Unidades ativas: {{ unit_usage.used }}</strong> · {{ unit_usage.included }} incluída(s) no plano. {% if unit_usage.multiunit %}Multiunidade habilitada; confira a cobrança dos adicionais acima.{% endif %}</p>{% if not request.billing_locked %}<a class="button" href="{% url 'billing-subscription-modules' %}">Solicitar expansão de unidades</a>{% endif %}{% endif %}
       <h3>Forma de pagamento</h3>
       <p>{% if subscription.payment_method %}{{ subscription.get_payment_method_display }}{% else %}Escolha a forma de pagamento ao iniciar a cobrança.{% endif %}</p>
       {% if can_change_payment_method %}

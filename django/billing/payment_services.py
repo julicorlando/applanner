@@ -71,10 +71,13 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
     if not gateway:
         raise RuntimeError("provedor de cobrança da plataforma não está configurado.")
 
+    from .commercial_pricing import prepare_price_changes
+    subscription=prepare_price_changes(subscription)
     amount=subscription.contracted_price
     if amount is None:
         months={"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[subscription.billing_cycle]
-        amount=getattr(subscription.plan,{"monthly":"monthly_price","quarterly":"quarterly_price","semiannual":"semiannual_price","annual":"annual_price"}[subscription.billing_cycle]) or subscription.plan.monthly_price*months
+        from .commercial_pricing import cycle_price
+        amount=cycle_price(subscription.plan,subscription.billing_cycle)
     frequency={
         Subscription.BillingCycle.MONTHLY:1,
         Subscription.BillingCycle.QUARTERLY:3,
@@ -133,10 +136,13 @@ def create_platform_pix_charge(*,subscription,payer_email):
     ).first()
     if not gateway:
         raise RuntimeError("provedor de cobrança da plataforma não está configurado.")
+    from .commercial_pricing import prepare_price_changes
+    subscription=prepare_price_changes(subscription)
     amount=subscription.contracted_price
     if amount is None:
         months={"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[subscription.billing_cycle]
-        amount=getattr(subscription.plan,{"monthly":"monthly_price","quarterly":"quarterly_price","semiannual":"semiannual_price","annual":"annual_price"}[subscription.billing_cycle]) or subscription.plan.monthly_price*months
+        from .commercial_pricing import cycle_price
+        amount=cycle_price(subscription.plan,subscription.billing_cycle)
     amount=Decimal(str(amount)).quantize(Decimal("0.01"))
     if amount<=0:
         raise ValueError("Valor da assinatura inválido.")

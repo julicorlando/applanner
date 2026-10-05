@@ -29,7 +29,7 @@ def retention_metrics(start,end):
         status__in=['paid','partially_refunded','refunded']).values_list('tenant_id',flat=True))
     latest=Subscription.objects.filter(tenant_id=OuterRef('tenant_id')).order_by('-started_at','-pk').values('pk')[:1]
     current=list(Subscription.objects.filter(pk=Subquery(latest)).select_related('tenant','plan'))
-    active={s.tenant_id for s in current if s.status=='active' and not s.tenant.deleted_at and not s.tenant.archived_at}
+    active={s.tenant_id for s in current if s.status=='active' and s.provider_environment!='sandbox' and not s.tenant.deleted_at and not s.tenant.archived_at}
     cohorts=defaultdict(lambda:{'trials':0,'converted':0,'active':0})
     for row in trials:
         cohort=cohorts[timezone.localtime(row.trial_started_at).strftime('%Y-%m')]
@@ -51,7 +51,20 @@ def retention_metrics(start,end):
     mrr=sum(((s.contracted_price / Decimal({'monthly':1,'quarterly':3,'semiannual':6,'annual':12}[s.billing_cycle])
              if s.contracted_price is not None else s.plan.monthly_price)
              for s in current if s.tenant_id in active),Decimal('0'))
-    return {'cohorts':rows,'trials':sum(r['trials'] for r in rows),'converted':sum(r['converted'] for r in rows),
+    from billing.models import TenantModuleAddon
+    active_tenants=list(active)
+    overdue=Payment.objects.filter(environment='production',purpose='subscription',status='pending',due_at__lt=timezone.now(),tenant__deleted_at__isnull=True,tenant__archived_at__isnull=True)
+    overdue_total=sum(overdue.values_list('amount',flat=True),Decimal('0'))
+    addons=list(TenantModuleAddon.objects.filter(tenant_id__in=active_tenants,status='active').select_related('module','tenant'))
+    addon_usage=defaultdict(lambda:{'companies':set(),'quantity':0,'monthly':Decimal('0')})
+    for addon in addons:
+        data=addon_usage[addon.module.name];data['companies'].add(addon.tenant_id)
+        data['quantity']+=(addon.tenant.units.filter(active=True).count() if addon.module.per_unit_billing else addon.quantity);data['monthly']+=addon.monthly_price
+    addon_rows=[{'name':name,'companies':len(data['companies']),'quantity':data['quantity'],'monthly':data['monthly']} for name,data in sorted(addon_usage.items())]
+    trial_count=sum(r['trials'] for r in rows);converted_count=sum(r['converted'] for r in rows)
+    return {'conversion':round(converted_count*100/trial_count,1) if trial_count else 0,
+        'overdue_total':overdue_total,'overdue_count':overdue.count(),'addon_usage':addon_rows,
+        'addon_mrr':sum((r['monthly'] for r in addon_rows),Decimal('0')),'cohorts':rows,'trials':sum(r['trials'] for r in rows),'converted':sum(r['converted'] for r in rows),
         'cancellations':cancellations[:100],'cancellation_count':len(seen),'reasons':dict(reasons),'mrr':mrr,'active_count':len(active)}
 
 @login_required

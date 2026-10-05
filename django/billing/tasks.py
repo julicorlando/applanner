@@ -95,3 +95,18 @@ def reconcile_platform_finances():
                 row.metadata={**(row.metadata or {}),'accounting_attempt_at':timezone.now().isoformat()}
                 row.save(update_fields=['metadata'])
     return confirmed
+
+
+@shared_task
+def apply_subscription_price_changes():
+    import logging
+    from .commercial_pricing import prepare_price_changes
+    ids=Subscription.objects.filter(price_changes__status="pending").distinct().values_list("pk",flat=True)
+    applied=0
+    for pk in ids.iterator():
+        try:
+            sub=prepare_price_changes(Subscription(pk=pk))
+            applied+=sub.price_changes.filter(status="applied").count()
+        except Exception:
+            logging.getLogger(__name__).exception("Falha ao sincronizar reajuste da assinatura %s; contrato anterior preservado",pk)
+    return applied

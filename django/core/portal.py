@@ -100,11 +100,16 @@ def _unit_billing_notice(tenant,module_slug,resource_slug):
     if not addon or addon.module.addon_monthly_price is None:
         return ""
     count=tenant.units.filter(active=True).count()
+    from billing.entitlements import active_subscription
+    sub=active_subscription(tenant)
+    unit_price=Decimal(addon.pricing_components[0]) if addon.pricing_components else addon.module.addon_monthly_price
+    projected=(sub.contracted_price+unit_price*{"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[sub.billing_cycle]) if sub and sub.contracted_price is not None else None
+    preview=f" Ao adicionar uma unidade ativa, o total previsto será R$ {projected:.2f} por ciclo {sub.get_billing_cycle_display().lower()}." if projected is not None else ""
     return (
         f"O módulo Multiunidade é cobrado por unidade ativa: R$ "
-        f"{addon.module.addon_monthly_price:.2f} por unidade. "
+        f"{unit_price:.2f} por unidade. "
         f"Atualmente há {count} unidade(s). Ao cadastrar, ativar, desativar ou remover uma unidade, "
-        "o valor da assinatura será recalculado automaticamente."
+        "o valor da assinatura será recalculado automaticamente."+preview
     )
 
 

@@ -16,6 +16,7 @@
         {% for module in card.modules %}<li>{{ module.name }}</li>{% endfor %}
       </ul>
       <a class="button primary" href="{% url 'billing-signup' %}?plan={{ card.plan.pk }}">{% if card.plan.trial_days %}Testar {{ card.plan.trial_days }} dias grátis{% else %}Escolher {{ card.plan.name }}{% endif %}</a>
+      {% if card.offer.promotion_months %}<p class="payment-hint">Oferta no ciclo mensal: R$ {{ card.offer.amount }} por {{ card.offer.promotion_months }} meses após o teste. Depois R$ {{ card.offer.regular }}/mês. Condições registradas na contratação.</p>{% endif %}
     </article>
     {% empty %}<div class="panel"><p>Nenhum plano público disponível.</p></div>{% endfor %}
     {% if medical_plan %}<article class="pricing-card" aria-label="{{ medical_plan.name }} indisponível">

@@ -40,6 +40,13 @@ def send_notification(self,notification_id):
             if notification.scheduled_at and notification.scheduled_at>timezone.now():
                 return
 
+            if notification.template_key=="subscription_price_change":
+                from billing.models import SubscriptionPriceChange
+                change=SubscriptionPriceChange.objects.select_related("subscription").filter(pk=notification.payload.get("price_change_id"),subscription__tenant_id=notification.tenant_id).first()
+                if not change or change.status=="cancelled" or change.subscription.status=="cancelled":
+                    notification.status=Notification.Status.SKIPPED
+                    notification.save(update_fields=["status"])
+                    return
             if notification.template_key=="subscription_due":
                 from billing.reminders import reminder_is_current
                 if not reminder_is_current(notification):

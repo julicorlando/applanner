@@ -214,7 +214,7 @@ def activate_module_request(*,module_request,user):
                     defaults={
                         "module_request":row,"monthly_price":quoted,
                         "quantity":1,
-                        "pricing_components":[str(quoted)] if repeatable else [],
+                        "pricing_components":[str(quoted)] if repeatable else [str(row.module.addon_monthly_price)] if row.module.per_unit_billing else [],
                         "status":TenantModuleAddon.Status.ACTIVE,
                         "billing_mode":TenantModuleAddon.BillingMode.MERGED,
                         "provider":"mercadopago" if gateway else "",
@@ -405,7 +405,8 @@ def sync_per_unit_addon_pricing(tenant_id):
     delta_monthly=Decimal("0.00")
     changed=[]
     for addon in addons:
-        target=module_monthly_price(addon.module,tenant)
+        unit_price=Decimal(addon.pricing_components[0]) if addon.pricing_components else Decimal(addon.module.addon_monthly_price or 0)
+        target=(unit_price*max(tenant.units.filter(active=True).count(),1)).quantize(Decimal("0.01"))
         current=Decimal(addon.monthly_price or Decimal("0.00")).quantize(Decimal("0.01"))
         if target!=current:
             delta_monthly+=target-current

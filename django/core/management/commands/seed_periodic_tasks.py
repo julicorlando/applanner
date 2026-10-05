@@ -19,6 +19,7 @@ TASKS=[
     ("Expirar checkouts","billing.tasks.expire_checkouts",10,"minutes"),
     ("Confirmar Pix pendentes","billing.tasks.reconcile_pending_pix",5,"minutes"),
     ("Conciliar taxas e estornos","billing.tasks.reconcile_platform_finances",1,"hours"),
+    ("Aplicar reajustes de assinatura","billing.tasks.apply_subscription_price_changes",1,"hours"),
     ("Reconciliar assinaturas","billing.tasks.reconcile_subscription_states",1,"hours"),
     ("Avisar vencimento de assinaturas","billing.tasks.queue_subscription_reminders",1,"hours"),
     ("Health check operacional","operations.tasks.platform_health_check",5,"minutes"),

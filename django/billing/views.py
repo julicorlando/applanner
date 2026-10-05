@@ -28,12 +28,8 @@ User=get_user_model()
 
 
 def _price(plan,cycle):
-    return {
-        Subscription.BillingCycle.MONTHLY:plan.monthly_price,
-        Subscription.BillingCycle.QUARTERLY:plan.quarterly_price or plan.monthly_price*3,
-        Subscription.BillingCycle.SEMIANNUAL:plan.semiannual_price or plan.monthly_price*6,
-        Subscription.BillingCycle.ANNUAL:plan.annual_price or plan.monthly_price*12,
-    }[cycle]
+    from .commercial_pricing import cycle_price
+    return cycle_price(plan,cycle)
 
 
 def _unique_slug(name):
@@ -57,6 +53,7 @@ def plan_categories(plan,choices):
 
 
 class SignupForm(forms.Form):
+    price_quote=forms.CharField(required=False,widget=forms.HiddenInput)
     proposal_token=forms.CharField(required=False,max_length=32,widget=forms.HiddenInput)
     plan=forms.ModelChoiceField(queryset=Plan.objects.none(),label="Plano")
     billing_cycle=forms.ChoiceField(choices=Subscription.BillingCycle.choices,label="Ciclo")
@@ -132,6 +129,15 @@ class SignupForm(forms.Form):
                 current=set(plan.module_links.filter(enabled=True,module__active=True).values_list("module__name",flat=True))
                 if current!=set(proposal.modules or []):
                     self.add_error("plan","O catálogo deste plano mudou. Solicite a atualização da proposta.")
+        if data.get("price_quote") and plan and data.get("billing_cycle") and not token:
+            from django.core import signing
+            from .commercial_pricing import quote_payload
+            try:
+                quoted=signing.loads(data["price_quote"],salt="subscription-offer",max_age=3600)
+                if quoted!=quote_payload(plan,data["billing_cycle"]):
+                    raise signing.BadSignature("Condições alteradas")
+            except signing.BadSignature:
+                self.add_error("plan","As condições do plano mudaram ou a cotação expirou. Confira os valores atualizados antes de continuar.")
         category=(data.get("category") or "").lower()
         if category=="clinica":
             from contenthub.models import PlatformHomepage
@@ -173,7 +179,8 @@ def plans(request):
             link.module for link in plan.module_links.all()
             if link.enabled and link.module.active
         ]
-        cards.append({"plan":plan,"modules":modules})
+        from .commercial_pricing import offer
+        cards.append({"plan":plan,"modules":modules,"offer":offer(plan,"monthly")})
     medical=Plan.objects.filter(slug="segment-medico").first() if medical_visible else None
     catalog={module.pk:module for card in cards for module in card["modules"]}
     comparison=[{"label":module.name,"values":["Incluído" if module in card["modules"] else "Não incluído" for card in cards]}
@@ -245,10 +252,19 @@ def signup(request):
     proposal=Proposal.objects.filter(public_token=request.GET.get("proposal", "")[:32],
         status=Proposal.Status.CONVERTED,tenant__isnull=True).first() if request.GET.get("proposal") else None
     form=SignupForm(request.POST or None,selected_plan=selected)
+    from .commercial_pricing import offer,quote_payload
+    from django.core import signing
     plan_conditions=[{"id":str(plan.pk),"name":plan.name,"days":plan.trial_days,"withoutCard":plan.trial_without_card,
+        "included_units":(plan.features or {}).get("units",1),"included_professionals":"Não se aplica" if "arena" in (plan.features or {}).get("segments",[]) else (plan.features or {}).get("professionals"),
+        "quotes":{cycle:signing.dumps(quote_payload(plan,cycle),salt="subscription-offer") for cycle,_ in Subscription.BillingCycle.choices},
+        "offers":{cycle:{"amount":str(offer(plan,cycle)["amount"]),"regular":str(offer(plan,cycle)["regular"]),"months":offer(plan,cycle)["promotion_months"],"saving":str(offer(plan,cycle)["saving"])} for cycle,_ in Subscription.BillingCycle.choices},
         "categories":[{"value":value,"label":label} for value,label in plan_categories(plan,form.category_options)],
         "prices":{cycle:number_format(_price(plan,cycle),decimal_pos=2) for cycle,_ in Subscription.BillingCycle.choices}}
         for plan in form.fields["plan"].queryset]
+    if proposal:
+        for condition in plan_conditions:
+            if condition["id"]==str(proposal.plan_id):
+                condition["offers"]["monthly"]={"amount":str(proposal.final_price),"regular":str(proposal.final_price),"months":0,"saving":"0"}
     if request.method!="POST" and request.GET.get("proposal"):
         form.fields["proposal_token"].initial=request.GET["proposal"][:32]
     if request.method=="POST" and form.is_valid():
@@ -258,7 +274,9 @@ def signup(request):
         now=timezone.now()
         trial_days=int(plan.trial_days or 0)
         trial_end=now+timedelta(days=trial_days) if trial_days else None
-        contracted=Decimal(str(_price(plan,cycle))).quantize(Decimal("0.01"))
+        selected_offer=offer(plan,cycle,now)
+        contracted=selected_offer["amount"]
+        regular=selected_offer["regular"]
         with transaction.atomic():
             proposal=None
             if data.get("proposal_token"):
@@ -270,6 +288,8 @@ def signup(request):
                     form.add_error("plan","Esta proposta já foi contratada ou expirou.")
                     return render(request,"billing/signup.html",{"form":form,"selected_plan":selected,"plan_conditions":plan_conditions})
                 contracted=proposal.final_price
+                regular=contracted
+                selected_offer={"promotion_months":0}
             slug=_unique_slug(data["business_name"])
             tenant=Tenant.objects.create(
                 name=data["business_name"],slug=slug,public_slug=slug,
@@ -295,12 +315,19 @@ def signup(request):
             subscription=Subscription.objects.create(
                 tenant=tenant,plan=plan,billing_cycle=cycle,
                 contracted_price=contracted,base_contracted_price=contracted,addon_contracted_price=0,
+                regular_base_price=regular,commercial_snapshot={"base":str(contracted),"regular_base":str(regular),"cycle":cycle,"promotion_months":selected_offer["promotion_months"],"features":plan.features},
                 status=Subscription.Status.TRIAL if trial_days else Subscription.Status.PAST_DUE,
                 started_at=now,trial_started_at=now if trial_days else None,
                 trial_ends_at=trial_end,trial_days_snapshot=trial_days,
                 next_billing_at=trial_end or now,
                 payment_method=data.get("payment_method") or "card",
             )
+            if selected_offer["promotion_months"]:
+                from dateutil.relativedelta import relativedelta
+                from .models import SubscriptionPriceChange
+                subscription.promotion_ends_at=(trial_end or now)+relativedelta(months=selected_offer["promotion_months"])
+                subscription.save(update_fields=["promotion_ends_at"])
+                SubscriptionPriceChange.objects.create(subscription=subscription,new_base_price=regular,effective_at=subscription.promotion_ends_at,reason="promotion")
             if proposal:
                 proposal.tenant=tenant
                 proposal.save(update_fields=["tenant","updated_at"])
@@ -382,10 +409,7 @@ def subscription_status(request):
         from .breakdown import subscription_charge_breakdown
         current_breakdown=subscription_charge_breakdown(subscription)
         months=current_breakdown["months"]
-        catalog_price={"monthly":subscription.plan.monthly_price,"quarterly":subscription.plan.quarterly_price,
-            "semiannual":subscription.plan.semiannual_price,"annual":subscription.plan.annual_price}.get(subscription.billing_cycle)
-        if catalog_price is None:
-            catalog_price=subscription.plan.monthly_price*months
+        catalog_price=_price(subscription.plan,subscription.billing_cycle)
         current_breakdown["catalog_price"]=str(catalog_price)
         current_breakdown["different_catalog_price"]=Decimal(current_breakdown["plan"]["amount"])!=catalog_price
 
@@ -413,6 +437,8 @@ def subscription_status(request):
         "subscription_payment_required":eligible_for_payment(subscription),
         "can_configure_card":bool(subscription and subscription.payment_method=="card" and not subscription.provider_subscription_id and subscription.status in {"trial","active","past_due"}),
         "can_change_payment_method":bool(subscription and request.user.role=="owner" and subscription.status in {"trial","active","past_due"}),
+        "price_changes":subscription.price_changes.exclude(status="cancelled").order_by("effective_at") if subscription else [],
+        "unit_usage":{"used":request.user.tenant.units.filter(active=True).count(),"included":(subscription.plan.features or {}).get("units",1),"multiunit":__import__("billing.entitlements",fromlist=["module_enabled"]).module_enabled(request.user.tenant,"multiunit")} if subscription and request.user.tenant_id else None,
         "subscription":subscription,"pix_charge":pix_charge,
         "has_pending_pix":bool(subscription and PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING).exists()),
         "professional_capacity":professional_capacity(request.user.tenant,subscription) if request.user.tenant_id and not segment_enabled(request.user.tenant,"arena") else None,
@@ -663,6 +689,8 @@ def subscription_modules(request):
     ).exclude(pk__in=blocked_ids|pending_ids).order_by("sort_order","name"))
     for module in available:
         module.current_monthly_price=module_monthly_price(module,tenant)
+        from .breakdown import subscription_charge_breakdown,CYCLE_MONTHS
+        module.projected_cycle_total=(Decimal(subscription_charge_breakdown(subscription)["total"])+module.current_monthly_price*CYCLE_MONTHS[subscription.billing_cycle]).quantize(Decimal("0.01"))
         module.current_unit_count=tenant.units.filter(active=True).count() if module.per_unit_billing else None
         if module.slug=="professional-extra":
             active_extra=TenantModuleAddon.objects.filter(
