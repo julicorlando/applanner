@@ -39,12 +39,24 @@ window.createBookingSlotPicker = ({container, input, status, onChange = () => {}
         return;
       }
       status.textContent = 'Selecione um horário disponível.';
-      slots.forEach(slot => {
+      const groups = new Map();
+      slots.forEach((slot, index) => {
+        const hour = Number(String(slot.label).split(':')[0]);
+        const period = hour < 12 ? 'Manhã' : hour < 18 ? 'Tarde' : 'Noite';
+        if (!groups.has(period)) {
+          const section = document.createElement('section'); section.className = 'booking-slot-group';
+          const title = document.createElement('h4'); title.textContent = period;
+          const list = document.createElement('div'); list.className = 'booking-slot-group__list';
+          section.appendChild(title); section.appendChild(list); container.appendChild(section); groups.set(period, list);
+        }
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'booking-slot';
         button.textContent = slot.label;
         button.setAttribute('aria-pressed', 'false');
+        if (index === 0) {
+          const badge = document.createElement('span'); badge.className = 'booking-slot__next'; badge.textContent = 'Próximo horário'; button.appendChild(badge);
+        }
         button.setAttribute('aria-label', `Selecionar ${slot.label}${slot.professional_name ? ` com ${slot.professional_name}` : ''}`);
         if (slot.professional_name) {
           const name = document.createElement('small');
@@ -56,9 +68,9 @@ window.createBookingSlotPicker = ({container, input, status, onChange = () => {}
           button.setAttribute('aria-pressed', 'true');
           input.value = slot.value;
           status.textContent = `Horário selecionado: ${slot.label}.`;
-          onChange(true);
+          onChange(true, slot);
         });
-        container.appendChild(button);
+        groups.get(period).appendChild(button);
       });
     } catch (error) {
       if (currentRequest === requestId) status.textContent = error.userMessage || 'Não foi possível consultar os horários. Tente novamente.';

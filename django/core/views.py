@@ -282,11 +282,15 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         unit.public_instagram_url=social_url(unit.instagram,"https://instagram.com/")
         unit.public_tiktok_url=social_url(unit.tiktok,"https://tiktok.com/@")
         rows=[row for row in unit.business_hours.all() if row.active]
-        rows.sort(key=lambda row:row.weekday)
-        for row in rows:
-            row.weekday_label=weekday_labels.get(row.weekday,str(row.weekday))
-            row.is_today=row.weekday==tenant_today.isoweekday()
-        unit.public_hours=rows
+        configured={row.weekday:row for row in rows}
+        unit.public_hours=[]
+        for weekday,label in weekday_labels.items():
+            row=configured.get(weekday)
+            unit.public_hours.append({
+                "weekday_label":label,"is_today":weekday==tenant_today.isoweekday(),
+                "not_configured":row is None,"closed":row.closed if row else False,
+                "opens_at":row.opens_at if row else None,"closes_at":row.closes_at if row else None,
+            })
     if selected_unit is None:
         selected_unit=(professional.unit if professional and professional.unit_id else (units[0] if units else None))
     if selected_unit:
@@ -350,6 +354,7 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         "arena":("RESERVA NA ARENA","Escolha a atividade e um horário disponível.","Atividade"),
         "barbearia":("AGENDAMENTO NA BARBEARIA","Escolha o serviço e o profissional para seu atendimento.","Serviço")}
     return {
+        "public_today":tenant_today.isoformat(),
         "tenant":tenant,"services":services,"professionals":professionals,"units":units,
         "selected_unit":selected_unit,
         "products":products,"packages":packages,"memberships":memberships,

@@ -55,3 +55,42 @@ class PublicMultiunitExperienceTests(TestCase):
         self.assertNotContains(response,"Comentário privado na capa")
         self.assertContains(response,'data-unit-card="'+str(self.first.pk)+'"')
         self.assertContains(response,"navigator.geolocation")
+
+    def test_public_week_includes_missing_and_explicitly_closed_days(self):
+        UnitBusinessHours.objects.create(
+            tenant=self.tenant,unit=self.first,weekday=7,closed=True,active=True,
+        )
+        response=self.client.get(reverse("tenant-public",args=[self.tenant.public_slug]))
+        hours=response.context["units"][0].public_hours
+        self.assertEqual(len(hours),7)
+        self.assertFalse(hours[0]["not_configured"])
+        self.assertTrue(hours[1]["not_configured"])
+        self.assertTrue(hours[6]["closed"])
+        self.assertEqual(sum(row["is_today"] for row in hours),1)
+        self.assertContains(response,"Não informado")
+        self.assertContains(response,"Fechado")
+
+    def test_single_unit_has_no_switch_control_and_one_service_catalog(self):
+        from scheduling.models import Service
+        self.second.active=False
+        self.second.save(update_fields=["active"])
+        service=Service.objects.create(tenant=self.tenant,name="Corte de cabelo",duration_minutes=30,price=35)
+        response=self.client.get(reverse("tenant-public",args=[self.tenant.public_slug]))
+        self.assertNotContains(response,"Escolher outra unidade")
+        self.assertContains(response,'data-select-service="'+str(service.pk)+'"',count=1)
+        self.assertContains(response,'class="topbar public-header"')
+        self.assertContains(response,'js/public-booking.js')
+        self.assertContains(response,'data-duration="30"')
+
+    def test_public_header_stays_client_focused_for_signed_in_master(self):
+        from accounts.models import User
+        master=User.objects.create_user(email="public-review@example.test",password="test-only",is_superuser=True,is_staff=True)
+        self.client.force_login(master)
+        response=self.client.get(reverse("tenant-public",args=[self.tenant.public_slug]))
+        self.assertEqual(response.status_code,200)
+        html=response.content.decode()
+        header=html.split('<header',1)[1].split('</header>',1)[0]
+        self.assertNotIn('/master/',header)
+        self.assertNotIn('/admin/',header)
+        self.assertIn('Localização e contato',header)
+        self.assertIn('theme-toggle',header)

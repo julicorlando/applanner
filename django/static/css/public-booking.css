@@ -1,0 +1,58 @@
+/* Public booking uses the same accessible light/dark palette as the application. */
+.public-page .public-header{min-height:68px;position:relative;gap:20px}
+.public-header__brand{font-weight:750;color:var(--ink);text-decoration:none;margin-right:auto;max-width:48%;overflow-wrap:anywhere}
+.public-header nav,.public-footer nav{display:flex;gap:20px}.public-header nav a,.public-footer a{color:var(--muted);text-decoration:none;font-size:.9rem}
+.public-page .tenant-hero{min-height:0;padding:38px 0 28px;background:var(--surface);position:relative;overflow:hidden}
+.public-page .tenant-hero__content{position:relative;display:block;max-width:1120px;padding-block:0;z-index:1}
+.public-page .tenant-hero h1{max-width:760px;font-size:clamp(1.8rem,3.4vw,2.8rem);margin:12px 0;line-height:1.13}
+.public-page .tenant-hero p{max-width:760px;margin:10px 0;font-size:.95rem}
+.public-page .tenant-profile-logo{position:relative;width:76px;height:76px;object-fit:cover;border-radius:50%;margin:0 0 12px;border:3px solid var(--paper)}
+.public-page .tenant-hero--has-cover{padding-top:155px;background:#172233}
+.public-page .tenant-cover{position:absolute;inset:0 0 auto;width:100%;height:145px;object-fit:cover;z-index:-1;opacity:.7;transform:none;border-radius:0}
+.public-page .tenant-hero--has-cover .tenant-hero__content{position:static}
+.public-page .tenant-hero--has-cover :is(h1,p,strong,.eyebrow){color:#fff}
+.public-page .public-cover-links{gap:8px;margin-top:20px}.public-page .public-cover-links a{font-size:.8rem;padding:6px 12px}
+.public-page .section{padding-block:32px;scroll-margin-top:16px}
+.public-page .section-head h2{font-size:clamp(1.4rem,2.3vw,2rem)}
+.public-page .public-choice-card{background:var(--paper);color:var(--ink);border:1px solid var(--line);text-align:left;border-radius:14px;padding:18px;box-shadow:none}
+.public-page .public-choice-card h3{font-size:1.1rem;margin:8px 0;color:var(--ink)}
+.public-page .public-choice-card p{color:var(--muted);font-size:.9rem}.public-page .public-choice-card.is-selected{border:2px solid var(--accent);background:var(--soft)}
+.public-page .booking-service-catalog .public-choice-grid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.public-page .booking-service-catalog h3{display:none}
+.booking-enhanced #booking-service{position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none}
+.booking-enhanced #booking-service + small{display:none}.booking-enhanced label[for=booking-service]{display:none}
+.booking-progress{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.booking-progress button{font:inherit;font-size:.8rem;border:1px solid var(--line);border-radius:30px;padding:8px 12px;background:var(--paper);color:var(--muted)}
+.booking-progress button[aria-current=step]{background:var(--soft);border-color:var(--accent);color:var(--accent);font-weight:700}
+.booking-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:32px;align-items:start}
+.booking-step{min-width:0}.booking-step>h3{margin:0 0 20px;font-size:1.25rem}.booking-step .form-field{margin-bottom:16px}
+.booking-summary{background:var(--soft);border:1px solid var(--line);padding:22px;border-radius:16px;position:sticky;top:20px}
+.booking-summary h3{margin:0 0 16px;font-size:1.1rem}.booking-summary p{display:grid;gap:3px;margin:0 0 14px}.booking-summary small{color:var(--muted);font-size:.8rem}.booking-summary strong{font-size:.95rem}
+.booking-navigation{display:flex;align-items:center;gap:10px;margin-top:24px;border-top:1px solid var(--line);padding-top:18px}.booking-navigation span{margin-right:auto;color:var(--muted);font-size:.85rem}
+.public-page .booking-slots:has(.booking-slot-group){display:block}
+.booking-slot-group{margin:16px 0}.booking-slot-group h4{font-size:.9rem;color:var(--muted);margin:0 0 10px}.booking-slot-group__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
+.public-page .booking-slot{min-height:54px;padding:10px;border-radius:10px;white-space:normal;background:var(--paper);color:var(--ink);border:1px solid var(--line)}
+.public-page .booking-slot[aria-pressed=true]{background:var(--action);color:#fff;border-color:var(--action)}
+.public-page .booking-slot small{color:inherit}.booking-slot__next{display:block;font-size:.65rem;margin-top:4px}
+.public-page .public-unit-hours .is-today{padding:6px 8px;background:var(--soft);border-radius:6px;color:var(--accent)}
+.public-page .public-footer{margin-top:32px;gap:20px}
+.public-page [hidden]{display:none!important}
+@media(max-width:760px){
+ .public-page .public-header{padding:12px 16px;gap:12px}.public-header__brand{max-width:60%;font-size:.85rem}.public-header nav a{font-size:.75rem}.public-header nav a:first-child{display:none}
+ .public-page .tenant-hero{padding:24px 0}.public-page .tenant-hero--has-cover{padding-top:150px}.public-page .tenant-hero h1{font-size:1.9rem}.public-page .tenant-hero .actions{flex-wrap:wrap}
+ .public-page .section{padding-block:24px}.public-page #agendar>.panel{padding:18px}
+ .booking-layout{grid-template-columns:1fr;gap:20px}.booking-summary{position:static;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}.booking-summary h3,.booking-summary>small{grid-column:1/-1}.booking-summary p{margin:0;overflow-wrap:anywhere}
+ .booking-progress{gap:6px}.booking-progress button{font-size:.7rem;padding:7px 9px}
+ .booking-navigation{position:sticky;bottom:0;background:var(--paper);padding:14px 0;z-index:3;flex-wrap:wrap}.booking-navigation span{flex:1 1 100%}.booking-navigation .primary{flex:1}
+ .public-page .booking-service-catalog .public-choice-grid{grid-template-columns:1fr}
+ .public-page .public-footer{flex-direction:column;align-items:flex-start}
+}
+@media(prefers-reduced-motion:reduce){.public-page *{scroll-behavior:auto!important}}
+
+.public-page{--action:var(--tenant-accent,#245eac)}
+.public-page .tenant-hero .tenant-cover{z-index:0}
+@media(max-width:760px){
+ .public-page:has(.booking-enhanced){padding-bottom:105px}
+ .booking-navigation{position:fixed;left:0;right:0;bottom:0;padding:12px 16px;border-top:1px solid var(--line);box-shadow:0 -6px 24px var(--shadow-color);margin:0}
+ .booking-step .form-actions{padding-bottom:16px}
+}

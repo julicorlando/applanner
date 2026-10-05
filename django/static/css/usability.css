@@ -321,3 +321,10 @@ select option, select optgroup { color: var(--ink); background-color: var(--pape
 body select,body select option,body select optgroup{color:var(--ink)!important;background-color:var(--paper)!important}
 [hidden]{display:none!important}
 .public-unit-card{cursor:pointer}
+
+/* Shared picker: booking and rescheduling use the same period groups. */
+.booking-slots:has(.booking-slot-group){display:block}
+.booking-slot-group{flex-basis:100%;margin:16px 0}
+.booking-slot-group h4{font-size:.9rem;color:var(--muted);margin:0 0 10px}
+.booking-slot-group__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
+.booking-slot__next{display:block;font-size:.65rem;margin-top:4px}
