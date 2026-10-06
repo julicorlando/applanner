@@ -119,6 +119,16 @@ class CustomerOperationsTests(TestCase):
         Appointment.objects.filter(pk=row.payload['appointment_id']).update(status='cancelled')
         self.client.post(reverse('communications-delivery-retry',args=[row.pk]));row.refresh_from_db();self.assertEqual(row.status,'failed')
 
+        response=self.client.get(reverse('communications-deliveries'))
+        self.assertFalse(next(item for item in response.context['page'] if item.pk==row.pk).retry_allowed)
+        row.template_key='appointment_2h';row.save()
+        Appointment.objects.filter(pk=row.payload['appointment_id']).update(
+            status='confirmed',
+            starts_at=timezone.now()-timedelta(hours=1),
+            ends_at=timezone.now()-timedelta(minutes=30))
+        self.client.post(reverse('communications-delivery-retry',args=[row.pk]))
+        row.refresh_from_db();self.assertEqual(row.status,'failed')
+
     def test_customer_notifications_cannot_cross_tenants(self):
         outside=Tenant.objects.create(name='Outra',slug='health-other')
         foreign_unit=Unit.objects.create(tenant=outside,name='Outra unidade')

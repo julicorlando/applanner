@@ -35,6 +35,14 @@ def can_retry(row):
         and row.channel in {'email','whatsapp'} and row.manual_retry_count<3
         and (not row.last_manual_retry_at or row.last_manual_retry_at<=timezone.now()-timedelta(minutes=5)))
 
+def appointment_eligible(row,appointment):
+    if not appointment: return False
+    if row.template_key in {'appointment_feedback','appointment_rating'}:
+        return appointment.status=='completed'
+    if row.template_key in {'appointment_2h','appointment_24h','appointment_reminder'} and appointment.starts_at<=timezone.now():
+        return False
+    return appointment.status in {'pending','confirmed','waiting','in_progress'}
+
 @login_required
 def dashboard(request):
     tenant,unit,qs=scope(request)
@@ -42,7 +50,13 @@ def dashboard(request):
     if state=='delivered': qs=qs.filter(delivered_at__isnull=False)
     elif state in dict(Notification.Status.choices): qs=qs.filter(status=state)
     page=Paginator(qs.order_by('-created_at'),50).get_page(request.GET.get('page'))
-    for row in page: row.retry_allowed=can_retry(row)
+    rows=list(page.object_list)
+    ids=[int(str(row.payload.get('appointment_id'))) for row in rows if str(row.payload.get('appointment_id','')).isdigit()]
+    appointments=Appointment.objects.filter(tenant=tenant,pk__in=ids).in_bulk()
+    for row in rows:
+        raw=str(row.payload.get('appointment_id',''))
+        row.retry_allowed=can_retry(row) and appointment_eligible(row,appointments.get(int(raw)) if raw.isdigit() else None)
+    page.object_list=rows
     return render(request,'communications/delivery_center.html',{'tenant':tenant,'unit':unit,'page':page,'state':state,'states':Notification.Status.choices})
 
 @login_required
@@ -53,7 +67,7 @@ def retry(request,pk):
     with transaction.atomic():
         row=get_object_or_404(qs.select_for_update(),pk=pk)
         appointment=Appointment.objects.filter(pk=row.payload.get('appointment_id'),tenant=tenant).first()
-        eligible=appointment and (appointment.status in {'pending','confirmed','waiting','in_progress'} or (row.template_key in {'appointment_feedback','appointment_rating'} and appointment.status=='completed'))
+        eligible=appointment_eligible(row,appointment)
         if not eligible or not can_retry(row):
             messages.error(request,'Esta notificação não permite reenvio. Confira o atendimento e a situação de entrega.')
         else:
