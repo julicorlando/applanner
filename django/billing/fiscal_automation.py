@@ -26,7 +26,7 @@ def prepare(payment_id,*,manual=False):
     config=PlatformFiscalSettings.objects.filter(pk=1,enabled=True,tax_confirmed=True).first()
     if not config:return None
     with transaction.atomic():
-        payment=Payment.objects.select_for_update().select_related('subscription','tenant').get(pk=payment_id)
+        payment=Payment.objects.select_for_update(of=('self',)).select_related('subscription','tenant').get(pk=payment_id)
         if not eligible(payment) or (not manual and payment.paid_at<config.auto_from):return None
         if payment.amount<=0:return None
         user=payment.tenant.users.filter(role__in=['owner','manager','tenant-admin'],is_active=True).order_by('pk').first()
@@ -59,7 +59,7 @@ def process(document_id):
     config=PlatformFiscalSettings.objects.filter(pk=1,enabled=True,tax_confirmed=True).first()
     if not config:return False
     with transaction.atomic():
-        row=FiscalDocumentRequest.objects.select_for_update().select_related('payment__subscription','payment__tenant','tenant').get(pk=document_id)
+        row=FiscalDocumentRequest.objects.select_for_update(of=('self',)).select_related('payment__subscription','payment__tenant','tenant').get(pk=document_id)
         if row.emission_state=='manual' or (row.status=='issued' and row.emission_state!='authorized'):return False
         if row.emission_state=='authorized' and row.pdf_file:return False
         if row.processing_until and row.processing_until>now:return False
