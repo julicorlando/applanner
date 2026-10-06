@@ -1,8 +1,10 @@
 from django.urls import path
 from . import views
+from .fiscal_views import profile as fiscal_profile
 from .fiscal import download_fiscal_document,request_fiscal_document
 
 urlpatterns=[
+    path("billing/dados-fiscais/",fiscal_profile,name="billing-fiscal-profile"),
     path("planos/",views.plans,name="billing-plans"),
     path("planos/monte-o-seu/",views.custom_plan,name="billing-custom-plan"),
     path("cadastro/",views.signup,name="billing-signup"),

@@ -16,3 +16,7 @@ Pillow>=11,<13
 sentry-sdk[django]>=2.35,<3
 PyMySQL>=1.1,<2
 dnspython>=2.7,<3
+
+lxml>=5.4,<7
+signxml>=4.2,<6
+reportlab>=4.4,<5

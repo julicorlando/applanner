@@ -41,3 +41,10 @@ from django.contrib.auth.signals import user_logged_in
 def mark_trial_prompt(sender,request,user,**kwargs):
     if request is not None:
         request.session["trial_prompt_login"]=True
+
+
+@receiver(post_save,sender=Payment)
+def queue_approved_payment_invoice(sender,instance,**kwargs):
+    if instance.status=='paid' and instance.environment=='production' and instance.purpose=='subscription':
+        from .fiscal_automation import dispatch
+        transaction.on_commit(lambda payment_id=instance.pk:dispatch(payment_id))

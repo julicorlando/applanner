@@ -110,3 +110,15 @@ def apply_subscription_price_changes():
         except Exception:
             logging.getLogger(__name__).exception("Falha ao sincronizar reajuste da assinatura %s; contrato anterior preservado",pk)
     return applied
+
+
+@shared_task
+def process_fiscal_document(document_id):
+    from .fiscal_automation import process
+    return process(document_id)
+
+
+@shared_task
+def reconcile_fiscal_documents():
+    from .fiscal_automation import reconcile
+    return reconcile()

@@ -5,6 +5,7 @@ from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_
 from .master_email import email_templates,smtp_settings,waive_onboarding_email
 from communications.master_marketing import campaigns,create_campaign,cancel_campaign,import_contacts
 from billing.fiscal import master_fiscal_document
+from billing.fiscal_views import settings_view as fiscal_settings,center as nfse_center,retry as nfse_retry
 
 from finance.platform_dashboard import dashboard as finance_dashboard
 
@@ -14,6 +15,9 @@ from operations.master_support import ticket_detail as support_ticket
 from operations.monitoring import dashboard as runtime_monitor
 
 urlpatterns=[
+    path("fiscal/configuracao/",fiscal_settings,name="master-fiscal-settings"),
+    path("fiscal/notas/",nfse_center,name="master-nfse-center"),
+    path("fiscal/notas/<int:pk>/processar/",nfse_retry,name="master-nfse-retry"),
     path("monitoramento/",runtime_monitor,name="master-runtime-monitor"),
     path("saude-empresas/",company_health_dashboard,name="master-company-health"),
     path("suporte/<int:pk>/atendimento/",support_ticket,name="master-support-ticket"),

@@ -71,7 +71,7 @@
     {% include "portal/professional_extra_link.html" %}
   </article>{% endif %}
   <article class="panel" style="margin-top:16px">
-    <div class="panel-head"><div><span class="eyebrow">HISTÓRICO</span><h2>Pagamentos e notas fiscais</h2><p>Cada linha representa um ciclo efetivamente pago. A NFe é vinculada ao mês de referência do pagamento.</p></div></div>
+    <div class="panel-head"><div><span class="eyebrow">HISTÓRICO</span><h2>Pagamentos e notas fiscais</h2><a class="button ghost" href="{% url 'billing-fiscal-profile' %}">Dados fiscais para a nota</a><p>Cada linha representa um ciclo efetivamente pago. A nota fiscal é vinculada ao mês de referência do pagamento.</p></div></div>
     {% for payment in payment_history %}
     <div class="module-row" style="align-items:flex-start">
       <span></span>
@@ -90,15 +90,15 @@
       <div class="table-actions">
         {% if payment.fiscal_request %}
           {% if payment.fiscal_request.status == "issued" %}
-            <a class="button ghost" href="{% url 'billing-nfe-download' payment.fiscal_request.pk 'pdf' %}">Baixar NFe</a>
+            {% if payment.fiscal_request.pdf_file %}<a class="button ghost" href="{% url 'billing-nfe-download' payment.fiscal_request.pk 'pdf' %}">Baixar nota fiscal</a>{% endif %}
             {% if payment.fiscal_request.xml_file %}<a href="{% url 'billing-nfe-download' payment.fiscal_request.pk 'xml' %}">Baixar XML</a>{% endif %}
           {% elif payment.fiscal_request.status == "requested" %}
-            <span class="status-pill">NFe solicitada</span>
+            <span class="status-pill">Nota fiscal em preparação</span>
           {% else %}
             <span class="status-pill">{{ payment.fiscal_request.get_status_display }}</span>
           {% endif %}
         {% elif can_request_nfe %}
-          <form method="post" action="{% url 'billing-nfe-request' payment.pk %}">{% csrf_token %}<button class="button ghost" type="submit">Solicitar NFe</button></form>
+          <form method="post" action="{% url 'billing-nfe-request' payment.pk %}">{% csrf_token %}<button class="button ghost" type="submit">Solicitar nota fiscal</button></form>
         {% endif %}
       </div>
     </div>

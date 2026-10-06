@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator,MaxValueValidator
 from decimal import Decimal
+from django.utils import timezone
 from core.models import TimeStampedModel
 
 
@@ -282,12 +283,59 @@ class FiscalDocumentRequest(TimeStampedModel):
     )
     uploaded_at=models.DateTimeField(null=True,blank=True)
     master_note=models.CharField(max_length=500,blank=True)
+    emission_state=models.CharField(max_length=20,default="manual",choices=[("manual","Manual"),("queued","Na fila"),("processing","Em processamento"),("waiting","Aguardando consulta"),("error","Precisa de atenção"),("authorized","Autorizada")],db_index=True)
+    fiscal_environment=models.CharField(max_length=16,blank=True)
+    issuer_document=models.CharField(max_length=14,blank=True)
+    dps_id=models.CharField(max_length=50,blank=True)
+    signed_dps_encrypted=models.TextField(blank=True)
+    access_key=models.CharField(max_length=50,blank=True)
+    attempts=models.PositiveIntegerField(default=0)
+    next_attempt_at=models.DateTimeField(null=True,blank=True)
+    processing_until=models.DateTimeField(null=True,blank=True)
+    last_error=models.CharField(max_length=500,blank=True)
+    emission_history=models.JSONField(default=list,blank=True)
+    notice_queued_at=models.DateTimeField(null=True,blank=True)
 
     class Meta:
         indexes=[
             models.Index(fields=["tenant","-reference_month"],name="billing_nfe_tenant_month_idx"),
             models.Index(fields=["status","requested_at"],name="billing_nfe_status_req_idx"),
         ]
+
+
+class PlatformFiscalSettings(TimeStampedModel):
+    """Single MEI issuer. Private key and password never enter file storage or audit."""
+    enabled=models.BooleanField("Emitir automaticamente após pagamento",default=False)
+    auto_from=models.DateTimeField("Pagamentos a partir de",default=timezone.now)
+    environment=models.CharField("Ambiente",max_length=16,choices=[("homologation","Homologação — sem validade fiscal"),("production","Produção")],default="homologation")
+    document=models.CharField("CNPJ do MEI",max_length=14)
+    legal_name=models.CharField("Razão social",max_length=150)
+    municipality_code=models.CharField("Código IBGE do município emissor",max_length=7)
+    service_code=models.CharField("Código nacional de tributação do serviço",max_length=6)
+    municipal_service_code=models.CharField("Código municipal do serviço (opcional)",max_length=3,blank=True)
+    service_description=models.CharField("Descrição do serviço",max_length=1000)
+    series=models.PositiveIntegerField("Série exclusiva da DPS nesta aplicação",default=1,validators=[MinValueValidator(1),MaxValueValidator(49999)])
+    certificate_encrypted=models.TextField(blank=True)
+    certificate_password_encrypted=models.TextField(blank=True)
+    certificate_expires_at=models.DateTimeField(null=True,blank=True)
+    tax_confirmed=models.BooleanField("Confirmei com a contabilidade o enquadramento MEI, código e competência do serviço",default=False)
+
+    def save(self,*args,**kwargs):
+        self.pk=1
+        return super().save(*args,**kwargs)
+
+
+class TenantFiscalProfile(TimeStampedModel):
+    tenant=models.OneToOneField("tenants.Tenant",on_delete=models.CASCADE,related_name="fiscal_profile")
+    document=models.CharField("CPF/CNPJ",max_length=14)
+    legal_name=models.CharField("Nome / razão social",max_length=150)
+    email=models.EmailField("E-mail fiscal",max_length=80)
+    municipality_code=models.CharField("Código IBGE do município",max_length=7)
+    postal_code=models.CharField("CEP",max_length=8)
+    street=models.CharField("Logradouro",max_length=255)
+    number=models.CharField("Número",max_length=60)
+    district=models.CharField("Bairro",max_length=60)
+    complement=models.CharField("Complemento",max_length=156,blank=True)
 
 
 class SubscriptionHistory(models.Model):

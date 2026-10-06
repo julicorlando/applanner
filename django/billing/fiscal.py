@@ -42,7 +42,7 @@ def _validate_upload(upload,kind):
 
 class FiscalDocumentUploadForm(forms.Form):
     invoice_number=forms.CharField(max_length=80,label="Número da nota fiscal")
-    pdf_file=forms.FileField(label="PDF da NFe / DANFE")
+    pdf_file=forms.FileField(label="PDF da nota fiscal / DANFSe")
     xml_file=forms.FileField(required=False,label="XML da nota fiscal (opcional)")
     master_note=forms.CharField(
         required=False,max_length=500,label="Observação interna",
@@ -103,10 +103,10 @@ def request_fiscal_document(request,payment_id):
         )
         messages.success(
             request,
-            f"NFe de {reference_month:%m/%Y} solicitada. Ela aparecerá aqui após o upload do Master.",
+            f"Nota fiscal de {reference_month:%m/%Y} solicitada. Acompanhe a disponibilidade nesta tela.",
         )
     else:
-        messages.info(request,"A NFe deste pagamento já foi solicitada.")
+        messages.info(request,"A nota fiscal deste pagamento já foi solicitada.")
     return redirect("billing-subscription-status")
 
 
@@ -114,10 +114,13 @@ def request_fiscal_document(request,payment_id):
 def download_fiscal_document(request,pk,kind):
     row=get_object_or_404(
         FiscalDocumentRequest.objects.select_related("tenant"),pk=pk,
-        status=FiscalDocumentRequest.Status.ISSUED,
     )
-    if not request.user.is_superuser and request.user.tenant_id!=row.tenant_id:
+    if not request.user.is_superuser and (request.user.tenant_id!=row.tenant_id or request.user.role not in {"owner","manager","tenant-admin"}):
         raise PermissionDenied("Este documento pertence a outra empresa.")
+    if not request.user.is_superuser and (row.status!='issued' or row.fiscal_environment=='homologation'):
+        raise Http404
+    if request.user.is_superuser and row.status!='issued' and row.emission_state!='authorized':
+        raise Http404
     field=row.pdf_file if kind=="pdf" else row.xml_file if kind=="xml" else None
     if not field or not field.name:
         raise Http404
@@ -143,6 +146,9 @@ def master_fiscal_document(request,pk):
             "tenant","subscription","payment","requested_by"
         ),pk=pk,
     )
+    if row.emission_state!='manual':
+        messages.info(request,'Esta nota usa emissão automática. Acompanhe ou consulte na central fiscal.')
+        return redirect('master-nfse-center')
     form=FiscalDocumentUploadForm(request.POST or None,request.FILES or None)
     if request.method=="POST" and form.is_valid():
         before={
