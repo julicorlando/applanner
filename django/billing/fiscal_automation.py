@@ -65,7 +65,7 @@ def process(document_id):
         if row.processing_until and row.processing_until>now:return False
         if row.next_attempt_at and row.next_attempt_at>now:return False
         if row.attempts>=6:return False
-        if not eligible(row.payment):
+        if not eligible(row.payment) and row.emission_state!='authorized' and not row.signed_dps_encrypted:
             record(row,'error','Pagamento não elegível para emissão automática. Confira pagamento, empresa e eventual estorno.');row.next_attempt_at=None;row.save();return False
         if row.issuer_document and row.issuer_document!=config.document:
             record(row,'error','O CNPJ emissor mudou. Restaure o emissor original para consultar esta DPS.');row.save();return False
@@ -93,6 +93,7 @@ def process(document_id):
                 if not re.fullmatch(r'\d{50}',key):raise FiscalError('Consulta da DPS retornou chave inválida.',uncertain=True)
                 result=client.invoice(key)
             else:
+                if not eligible(row.payment):raise FiscalError('Pagamento não elegível. A consulta não encontrou nota autorizada; nenhuma DPS será transmitida.')
                 if row.status=='rejected':
                     profile=TenantFiscalProfile.objects.filter(tenant=row.tenant).first()
                     if not profile:raise FiscalError('Complete os dados fiscais da empresa.')

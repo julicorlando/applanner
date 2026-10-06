@@ -127,6 +127,7 @@ class NfseAutomationTests(TestCase):
             api=provider.return_value;api.lookup.return_value=None;api.submit.return_value=self.response()
             self.assertTrue(process(self.row.pk))
         self.row.refresh_from_db();self.assertEqual(self.row.status,'issued');self.assertTrue(self.row.xml_file)
+        Payment.objects.filter(pk=self.payment.pk).update(status='refunded')
         FiscalDocumentRequest.objects.filter(pk=self.row.pk).update(next_attempt_at=timezone.now())
         with patch('billing.fiscal_automation.NationalClient') as provider:
             api=provider.return_value;api.pdf.return_value=b'%PDF-synthetic'
