@@ -9,7 +9,7 @@
     const setView = (simplified, persist = true) => {
       dashboard.classList.toggle('is-simplified', simplified);
       toggle.setAttribute('aria-pressed', String(simplified));
-      toggle.innerHTML = simplified ? '<span aria-hidden="true">◑</span> Visão completa' : '<span aria-hidden="true">◐</span> Visão simplificada';
+      toggle.innerHTML = simplified ? '<span aria-hidden="true">◑</span> Expandir painel' : '<span aria-hidden="true">◐</span> Compactar painel';
       if (persist) {
         try { window.localStorage.setItem(key, simplified ? '1' : '0'); } catch (_) { /* Keep the current view usable. */ }
       }

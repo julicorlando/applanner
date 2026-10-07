@@ -19,13 +19,15 @@
   {% block extra_css %}{% endblock %}
   <link rel="stylesheet" href="{% static 'css/adaptive-layout.css' %}">
   <script src="{% static 'js/adaptive-layout.js' %}" defer></script>
+{% if simple_mode %}<link rel="stylesheet" href="{% static 'css/simple-mode.css' %}">{% endif %}
 </head>
-<body class="adaptive-ui {% block body_class %}{% endblock %}">
+<body class="adaptive-ui {% if simple_mode %}simple-mode{% endif %} {% block body_class %}{% endblock %}">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
   {% block header %}<header class="topbar">
     <a class="brand" href="/" aria-label="ApPlanner início">
       {% if platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="ApPlanner">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="ApPlanner">{% endif %}
     </a>
+    {% if simple_mode %}<nav class="simple-primary-nav" aria-label="Ações principais">{% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento</a>{% else %}{% for item in simple_nav %}<a href="{{ item.url }}">{{ item.title }}</a>{% endfor %}{% endif %}</nav><details class="simple-more"><summary>Mais opções</summary>{% endif %}
     <nav class="nav">
       {% if request.user.is_authenticated %}
         {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
@@ -44,6 +46,7 @@
         <a class="nav-cta" href="/account/login/">Entrar</a>
       {% endif %}
     </nav>
+    {% if simple_mode %}</details>{% endif %}
     <details class="mobile-nav"><summary>Menu</summary><div class="mobile-nav-links">
       {% if request.user.is_authenticated %}
       {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
@@ -74,7 +77,7 @@
   {% if messages %}
   <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
   {% endif %}
-  <main id="conteudo">{% block account_notices %}{% include "billing/due_notice.html" %}{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
+  <main id="conteudo">{% if simple_mode and not request.billing_locked %}<div class="shell simple-breadcrumb"><a href="{% url 'portal-home' %}">← Voltar ao início</a><span>Modo simples</span></div>{% endif %}{% block account_notices %}{% include "billing/due_notice.html" %}{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
 {% endblock %}{% block content %}{% endblock %}</main>
   {% block footer %}<footer class="footer">
     <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>

@@ -51,6 +51,7 @@ class Tenant(TimeStampedModel):
     archived_at=models.DateTimeField(null=True,blank=True,db_index=True)
     archive_snapshot=models.JSONField(default=dict,blank=True)
     is_demo=models.BooleanField(default=False)
+    simple_mode=models.BooleanField(default=False,editable=False,verbose_name="Modo simples")
 
     def __str__(self):
         return self.name
