@@ -1,5 +1,5 @@
 from django.urls import path
-from . import master, master_console, master_retention
+from . import master, master_console, master_retention, simple_mode
 from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment,master_whatsapp_simulate
 from .master_email import email_templates,smtp_settings,waive_onboarding_email
@@ -15,6 +15,7 @@ from operations.master_support import ticket_detail as support_ticket
 from operations.monitoring import dashboard as runtime_monitor
 
 urlpatterns=[
+    path("empresas/<int:pk>/modo-simples/",simple_mode.set_mode,name="master-company-simple-mode"),
     path("fiscal/configuracao/",fiscal_settings,name="master-fiscal-settings"),
     path("fiscal/notas/",nfse_center,name="master-nfse-center"),
     path("fiscal/notas/<int:pk>/processar/",nfse_retry,name="master-nfse-retry"),

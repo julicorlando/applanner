@@ -121,3 +121,27 @@ na conversa, pode assumir o atendimento e responder pelo número da própria emp
   informações públicas da empresa e não confirma reservas nem pagamentos.
 
 Veja `WHATSAPP_RETURN.md` para publicação, fila, recuperação e conexão do gateway.
+
+## Modo simples para empresas (Simple Mode)
+
+Em **Master → Empresas**, use **Simple Mode · Ativar** na empresa desejada.
+A ficha da empresa também permite ativar/desativar e visualizar o ambiente.
+Somente o superusuário Master pode alterar essa opção; a mudança fica auditada.
+A configuração é por empresa e vale para todos os dispositivos, sem depender
+de preferências locais do navegador. O modo padrão continua completo.
+
+O início simplificado apresenta ações grandes, atendimentos de hoje da unidade
+selecionada, clientes, serviços e equipe, conforme as permissões e o plano.
+As ferramentas restantes ficam em **Outras ferramentas e configurações** e
+**Mais opções**. As telas internas usam controles maiores e formulários em uma
+coluna. Profissionais continuam entrando na área própria. Página pública,
+agendamentos, limites, módulos, cobrança, segurança e permissões não são alterados.
+
+`POST /master/empresas/{id}/modo-simples/`: sessão Master e CSRF obrigatórios.
+Formulário `action=enable` ou `action=disable`; `destination=detail` retorna à ficha,
+caso contrário à lista. A operação é idempotente e não aceita empresa excluída
+ou arquivada. O campo `simple_mode` não é editável nos formulários comuns.
+
+No redeploy, o entrypoint executa a migration `tenants.0012_tenant_simple_mode`.
+O botão anterior de compactação local do dashboard passa a se chamar
+**Compactar painel**, distinguindo-o do modo simples controlado pelo Master.

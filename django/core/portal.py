@@ -1045,6 +1045,9 @@ def home(request):
 
     from .activation import activation_status
     modules=available_modules(request.user,tenant)
+    if tenant.simple_mode:
+        from .simple_mode import dashboard_context
+        return render(request,"portal/simple_home.html",dashboard_context(request,tenant,modules))
     from billing.models import Module,TenantModule
     selected=set(TenantModule.objects.filter(tenant=tenant,enabled=True,module__active=True)
         .values_list("module_id",flat=True))
