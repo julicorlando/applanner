@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -153,7 +153,12 @@ def master_whatsapp_inbox(request):
         )
         return redirect("master-whatsapp-conversation",pk=row.pk)
     q=(request.GET.get("q") or "").strip()[:80]
-    rows=MasterWhatsAppConversation.objects.select_related("tenant")
+    rows=MasterWhatsAppConversation.objects.select_related("tenant").annotate(
+        unread_count=Count("messages",filter=Q(messages__direction="in",messages__read_at__isnull=True)))
+    inbox_filter=request.GET.get("filter","")
+    if inbox_filter=="unread": rows=rows.filter(unread_count__gt=0)
+    elif inbox_filter=="human": rows=rows.filter(human_handoff=True)
+    elif inbox_filter=="bot": rows=rows.filter(human_handoff=False)
     if q:
         rows=rows.filter(Q(contact_name__icontains=q)|Q(wa_id__icontains=q)|Q(tenant__name__icontains=q))
     leads=Lead.objects.filter(consent_granted=True,do_not_contact=False,anonymized_at__isnull=True)
@@ -162,7 +167,7 @@ def master_whatsapp_inbox(request):
         leads=leads.filter(Q(name__icontains=q)|Q(phone__icontains=q))
         companies=companies.filter(Q(name__icontains=q)|Q(phone__icontains=q))
     return render(request,"master/whatsapp_inbox.html",{
-        "rows":rows[:200],"q":q,
+        "rows":rows[:200],"q":q,"inbox_filter":inbox_filter,
         "leads":leads.order_by("-created_at")[:50],"companies":companies.order_by("name")[:50],
         "configured":bool(settings.MASTER_WHATSAPP_GATEWAY_TOKEN and settings.MASTER_WHATSAPP_GATEWAY_URL),
     })
@@ -291,6 +296,7 @@ def master_whatsapp_conversation(request,pk):
                 except (ValueError,KeyError) as exc:
                     messages.error(request,str(exc))
         return redirect("master-whatsapp-conversation",pk=row.pk)
+    row.messages.filter(direction="in",read_at__isnull=True).update(read_at=timezone.now())
     return render(request,"master/whatsapp_conversation.html",{
         "row":row,"thread":row.messages.select_related("sent_by")[:500],
         "conversations":MasterWhatsAppConversation.objects.select_related("tenant")[:100],
@@ -311,6 +317,7 @@ def master_whatsapp_messages(request,pk):
     row=get_object_or_404(MasterWhatsAppConversation,pk=pk)
     contact=row.contact_name or row.wa_id
     thread=list(row.messages.order_by("-id")[:200])
+    row.messages.filter(pk__in=[m.pk for m in thread],direction="in",read_at__isnull=True).update(read_at=timezone.now())
     from django.urls import reverse
     return JsonResponse({"messages":[{
         "id":item.pk,"body":item.body,"direction":item.direction,
@@ -416,3 +423,20 @@ def master_whatsapp_receive(request):
                 # The inbound message stays stored and visible for manual response.
                 logger.exception("Could not queue Master WhatsApp flow for message %s",incoming.pk)
     return JsonResponse({"ok":True})
+
+
+def send_billing_reminder(notification):
+    """Platform billing uses the paired Master number, never the tenant sender."""
+    from .phone import whatsapp_number
+    number=whatsapp_number(notification.destination)
+    if not 10<=len(number)<=15:
+        raise ValueError("Telefone da empresa inválido.")
+    conversation,_=MasterWhatsAppConversation.objects.get_or_create(wa_id=number+"@s.whatsapp.net",
+        defaults={"tenant_id":notification.tenant_id,"contact_name":notification.tenant.name,
+            "last_message_at":timezone.now()})
+    body=notification.payload.get("text") or ""
+    sent=_gateway("POST","/send",{"to":conversation.wa_id,"text":body})
+    record_outbound_message(conversation=conversation,sent=sent,body=body,sent_by=None)
+    conversation.last_message_at=timezone.now()
+    conversation.save(update_fields=["last_message_at","updated_at"])
+    return sent["id"]

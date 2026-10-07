@@ -6,6 +6,7 @@
     <div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">RELACIONAMENTO</span><h1>Inteligência de retorno</h1><p>O ApPlanner recalcula automaticamente os padrões de retorno dos clientes. Um mesmo cliente recebe no máximo uma mensagem em 24 horas, independentemente de quem iniciou o contato.</p></div>
     {% if not reception_mode %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="recalculate"><button class="button">Recalcular agora</button></form>{% endif %}
   </div>
+  {% if not reception_mode %}<details class="panel" style="margin-bottom:18px"><summary>Configurar convites automáticos pelo WhatsApp</summary><p>Somente clientes com autorização, retorno previsto vencido e sem agendamento futuro. A verificação ocorre a cada 12 horas. O link abre a agenda da unidade do último atendimento.</p><form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="configure_return">{{ return_form.as_p }}<button class="button primary">Salvar configuração</button></form></details>{% endif %}
   <div class="metric-grid">
     <article><span>Perfis analisados</span><strong>{{ total }}</strong></article>
     <article><span>Retorno vencido</span><strong>{{ overdue }}</strong></article>
@@ -25,7 +26,7 @@
           <td>{{ row.visits_count }}</td>
           <td>{{ row.confidence_score }}%</td>
           <td>
-            {% if row.contact_blocked %}
+            {% if not row.customer.consent_marketing %}<span class="status-pill">Sem autorização de contato</span>{% elif row.contact_blocked %}
               <span class="status-pill">Contato feito nas últimas 24h</span>
             {% else %}
               <form method="post">{% csrf_token %}<input type="hidden" name="action" value="contact"><input type="hidden" name="customer" value="{{ row.customer_id }}"><button class="nav-link" type="submit">Perguntar se quer agendar →</button></form>

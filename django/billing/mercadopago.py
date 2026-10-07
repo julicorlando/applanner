@@ -2,9 +2,22 @@ import hashlib
 import hmac
 import re
 import time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import requests
+
+
+def validate_charge_amount(value):
+    try:
+        amount=Decimal(str(value))
+        if not amount.is_finite():
+            raise InvalidOperation
+        amount=amount.quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise ValueError("Valor da cobrança inválido. Revise o valor contratado.") from exc
+    if amount<Decimal("0.50"):
+        raise ValueError("O valor da cobrança deve ser de pelo menos R$ 0,50. Peça à gestão para revisar o valor contratado, a promoção ou os descontos; nenhuma cobrança foi iniciada.")
+    return amount
 
 
 class MercadoPagoError(RuntimeError):
@@ -73,7 +86,7 @@ class MercadoPagoProvider:
         return self._request("GET","/users/me")
 
     def create_subscription(self,*,reason,external_reference,payer_email,back_url,amount,frequency=1,trial_days=0,idempotency_key="",start_at=None):
-        amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+        amount=validate_charge_amount(amount)
         if amount<=0:
             raise ValueError("Valor da assinatura inválido.")
         body={
@@ -107,7 +120,7 @@ class MercadoPagoProvider:
         return self._request("GET",f"/preapproval/{reference}")
 
     def update_subscription_amount(self,reference,amount):
-        amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+        amount=validate_charge_amount(amount)
         if amount<=0:
             raise ValueError("Valor inválido.")
         return self._request("PUT",f"/preapproval/{reference}",{
@@ -125,7 +138,7 @@ class MercadoPagoProvider:
             raise ValueError("Referência Pix inválida: use até 64 letras, números, hífens ou sublinhados.")
         if not 1<=len(idempotency_key)<=128:
             raise ValueError("Chave de idempotência Pix inválida.")
-        amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+        amount=validate_charge_amount(amount)
         if amount<=0:
             raise ValueError("Valor Pix inválido.")
         hours=max(1,min(720,int(expiration_hours)))
@@ -166,7 +179,7 @@ class MercadoPagoProvider:
         installments=1,issuer_id="",identification=None,notification_url="",
         description="ApPlanner",idempotency_key=""
     ):
-        amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+        amount=validate_charge_amount(amount)
         if amount<=0 or not token or not payment_method_id or "@" not in payer_email:
             raise ValueError("Dados do pagamento por cartão inválidos.")
         body={

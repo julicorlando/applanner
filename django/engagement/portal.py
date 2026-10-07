@@ -226,6 +226,16 @@ def waitlist(request):
     })
 
 
+class ReturnMessagingForm(forms.ModelForm):
+    daily_limit=forms.IntegerField(min_value=1,max_value=100,label="Máximo de convites automáticos em 24h")
+    cooldown_days=forms.IntegerField(min_value=1,max_value=90,label="Intervalo entre convites automáticos ao cliente (dias)")
+    class Meta:
+        from .models import ReturnMessagingSettings
+        model=ReturnMessagingSettings
+        fields=['enabled','daily_limit','cooldown_days']
+        labels={'enabled':'Ativar convites automáticos pelo WhatsApp da empresa'}
+
+
 @login_required
 def intelligence(request):
     require_any_capability(request.user,"engagement.manage")
@@ -233,11 +243,21 @@ def intelligence(request):
     from django.utils import timezone
     from .behavior import refresh_behavior_for_tenant
     from .contacting import contact_blocked,send_return_invitation
-    from .models import BehaviorProfile
+    from .models import BehaviorProfile,ReturnMessagingSettings
+    config,_=ReturnMessagingSettings.objects.get_or_create(tenant=tenant)
+    return_form=ReturnMessagingForm(instance=config)
 
     if request.method=="POST":
         action=request.POST.get("action") or "recalculate"
-        if action=="contact":
+        if action=="configure_return":
+            if request.user.role=="reception":
+                raise PermissionDenied("Somente a gestão pode configurar os envios automáticos.")
+            return_form=ReturnMessagingForm(request.POST,instance=config)
+            if return_form.is_valid():
+                return_form.save()
+                messages.success(request,"Configuração de retorno salva. Os convites serão processados automaticamente, com o WhatsApp conectado da empresa.")
+                return redirect("engagement-intelligence")
+        elif action=="contact":
             customer=get_object_or_404(Customer,pk=request.POST.get("customer"),tenant=tenant,active=True)
             try:
                 send_return_invitation(tenant=tenant,customer=customer,user=request.user)
@@ -248,11 +268,12 @@ def intelligence(request):
             else:
                 messages.success(request,"Convite de retorno enviado com o link de agendamento.")
             return redirect("engagement-intelligence")
-        if request.user.role=="reception":
-            raise PermissionDenied("A inteligência é recalculada automaticamente.")
-        updated=refresh_behavior_for_tenant(tenant)
-        messages.success(request,f"Inteligência atualizada: {updated} perfis recalculados.")
-        return redirect("engagement-intelligence")
+        elif action=="recalculate":
+            if request.user.role=="reception":
+                raise PermissionDenied("A inteligência é recalculada automaticamente.")
+            updated=refresh_behavior_for_tenant(tenant)
+            messages.success(request,f"Inteligência atualizada: {updated} perfis recalculados.")
+            return redirect("engagement-intelligence")
 
     today=timezone.localdate()
     horizon=today+__import__("datetime").timedelta(days=14)
@@ -268,5 +289,5 @@ def intelligence(request):
         "overdue":qs.filter(next_expected_date__lt=today).count(),
         "upcoming":qs.filter(next_expected_date__gte=today,next_expected_date__lte=horizon).count(),
         "high_confidence":qs.filter(confidence_score__gte=70).count(),
-        "reception_mode":request.user.role=="reception",
+        "reception_mode":request.user.role=="reception","return_form":return_form,
     })

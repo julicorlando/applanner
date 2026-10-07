@@ -154,7 +154,7 @@ class ReceptionPolicyTests(TestCase):
 
 
 class ProfessionalReturnScopeTests(TestCase):
-    def test_professional_return_list_requires_two_completed_appointments_with_same_professional(self):
+    def test_professional_return_list_includes_first_completed_appointment_with_same_professional(self):
         tenant=Tenant.objects.create(
             name="Barbearia Retorno",slug="barbearia-retorno",status=Tenant.Status.ACTIVE
         )
@@ -198,7 +198,7 @@ class ProfessionalReturnScopeTests(TestCase):
         self.assertEqual(response.status_code,200)
         names=[row.customer.name for row in response.context["return_rows"]]
         self.assertIn("Cliente recorrente",names)
-        self.assertNotIn("Cliente não recorrente com Ana",names)
+        self.assertIn("Cliente não recorrente com Ana",names)
 
 
 class BankAccountRegistrationTests(TestCase):

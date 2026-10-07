@@ -90,6 +90,12 @@ def queue_subscription_reminder(subscription_id, now=None):
             Notification.objects.create(tenant=subscription.tenant,channel="email",destination=email,
                 template_key="subscription_due",payload={"subject":f"ApPlanner — {notice['title']}","text":text,
                 "subscription_id":subscription.pk,"notice_key":key})
+        from communications.phone import whatsapp_number
+        number=whatsapp_number(subscription.tenant.phone)
+        if 10<=len(number)<=15:
+            Notification.objects.create(tenant=subscription.tenant,channel="whatsapp",destination=number,
+                template_key="subscription_due",payload={"text":text,"subscription_id":subscription.pk,
+                    "notice_key":key,"sender":"master"})
         return 1
 
 

@@ -1,9 +1,9 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
 {% block title %}WhatsApp do Master — ApPlanner{% endblock %}
 {% block content %}
-<section class="shell portal-page">
+<link rel="stylesheet" href="{% static 'css/master-whatsapp.css' %}"><section class="shell portal-page wa-inbox">
   <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">ATENDIMENTO DA PLATAFORMA</span><h1>WhatsApp do Master</h1><p>Atenda empresas cadastradas e novos contatos em uma caixa de entrada separada dos estabelecimentos.</p></div></div>
-  <div class="chat-shell"><aside class="chat-sidebar"><h2>Conversas</h2><form method="get" class="portal-search"><input name="q" value="{{ q }}" placeholder="Buscar nome, empresa ou número" aria-label="Buscar conversas"><button class="button ghost">Buscar</button></form>{% for row in rows %}<a class="chat-contact" href="{% url 'master-whatsapp-conversation' row.pk %}"><span class="chat-avatar">{{ row.contact_name|default:row.wa_id|slice:':1'|upper }}</span><span><strong>{{ row.contact_name|default:row.wa_id }}</strong><small>{{ row.tenant.name|default:'Novo contato' }} · {{ row.last_message_at|date:'d/m H:i' }}</small></span></a>{% empty %}<p class="empty">Nenhuma conversa ainda.</p>{% endfor %}</aside><div class="chat-main"><div class="panel" style="margin:16px">
+  <div class="chat-shell"><aside class="chat-sidebar"><h2>Conversas</h2><form method="get" class="portal-search"><input name="q" value="{{ q }}" placeholder="Buscar nome, empresa ou número" aria-label="Buscar conversas"><button class="button ghost">Buscar</button></form><nav class="wa-tabs" aria-label="Filtrar conversas"><a href="?q={{ q|urlencode }}" class="{% if not inbox_filter %}active{% endif %}">Todas</a><a href="?filter=unread&q={{ q|urlencode }}" class="{% if inbox_filter == 'unread' %}active{% endif %}">Não lidas</a><a href="?filter=human&q={{ q|urlencode }}" class="{% if inbox_filter == 'human' %}active{% endif %}">Humanas</a><a href="?filter=bot&q={{ q|urlencode }}" class="{% if inbox_filter == 'bot' %}active{% endif %}">Automáticas</a></nav><div class="wa-contact-list">{% for row in rows %}<a class="chat-contact" href="{% url 'master-whatsapp-conversation' row.pk %}"><span class="chat-avatar">{{ row.contact_name|default:row.wa_id|slice:':1'|upper }}</span><span><strong>{{ row.contact_name|default:row.wa_id }}</strong><small>{{ row.tenant.name|default:'Novo contato' }} · {{ row.last_message_at|date:'d/m H:i' }}</small>{% if row.unread_count %}<small>{{ row.unread_count }} não lida{{ row.unread_count|pluralize:"s" }}</small>{% endif %}</span></a>{% empty %}<p class="empty">Nenhuma conversa ainda.</p>{% endfor %}</div></aside><div class="chat-main"><div class="wa-empty"><span class="wa-empty-icon">▢</span><strong>Pronto para ajudar?</strong><p>Selecione uma conversa para começar o atendimento.</p><a href="{% url 'master-whatsapp-flow' %}">Montar chatbot →</a></div></div><aside class="wa-details"><div class="panel" style="margin:16px">
     <h2>Conectar o número do Master</h2><p><a class="button ghost" href="{% url 'master-whatsapp-flow' %}">Configurar fluxo de atendimento →</a></p>
     {% if configured %}
       <p id="wa-state" class="wa-connection" role="status" aria-live="polite">Consultando conexão...</p>
@@ -19,7 +19,7 @@
     <h3>Leads com consentimento</h3>{% for contact in leads %}<form method="post" class="module-row">{% csrf_token %}<input type="hidden" name="lead_id" value="{{ contact.pk }}"><strong>{{ contact.name }}</strong><small>{{ contact.phone }}</small><button class="button ghost" type="submit">Conversar</button></form>{% empty %}<p class="empty">Nenhum lead apto para contato.</p>{% endfor %}
   </div>
   <div class="panel" style="margin:16px"><h2>Iniciar conversa</h2><p>Use o número com código do país e DDD. Exemplo: 5581999999999.</p><form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="start-phone">WhatsApp</label><input id="start-phone" name="phone" type="tel" required></div><div class="form-field"><label for="start-name">Nome (opcional)</label><input id="start-name" name="name"></div><div class="form-actions"><button class="button primary">Abrir atendimento</button></div></form></div>
-</div></div>
+</aside></div>
 </section>
 {% if configured %}<script>
 (() => {

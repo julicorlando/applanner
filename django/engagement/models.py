@@ -406,3 +406,10 @@ class CustomerContactThrottle(TimeStampedModel):
             models.UniqueConstraint(fields=["tenant","customer"],name="uq_customer_contact_throttle")
         ]
         indexes=[models.Index(fields=["tenant","last_contact_at"],name="eng_contact_throttle_idx")]
+
+
+class ReturnMessagingSettings(TimeStampedModel):
+    tenant=models.OneToOneField("tenants.Tenant",on_delete=models.CASCADE,related_name="return_messaging")
+    enabled=models.BooleanField(default=False)
+    daily_limit=models.PositiveSmallIntegerField(default=30)
+    cooldown_days=models.PositiveSmallIntegerField(default=7)

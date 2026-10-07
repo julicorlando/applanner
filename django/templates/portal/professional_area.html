@@ -12,13 +12,13 @@
   </section>
   {% if return_rows %}
   <section class="panel professional-schedule">
-    <div class="panel-head"><h2>Clientes com recorrência no seu atendimento</h2><span>O contato some por 24h após qualquer mensagem enviada ao cliente.</span></div>
+    <div class="panel-head"><h2>Convide seus clientes para retornar</h2><span>Até 20 convites em 24h · um convite por cliente em 24h · somente com autorização.</span></div>
     <div class="appointment-list">
       {% for row in return_rows %}
       <div class="appointment-row">
         <time>{% if row.next_expected_date %}{{ row.next_expected_date|date:"d/m" }}{% else %}Retorno{% endif %}</time>
         <div><strong>{{ row.customer.name }}</strong><span>{{ row.visits_count }} visitas · confiança {{ row.confidence_score }}%</span></div>
-        {% if row.contact_blocked %}<span class="status-pill">Contatado nas últimas 24h</span>{% else %}
+        {% if not row.customer.consent_marketing %}<span class="status-pill">Sem autorização de contato</span>{% elif row.contact_blocked %}<span class="status-pill">Contatado nas últimas 24h</span>{% else %}
         <form method="post">{% csrf_token %}<input type="hidden" name="action" value="contact_return"><input type="hidden" name="customer" value="{{ row.customer_id }}"><button class="button ghost" type="submit">Perguntar se quer agendar</button></form>{% endif %}
       </div>
       {% endfor %}

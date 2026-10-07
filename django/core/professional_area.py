@@ -121,15 +121,9 @@ def professional_area(request):
         from engagement.contacting import send_return_invitation
         from scheduling.models import Customer
         customer=get_object_or_404(
-            Customer,pk=request.POST.get("customer"),tenant=professional.tenant,active=True,
+            Customer.objects.distinct(),pk=request.POST.get("customer"),tenant=professional.tenant,active=True,
             appointments__professional=professional,appointments__status=Appointment.Status.COMPLETED,
         )
-        completed_for_professional=Appointment.objects.filter(
-            tenant=professional.tenant,customer=customer,professional=professional,
-            status=Appointment.Status.COMPLETED,
-        ).count()
-        if completed_for_professional<2:
-            raise PermissionDenied("O profissional só pode contatar clientes com recorrência no próprio atendimento.")
         try:
             send_return_invitation(
                 tenant=professional.tenant,customer=customer,user=request.user,professional=professional
@@ -182,16 +176,14 @@ def professional_area(request):
         grouped.setdefault(item.customer_id,[]).append(item)
     return_rows=[]
     for items in grouped.values():
-        if len(items)<2:
-            continue
         dates=[timezone.localtime(item.starts_at).date() for item in items]
         intervals=[max((dates[idx]-dates[idx-1]).days,1) for idx in range(1,len(dates))]
-        avg_days=max(round(sum(intervals)/len(intervals)),1)
+        avg_days=max(round(sum(intervals)/len(intervals)),1) if intervals else 30
         if len(intervals)>1:
             variation=sum(abs(value-avg_days) for value in intervals)/len(intervals)
             confidence=max(20,min(100,round(100-(variation/max(avg_days,1))*100)))
         else:
-            confidence=60
+            confidence=60 if intervals else 20
         customer=items[-1].customer
         row=SimpleNamespace(
             customer=customer,customer_id=customer.pk,visits_count=len(items),

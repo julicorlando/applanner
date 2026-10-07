@@ -13,6 +13,7 @@ from .models import CustomerContactThrottle
 
 
 CONTACT_WINDOW=timedelta(hours=24)
+PROFESSIONAL_DAILY_LIMIT=20
 
 
 def contact_blocked(tenant,customer,*,now=None):
@@ -24,6 +25,13 @@ def contact_blocked(tenant,customer,*,now=None):
 @transaction.atomic
 def reserve_contact_window(tenant,customer,user,reason):
     now=timezone.now()
+    if user and user.role=="professional":
+        from accounts.models import User
+        # Serialize the daily allowance across all customers and concurrent panels.
+        User.objects.select_for_update().get(pk=user.pk)
+        if CustomerContactThrottle.objects.filter(tenant=tenant,sent_by=user,
+            last_contact_at__gt=now-CONTACT_WINDOW,reason="return_invite").count()>=PROFESSIONAL_DAILY_LIMIT:
+            raise ValueError("Limite de 20 convites por profissional em 24 horas atingido.")
     row,_=CustomerContactThrottle.objects.get_or_create(
         tenant=tenant,customer=customer,
         defaults={
@@ -53,15 +61,25 @@ def release_contact_window(reservation):
     )
 
 
-def _booking_url(tenant,professional=None):
+def _booking_url(tenant,professional=None,unit_id=None):
     base=settings.PUBLIC_BASE_URL.rstrip("/")
     slug=tenant.public_slug or tenant.slug
     if professional and professional.public_slug:
-        return f"{base}/p/{slug}/profissional/{professional.public_slug}/#agendar"
-    return f"{base}/p/{slug}/#agendar"
+        return f"{base}/p/{slug}/profissional/{professional.public_slug}/"+(f"?unit={unit_id}" if unit_id else "")+"#agendar"
+    return f"{base}/p/{slug}/"+(f"?unit={unit_id}" if unit_id else "")+"#agendar"
 
 
 def send_return_invitation(*,tenant,customer,user,professional=None):
+    from scheduling.models import Appointment, Professional
+    if customer.tenant_id!=tenant.pk or not customer.active or (user and user.tenant_id!=tenant.pk and not user.is_superuser):
+        raise ValueError("Cliente ou responsável não pertence à empresa.")
+    if not customer.consent_marketing:
+        raise ValueError("O cliente precisa autorizar mensagens de relacionamento antes de receber um convite.")
+    if user and user.role=="professional":
+        professional=Professional.objects.filter(tenant=tenant,user=user,active=True).first()
+        if not professional or not Appointment.objects.filter(tenant=tenant,customer=customer,
+            professional=professional,status=Appointment.Status.COMPLETED).exists():
+            raise ValueError("Você só pode convidar clientes que já atendeu.")
     number=whatsapp_number(customer.phone)
     if not 10<=len(number)<=15:
         raise ValueError("O cliente não possui telefone válido para WhatsApp.")
@@ -75,7 +93,10 @@ def send_return_invitation(*,tenant,customer,user,professional=None):
         raise ValueError("Este cliente já recebeu uma mensagem nas últimas 24 horas.")
 
     first=(customer.name or "cliente").split()[0]
-    link=_booking_url(tenant,professional)
+    latest=Appointment.objects.filter(tenant=tenant,customer=customer,status=Appointment.Status.COMPLETED)
+    if professional: latest=latest.filter(professional=professional)
+    latest=latest.order_by('-starts_at').first()
+    link=_booking_url(tenant,professional,latest.unit_id if latest else None)
     body=(
         f"Olá, {first}! Já faz um tempo desde seu último atendimento em {tenant.name}. "
         f"Quer agendar novamente? Escolha um horário por aqui: {link}"
@@ -94,13 +115,12 @@ def send_return_invitation(*,tenant,customer,user,professional=None):
         },
     )
     conversation.customer=customer
-    conversation.status=WhatsAppConversation.Status.BOT
     conversation.last_message_at=timezone.now()
-    conversation.save(update_fields=["customer","status","last_message_at","updated_at"])
+    conversation.save(update_fields=["customer","last_message_at","updated_at"])
     WhatsAppMessage.objects.create(
         conversation=conversation,tenant=tenant,provider_message_id=sent["id"],
         direction=WhatsAppMessage.Direction.OUT,
-        sender_type=WhatsAppMessage.SenderType.USER,user=user,
+        sender_type=WhatsAppMessage.SenderType.USER if user else WhatsAppMessage.SenderType.SYSTEM,user=user,
         message_type="text",body=body,status=WhatsAppMessage.Status.SENT,
         sent_at=timezone.now(),
     )

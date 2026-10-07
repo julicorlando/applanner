@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.crypto import decrypt_json, decrypt_text, encrypt_json, encrypt_text
-from .mercadopago import MercadoPagoProvider
+from .mercadopago import MercadoPagoProvider, validate_charge_amount
 from .models import (
     PaymentGateway,
     CheckoutSession,
@@ -96,7 +96,7 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
         external_reference=f"subscription:{subscription.pk}",
         payer_email=payer_email,
         back_url=back_url,
-        amount=Decimal(str(amount)),
+        amount=validate_charge_amount(amount),
         frequency=frequency,
         trial_days=0,
         start_at=start_at,
@@ -143,7 +143,7 @@ def create_platform_pix_charge(*,subscription,payer_email):
         months={"monthly":1,"quarterly":3,"semiannual":6,"annual":12}[subscription.billing_cycle]
         from .commercial_pricing import cycle_price
         amount=cycle_price(subscription.plan,subscription.billing_cycle)
-    amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+    amount=validate_charge_amount(amount)
     if amount<=0:
         raise ValueError("Valor da assinatura inválido.")
     public_id=token_hex(16)
@@ -288,7 +288,7 @@ def create_tenant_pix(*,tenant,reference_type,reference_id,amount,payer_email,ex
     from .models import TenantPaymentTransaction
 
     connection=connected_tenant_gateway(tenant)
-    amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+    amount=validate_charge_amount(amount)
     if amount<=0:
         raise ValueError("Valor da cobrança inválido.")
     if "@" not in payer_email:
@@ -367,7 +367,7 @@ def create_tenant_card_payment(
     from .models import TenantPaymentTransaction
 
     connection=connected_tenant_gateway(tenant)
-    amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+    amount=validate_charge_amount(amount)
     if amount<=0:
         raise ValueError("Valor da cobrança inválido.")
     if not card_token or not payment_method_id or not attempt_id:
@@ -434,7 +434,7 @@ def create_tenant_recurring_subscription(
     from .models import TenantRecurringSubscription
 
     connection=connected_tenant_gateway(tenant)
-    amount=Decimal(str(amount)).quantize(Decimal("0.01"))
+    amount=validate_charge_amount(amount)
     cycle_months=max(1,min(12,int(cycle_months)))
     idempotency="recurring-"+hashlib.sha256(
         f"{tenant.pk}|{reference_type}|{reference_id}|{amount}|{cycle_months}".encode()

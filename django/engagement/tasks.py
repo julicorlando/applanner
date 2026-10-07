@@ -64,6 +64,8 @@ def refresh_behavior_intelligence():
     total=0
     for tenant in Tenant.objects.filter(status__in=["trial","active"]):
         total+=refresh_behavior_for_tenant(tenant)
+        from .return_automation import queue_return_campaign
+        queue_return_campaign(tenant)
     return total
 
 

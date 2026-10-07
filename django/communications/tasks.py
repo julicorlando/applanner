@@ -71,7 +71,15 @@ def send_notification(self,notification_id):
                     message.attach_alternative(html,"text/html")
                 message.send(fail_silently=False)
             elif notification.channel==Notification.Channel.WHATSAPP:
-                if notification.template_key in {"appointment_confirmation","appointment_reminder","appointment_feedback"}:
+                if notification.template_key=="return_invitation":
+                    from engagement.return_automation import deliver_return_invitation
+                    provider_id=deliver_return_invitation(notification)
+                    if notification.status==Notification.Status.SKIPPED:
+                        return
+                elif notification.template_key=="subscription_due":
+                    from .master_whatsapp import send_billing_reminder
+                    provider_id=send_billing_reminder(notification)
+                elif notification.template_key in {"appointment_confirmation","appointment_reminder","appointment_feedback"}:
                     from .tenant_whatsapp import send_appointment_notification
                     provider_id=send_appointment_notification(notification)
                     if notification.status==Notification.Status.SKIPPED:

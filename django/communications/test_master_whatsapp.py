@@ -175,7 +175,7 @@ class MasterWhatsAppTests(TestCase):
         self.assertEqual(self.client.get(reverse("master-whatsapp-flow")).status_code,403)
         self.client.force_login(self.master)
         editor=reverse("master-whatsapp-flow")
-        self.assertContains(self.client.get(editor),"Prévia das etapas")
+        self.assertContains(self.client.get(editor),"Construtor de atendimento")
         self.assertEqual(self.client.post(editor,{
             "enabled":"on","greeting":"Olá empresa","fallback":"Pode explicar?",
             "handoff":"Chamando uma pessoa",
