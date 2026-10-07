@@ -8,7 +8,8 @@ from django.utils import timezone
 from accounts.permissions import require_any_capability
 from billing.segment_access import require_feature
 from tenants.models import Tenant
-from .models import UserNotification,WhatsAppConversation,WhatsAppMessage
+from .models import UserNotification,WhatsAppConversation,WhatsAppMessage,TenantFlowDelivery
+from core.crypto import decrypt_json
 from .whatsapp import WhatsAppProviderError,send_text
 from .tenant_whatsapp import send_prepared_message
 from scheduling.models import Appointment
@@ -50,6 +51,7 @@ def conversation(request,pk):
     return render(request,"communications/conversation.html",{
         "tenant":tenant,"conversation":row,"thread":thread,
         "appointment":row.appointment,
+        "triage":{k:v for k,v in decrypt_json(row.flow_context_encrypted).get("variables",{}).items() if k in {"nome","unidade_interesse","necessidade"}} if row.flow_context_encrypted else {},
         "can_message":bool(row.appointment_id and row.appointment.status in {
             Appointment.Status.PENDING,Appointment.Status.CONFIRMED,Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
         }),
@@ -58,12 +60,13 @@ def conversation(request,pk):
 
 
 @login_required
+@transaction.atomic
 def conversation_action(request,pk):
     require_any_capability(request.user,"communications.manage")
     if request.method!="POST":
         raise PermissionDenied
     tenant=_tenant(request)
-    row=get_object_or_404(WhatsAppConversation.objects.select_related("appointment","customer"),pk=pk,tenant=tenant)
+    row=get_object_or_404(WhatsAppConversation.objects.select_for_update(of=("self",)).select_related("appointment","customer"),pk=pk,tenant=tenant)
     action=request.POST.get("action","")
     if action=="cancel_appointment":
         with transaction.atomic():
@@ -101,7 +104,14 @@ def conversation_action(request,pk):
             messages.error(request,"Digite uma mensagem.")
         else:
             try:
-                provider_id=send_text(row.wa_id,body)
+                if len(body)>4096:raise ValueError("A mensagem deve ter até 4096 caracteres.")
+                if row.context.get("_chatbot_transport")=="qr":
+                    from .tenant_whatsapp import gateway
+                    provider_id=gateway(tenant,"POST","send",{"to":row.context.get("_chatbot_jid") or row.wa_id,"text":body})["id"]
+                else:
+                    from django.conf import settings
+                    if tenant.metadata.get("whatsapp_phone_number_id")!=settings.WHATSAPP_PHONE_NUMBER_ID:raise ValueError("Confira a conexão WhatsApp da empresa.")
+                    provider_id=send_text(row.wa_id,body)
                 WhatsAppMessage.objects.create(
                     conversation=row,tenant=tenant,provider_message_id=provider_id or None,
                     direction=WhatsAppMessage.Direction.OUT,
@@ -114,21 +124,27 @@ def conversation_action(request,pk):
                 row.last_message_at=timezone.now()
                 row.save(update_fields=["status","assigned_to","last_message_at","updated_at"])
                 messages.success(request,"Mensagem enviada.")
-            except WhatsAppProviderError as exc:
+            except (WhatsAppProviderError,ValueError,KeyError) as exc:
                 messages.error(request,str(exc))
     elif action in {"bot","human","close"}:
         if action=="bot":
             row.status=WhatsAppConversation.Status.BOT
             row.assigned_to=None
+            row.bot_state="welcome";row.flow_context_encrypted="";row.flow_revision=""
+            row.messages.filter(direction="in",flow_processed_at__isnull=True).update(flow_processed_at=timezone.now())
         elif action=="human":
             row.status=WhatsAppConversation.Status.HUMAN
             row.assigned_to=request.user
         else:
             row.status=WhatsAppConversation.Status.CLOSED
-        row.save(update_fields=["status","assigned_to","updated_at"])
+        row.flow_wake_at=None;row.flow_wait_kind=""
+        row.save(update_fields=["status","assigned_to","bot_state","flow_context_encrypted","flow_revision","flow_wake_at","flow_wait_kind","updated_at"])
         messages.success(request,"Conversa atualizada.")
     else:
         messages.error(request,"Ação inválida.")
+    if action in {"reply","bot","human","close"}:
+        TenantFlowDelivery.objects.filter(conversation=row,status__in=["queued","failed"]).update(status="cancelled")
+        row.flow_wake_at=None;row.save(update_fields=["flow_wake_at"])
     return redirect("communications-conversation",pk=row.pk)
 
 

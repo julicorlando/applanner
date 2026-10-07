@@ -203,7 +203,12 @@ class WhatsAppConversation(TimeStampedModel):
     wa_id=models.CharField(max_length=32)
     contact_name=models.CharField(max_length=150,blank=True)
     status=models.CharField(max_length=20,choices=Status.choices,default=Status.BOT,db_index=True)
-    bot_state=models.CharField(max_length=60,default="welcome")
+    bot_state=models.CharField(max_length=80,default="welcome")
+    flow_context_encrypted=models.TextField(blank=True)
+    flow_wait_kind=models.CharField(max_length=20,blank=True)
+    flow_wake_at=models.DateTimeField(null=True,blank=True)
+    flow_revision=models.CharField(max_length=40,blank=True)
+    flow_last_error=models.CharField(max_length=300,blank=True)
     assigned_to=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="whatsapp_conversations")
     context=models.JSONField(default=dict,blank=True)
     last_message_at=models.DateTimeField()
@@ -226,6 +231,8 @@ class ChatbotFlow(TimeStampedModel):
     fallback=models.CharField(max_length=1000,default="Vou encaminhar sua mensagem para nossa equipe.")
     handoff=models.CharField(max_length=1000,default="Vou chamar um atendente para ajudar você.")
     rules=models.JSONField(default=list,blank=True)
+    graph=models.JSONField(default=dict,blank=True)
+    ai_enabled=models.BooleanField(default=True)
 
 
 class MasterWhatsAppConversation(TimeStampedModel):
@@ -326,6 +333,8 @@ class WhatsAppMessage(models.Model):
     body=models.TextField(blank=True)
     status=models.CharField(max_length=16,choices=Status.choices)
     error_message=models.CharField(max_length=500,blank=True)
+    flow_processed_at=models.DateTimeField(null=True,blank=True)
+    chatbot_transport=models.CharField(max_length=8,blank=True)
     created_at=models.DateTimeField(auto_now_add=True)
     sent_at=models.DateTimeField(null=True,blank=True)
 
@@ -342,6 +351,19 @@ class MarketingCampaignReferrer(models.Model):
 class MasterFlowDelivery(models.Model):
     conversation=models.ForeignKey(MasterWhatsAppConversation,on_delete=models.CASCADE,related_name='flow_deliveries')
     event_key=models.CharField(max_length=120,unique=True)
+    body=models.CharField(max_length=4096)
+    status=models.CharField(max_length=12,default='queued',db_index=True)
+    attempts=models.PositiveSmallIntegerField(default=0)
+    last_error=models.CharField(max_length=200,blank=True)
+    next_attempt_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+    sent_at=models.DateTimeField(null=True,blank=True)
+
+
+class TenantFlowDelivery(models.Model):
+    conversation=models.ForeignKey(WhatsAppConversation,on_delete=models.CASCADE,related_name='flow_deliveries')
+    event_key=models.CharField(max_length=120,unique=True)
+    transport=models.CharField(max_length=8,choices=[('qr','QR'),('cloud','Cloud API')])
     body=models.CharField(max_length=4096)
     status=models.CharField(max_length=12,default='queued',db_index=True)
     attempts=models.PositiveSmallIntegerField(default=0)

@@ -248,6 +248,7 @@ def mark_inbound_appointment(conversation,body):
 
 @csrf_exempt
 @require_POST
+@transaction.atomic
 def tenant_whatsapp_receive(request):
     expected=settings.MASTER_WHATSAPP_GATEWAY_TOKEN
     if not expected or not hmac.compare_digest(request.headers.get("Authorization",""),"Bearer "+expected):
@@ -281,12 +282,16 @@ def tenant_whatsapp_receive(request):
         if whatsapp_number(candidate.phone)==number),None)
     conversation,_=WhatsAppConversation.objects.get_or_create(tenant=tenant,wa_id=number,
         defaults={"customer":customer,"contact_name":str(data.get("name") or "")[:150],"last_message_at":timezone.now()})
-    _,created=WhatsAppMessage.objects.get_or_create(provider_message_id=msg_id,
+    incoming,created=WhatsAppMessage.objects.get_or_create(provider_message_id=msg_id,
         defaults={"conversation":conversation,"tenant":tenant,"direction":WhatsAppMessage.Direction.IN,
-                  "sender_type":WhatsAppMessage.SenderType.CUSTOMER,"body":body,
+                  "sender_type":WhatsAppMessage.SenderType.CUSTOMER,"body":body,"chatbot_transport":"qr",
                   "status":WhatsAppMessage.Status.RECEIVED})
     if created:
         if not mark_inbound_appointment(conversation,body):
             conversation.last_message_at=timezone.now()
-            conversation.save(update_fields=["last_message_at","updated_at"])
+            conversation.context={**conversation.context,"_chatbot_transport":"qr","_chatbot_jid":jid}
+            conversation.save(update_fields=["last_message_at","context","updated_at"])
+            if body.strip():
+                from .tenant_graph_services import enqueue
+                transaction.on_commit(lambda pk=incoming.pk:enqueue(pk))
     return JsonResponse({"ok":True})

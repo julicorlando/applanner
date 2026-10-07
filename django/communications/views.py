@@ -1,5 +1,6 @@
 import json
 from django.conf import settings
+from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -12,6 +13,7 @@ from .whatsapp import verify_webhook_signature
 
 
 @csrf_exempt
+@transaction.atomic
 def whatsapp_webhook(request):
     if request.method=="GET":
         if (
@@ -52,14 +54,14 @@ def whatsapp_webhook(request):
                     },
                 )
                 body=((message.get("text") or {}).get("body") or "")
-                _,created=WhatsAppMessage.objects.get_or_create(
+                incoming,created=WhatsAppMessage.objects.get_or_create(
                     provider_message_id=str(message.get("id") or ""),
                     defaults={
                         "conversation":conversation,"tenant":tenant,
                         "direction":WhatsAppMessage.Direction.IN,
                         "sender_type":WhatsAppMessage.SenderType.CUSTOMER,
                         "message_type":str(message.get("type") or "text"),
-                        "body":body,"status":WhatsAppMessage.Status.RECEIVED,
+                        "body":body,"status":WhatsAppMessage.Status.RECEIVED,"chatbot_transport":"cloud",
                     },
                 )
                 if not created:
@@ -67,6 +69,14 @@ def whatsapp_webhook(request):
                 from .tenant_whatsapp import mark_inbound_appointment
                 if mark_inbound_appointment(conversation,body):
                     continue
+                conversation.context={**conversation.context,"_chatbot_transport":"cloud"}
+                conversation.save(update_fields=['context','updated_at'])
+                if flow and flow.graph and message.get('type')=='text' and phone_number_id==settings.WHATSAPP_PHONE_NUMBER_ID:
+                    from .tenant_graph_services import enqueue
+                    transaction.on_commit(lambda pk=incoming.pk:enqueue(pk))
+                    continue
+                incoming.flow_processed_at=timezone.now()
+                incoming.save(update_fields=["flow_processed_at"])
                 reply=None
                 if flow and message.get("type")=="text" and phone_number_id==settings.WHATSAPP_PHONE_NUMBER_ID:
                     reply,conversation.status=next_reply(flow,conversation,body,first_message=first_message)

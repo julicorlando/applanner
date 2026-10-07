@@ -101,3 +101,23 @@ Nos blocos de IA, marque **Restringir à base oficial do ApPlanner**. Nesse modo
 ### Exclusão de leads (Master)
 
 Na ficha do lead, **Gestão Master → Excluir lead** abre uma confirmação antes da remoção definitiva do cadastro, notas e histórico comercial. A ação exige Master, sessão autenticada, POST e CSRF; o comercial não possui essa permissão. Empresas, pagamentos, propostas e mensagens de WhatsApp são preservados. Conversas vinculadas passam para atendimento humano, com contexto da coleta limpo e envios pendentes cancelados, evitando a recriação automática pelo cadastro em andamento. A exclusão fica registrada na auditoria, sem copiar dados pessoais do lead. A API de leads continua de leitura, sem endpoint de exclusão.
+
+## Chatbot visual por empresa
+
+Na conexão WhatsApp, abra **Configurar chatbot**, use o modelo de atendimento,
+ajuste mensagens e caminhos, simule e salve. A aba Configurar permite ativar o
+bot e usar a IA central do Master sem copiar ou revelar a chave. É necessário
+ter WhatsApp conectado e acesso ao módulo. A equipe vê a necessidade e a unidade
+na conversa, pode assumir o atendimento e responder pelo número da própria empresa.
+
+- `GET/POST /app/comunicacao/chatbot/`: gestão autenticada, formulário com CSRF;
+  `graph_json` é o grafo v2, `enabled` ativa o bot e `ai_enabled` usa a IA central.
+- `POST /app/comunicacao/chatbot/simular/`: JSON (`graph`, `state`, `context`,
+  `waiting`, `incoming`, `resume`) com CSRF; retorna estado, contexto, mensagens,
+  espera, caminho e encaminhamento. Nenhum envio real ou consumo de IA.
+- A empresa é determinada pelo usuário; o Master usa a empresa selecionada na
+  sessão. Não se aceita trocar empresa com `tenant_id` enviado no formulário.
+- Blocos API externos e legados são rejeitados. A IA consulta exclusivamente
+  informações públicas da empresa e não confirma reservas nem pagamentos.
+
+Veja `WHATSAPP_RETURN.md` para publicação, fila, recuperação e conexão do gateway.
