@@ -32,12 +32,16 @@ def advance_graph(conversation_id,message_id=None,resume=False):
     if state=='__finished__' or conversation.flow_revision!=revision:
         state=flow.graph['start'];context={};waiting=''
     variables=context.setdefault('variables',{})
-    variables['contact_name']=conversation.contact_name;variables['contact_phone']=conversation.wa_id.split('@')[0]
+    from .master_sales import plans_text
+    variables['public_plans']=plans_text()
+    variables['contact_name']=conversation.contact_name;variables['contact_phone']=conversation.wa_id.split('@')[0] if conversation.wa_id.endswith('@s.whatsapp.net') else ''
     event_key=f'in-{incoming.pk}' if incoming else f'wake-{conversation.pk}-{int(conversation.flow_wake_at.timestamp())}'
     body=incoming.body if incoming else ''
-    if any(term in body.casefold() for term in ('atendimento','humano','atendente')):
+    from .master_runtime import normalized
+    if normalized(body).strip(' .!?') in {'humano','atendente','atendimento humano','falar com atendente','quero falar com atendente'}:
         result={'state':state,'context':context,'waiting':'','messages':[flow.handoff],'handoff':True,'wake_seconds':None,'error':''}
     else:result=run_graph(flow.graph,flow,state,context,waiting,body,resume=resume,event_key=event_key)
+    sync_sales_lead(conversation,result['context']['variables'])
     # Messages persist before any delivery. Broker outages are recovered by beat.
     for index,text in enumerate(result['messages']):
         delivery,_=MasterFlowDelivery.objects.get_or_create(event_key=f'{event_key}-{index}',defaults={'conversation':conversation,'body':text[:4096]})
@@ -86,3 +90,36 @@ def reconcile():
     ids=list(MasterFlowDelivery.objects.filter(status='queued').filter(Q(next_attempt_at__isnull=True)|Q(next_attempt_at__lte=now)).values_list('pk',flat=True)[:100])
     for pk in ids:dispatch_delivery(pk)
     return len(ids)
+
+
+def sync_sales_lead(conversation,variables):
+    # Called while the conversation is locked, before marking the inbound processed.
+    import re
+    from commercial.models import Lead,LeadHistory
+    from django.core.validators import validate_email
+    from django.core.exceptions import ValidationError
+    phone=variables.get('telefone') or variables.get('contact_phone','')
+    if not variables.get('nome') or not re.fullmatch(r'\d{10,15}',phone):return
+    lead=conversation.sales_lead
+    if lead and (lead.anonymized_at or lead.do_not_contact):return
+    if not lead:
+        lead=Lead.objects.select_for_update().filter(phone=phone,anonymized_at__isnull=True).order_by('pk').first()
+        if lead and lead.do_not_contact:return
+        if not lead:
+            lead=Lead.objects.create(name=variables['nome'][:160],phone=phone,email='',business_type='',source='whatsapp_master_chatbot',status=Lead.Status.NEW)
+            LeadHistory.objects.create(lead=lead,action=LeadHistory.Action.CREATED,notes='Solicitação recebida no chatbot Master; sem consentimento de marketing.')
+        conversation.sales_lead=lead;conversation.save(update_fields=['sales_lead'])
+    if conversation.contact_name!=variables['nome'][:150]:
+        conversation.contact_name=variables['nome'][:150];conversation.save(update_fields=['contact_name'])
+    lead.name=variables['nome'][:160]
+    if variables.get('segmento'):lead.business_type=variables['segmento'][:100]
+    if variables.get('email'):
+        try:validate_email(variables['email'])
+        except ValidationError:pass
+        else:lead.email=variables['email'][:254]
+    fields={'Empresa':'empresa','Unidades':'unidades','Profissionais':'profissionais','Plano de interesse':'plano_interesse','Necessidade':'necessidade','Dúvida':'ultima_duvida','Pergunta inicial':'pergunta'}
+    note='[Chatbot ApPlanner]\n'+'\n'.join(f'{label}: {variables[key][:1000]}' for label,key in fields.items() if variables.get(key))
+    end='[/Chatbot ApPlanner]'
+    clean=re.sub(r'\[Chatbot ApPlanner\].*?\[/Chatbot ApPlanner\]', '',lead.notes,flags=re.S).strip()
+    lead.notes=(clean+'\n\n'+note+'\n'+end).strip()
+    lead.save(update_fields=['name','business_type','email','notes','updated_at'])

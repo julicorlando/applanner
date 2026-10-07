@@ -229,6 +229,7 @@ class ChatbotFlow(TimeStampedModel):
 
 
 class MasterWhatsAppConversation(TimeStampedModel):
+    sales_lead=models.ForeignKey("commercial.Lead",null=True,blank=True,on_delete=models.SET_NULL,related_name="whatsapp_conversations")
     """Central da plataforma, independente das conversas WhatsApp dos tenants."""
     wa_id=models.CharField(max_length=80,unique=True)
     contact_name=models.CharField(max_length=150,blank=True)

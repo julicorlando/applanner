@@ -319,8 +319,8 @@ def master_whatsapp_conversation(request,pk):
         "tenants":Tenant.objects.filter(deleted_at__isnull=True).order_by("name")[:500],
         "flow_enabled":MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).exists(),
         "flow_failed_deliveries":row.flow_deliveries.filter(status="failed").count(),
-        "lead":Lead.objects.filter(phone=row.wa_id.split("@")[0],anonymized_at__isnull=True).first()
-            if row.wa_id.endswith("@s.whatsapp.net") else None,
+        "lead":row.sales_lead or (Lead.objects.filter(phone=row.wa_id.split("@")[0],anonymized_at__isnull=True).first()
+            if row.wa_id.endswith("@s.whatsapp.net") else None),
         "proposals":Proposal.objects.exclude(status__in=[Proposal.Status.CONVERTED,Proposal.Status.EXPIRED,
             Proposal.Status.CANCELLED]).exclude(approval_status__in=[Proposal.Approval.PENDING,
             Proposal.Approval.REJECTED]).order_by("-created_at")[:50],
@@ -368,7 +368,8 @@ def master_whatsapp_attachment(request,pk):
 def master_whatsapp_flow(request):
     _master(request)
     from .master_whatsapp_flow import MasterFlowForm
-    flow,_=MasterWhatsAppFlow.objects.get_or_create(pk=1)
+    from .master_sales import commercial_graph
+    flow,_=MasterWhatsAppFlow.objects.get_or_create(pk=1,defaults={"graph":commercial_graph()})
     form=MasterFlowForm(request.POST or None,instance=flow)
     if request.method=="POST" and form.is_valid():
         if form.cleaned_data["enabled"] and not (
@@ -385,7 +386,7 @@ def master_whatsapp_flow(request):
             row.save()
             messages.success(request,"Fluxo do Master salvo.")
             return redirect("master-whatsapp-flow")
-    return render(request,"master/whatsapp_flow.html",{"form":form,"flow":flow})
+    return render(request,"master/whatsapp_flow.html",{"form":form,"flow":flow,"commercial_template":commercial_graph()})
 
 
 @csrf_exempt
@@ -480,6 +481,9 @@ def master_whatsapp_simulate(request):
         incoming=data.get('incoming','')
         if not isinstance(incoming,str) or len(incoming)>2000:raise ValueError
         flow=MasterWhatsAppFlow.objects.filter(pk=1).first() or MasterWhatsAppFlow()
+        from .master_sales import plans_text
+        context.setdefault('variables',{})['public_plans']=plans_text()
+        context['variables'].setdefault('contact_phone','5581000000000')
         result=run_graph(graph,flow,str(data.get('state') or graph['start']),context,
             str(data.get('waiting') or ''),incoming,resume=bool(data.get('resume')),simulation=True)
         return JsonResponse(result)
