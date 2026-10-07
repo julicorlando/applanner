@@ -91,3 +91,13 @@ O simulador não cria leads e não envia mensagens. O fluxo real requer gateway 
 3. Adicione um bloco **Agente IA** depois da entrada da pergunta. Defina a variável de saída (`resposta_ia`) e marque envio da resposta.
 4. Nas instruções, use: `Você é o assistente virtual do ApPlanner. Responda em português com acolhimento e objetividade. Use somente as informações fornecidas. Planos atuais: {{public_plans}}. Não invente preços, recursos, confirmação de pagamentos ou prazos. Se não souber, diga que a equipe vai confirmar. Não solicite senhas nem dados de cartão.`
 5. Conecte **Sucesso** ao próximo menu/cadastro e **Falha** ao atendimento humano. O simulador usa resposta fictícia; a homologação real usa a API e pode gerar cobrança. O fluxo comercial nativo funciona sem chave de IA.
+
+### Assistente IA com triagem (Master)
+
+O arquivo `communications/master-assistant-flow.json` pode ser importado no construtor. A recepção identifica novos interessados ou clientes atuais, pergunta segmento e necessidade, apresenta os planos públicos cadastrados e oferece dúvidas, proposta ou atendimento humano. A coleta comercial só começa após a triagem e a escolha de orientação/proposta; os dados recebidos são salvos progressivamente em um único lead. Pedidos explícitos de atendimento humano interrompem a automação.
+
+Nos blocos de IA, marque **Restringir à base oficial do ApPlanner**. Nesse modo, o modelo classifica a pergunta escolhendo até dois fatos aprovados; o servidor compõe a resposta exclusivamente com esses fatos e os planos ativos. Respostas livres geradas pelo modelo não são exibidas. Assuntos fora da base recebem orientação para procurar a equipe; erro de IA segue a saída de erro/atendimento humano. Apenas a mensagem atual e a base pública são enviados ao provedor, sem o cadastro do lead ou o histórico completo. O simulador não chama a API de IA. A chave permanece cifrada, e o modelo e a habilitação continuam configuráveis.
+
+### Exclusão de leads (Master)
+
+Na ficha do lead, **Gestão Master → Excluir lead** abre uma confirmação antes da remoção definitiva do cadastro, notas e histórico comercial. A ação exige Master, sessão autenticada, POST e CSRF; o comercial não possui essa permissão. Empresas, pagamentos, propostas e mensagens de WhatsApp são preservados. Conversas vinculadas passam para atendimento humano, com contexto da coleta limpo e envios pendentes cancelados, evitando a recriação automática pelo cadastro em andamento. A exclusão fica registrada na auditoria, sem copiar dados pessoais do lead. A API de leads continua de leitura, sem endpoint de exclusão.

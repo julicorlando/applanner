@@ -36,3 +36,9 @@ Os fluxos antigos continuam no motor legado até serem editados e salvos no novo
 ## Modelo comercial com captação automática
 
 Veja `DOCUMENTACAO_USUARIOS_API.md`, seção Chatbot comercial Master e leads. Os novos blocos `knowledge` e `commercial` oferecem orientações nativas e cadastro progressivo, sem custos de IA. A migração 0013 instala o modelo na configuração existente; o sinalizador de ativação e as credenciais são preservados. Os leads são vinculados em `MasterWhatsAppConversation.sales_lead`, sem consentimento de marketing automático. Perguntas e respostas inválidas não avançam o cadastro indevidamente. Os dados do lead ficam disponíveis para a equipe e na API com escopo comercial.
+
+## Assistente de triagem restrito ao ApPlanner
+
+Importar `communications/master-assistant-flow.json` no Master, preservar a chave existente, conferir modelo/habilitação e salvar. O modo `config.applanner_only=true` dos blocos `ai` usa classificação de fatos aprovados: não transmite variáveis da coleta comercial e não exibe texto livre do provedor. Preços vêm dos planos públicos ativos. O simulador nunca chama OpenAI. Falhas passam para a equipe pela saída `error`. O atendimento identifica segmento/necessidade antes da coleta comercial e permite dúvidas adicionais ou transferência humana.
+
+O Master também pode excluir um lead na ficha comercial com confirmação. A transação bloqueia conversas antes do lead, cancela mensagens automáticas pendentes, limpa a coleta e transfere para humano. Não remove conversas, empresas ou pagamentos. Auditoria: `commercial_lead_deleted`. Nenhuma exclusão é exposta na API pública/comercial.

@@ -38,7 +38,7 @@ def advance_graph(conversation_id,message_id=None,resume=False):
     event_key=f'in-{incoming.pk}' if incoming else f'wake-{conversation.pk}-{int(conversation.flow_wake_at.timestamp())}'
     body=incoming.body if incoming else ''
     from .master_runtime import normalized
-    if normalized(body).strip(' .!?') in {'humano','atendente','atendimento humano','falar com atendente','quero falar com atendente'}:
+    if normalized(body).strip(' .!?') in {'humano','atendente','atendimento humano','falar com atendente','quero falar com atendente','atendimento','quero falar com um atendente','falar com um atendente','quero atendimento humano'}:
         result={'state':state,'context':context,'waiting':'','messages':[flow.handoff],'handoff':True,'wake_seconds':None,'error':''}
     else:result=run_graph(flow.graph,flow,state,context,waiting,body,resume=resume,event_key=event_key)
     sync_sales_lead(conversation,result['context']['variables'])

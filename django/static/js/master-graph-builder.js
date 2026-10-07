@@ -5,6 +5,17 @@
   if (!graphField) return;
   const viewport = $('graph-viewport'), canvas = $('graph-canvas'), nodes = $('graph-nodes'), svg = $('graph-links');
   const script = document.querySelector('script[data-simulate-url]');
+  const sidebar = $('graph-sidebar'), sidebarToggle = $('graph-side-toggle'), layout = $('graph-layout');
+  function setSidebarCollapsed(collapsed, persist=false) {
+    if (!sidebar || !sidebarToggle || !layout) return;
+    sidebar.hidden = collapsed;
+    layout.classList.toggle('side-collapsed', collapsed);
+    sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+    sidebarToggle.textContent = collapsed ? 'Mostrar painel' : 'Ocultar painel';
+    if (persist) { try { localStorage.setItem('applanner.master.flow.sidebar.collapsed', String(collapsed)); } catch {} }
+  }
+  if (sidebarToggle) sidebarToggle.onclick = () => setSidebarCollapsed(!sidebar.hidden, true);
+  try { setSidebarCollapsed(localStorage.getItem('applanner.master.flow.sidebar.collapsed') === 'true'); } catch {}
   const metadata = {
     knowledge:['Dúvidas do ApPlanner','#13a5bb'],commercial:['Cadastro de lead','#1ab767'],start:['Início','#ef365f'],message:['Mensagem','#336cf2'],menu:['Opções / menu','#ef9e09'],input:['Entrada de texto','#1ab767'],
     condition:['Condição / se','#13a5bb'],set:['Definir variável','#00a87b'],api:['Chamada API','#ff781b'],ai:['Agente IA','#ce2fba'],
@@ -85,6 +96,7 @@
       f.oninput=()=>change(()=>{source[key]=type==='checkbox'?f.checked:type==='number'?Number(f.value):f.value;});l.append(f);container.append(l);return f;
     }
     field('Nome do bloco','label','text',null,node);
+    if(node.type==='ai')field('Restringir à base oficial do ApPlanner','applanner_only','checkbox');
     if(node.type==='knowledge')field('Variável com a pergunta','variable');
     if(node.type==='commercial')container.append(element('p','Coleta nome, empresa, segmento, e-mail, unidades, profissionais, plano e necessidade; salva o lead progressivamente.'));
     if(['start','message','menu','input','handoff','finish','legacy'].includes(node.type))field(node.type==='input'?'Pergunta ao cliente':'Texto / mensagem','text','textarea');
