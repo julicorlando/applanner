@@ -16,6 +16,8 @@ try {
 } catch { /* reported in status */ }
 const directory = '/app/session/auth';
 const pendingFile = '/app/session/pending.json';
+const flowReceiptDirectory = '/app/session/flow-receipts';
+const sendsInFlight = new Map();
 let socket;
 let state = 'disconnected';
 let qr = null;
@@ -185,9 +187,42 @@ http.createServer(async (req, res) => {
         if (!found?.exists) return reply(res, 404, { error: 'Este número não foi encontrado no WhatsApp. Confira DDD e código do país.' });
         recipient = found.jid || recipient;
       }
-      const message = await socket.sendMessage(recipient, content);
-      if (!message?.key?.id) return reply(res, 503, { error: 'O WhatsApp não confirmou o envio. Tente novamente.' });
-      return reply(res, 200, { id: message.key.id, to: recipient });
+      const key = data.idempotencyKey;
+      if (key !== undefined && (typeof key !== 'string' || !/^[a-zA-Z0-9_-]{1,120}$/.test(key))) {
+        return reply(res, 400, { error: 'Chave de envio inválida.' });
+      }
+      const digest = crypto.createHash('sha256').update(JSON.stringify({ to: recipient, content })).digest('hex');
+      const keyHash = key ? crypto.createHash('sha256').update(key).digest('hex') : '';
+      const send = async () => {
+        const filename = key ? path.join(flowReceiptDirectory, keyHash + '.json') : '';
+        if (filename) {
+          try {
+            const saved = JSON.parse(await fs.readFile(filename, 'utf8'));
+            if (saved.digest !== digest) throw new Error('Chave de envio reutilizada com conteúdo diferente.');
+            return saved.result;
+          } catch (error) { if (error.code !== 'ENOENT') throw error; }
+        }
+        const message = await socket.sendMessage(recipient, content, key ? { messageId: keyHash.slice(0, 32).toUpperCase() } : undefined);
+        if (!message?.key?.id) throw new Error('O WhatsApp não confirmou o envio.');
+        const result = { id: message.key.id, to: recipient };
+        if (filename) {
+          await fs.mkdir(flowReceiptDirectory, { recursive: true, mode: 0o700 });
+          const temp = filename + '.' + crypto.randomUUID() + '.tmp';
+          await fs.writeFile(temp, JSON.stringify({ digest, result }), { mode: 0o600 });
+          await fs.rename(temp, filename);
+        }
+        return result;
+      };
+      if (!key) return reply(res, 200, await send());
+      if (sendsInFlight.has(keyHash)) {
+        const active = sendsInFlight.get(keyHash);
+        if (active.digest !== digest) throw new Error('Chave de envio reutilizada com conteúdo diferente.');
+        return reply(res, 200, await active.promise);
+      }
+      const pendingSend = send();
+      sendsInFlight.set(keyHash, { digest, promise: pendingSend });
+      try { return reply(res, 200, await pendingSend); }
+      finally { sendsInFlight.delete(keyHash); }
     }
     return reply(res, 404, { error: 'Rota não encontrada.' });
   } catch (error) {

@@ -236,6 +236,11 @@ class MasterWhatsAppConversation(TimeStampedModel):
     last_message_at=models.DateTimeField()
     human_handoff=models.BooleanField(default=False)
     flow_state=models.CharField(max_length=80,blank=True)
+    flow_context_encrypted=models.TextField(blank=True)
+    flow_wait_kind=models.CharField(max_length=20,blank=True)
+    flow_wake_at=models.DateTimeField(null=True,blank=True)
+    flow_revision=models.CharField(max_length=40,blank=True)
+    flow_last_error=models.CharField(max_length=300,blank=True)
 
     class Meta:
         ordering=["-last_message_at"]
@@ -270,6 +275,11 @@ class MasterWhatsAppFlow(models.Model):
     fallback=models.CharField(max_length=1000,default="Não entendi. Conte com outras palavras ou escreva atendimento.")
     handoff=models.CharField(max_length=1000,default="Vou encaminhar você para nosso atendimento humano.")
     steps=models.JSONField(default=list,blank=True)
+    graph=models.JSONField(default=dict,blank=True)
+    integrations_encrypted=models.TextField(blank=True)
+    ai_key_encrypted=models.TextField(blank=True)
+    ai_model=models.CharField(max_length=80,blank=True)
+    ai_enabled=models.BooleanField(default=False)
     updated_at=models.DateTimeField(auto_now=True)
 
 
@@ -326,3 +336,15 @@ class MarketingCampaignReferrer(models.Model):
     campaign=models.OneToOneField(MarketingCampaign,primary_key=True,on_delete=models.CASCADE,related_name="referrer")
     referrer_user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="referred_marketing_campaigns")
     created_at=models.DateTimeField(auto_now_add=True)
+
+
+class MasterFlowDelivery(models.Model):
+    conversation=models.ForeignKey(MasterWhatsAppConversation,on_delete=models.CASCADE,related_name='flow_deliveries')
+    event_key=models.CharField(max_length=120,unique=True)
+    body=models.CharField(max_length=4096)
+    status=models.CharField(max_length=12,default='queued',db_index=True)
+    attempts=models.PositiveSmallIntegerField(default=0)
+    last_error=models.CharField(max_length=200,blank=True)
+    next_attempt_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+    sent_at=models.DateTimeField(null=True,blank=True)

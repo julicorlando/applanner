@@ -211,9 +211,12 @@ def master_whatsapp_disconnect(request):
 
 
 @login_required
+@transaction.atomic
 def master_whatsapp_conversation(request,pk):
     _master(request)
-    row=get_object_or_404(MasterWhatsAppConversation.objects.select_related("tenant"),pk=pk)
+    query=MasterWhatsAppConversation.objects.select_related("tenant")
+    if request.method=="POST":query=query.select_for_update(of=("self",))
+    row=get_object_or_404(query,pk=pk)
     if request.method=="POST":
         action=request.POST.get("action")
         if action=="assign":
@@ -266,11 +269,21 @@ def master_whatsapp_conversation(request,pk):
                         proposal.save(update_fields=["status","updated_at"])
                     row.human_handoff=True
                     row.last_message_at=timezone.now()
-                    row.save(update_fields=["human_handoff","last_message_at","updated_at"])
+                    row.save(update_fields=["human_handoff","flow_wake_at","last_message_at","updated_at"])
                     messages.success(request,"Link da proposta enviado por WhatsApp.")
+        elif action=="retry_flow":
+            from .models import MasterFlowDelivery
+            from .master_graph_services import dispatch_delivery
+            for delivery in MasterFlowDelivery.objects.select_for_update().filter(conversation=row,status='failed'):
+                delivery.status='queued';delivery.attempts=0;delivery.next_attempt_at=None;delivery.save(update_fields=['status','attempts','next_attempt_at'])
+                transaction.on_commit(lambda pk=delivery.pk:dispatch_delivery(pk))
+            messages.success(request,'Mensagens do fluxo recolocadas na fila.')
         elif action=="handoff":
+            from .models import MasterFlowDelivery
+            MasterFlowDelivery.objects.filter(conversation=row,status='queued').update(status='cancelled')
+            row.flow_wake_at=None
             row.human_handoff=request.POST.get("enabled")=="1"
-            row.save(update_fields=["human_handoff","updated_at"])
+            row.save(update_fields=["human_handoff","flow_wake_at","updated_at"])
             row.messages.filter(direction="in",flow_processed_at__isnull=True).update(flow_processed_at=timezone.now())
             messages.success(request,"Atendimento humano ativado." if row.human_handoff else "Fluxo automático retomado.")
         elif action=="reply":
@@ -288,10 +301,13 @@ def master_whatsapp_conversation(request,pk):
                     record_outbound_message(conversation=row,sent=sent,body=body,sent_by=request.user,
                         attachment=uploaded,mime=attachment["mime"] if attachment else "",
                         filename=attachment["name"] if attachment else "")
+                    from .models import MasterFlowDelivery
+                    MasterFlowDelivery.objects.filter(conversation=row,status='queued').update(status='cancelled')
+                    row.flow_wake_at=None
                     row.human_handoff=True
                     row.messages.filter(direction="in",flow_processed_at__isnull=True).update(flow_processed_at=timezone.now())
                     row.last_message_at=timezone.now()
-                    row.save(update_fields=["human_handoff","last_message_at","updated_at"])
+                    row.save(update_fields=["human_handoff","flow_wake_at","last_message_at","updated_at"])
                     messages.success(request,"Mensagem enviada. Acompanhe a entrega e leitura nesta conversa.")
                 except (ValueError,KeyError) as exc:
                     messages.error(request,str(exc))
@@ -302,6 +318,7 @@ def master_whatsapp_conversation(request,pk):
         "conversations":MasterWhatsAppConversation.objects.select_related("tenant")[:100],
         "tenants":Tenant.objects.filter(deleted_at__isnull=True).order_by("name")[:500],
         "flow_enabled":MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).exists(),
+        "flow_failed_deliveries":row.flow_deliveries.filter(status="failed").count(),
         "lead":Lead.objects.filter(phone=row.wa_id.split("@")[0],anonymized_at__isnull=True).first()
             if row.wa_id.endswith("@s.whatsapp.net") else None,
         "proposals":Proposal.objects.exclude(status__in=[Proposal.Status.CONVERTED,Proposal.Status.EXPIRED,
@@ -360,7 +377,11 @@ def master_whatsapp_flow(request):
             form.add_error("enabled","Configure o WhatsApp do Master no Coolify antes de ativar o fluxo.")
         else:
             row=form.save(commit=False)
+            from core.crypto import encrypt_text
             row.steps=form.cleaned_data["steps_text"]
+            row.graph=form.cleaned_data.get('graph_json') or {}
+            row.integrations_encrypted=form.cleaned_data.get('integrations_json') or ''
+            if form.cleaned_data.get('ai_key'):row.ai_key_encrypted=encrypt_text(form.cleaned_data['ai_key'])
             row.save()
             messages.success(request,"Fluxo do Master salvo.")
             return redirect("master-whatsapp-flow")
@@ -440,3 +461,27 @@ def send_billing_reminder(notification):
     conversation.last_message_at=timezone.now()
     conversation.save(update_fields=["last_message_at","updated_at"])
     return sent["id"]
+
+
+@login_required
+@require_POST
+def master_whatsapp_simulate(request):
+    _master(request)
+    from .master_graph import validate_graph
+    from .master_runtime import run_graph
+    from django.core.exceptions import ValidationError
+    if len(request.body)>180000:return JsonResponse({'error':'Simulação muito grande.'},status=400)
+    try:
+        data=json.loads(request.body)
+        if not isinstance(data,dict):raise ValueError
+        graph=validate_graph(data.get('graph'))
+        context=data.get('context') or {'variables':{}}
+        if not isinstance(context,dict) or not isinstance(context.get('variables',{}),dict) or len(json.dumps(context))>30000:raise ValueError
+        incoming=data.get('incoming','')
+        if not isinstance(incoming,str) or len(incoming)>2000:raise ValueError
+        flow=MasterWhatsAppFlow.objects.filter(pk=1).first() or MasterWhatsAppFlow()
+        result=run_graph(graph,flow,str(data.get('state') or graph['start']),context,
+            str(data.get('waiting') or ''),incoming,resume=bool(data.get('resume')),simulation=True)
+        return JsonResponse(result)
+    except (ValueError,TypeError,KeyError,ValidationError) as exc:
+        return JsonResponse({'error':'; '.join(exc.messages) if isinstance(exc,ValidationError) else 'Dados da simulação inválidos.'},status=400)

@@ -20,6 +20,8 @@ def retry_master_chatbot_queue():
     flow=MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).first()
     if not flow:
         return 0
+    from .master_graph_services import reconcile
+    reconcile()
     recent=max(flow.updated_at,timezone.now()-timedelta(hours=2))
     ids=list(MasterWhatsAppMessage.objects.filter(
         direction="in",flow_processed_at__isnull=True,created_at__gte=recent,
@@ -221,3 +223,9 @@ def send_chatbot_reply(conversation_id, body):
         sender_type=WhatsAppMessage.SenderType.BOT,
         message_type="text",body=body,status=WhatsAppMessage.Status.SENT,
     )
+
+
+@shared_task
+def deliver_master_flow_message(delivery_id):
+    from .master_graph_services import deliver
+    return deliver(delivery_id)

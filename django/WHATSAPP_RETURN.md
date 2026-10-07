@@ -20,3 +20,15 @@ Cobranças e reajustes enviados ao provedor devem ter pelo menos R$ 0,50, valor 
 
 ## Publicação
 Executar `python manage.py migrate --noinput` no redeploy, como nas outras atualizações: migration `engagement.0009_returnmessagingsettings`. Sem alterações nas variáveis de ambiente existentes. Conectar o WhatsApp da empresa e o Master; ativar os convites automáticos somente após revisar consentimentos e limites.
+
+## Construtor avançado do chatbot Master
+
+O editor visual em `/master/whatsapp/fluxo/` oferece blocos arrastáveis, conexões por saída, zoom, desfazer/refazer, importação/exportação de JSON e um modelo comercial. Menus possuem até dez opções com caminhos independentes. Os blocos disponíveis são mensagem, menu, entrada validada, condição, variável, API, IA, espera, transferência humana e finalização.
+
+Use `{{nome}}` e `{{resposta.campo}}` para interpolar variáveis. Entradas podem validar texto, e-mail, telefone ou número. O simulador executa o mesmo motor, com respostas fictícias de API/IA, sem enviar WhatsApp ou realizar chamadas externas. Exportações não incluem as credenciais configuradas.
+
+APIs devem ser cadastradas no painel Configurar, com HTTPS público, GET/POST e token Bearer opcional. DNS privado, redirecionamentos e respostas acima de 64 KB são recusados. A IA usa chave e modelo OpenAI definidos pelo operador; fica desativada até a configuração. Não há execução de JavaScript arbitrário. As variáveis da conversa e as credenciais ficam criptografadas no banco.
+
+As mensagens são persistidas em uma fila com chave idempotente, entrega ordenada e até cinco tentativas. Falhas podem ser retomadas na conversa. O gateway preserva recibos no volume de sessão. Esperas são retomadas pelo Celery Beat a cada minuto, portanto o tempo é aproximado. Alterar o fluxo durante uma espera exige retomada humana; mensagens pendentes de um fluxo desativado são canceladas ao tentar entregá-las.
+
+Os fluxos antigos continuam no motor legado até serem editados e salvos no novo editor. Na publicação, aplique `python manage.py migrate` e atualize os serviços web, worker, beat e gateway Master. Homologue a conexão WhatsApp e as integrações com suas credenciais antes de ativar atendimento real.
