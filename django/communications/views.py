@@ -75,6 +75,8 @@ def whatsapp_webhook(request):
                     from .tenant_graph_services import enqueue
                     transaction.on_commit(lambda pk=incoming.pk:enqueue(pk))
                     continue
+                incoming.flow_processed_at=timezone.now()
+                incoming.save(update_fields=["flow_processed_at"])
                 reply=None
                 if flow and message.get("type")=="text" and phone_number_id==settings.WHATSAPP_PHONE_NUMBER_ID:
                     reply,conversation.status=next_reply(flow,conversation,body,first_message=first_message)
