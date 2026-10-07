@@ -1,6 +1,7 @@
 from datetime import timedelta
 from django.test import TestCase,Client
 from django.urls import reverse
+from django.templatetags.static import static
 from django.utils import timezone
 from django.forms import modelform_factory
 from accounts.models import User
@@ -53,10 +54,10 @@ class SimpleModeTests(TestCase):
             self.assertContains(response,text)
         self.assertNotContains(response,'portal-view-toggle')
         response=self.client.get(reverse('portal-resource-create',args=['agenda','clientes']))
-        self.assertContains(response,'simple-mode.css');self.assertContains(response,'Preencha os dados abaixo')
+        self.assertContains(response,static('css/simple-mode.css'));self.assertContains(response,'Preencha os dados abaixo')
     def test_mode_does_not_leak_to_other_company_or_public_pages(self):
         self.enable();self.tenant.public_enabled=True;self.tenant.save(update_fields=['public_enabled'])
-        self.assertNotContains(self.client.get(reverse('tenant-public',args=[self.tenant.slug])),'simple-mode.css')
+        self.assertNotContains(self.client.get(reverse('tenant-public',args=[self.tenant.slug])),static('css/simple-mode.css'))
         another=User.objects.create_user(email='outro-simple@example.test',password='StrongPassword123!',tenant=self.other,role='owner')
         self.client.force_login(another)
         self.assertTemplateUsed(self.client.get(reverse('portal-home')),'portal/home.html')
@@ -83,4 +84,4 @@ class SimpleModeTests(TestCase):
         self.enable();self.client.force_login(self.master)
         self.client.get(reverse('portal-select-tenant',args=[self.tenant.pk]))
         self.assertTemplateUsed(self.client.get(reverse('portal-home')),'portal/simple_home.html')
-        self.assertNotContains(self.client.get(reverse('master-home')),'simple-mode.css')
+        self.assertNotContains(self.client.get(reverse('master-home')),static('css/simple-mode.css'))
