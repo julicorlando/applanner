@@ -40,6 +40,7 @@ def validate_graph(graph):
             if k in config and (not isinstance(config[k],str) or len(config[k])>4000):raise ValidationError('Texto do bloco muito longo ou inválido.')
         kind=node['type']
         if kind in {'input','set','api','ai'}:variable(config.get('variable',''))
+        if kind=='ai' and 'applanner_only' in config and type(config['applanner_only']) is not bool:raise ValidationError('A restrição ApPlanner deve ser ativada ou desativada.')
         if kind=='input' and config.get('validation','text') not in {'text','email','phone','number'}:raise ValidationError('Validação de entrada inválida.')
         if kind=='knowledge' and (not isinstance(config.get('variable'),str) or not re.fullmatch(r'[a-z_][a-z0-9_]{0,39}',config['variable'])):raise ValidationError('Variável da pergunta inválida.')
         if kind=='condition':

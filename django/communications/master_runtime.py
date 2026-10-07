@@ -124,6 +124,9 @@ def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulatio
                     value={'simulated':True,'result':'Resposta simulada'} if kind=='api' else 'Resposta simulada da IA.'
                     trace[-1]['result']='simulado, sem chamada externa'
                 elif kind=='api':value=call_api(flow,node,variables,f'flow-{event_key}-{node["id"]}-{index}')
+                elif cfg.get('applanner_only'):
+                    from .master_assistant import grounded_answer
+                    value=grounded_answer(flow,node,variables,incoming)
                 else:value=call_ai(flow,node,variables,incoming)
                 variables[cfg['variable']]=value
                 if kind=='ai' and cfg.get('send_output',True):say(value)

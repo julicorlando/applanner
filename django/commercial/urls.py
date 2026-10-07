@@ -5,6 +5,7 @@ urlpatterns = [
     path("proposta/<str:token>/",views.public_proposal,name="commercial-public-proposal"),
     path("",views.dashboard,name="commercial-dashboard"),
     path("leads/novo/",views.prospect_create,name="commercial-prospect-create"),
+    path("leads/<int:pk>/excluir/",views.lead_delete,name="commercial-lead-delete"),
     path("leads/<int:pk>/",views.lead_detail,name="commercial-lead-detail"),
     path("propostas/nova/",views.proposal_create,name="commercial-proposal-create"),
     path("propostas/<int:pk>/",views.proposal_detail,name="commercial-proposal-detail"),

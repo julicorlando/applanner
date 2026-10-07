@@ -85,6 +85,7 @@
       f.oninput=()=>change(()=>{source[key]=type==='checkbox'?f.checked:type==='number'?Number(f.value):f.value;});l.append(f);container.append(l);return f;
     }
     field('Nome do bloco','label','text',null,node);
+    if(node.type==='ai')field('Restringir à base oficial do ApPlanner','applanner_only','checkbox');
     if(node.type==='knowledge')field('Variável com a pergunta','variable');
     if(node.type==='commercial')container.append(element('p','Coleta nome, empresa, segmento, e-mail, unidades, profissionais, plano e necessidade; salva o lead progressivamente.'));
     if(['start','message','menu','input','handoff','finish','legacy'].includes(node.type))field(node.type==='input'?'Pergunta ao cliente':'Texto / mensagem','text','textarea');

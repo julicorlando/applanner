@@ -285,3 +285,35 @@ def public_proposal(request,token):
         except ValidationError as exc:
             error=str(exc)
     return render(request,"commercial/public_proposal.html",{"proposal":proposal,"error":error})
+
+
+@login_required
+def lead_delete(request,pk):
+    if not request.user.is_superuser or getattr(request,'support_actor',None):
+        raise PermissionDenied('Somente o Master pode excluir leads.')
+    if request.method not in {'GET','POST'}:
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(['GET','POST'])
+    lead=get_object_or_404(Lead,pk=pk)
+    if request.method=='POST':
+        from django.db import transaction
+        from communications.models import MasterWhatsAppConversation,MasterFlowDelivery
+        from core.audit import append_audit
+        if request.POST.get('confirm')!='delete':
+            messages.error(request,'Confirme a exclusão do lead.')
+            return redirect('commercial-lead-delete',pk=pk)
+        with transaction.atomic():
+            # Use the same lock order as the chatbot (conversation before lead).
+            conversations=list(MasterWhatsAppConversation.objects.select_for_update().filter(sales_lead_id=pk).order_by('pk'))
+            lead=get_object_or_404(Lead.objects.select_for_update(),pk=pk)
+            for row in conversations:
+                MasterFlowDelivery.objects.filter(conversation=row,status__in=['queued','failed']).update(status='cancelled')
+                row.sales_lead=None;row.flow_context_encrypted='';row.flow_state='__finished__'
+                row.flow_wait_kind='';row.flow_wake_at=None;row.human_handoff=True
+                row.save(update_fields=['sales_lead','flow_context_encrypted','flow_state','flow_wait_kind','flow_wake_at','human_handoff'])
+            append_audit(user=request.user,action='commercial_lead_deleted',entity_type='commercial.Lead',entity_id=pk,
+                before={'status':lead.status,'source':lead.source,'linked_conversations':len(conversations)},after={'deleted':True},request=request)
+            lead.delete()
+        messages.success(request,'Lead excluído. Conversas, empresas e pagamentos foram preservados.')
+        return redirect('commercial-dashboard')
+    return render(request,'commercial/lead_delete.html',{'lead':lead})

@@ -102,3 +102,50 @@ class CommercialSupportParityTests(TestCase):
         profile.support_enabled=True
         profile.save(update_fields=["support_enabled"])
         self.assertTrue(has_capability(user,"support.manage"))
+
+
+class MasterLeadDeleteTests(TestCase):
+    def setUp(self):
+        self.master=User.objects.create_superuser(email='master-delete@example.com',password='StrongPassword!123')
+        self.lead=Lead.objects.create(name='Lead QA',phone='5581999999999',email='lead-delete@example.com',business_type='Barbearia')
+        self.url=f'/commercial/leads/{self.lead.pk}/excluir/'
+        self.client.force_login(self.master)
+
+    def test_get_and_unconfirmed_post_do_not_delete(self):
+        self.assertContains(self.client.get(self.url),'Excluir lead definitivamente')
+        self.assertEqual(self.client.post(self.url,{}).status_code,302)
+        self.assertTrue(Lead.objects.filter(pk=self.lead.pk).exists())
+
+    def test_commercial_cannot_delete_even_assigned_lead(self):
+        sales=User.objects.create_user(email='sales-delete@example.com',password='StrongPassword!123',role='commercial')
+        CommercialProfile.objects.create(user=sales)
+        self.lead.assigned_to=sales;self.lead.save()
+        self.client.force_login(sales)
+        self.assertEqual(self.client.get(self.url).status_code,403)
+        self.assertEqual(self.client.post(self.url,{'confirm':'delete'}).status_code,403)
+        self.assertTrue(Lead.objects.filter(pk=self.lead.pk).exists())
+
+    def test_delete_preserves_messages_and_stops_pending_intake(self):
+        from communications.models import MasterWhatsAppConversation,MasterWhatsAppMessage,MasterFlowDelivery
+        from core.models import AuditLog
+        from core.crypto import encrypt_json
+        from django.utils import timezone
+        conversation=MasterWhatsAppConversation.objects.create(wa_id='delete-test',sales_lead=self.lead,last_message_at=timezone.now(),flow_wait_kind='commercial',flow_context_encrypted=encrypt_json({'variables':{'nome':'Lead QA'}}))
+        message=MasterWhatsAppMessage.objects.create(conversation=conversation,provider_message_id='delete-msg',direction='in',body='Preserve esta mensagem')
+        pending=MasterFlowDelivery.objects.create(conversation=conversation,event_key='delete-delivery',body='Próximo dado')
+        response=self.client.post(self.url,{'confirm':'delete'})
+        self.assertEqual(response.status_code,302)
+        self.assertFalse(Lead.objects.filter(pk=self.lead.pk).exists())
+        self.assertTrue(MasterWhatsAppMessage.objects.filter(pk=message.pk).exists())
+        conversation.refresh_from_db();pending.refresh_from_db()
+        self.assertIsNone(conversation.sales_lead_id)
+        self.assertTrue(conversation.human_handoff)
+        self.assertEqual(conversation.flow_context_encrypted,'')
+        self.assertEqual(pending.status,'cancelled')
+        self.assertTrue(AuditLog.objects.filter(action='commercial_lead_deleted',entity_id=self.lead.pk).exists())
+
+    def test_csrf_required(self):
+        from django.test import Client
+        client=Client(enforce_csrf_checks=True);client.force_login(self.master)
+        self.assertEqual(client.post(self.url,{'confirm':'delete'}).status_code,403)
+        self.assertTrue(Lead.objects.filter(pk=self.lead.pk).exists())
