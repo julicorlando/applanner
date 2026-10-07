@@ -32,3 +32,7 @@ APIs devem ser cadastradas no painel Configurar, com HTTPS público, GET/POST e 
 As mensagens são persistidas em uma fila com chave idempotente, entrega ordenada e até cinco tentativas. Falhas podem ser retomadas na conversa. O gateway preserva recibos no volume de sessão. Esperas são retomadas pelo Celery Beat a cada minuto, portanto o tempo é aproximado. Alterar o fluxo durante uma espera exige retomada humana; mensagens pendentes de um fluxo desativado são canceladas ao tentar entregá-las.
 
 Os fluxos antigos continuam no motor legado até serem editados e salvos no novo editor. Na publicação, aplique `python manage.py migrate` e atualize os serviços web, worker, beat e gateway Master. Homologue a conexão WhatsApp e as integrações com suas credenciais antes de ativar atendimento real.
+
+## Modelo comercial com captação automática
+
+Veja `DOCUMENTACAO_USUARIOS_API.md`, seção Chatbot comercial Master e leads. Os novos blocos `knowledge` e `commercial` oferecem orientações nativas e cadastro progressivo, sem custos de IA. A migração 0013 instala o modelo na configuração existente; o sinalizador de ativação e as credenciais são preservados. Os leads são vinculados em `MasterWhatsAppConversation.sales_lead`, sem consentimento de marketing automático. Perguntas e respostas inválidas não avançam o cadastro indevidamente. Os dados do lead ficam disponíveis para a equipe e na API com escopo comercial.

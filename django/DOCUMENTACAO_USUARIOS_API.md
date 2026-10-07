@@ -67,3 +67,27 @@ Erros: `400` parâmetro inválido, `401` credencial inválida ou expirada, `403`
 ## Limites desta versão
 
 Os fluxos de escrita, pagamentos, WhatsApp, prontuários e ações administrativas continuam no portal e nas integrações próprias; a API pessoal v1 não os executa. Amplie endpoints apenas com contratos e testes específicos de permissão, auditoria, idempotência e isolamento antes de anunciar API de escrita. A implantação requer migration `accounts.0006_personal_api_token` e deploy do `web`; a validade depende do banco e da cache compartilhada.
+
+## Chatbot comercial Master e leads
+
+O modelo comercial do construtor (`/master/whatsapp/fluxo/`) apresenta os planos ativos e públicos do banco, incluindo preço mensal regular, dias de teste e módulos. Valores de promoções, extras e outros ciclos são confirmados no checkout ou pela equipe. A base de dúvidas cobre agenda, unidades, equipe, arena, pagamentos, WhatsApp, financeiro, localização e API. Perguntas fora da base são encaminhadas para confirmação humana; o assistente se identifica como virtual.
+
+O bloco **Cadastro automático de lead** coleta nome, empresa, segmento, e-mail, número de unidades e profissionais, plano de interesse e necessidade. O WhatsApp é aproveitado quando disponível; contatos com JID LID informam telefone. A partir do nome e telefone válidos, um lead é salvo e atualizado a cada resposta, com vínculo à conversa. Dúvidas durante a coleta não apagam o campo pendente. A transferência humana recebe o histórico e o resumo no Comercial. O cliente pode solicitar um atendente diretamente, sem cadastro obrigatório. Não é registrado consentimento automático de marketing.
+
+A API v1 continua somente leitura, com Bearer pessoal, limite de 60 requisições/minuto e listas paginadas em 50 registros:
+
+| GET | Escopo | Resultado |
+| --- | --- | --- |
+| `/api/v1/leads/` e `/api/v1/leads/ID/` | `commercial.read` | Nome, telefone, e-mail, segmento, origem, notas, status, consentimento, bloqueio de contato, próximo contato e datas. Comercial vê somente leads atribuídos; Master vê todos. |
+| `/api/v1/planos-publicos/` | `commercial.read` | Planos ativos/públicos, preços mensais regulares, descrição, teste e módulos; planos personalizados são sinalizados com `is_custom`. |
+| `/api/v1/chatbot-master/` | `master.read` e usuário Master | Ativação, data de alteração, quantidade de blocos, leads vinculados e conversas com transferência humana. Não retorna chaves, variáveis nem conteúdo de mensagens. |
+
+O simulador não cria leads e não envia mensagens. O fluxo real requer gateway Master conectado, automação habilitada e Celery worker/beat disponíveis. A migração instala o modelo na configuração existente, preservando ativação e credenciais; fluxos novos recebem o modelo ao abrir o construtor. O botão **Modelo comercial pronto** permite restaurar o modelo no rascunho antes de salvar.
+
+### Aplicar OpenAI
+
+1. Crie uma chave em `https://platform.openai.com/api-keys` e configure o faturamento/créditos da API, separados do ChatGPT Plus.
+2. Em **Configurar**, informe `gpt-4.1-mini` (ou outro modelo compatível com Chat Completions disponível no seu projeto), cole a chave e marque **Habilitar chamadas de IA**. Salve. A chave é criptografada e não volta a aparecer.
+3. Adicione um bloco **Agente IA** depois da entrada da pergunta. Defina a variável de saída (`resposta_ia`) e marque envio da resposta.
+4. Nas instruções, use: `Você é o assistente virtual do ApPlanner. Responda em português com acolhimento e objetividade. Use somente as informações fornecidas. Planos atuais: {{public_plans}}. Não invente preços, recursos, confirmação de pagamentos ou prazos. Se não souber, diga que a equipe vai confirmar. Não solicite senhas nem dados de cartão.`
+5. Conecte **Sucesso** ao próximo menu/cadastro e **Falha** ao atendimento humano. O simulador usa resposta fictícia; a homologação real usa a API e pode gerar cobrança. O fluxo comercial nativo funciona sem chave de IA.

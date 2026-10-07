@@ -21,7 +21,7 @@ def lookup(variables,path):
 
 
 def expand(value,variables):
-    return re.sub(r'\{\{\s*([a-z_][a-z0-9_.]*)\s*\}\}',lambda m:str(lookup(variables,m[1]))[:2000],str(value))[:4000]
+    return re.sub(r'\{\{\s*([a-z_][a-z0-9_.]*)\s*\}\}',lambda m:str(lookup(variables,m[1]))[:4000 if m[1]=='public_plans' else 2000],str(value))[:4000]
 
 
 def expand_json(value,variables):
@@ -68,6 +68,11 @@ def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulatio
     if waiting=='wait':
         if not resume:return {'state':state,'context':{'variables':variables},'waiting':waiting,'messages':[],'trace':[],'wake_seconds':None,'handoff':False,'error':''}
         state=nodes[state].get('outputs',{}).get('next','');waiting=''
+    elif waiting=='commercial':
+        from .master_sales import sales_turn
+        variables,replies,done=sales_turn(variables,incoming)
+        for reply in replies:say(reply)
+        if done:state=nodes[state].get('outputs',{}).get('next','');waiting=''
     elif waiting in {'menu','input','legacy'}:
         node=nodes[state];cfg=node.get('config',{});outputs=node.get('outputs',{})
         if waiting=='menu':
@@ -101,6 +106,15 @@ def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulatio
                 say(cfg.get('text','')+'\n'+'\n'.join(f'{i}. '+o['label'] for i,o in enumerate(cfg['options'],1)));waiting='menu'
             elif kind=='input':say(cfg.get('text','Informe o dado solicitado.'));waiting='input'
             elif kind=='legacy':waiting='legacy'
+            elif kind=='knowledge':
+                from .master_sales import answer_question
+                say(answer_question(variables.get(cfg['variable'],incoming)));state=out.get('next','')
+            elif kind=='commercial':
+                from .master_sales import sales_turn
+                variables,replies,done=sales_turn(variables,incoming,first=True)
+                for reply in replies:say(reply)
+                if done:state=out.get('next','')
+                else:waiting='commercial'
             elif kind=='set':variables[cfg['variable']]=expand(cfg.get('value',''),variables);state=out.get('next','')
             elif kind=='condition':state=out.get('yes' if condition(cfg,variables) else 'no','')
             elif kind in {'api','ai'}:

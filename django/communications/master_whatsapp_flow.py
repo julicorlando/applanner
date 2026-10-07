@@ -29,6 +29,7 @@ class MasterFlowForm(forms.ModelForm):
 
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
+        self.fields["ai_model"].widget.attrs["placeholder"]="gpt-4.1-mini"
         if not self.is_bound:
             self.fields["steps_text"].initial="\n".join(
                 " | ".join((step.get("id",""),";".join(step.get("keywords",[])),

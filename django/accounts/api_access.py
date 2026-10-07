@@ -34,7 +34,7 @@ RESOURCES={
     "reservas":("arena.read","arena.Reservation",("id","status","starts_at","ends_at")),
     "veiculos":("auto.read","auto.Vehicle",("id","plate","brand","model")),
     "chamados":("support.read","operations.SupportTicket",("id","protocol","subject","priority","status","created_at")),
-    "leads":("commercial.read","commercial.Lead",("id","name","business_type","status","next_contact_at")),
+    "leads":("commercial.read","commercial.Lead",("id","name","phone","email","business_type","status","source","notes","consent_granted","do_not_contact","next_contact_at","created_at","updated_at")),
     "propostas":("commercial.read","commercial.Proposal",("id","title","customer_name","final_price","status")),
 }
 
@@ -154,13 +154,17 @@ def documentation(request):
         from core.master import MASTER_RESOURCES
         master=[{"title":cfg["title"],"url":f"/master/{slug}/"} for slug,cfg in MASTER_RESOURCES.items()]
         master += [{"title":title,"url":url} for title,url in [
-            ("WhatsApp Master","/master/whatsapp/"),("Campanhas","/master/marketing/"),
+            ("WhatsApp Master","/master/whatsapp/"),("Fluxo comercial e chatbot","/master/whatsapp/fluxo/"),("Campanhas","/master/marketing/"),
             ("Chatbot","/master/chatbot/"),("Página inicial","/master/pagina-inicial/"),
             ("E-mail e SMTP","/master/email/smtp/"),("Modelos de e-mail","/master/email/modelos/"),
             ("Mercado Pago","/master/pagamentos/mercado-pago/")]]
     endpoint_rows=[{"key":key,"scope":scope,"fields":", ".join(fields)} for key,(scope,_,fields) in RESOURCES.items()
                    if scope in available and (user.is_superuser or key not in FEATURE_RESOURCES or
                        _feature_allowed(user,user.tenant,*FEATURE_RESOURCES[key]))]
+    if "commercial.read" in available:
+        endpoint_rows.append({"key":"planos-publicos","scope":"commercial.read","fields":"id, name, description, monthly_price, trial_days, trial_without_card, is_custom, modules"})
+    if "master.read" in available:
+        endpoint_rows.append({"key":"chatbot-master","scope":"master.read","fields":"enabled, updated_at, blocks, leads_linked, human_queue"})
     if "professional.read" in available:
         endpoint_rows.append({"key":"meus-agendamentos","scope":"professional.read","fields":"id, starts_at, status, service_id, customer_id"})
     return render(request,"accounts/documentation.html",{
@@ -229,8 +233,10 @@ def api_resource(request,key,pk=None):
     elif key in RESOURCES:
         scope,model_name,fields=RESOURCES[key]
         model=apps.get_model(model_name)
-    elif key=="visao-master":
+    elif key in {"visao-master","chatbot-master"}:
         scope="master.read"
+    elif key=="planos-publicos":
+        scope="commercial.read"
     else:
         return JsonResponse({"erro":"Recurso não encontrado."},status=404)
     if scope not in token.scopes or scope not in allowed_scopes(token.user):
@@ -239,6 +245,21 @@ def api_resource(request,key,pk=None):
         token.user,token.user.tenant,*FEATURE_RESOURCES[key]
     ):
         return JsonResponse({"erro":"Módulo não incluído no plano."},status=403)
+    if key in {"chatbot-master","planos-publicos"}:
+        if pk is not None:return JsonResponse({"erro":"Este recurso não possui detalhe por ID."},status=404)
+        if key=="chatbot-master":
+            if not token.user.is_superuser:return JsonResponse({"erro":"Acesso negado."},status=403)
+            from communications.models import MasterWhatsAppFlow,MasterWhatsAppConversation
+            flow=MasterWhatsAppFlow.objects.filter(pk=1).first()
+            result={"enabled":bool(flow and flow.enabled),"updated_at":flow.updated_at if flow else None,
+                    "blocks":len(flow.graph.get('nodes',[])) if flow else 0,
+                    "leads_linked":MasterWhatsAppConversation.objects.filter(sales_lead__isnull=False).count(),
+                    "human_queue":MasterWhatsAppConversation.objects.filter(human_handoff=True).count()}
+        else:
+            from communications.master_sales import plans_data
+            result=plans_data()
+        PersonalAPIToken.objects.filter(pk=token.pk).update(last_used_at=timezone.now())
+        return JsonResponse({"dados":result})
     if key=="visao-master":
         if not token.user.is_superuser:return JsonResponse({"erro":"Acesso negado."},status=403)
         from tenants.models import Tenant

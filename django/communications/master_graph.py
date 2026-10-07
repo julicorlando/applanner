@@ -4,7 +4,7 @@ import math
 import re
 from django.core.exceptions import ValidationError
 
-TYPES={'start','message','menu','input','condition','set','api','ai','wait','handoff','finish','legacy'}
+TYPES={'start','message','menu','input','condition','set','api','ai','wait','handoff','finish','legacy','knowledge','commercial'}
 NAME=re.compile(r'^[a-z][a-z0-9_]{0,39}$')
 ID=re.compile(r'^[a-z][a-z0-9_-]{0,59}$')
 
@@ -41,6 +41,7 @@ def validate_graph(graph):
         kind=node['type']
         if kind in {'input','set','api','ai'}:variable(config.get('variable',''))
         if kind=='input' and config.get('validation','text') not in {'text','email','phone','number'}:raise ValidationError('Validação de entrada inválida.')
+        if kind=='knowledge' and (not isinstance(config.get('variable'),str) or not re.fullmatch(r'[a-z_][a-z0-9_]{0,39}',config['variable'])):raise ValidationError('Variável da pergunta inválida.')
         if kind=='condition':
             if not isinstance(config.get('variable'),str) or not re.fullmatch(r'[a-z_][a-z0-9_.]{0,99}',config['variable']):raise ValidationError('Variável da condição inválida.')
             if config.get('operator') not in {'equals','contains','exists','gt','lt'}:raise ValidationError('Operador inválido.')
@@ -63,7 +64,7 @@ def validate_graph(graph):
                 words=option.get('keywords',[])
                 if not isinstance(words,list) or len(words)>10 or any(not isinstance(w,str) or not 1<=len(w)<=60 for w in words):raise ValidationError('Palavras da opção inválidas.')
         if kind=='legacy' and (not isinstance(config.get('keywords',[]),list) or any(not isinstance(k,str) or len(k)>60 for k in config.get('keywords',[]))):raise ValidationError('Palavras inválidas.')
-        allowed=({'next'} if kind=='start' else {'next','error'} if kind in {'message','set','api','ai','input','wait','legacy'} else {'yes','no'} if kind=='condition' else {o['id'] for o in config['options']}|{'invalid'} if kind=='menu' else set())
+        allowed=({'next'} if kind=='start' else {'next','error'} if kind in {'message','set','api','ai','input','wait','legacy','knowledge','commercial'} else {'yes','no'} if kind=='condition' else {o['id'] for o in config['options']}|{'invalid'} if kind=='menu' else set())
         if set(outputs)-allowed:raise ValidationError('Saída incompatível com o bloco.')
         if kind=='start' and not outputs.get('next'):raise ValidationError('Conecte o início a um bloco.')
     if graph.get('start') not in ids or sum(n['type']=='start' for n in nodes)!=1 or next(n for n in nodes if n['id']==graph['start'])['type']!='start':raise ValidationError('Defina um único bloco inicial.')
@@ -72,7 +73,7 @@ def validate_graph(graph):
     # Automatic cycles would flood messages or repeatedly call an external API.
     checked=set()
     def visit(key,path):
-        if not key or by_id[key]['type'] in {'input','menu','wait','legacy','handoff','finish'}:return
+        if not key or by_id[key]['type'] in {'input','menu','wait','legacy','handoff','finish','commercial'}:return
         if key in path:raise ValidationError('Há um ciclo sem espera ou entrada do cliente.')
         if key in checked:return
         for target in by_id[key].get('outputs',{}).values():visit(target,path|{key})
