@@ -9,6 +9,9 @@ from .models import MasterWhatsAppConversation, MasterWhatsAppFlow, MasterWhatsA
 
 
 class MasterFlowForm(forms.ModelForm):
+    graph_json=forms.CharField(required=False,widget=forms.HiddenInput())
+    integrations_json=forms.CharField(required=False,widget=forms.HiddenInput())
+    ai_key=forms.CharField(required=False,label="Chave da API OpenAI",widget=forms.PasswordInput(render_value=False))
     positions_text=forms.CharField(required=False,widget=forms.HiddenInput())
     steps_text=forms.CharField(required=False,label="Etapas e respostas",widget=forms.Textarea(attrs={
         "rows":12,"placeholder":"inicio | planos;preço | Temos planos para sua empresa. Qual segmento? | segmento | não\nsegmento | barbearia;salão | Vou chamar nossa equipe comercial. | | sim",
@@ -16,10 +19,10 @@ class MasterFlowForm(forms.ModelForm):
 
     class Meta:
         model=MasterWhatsAppFlow
-        fields=["enabled","greeting","fallback","handoff"]
+        fields=["enabled","greeting","fallback","handoff","ai_enabled","ai_model"]
         labels={"enabled":"Ativar respostas automáticas do Master",
                 "greeting":"Primeira mensagem","fallback":"Quando não entender",
-                "handoff":"Ao transferir para uma pessoa"}
+                "handoff":"Ao transferir para uma pessoa","ai_enabled":"Habilitar chamadas de IA","ai_model":"Modelo OpenAI (identificador da API)"}
         widgets={"greeting":forms.Textarea(attrs={"rows":2}),
                  "fallback":forms.Textarea(attrs={"rows":2}),
                  "handoff":forms.Textarea(attrs={"rows":2})}
@@ -33,10 +36,46 @@ class MasterFlowForm(forms.ModelForm):
                 for step in (self.instance.steps or [])
             )
 
+            from .master_graph import legacy_graph
+            from .master_integrations import integrations
+            self.fields["graph_json"].initial=json.dumps(self.instance.graph or legacy_graph(self.instance),ensure_ascii=False)
+            self.fields["integrations_json"].initial=json.dumps([{**{k:i.get(k) for k in ('name','url','enabled')},'has_token':bool(i.get('token'))} for i in integrations(self.instance)])
             self.fields["positions_text"].initial=json.dumps({step["id"]:step.get("position",{}) for step in (self.instance.steps or [])})
+
+    def clean_graph_json(self):
+        text=self.cleaned_data.get('graph_json','')
+        if not text:return None
+        from .master_graph import validate_graph
+        try:return validate_graph(json.loads(text))
+        except (ValueError,TypeError) as exc:raise forms.ValidationError('JSON do fluxo inválido.') from exc
+
+    def clean_integrations_json(self):
+        from .master_integrations import integrations,public_endpoint
+        from .master_graph import ID
+        from core.crypto import encrypt_json
+        raw=self.cleaned_data.get('integrations_json','')
+        if not raw:return self.instance.integrations_encrypted
+        try:items=json.loads(raw)
+        except ValueError:raise forms.ValidationError('Integrações inválidas.')
+        if not isinstance(items,list) or len(items)>10:raise forms.ValidationError('Cadastre até dez integrações.')
+        old={i['name']:i for i in integrations(self.instance)};result=[];names=set()
+        for item in items:
+            if not isinstance(item,dict) or not ID.fullmatch(item.get('name','')) or item['name'] in names:raise forms.ValidationError('Cada integração precisa de um nome válido e exclusivo.')
+            url=item.get('url','')
+            if not isinstance(url,str) or len(url)>500:raise forms.ValidationError('URL inválida.')
+            public_endpoint(url,resolve=False)
+            token=item.get('token') or old.get(item['name'],{}).get('token','')
+            if not isinstance(token,str) or len(token)>4000 or any(c in token for c in '\r\n'):raise forms.ValidationError('Token inválido.')
+            result.append({'name':item['name'],'url':url,'token':token,'enabled':bool(item.get('enabled',False))});names.add(item['name'])
+        return encrypt_json({'items':result})
 
     def clean(self):
         data=super().clean()
+        if data.get('ai_enabled') and (not data.get('ai_model') or not (data.get('ai_key') or self.instance.ai_key_encrypted)):
+            self.add_error('ai_enabled','Informe o modelo e a chave antes de habilitar a IA.')
+        model=data.get('ai_model','')
+        if model and not re.fullmatch(r'[A-Za-z0-9_.:-]{1,80}',model):self.add_error('ai_model','Identificador do modelo inválido.')
+        if data.get('graph_json'):return data
         try:
             positions=json.loads(data.get("positions_text") or "{}")
             if not isinstance(positions,dict) or len(positions)>30:
@@ -52,6 +91,7 @@ class MasterFlowForm(forms.ModelForm):
         return data
 
     def clean_steps_text(self):
+        if self.data.get('graph_json'):return self.instance.steps or []
         lines=[line.strip() for line in self.cleaned_data.get("steps_text","").splitlines() if line.strip()]
         if len(lines)>30:
             raise forms.ValidationError("O fluxo aceita até 30 etapas.")
@@ -93,6 +133,10 @@ def process_master_automation(message_id):
     if incoming.direction!="in" or incoming.flow_processed_at or not flow or conversation.human_handoff:
         return
 
+    if flow.graph:
+        from .master_graph_services import advance_graph
+        advance_graph(conversation.pk,incoming.pk)
+        return
     content=incoming.body.casefold()
     if not conversation.flow_state or conversation.flow_state=="__finished__":
         response=flow.greeting

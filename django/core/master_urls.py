@@ -1,7 +1,7 @@
 from django.urls import path
 from . import master, master_console, master_retention
 from .branding import platform_homepage
-from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment
+from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment,master_whatsapp_simulate
 from .master_email import email_templates,smtp_settings,waive_onboarding_email
 from communications.master_marketing import campaigns,create_campaign,cancel_campaign,import_contacts
 from billing.fiscal import master_fiscal_document
@@ -54,6 +54,7 @@ urlpatterns=[
     path("whatsapp/desconectar/",master.master_whatsapp_disconnect,name="master-whatsapp-disconnect"),
     path("whatsapp/receber/",master.master_whatsapp_receive,name="master-whatsapp-receive"),
     path("whatsapp/fluxo/",master_whatsapp_flow,name="master-whatsapp-flow"),
+    path("whatsapp/fluxo/simular/",master_whatsapp_simulate,name="master-whatsapp-simulate"),
     path("whatsapp/anexo/<int:pk>/",master_whatsapp_attachment,name="master-whatsapp-attachment"),
     path("whatsapp/<int:pk>/mensagens/",master_whatsapp_messages,name="master-whatsapp-messages"),
     path("whatsapp/<int:pk>/",master.master_whatsapp_conversation,name="master-whatsapp-conversation"),
