@@ -42,3 +42,40 @@ Veja `DOCUMENTACAO_USUARIOS_API.md`, seção Chatbot comercial Master e leads. O
 Importar `communications/master-assistant-flow.json` no Master, preservar a chave existente, conferir modelo/habilitação e salvar. O modo `config.applanner_only=true` dos blocos `ai` usa classificação de fatos aprovados: não transmite variáveis da coleta comercial e não exibe texto livre do provedor. Preços vêm dos planos públicos ativos. O simulador nunca chama OpenAI. Falhas passam para a equipe pela saída `error`. O atendimento identifica segmento/necessidade antes da coleta comercial e permite dúvidas adicionais ou transferência humana.
 
 O Master também pode excluir um lead na ficha comercial com confirmação. A transação bloqueia conversas antes do lead, cancela mensagens automáticas pendentes, limpa a coleta e transfere para humano. Não remove conversas, empresas ou pagamentos. Auditoria: `commercial_lead_deleted`. Nenhuma exclusão é exposta na API pública/comercial.
+
+## Chatbot visual das empresas
+
+Em **WhatsApp → Conectar → Configurar chatbot**, a gestão da empresa pode editar,
+simular e salvar o mesmo construtor visual do Master. O modelo pronto acolhe o
+cliente, apresenta serviços/quadras e unidades, orienta sobre a agenda, responde
+dúvidas e coleta nome, necessidade e unidade preferida antes de transferir.
+A triagem fica na conversa da empresa e vincula um cliente pelo telefone,
+preservando cadastros e consentimentos. Não cria leads comerciais do Master.
+
+A empresa reutiliza o modelo e a chave OpenAI configurados pelo Master; a chave
+nunca é exibida no formulário da empresa. A IA recebe a mensagem atual e dados
+públicos dessa empresa, sem histórico privado de clientes. O servidor forma a
+resposta a partir de fatos aprovados do catálogo. Não confirma pagamentos ou
+reservas: o agendamento é concluído na agenda pública ou pela equipe. O simulador
+não usa créditos nem envia WhatsApp.
+
+Cada empresa mantém sua conexão QR existente (ou Cloud API vinculada). Conecte
+antes de ativar o fluxo e habilite o módulo/plano. Empresas sem acesso vigente
+não geram respostas. Integrações HTTP arbitrárias e blocos legados não são aceitos.
+A configuração central da IA continua exclusiva do Master.
+
+A fila persiste respostas e deduplica eventos. O gateway QR usa chaves de envio
+duráveis por empresa e suporta números padrão e LID. Na Cloud API, uma falha
+ambígua fica para conferência humana, sem reenvio automático. Assumir/encerrar
+cancela respostas pendentes; devolver ao bot reinicia para a próxima mensagem.
+Erros de entrega aparecem na conversa para a equipe conferir a conexão.
+
+### Publicação e API
+
+Faça redeploy de **web, worker, beat e tenant-whatsapp** da branch `django-replatform`.
+O entrypoint aplica automaticamente a migration `communications.0014`.
+URLs reversas autenticadas: `tenant-whatsapp-chatbot` (GET/POST construtor) e
+`tenant-whatsapp-simulate` (POST JSON com graph, state, context, waiting, incoming).
+Ambas exigem gestão da própria empresa, acesso vigente e proteção CSRF.
+
+Caminhos atuais: `/app/comunicacao/chatbot/` e `/app/comunicacao/chatbot/simular/`.

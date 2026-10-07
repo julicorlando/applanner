@@ -56,7 +56,7 @@ def valid_input(value,kind):
     return bool(value.strip()) and len(value)<=2000
 
 
-def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulation=False,event_key=''):
+def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulation=False,event_key='',knowledge_handler=None,ai_handler=None,intake_handler=None):
     nodes={n['id']:n for n in graph['nodes']};variables=dict(context.get('variables',{}))
     variables['_message']=incoming[:2000]
     messages=[];trace=[];wake=None;handoff=False;error='';external=0
@@ -70,7 +70,7 @@ def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulatio
         state=nodes[state].get('outputs',{}).get('next','');waiting=''
     elif waiting=='commercial':
         from .master_sales import sales_turn
-        variables,replies,done=sales_turn(variables,incoming)
+        variables,replies,done=(intake_handler or sales_turn)(variables,incoming)
         for reply in replies:say(reply)
         if done:state=nodes[state].get('outputs',{}).get('next','');waiting=''
     elif waiting in {'menu','input','legacy'}:
@@ -108,10 +108,10 @@ def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulatio
             elif kind=='legacy':waiting='legacy'
             elif kind=='knowledge':
                 from .master_sales import answer_question
-                say(answer_question(variables.get(cfg['variable'],incoming)));state=out.get('next','')
+                say((knowledge_handler or answer_question)(variables.get(cfg['variable'],incoming)));state=out.get('next','')
             elif kind=='commercial':
                 from .master_sales import sales_turn
-                variables,replies,done=sales_turn(variables,incoming,first=True)
+                variables,replies,done=(intake_handler or sales_turn)(variables,incoming,first=True)
                 for reply in replies:say(reply)
                 if done:state=out.get('next','')
                 else:waiting='commercial'
@@ -124,6 +124,7 @@ def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulatio
                     value={'simulated':True,'result':'Resposta simulada'} if kind=='api' else 'Resposta simulada da IA.'
                     trace[-1]['result']='simulado, sem chamada externa'
                 elif kind=='api':value=call_api(flow,node,variables,f'flow-{event_key}-{node["id"]}-{index}')
+                elif ai_handler:value=ai_handler(flow,node,variables,incoming)
                 elif cfg.get('applanner_only'):
                     from .master_assistant import grounded_answer
                     value=grounded_answer(flow,node,variables,incoming)

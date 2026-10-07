@@ -9,6 +9,7 @@ const secret=process.env.MASTER_WHATSAPP_GATEWAY_TOKEN || '';
 const callback='http://web:8000/webhooks/tenant-whatsapp/';
 const root='/app/session/tenant';
 const sessions=new Map();
+const sendsInFlight=new Map();
 const logger=pino({level:'warn'});
 const jidPattern=/^\d{10,20}@(s\.whatsapp\.net|lid)$/;
 const phonePattern=/^\d{10,20}$/;
@@ -89,14 +90,44 @@ http.createServer(async(req,res)=>{
     if(req.method==='POST'&&match[2]==='send'){
       if(session.state!=='connected'||!session.socket)return reply(res,409,{error:'Conecte o WhatsApp antes de enviar.'});
       let body='';for await(const chunk of req){body+=chunk;if(body.length>8192)return reply(res,413,{error:'Mensagem muito longa.'});}
-      const data=JSON.parse(body),number=String(data.to||'').replace(/\D/g,'');
-      if(!phonePattern.test(number)||typeof data.text!=='string'||!data.text.trim()||data.text.length>4096)return reply(res,400,{error:'Destinatário ou texto inválido.'});
-      const jid=`${number}@s.whatsapp.net`;
-      const [found]=await session.socket.onWhatsApp(jid);
-      if(!found?.exists)return reply(res,404,{error:'Número não encontrado no WhatsApp.'});
-      const sent=await session.socket.sendMessage(found.jid||jid,{text:data.text});
-      if(!sent?.key?.id)return reply(res,503,{error:'Envio não confirmado.'});
-      return reply(res,200,{id:sent.key.id,to:found.jid||jid});
+      const data=JSON.parse(body),to=String(data.to||'');
+      const jid=jidPattern.test(to)?to:phonePattern.test(to)?`${to}@s.whatsapp.net`:'';
+      if(!jid||typeof data.text!=='string'||!data.text.trim()||data.text.length>4096)return reply(res,400,{error:'Destinatário ou texto inválido.'});
+      const key=data.idempotencyKey;
+      if(key!==undefined&&(typeof key!=='string'||!/^[a-zA-Z0-9_-]{1,120}$/.test(key)))return reply(res,400,{error:'Chave de envio inválida.'});
+      const hash=key?crypto.createHash('sha256').update(`${session.id}:${key}`).digest('hex'):'';
+      const digest=crypto.createHash('sha256').update(JSON.stringify({to:jid,text:data.text})).digest('hex');
+      const send=async()=>{
+        const directory=`${root}/${session.id}/flow-receipts`,filename=key?`${directory}/${hash}.json`:'';
+        if(filename){try{
+          const saved=JSON.parse(await fs.readFile(filename,'utf8'));
+          if(saved.digest!==digest)throw new Error('Chave reutilizada com conteúdo diferente.');
+          return saved.result;
+        }catch(error){if(error.code!=='ENOENT')throw error;}}
+        let recipient=jid;
+        if(jid.endsWith('@s.whatsapp.net')){
+          const [found]=await session.socket.onWhatsApp(jid);
+          if(!found?.exists)throw new Error('Número não encontrado no WhatsApp.');
+          recipient=found.jid||jid;
+        }
+        const sent=await session.socket.sendMessage(recipient,{text:data.text},key?{messageId:hash.slice(0,32).toUpperCase()}:undefined);
+        if(!sent?.key?.id)throw new Error('Envio não confirmado.');
+        const result={id:sent.key.id,to:recipient};
+        if(filename){
+          await fs.mkdir(directory,{recursive:true,mode:0o700});
+          const temp=filename+'.'+crypto.randomUUID()+'.tmp';
+          await fs.writeFile(temp,JSON.stringify({digest,result}),{mode:0o600});await fs.rename(temp,filename);
+        }
+        return result;
+      };
+      if(!key)return reply(res,200,await send());
+      if(sendsInFlight.has(hash)){
+        const active=sendsInFlight.get(hash);
+        if(active.digest!==digest)throw new Error('Chave reutilizada com conteúdo diferente.');
+        return reply(res,200,await active.promise);
+      }
+      const promise=send();sendsInFlight.set(hash,{digest,promise});
+      try{return reply(res,200,await promise);}finally{sendsInFlight.delete(hash);}
     }
     return reply(res,405,{error:'Método não permitido.'});
   }catch(error){logger.error({error,id:session.id},'Tenant gateway error');return reply(res,503,{error:'WhatsApp indisponível no momento.'});}

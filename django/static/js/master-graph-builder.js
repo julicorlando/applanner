@@ -21,6 +21,8 @@
     condition:['Condição / se','#13a5bb'],set:['Definir variável','#00a87b'],api:['Chamada API','#ff781b'],ai:['Agente IA','#ce2fba'],
     wait:['Aguardar','#19a5af'],handoff:['Atendimento humano','#9b44ed'],finish:['Finalizar','#263344'],legacy:['Resposta por palavra','#456bf3']
   };
+  const tenantMode = script.dataset.tenantMode === 'true';
+  if (tenantMode) {metadata.knowledge[0]='Dúvidas da empresa';metadata.commercial[0]='Dados do cliente';}
   let graph, integrations = [], selected = null, pending = null, zoom = 1, undo = [], redo = [];
   let simulation = {}, simBusy = false;
   try { graph = JSON.parse(graphField.value); integrations = JSON.parse($('id_integrations_json').value || '[]'); }
@@ -96,16 +98,16 @@
       f.oninput=()=>change(()=>{source[key]=type==='checkbox'?f.checked:type==='number'?Number(f.value):f.value;});l.append(f);container.append(l);return f;
     }
     field('Nome do bloco','label','text',null,node);
-    if(node.type==='ai')field('Restringir à base oficial do ApPlanner','applanner_only','checkbox');
+    if(node.type==='ai'&&!tenantMode)field('Restringir à base oficial do ApPlanner','applanner_only','checkbox');
     if(node.type==='knowledge')field('Variável com a pergunta','variable');
-    if(node.type==='commercial')container.append(element('p','Coleta nome, empresa, segmento, e-mail, unidades, profissionais, plano e necessidade; salva o lead progressivamente.'));
+    if(node.type==='commercial')container.append(element('p',tenantMode?'Coleta nome, WhatsApp, unidade e necessidade; vincula apenas o cadastro de cliente desta empresa, sem consentimento automático de marketing.':'Coleta nome, empresa, segmento, e-mail, unidades, profissionais, plano e necessidade; salva o lead progressivamente.'));
     if(['start','message','menu','input','handoff','finish','legacy'].includes(node.type))field(node.type==='input'?'Pergunta ao cliente':'Texto / mensagem','text','textarea');
     if(node.type==='input') {field('Salvar na variável','variable');field('Validação','validation','text',[['text','Texto'],['email','E-mail'],['phone','Telefone'],['number','Número']]);field('Mensagem quando inválido','invalid_text','textarea');}
     if(node.type==='set'){field('Variável','variable');field('Valor (aceita {{variavel}})','value','textarea');}
     if(node.type==='condition'){field('Variável ou caminho JSON','variable');field('Operador','operator','text',[['equals','Igual a'],['contains','Contém'],['exists','Existe'],['gt','Maior que'],['lt','Menor que']]);field('Valor esperado','expected');}
     if(node.type==='wait')field('Aguardar em segundos (1 a 86400)','seconds','number');
     if(node.type==='api') {field('Integração','integration','text',[['','Selecione'],...integrations.map(i=>[i.name,i.name])]);field('Método','method','text',[['GET','GET — consulta'],['POST','POST — operação']]);field('Caminho relativo (ex.: /clientes)','path');field('Corpo JSON (variáveis nas strings)','body','textarea');field('Guardar JSON na variável','variable');}
-    if(node.type==='ai'){field('Instruções do agente','prompt','textarea');field('Salvar resposta na variável','variable');field('Enviar resposta ao cliente','send_output','checkbox');container.append(element('small','Chave e modelo em Configurar. Somente as instruções e a mensagem atual são enviadas à IA.'))}
+    if(node.type==='ai'){if(!tenantMode)field('Instruções do agente','prompt','textarea');else container.append(element('p','Respostas limitadas aos serviços, unidades e informações públicas desta empresa. Personalize a recepção e as perguntas nos blocos de mensagem e entrada.'));field('Salvar resposta na variável','variable');field('Enviar resposta ao cliente','send_output','checkbox');container.append(element('small',tenantMode?'A chave e o modelo vêm da configuração central. Somente a mensagem atual e a base pública desta empresa são enviados à IA.':'Chave e modelo em Configurar. Somente as instruções e a mensagem atual são enviadas à IA.'))}
     if(node.type==='legacy'){field('Palavras separadas por ;','keywords_text');const last=container.lastChild.querySelector('input');last.value=(node.config.keywords||[]).join(';');last.oninput=()=>change(()=>node.config.keywords=last.value.split(';').map(x=>x.trim()).filter(Boolean));field('Transferir ao humano','handoff','checkbox');field('Finalizar após resposta','finish','checkbox');}
     if(node.type==='menu') {
       for(const option of node.config.options||[]) {
@@ -151,7 +153,7 @@
   window.addEventListener('keydown',e=>{if(e.key==='Escape'){pending=null;draw();status('Conexão cancelada.');}if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)){e.preventDefault();(e.shiftKey?$('graph-redo'):$('graph-undo')).click();}});
   $('graph-export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(graph,null,2)],{type:'application/json'}));const a=element('a');a.href=url;a.download='applanner-fluxo-master.json';a.click();URL.revokeObjectURL(url);};
   $('graph-import').onchange=async()=>{const f=$('graph-import').files[0];if(!f)return;if(f.size>150000){status('Arquivo excede 150 KB.');return;}try {const value=JSON.parse(await f.text());if(value.version!==2||!Array.isArray(value.nodes)||value.nodes.length>80||!value.nodes.length||value.nodes.some(n=>!metadata[n.type]||!/^[a-z][a-z0-9_-]{0,59}$/.test(n.id)||!n.config||!n.outputs||!Number.isFinite(n.x)||!Number.isFinite(n.y)))throw new Error();change(()=>{graph=value;selected=null;});status('Fluxo importado. O servidor validará todas as conexões ao salvar.');}catch{status('Arquivo de fluxo inválido.');}};
-  $('graph-template').onclick=()=>{if(!confirm('Substituir o rascunho pelo atendimento comercial completo?'))return;change(()=>{graph=JSON.parse($('commercial-template').textContent);selected=null;});edit();};
+  $('graph-template').onclick=()=>{if(!confirm(tenantMode?'Substituir o rascunho pelo modelo de atendimento da empresa?':'Substituir o rascunho pelo atendimento comercial completo?'))return;change(()=>{graph=JSON.parse($('commercial-template').textContent);selected=null;});edit();};
   function bubble(text,user=false) {const b=element('div',text,'graph-sim-bubble'+(user?' user':''));$('graph-test-thread').append(b);$('graph-test-thread').scrollTop=$('graph-test-thread').scrollHeight;}
   async function simulate(incoming='',resume=false) {
     if(simBusy)return;simBusy=true;const submit=$('graph-test-form').querySelector('button');submit.disabled=true;

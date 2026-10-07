@@ -16,6 +16,8 @@ def process_master_chatbot(self,message_id):
 
 @shared_task
 def retry_master_chatbot_queue():
+    from .tenant_graph_services import reconcile as reconcile_tenant
+    reconcile_tenant()
     from .models import MasterWhatsAppFlow,MasterWhatsAppMessage
     flow=MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).first()
     if not flow:
@@ -228,4 +230,18 @@ def send_chatbot_reply(conversation_id, body):
 @shared_task
 def deliver_master_flow_message(delivery_id):
     from .master_graph_services import deliver
+    return deliver(delivery_id)
+
+
+@shared_task
+def process_tenant_chatbot(message_id):
+    from .models import WhatsAppMessage
+    from .tenant_graph_services import advance
+    row=WhatsAppMessage.objects.filter(pk=message_id,direction='in').first()
+    if row:advance(row.conversation_id,row.pk)
+
+
+@shared_task
+def deliver_tenant_flow_message(delivery_id):
+    from .tenant_graph_services import deliver
     return deliver(delivery_id)
