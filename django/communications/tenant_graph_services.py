@@ -32,7 +32,7 @@ def advance(conversation_id,message_id=None,resume=False):
     flow=ChatbotFlow.objects.filter(tenant=conversation.tenant,enabled=True).first()
     incoming=WhatsAppMessage.objects.filter(pk=message_id,conversation=conversation,tenant=conversation.tenant,direction='in').first() if message_id else None
     if not flow or conversation.status!=WhatsAppConversation.Status.BOT or conversation.appointment_id or (message_id and (not incoming or incoming.flow_processed_at)):return
-    if not available(conversation.tenant):
+    if not available(conversation.tenant) or incoming and (not incoming.body.strip() or incoming.created_at<flow.updated_at):
         if incoming:incoming.flow_processed_at=timezone.now();incoming.save(update_fields=['flow_processed_at'])
         return
     if resume and (not conversation.flow_wake_at or conversation.flow_wake_at>timezone.now()):return
