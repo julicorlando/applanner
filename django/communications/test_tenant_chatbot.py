@@ -108,3 +108,12 @@ class TenantChatbotTests(TestCase):
     def test_disabled_flow_does_not_answer(self):
         self.flow.enabled=False;self.flow.save(update_fields=['enabled'])
         self.send('Oi');self.assertFalse(TenantFlowDelivery.objects.exists())
+
+    def test_blank_and_preconfiguration_messages_do_not_trigger_bot(self):
+        message=WhatsAppMessage.objects.create(tenant=self.tenant,conversation=self.conversation,direction='in',body='')
+        advance(self.conversation.pk,message.pk)
+        message.refresh_from_db();self.assertIsNotNone(message.flow_processed_at)
+        older=WhatsAppMessage.objects.create(tenant=self.tenant,conversation=self.conversation,direction='in',body='Oi')
+        self.flow.save()
+        advance(self.conversation.pk,older.pk)
+        self.assertFalse(TenantFlowDelivery.objects.exists())
