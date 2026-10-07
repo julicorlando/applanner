@@ -5,6 +5,17 @@
   if (!graphField) return;
   const viewport = $('graph-viewport'), canvas = $('graph-canvas'), nodes = $('graph-nodes'), svg = $('graph-links');
   const script = document.querySelector('script[data-simulate-url]');
+  const sidebar = $('graph-sidebar'), sidebarToggle = $('graph-side-toggle'), layout = $('graph-layout');
+  function setSidebarCollapsed(collapsed, persist=false) {
+    if (!sidebar || !sidebarToggle || !layout) return;
+    sidebar.hidden = collapsed;
+    layout.classList.toggle('side-collapsed', collapsed);
+    sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+    sidebarToggle.textContent = collapsed ? 'Mostrar painel' : 'Ocultar painel';
+    if (persist) { try { localStorage.setItem('applanner.master.flow.sidebar.collapsed', String(collapsed)); } catch {} }
+  }
+  if (sidebarToggle) sidebarToggle.onclick = () => setSidebarCollapsed(!sidebar.hidden, true);
+  try { setSidebarCollapsed(localStorage.getItem('applanner.master.flow.sidebar.collapsed') === 'true'); } catch {}
   const metadata = {
     knowledge:['Dúvidas do ApPlanner','#13a5bb'],commercial:['Cadastro de lead','#1ab767'],start:['Início','#ef365f'],message:['Mensagem','#336cf2'],menu:['Opções / menu','#ef9e09'],input:['Entrada de texto','#1ab767'],
     condition:['Condição / se','#13a5bb'],set:['Definir variável','#00a87b'],api:['Chamada API','#ff781b'],ai:['Agente IA','#ce2fba'],
