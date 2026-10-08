@@ -79,6 +79,11 @@ def request_module(*,tenant,module,user,note=""):
     if not module.active or not module.addon_sellable or module.addon_monthly_price is None:
         raise ValidationError("Este módulo não está disponível para contratação avulsa.")
     from .entitlements import module_enabled
+    if module.slug == "verified-business":
+        from core.public_identity import verification_status
+        status=verification_status(tenant)
+        if not status["eligible"]:
+            raise ValidationError(" ".join(status["reasons"]))
     repeatable=module.slug=="professional-extra"
     if not repeatable and module_enabled(tenant,module.slug):
         raise ValidationError("Este módulo já está habilitado.")

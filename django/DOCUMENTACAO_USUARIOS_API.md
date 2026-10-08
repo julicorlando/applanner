@@ -145,3 +145,11 @@ ou arquivada. O campo `simple_mode` não é editável nos formulários comuns.
 No redeploy, o entrypoint executa a migration `tenants.0012_tenant_simple_mode`.
 O botão anterior de compactação local do dashboard passa a se chamar
 **Compactar painel**, distinguindo-o do modo simples controlado pelo Master.
+
+## Links curtos e empresa verificada
+
+- Em **Operação → Links para compartilhar**, **Minha página** e na área do profissional, use **Copiar link curto**. Os links usam `PUBLIC_BASE_URL`, com rotas `/s/<código>/` para empresa e `/s/p/<código>/` para profissional. São estáveis após mudar o nome/slug; a unidade selecionada é preservada. Páginas despublicadas, empresas arquivadas e profissionais inativos não são expostos. O acesso continua sujeito à situação da assinatura.
+- **Empresa verificada** é um módulo adicional. O Master define o preço em seu catálogo e aprova/libera pelo fluxo existente de módulos. Não é incluído automaticamente nos planos.
+- Elegibilidade: sete dias completos desde a criação da empresa, empresa ativa e todas as etapas do cadastro inicial concluídas, incluindo página e pagamentos. O selo aparece somente enquanto o módulo estiver habilitado e os requisitos forem atendidos. Confirma a conclusão do cadastro no ApPlanner; não representa uma avaliação externa de qualidade.
+- O Explorar mostra a logo da unidade (ou a da empresa), com uma inicial como alternativa, e o selo quando elegível. `GET /api/directory/` retorna também `logo_url` e `verified` em cada resultado.
+- A publicação requer `python manage.py migrate`: cria o catálogo do adicional e os códigos dos cadastros existentes. O preço permanece sob definição do Master.

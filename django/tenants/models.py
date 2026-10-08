@@ -53,6 +53,11 @@ class Tenant(TimeStampedModel):
     is_demo=models.BooleanField(default=False)
     simple_mode=models.BooleanField(default=False,editable=False,verbose_name="Modo simples")
 
+    def save(self, *args, **kwargs):
+        from core.public_identity import assign_short_code
+        assign_short_code(self, kwargs)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
 

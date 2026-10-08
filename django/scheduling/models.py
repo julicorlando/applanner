@@ -59,6 +59,7 @@ class Professional(TimeStampedModel):
     user=models.OneToOneField(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
     name=models.CharField(max_length=150)
     public_slug=models.SlugField(max_length=120,null=True,blank=True)
+    public_short_code=models.CharField(max_length=16,unique=True,null=True,blank=True,editable=False)
     email=models.EmailField(blank=True)
     phone=models.CharField(max_length=32,blank=True)
     specialty=models.CharField(max_length=150,blank=True)
@@ -75,6 +76,11 @@ class Professional(TimeStampedModel):
         if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
             from django.core.exceptions import ValidationError
             raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa."})
+
+    def save(self, *args, **kwargs):
+        from core.public_identity import assign_short_code
+        assign_short_code(self, kwargs)
+        super().save(*args, **kwargs)
 
     class Meta:
         constraints=[

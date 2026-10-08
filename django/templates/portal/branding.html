@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Minha página pública · ApPlanner{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
@@ -6,6 +7,7 @@
   <p><a href="?company=1">Publicação geral da empresa: ativar página e agendamento →</a></p>
   {% if unit_choices and selected_unit %}<form method="get" class="portal-search"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in unit_choices %}<option value="{{ unit.pk }}"{% if selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label></form><p>Personalização de {{ selected_unit.name }}. <a href="{% url 'portal-resource-list' 'agenda' 'horarios-unidades' %}?unit={{ selected_unit.pk }}">Configurar dias e horários →</a></p>{% endif %}
   {% if tenant.public_enabled %}<p><a class="button ghost" href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}?unit={{ selected_unit.pk }}" target="_blank" rel="noopener">Abrir e compartilhar minha página ↗</a></p>{% endif %}
+  {% if tenant.public_enabled %}{% include "short_link_share.html" %}{% endif %}
   <form method="post" enctype="multipart/form-data" class="portal-form panel">{% csrf_token %}<input type="hidden" name="unit" value="{{ selected_unit.pk }}">{{ form.non_field_errors }}
     {% if tenant.logo and tenant.public_enabled %}<img class="brand-preview" src="{% url 'public-tenant-image' tenant.pk 'logo' %}?unit={{ selected_unit.pk }}" alt="Logo atual">{% endif %}
     {% if tenant.cover and tenant.public_enabled %}<img class="cover-preview" src="{% url 'public-tenant-image' tenant.pk 'cover' %}?unit={{ selected_unit.pk }}" alt="Capa atual">{% endif %}
@@ -13,4 +15,5 @@
     <div class="form-actions"><button class="button primary">Salvar alterações</button><a class="button ghost" href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}">Fotos dos profissionais →</a></div>
   </form>
 </section>
+<script src="{% static 'js/short-links.js' %}" defer></script>
 {% endblock %}

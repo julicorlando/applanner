@@ -10,7 +10,7 @@ class SubscriptionAccessMiddleware:
     PAYMENT_NAMES={'billing-fiscal-profile','billing-nfe-download','billing-nfe-request','billing-subscription-status','billing-subscription-checkout','billing-subscription-pix','billing-subscription-cancel','billing-account-deletion','billing-subscription-payment-method','billing-subscription-pix-refresh'}
     AUTH_NAMES={'accounts:login','accounts:logout','accounts:two-factor-challenge','accounts:change-password',
                 'accounts:password-reset-request','accounts:password-reset-confirm'}
-    PUBLIC_NAMES={'tenant-public','professional-public','public-availability','public-booking','public-waitlist','public-arena-slots','public-arena-book'}
+    PUBLIC_NAMES={'tenant-short-link','professional-short-link','tenant-public','professional-public','public-availability','public-booking','public-waitlist','public-arena-slots','public-arena-book'}
 
     def __init__(self,get_response):
         self.get_response=get_response
@@ -37,8 +37,15 @@ class SubscriptionAccessMiddleware:
         tenant=user.tenant if user.is_authenticated and user.tenant_id and not user.is_superuser else None
         if match.view_name in self.PUBLIC_NAMES:
             from tenants.models import Tenant
-            slug=match.kwargs.get('slug')
-            tenant=Tenant.objects.filter(Q(public_slug=slug)|Q(slug=slug)).first()
+            if match.view_name == 'tenant-short-link':
+                tenant=Tenant.objects.filter(public_short_code=match.kwargs.get('code')).first()
+            elif match.view_name == 'professional-short-link':
+                from scheduling.models import Professional
+                professional=Professional.objects.select_related('tenant').filter(public_short_code=match.kwargs.get('code')).first()
+                tenant=professional.tenant if professional else None
+            else:
+                slug=match.kwargs.get('slug')
+                tenant=Tenant.objects.filter(Q(public_slug=slug)|Q(slug=slug)).first()
         if not tenant or (user.is_authenticated and user.is_superuser):
             return self.get_response(request)
         request.billing_locked=not subscription_allows_access(current_subscription(tenant))

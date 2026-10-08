@@ -30,8 +30,9 @@
       <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">↗</span><div><span class="eyebrow">PRESENÇA ONLINE</span><h2 id="operation-share-title">Links para compartilhar</h2></div></div>
       {% if tenant.public_enabled %}
         <div class="operation-share-row"><div><strong>Página do estabelecimento</strong><span>Envie para o cliente conhecer seus serviços e agendar.</span></div><div class="operation-share-actions"><a class="button" href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">Abrir página</a><button class="button operation-copy" type="button" data-copy-url="{{ request.scheme }}://{{ request.get_host }}{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" aria-label="Copiar link do estabelecimento">Copiar link</button></div></div>
+        {% include "short_link_share.html" %}
         {% if public_professionals %}<details class="operation-professionals"><summary>Links dos profissionais <span aria-hidden="true">⌄</span></summary><div class="operation-professional-list">
-          {% for professional in public_professionals %}<div class="operation-share-row"><div><strong>{{ professional.name }}</strong><span>Página individual para agendamento</span></div><div class="operation-share-actions"><a class="button" href="{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" target="_blank" rel="noopener">Abrir</a><button class="button operation-copy" type="button" data-copy-url="{{ request.scheme }}://{{ request.get_host }}{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" aria-label="Copiar link de {{ professional.name }}">Copiar link</button></div></div>{% endfor %}
+          {% for professional in public_professionals %}<div class="operation-share-row"><div><strong>{{ professional.name }}</strong><span>Página individual para agendamento</span>{% include "short_link_share.html" with short_link=professional.short_link share_id=professional.pk %}</div><div class="operation-share-actions"><a class="button" href="{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" target="_blank" rel="noopener">Abrir</a><button class="button operation-copy" type="button" data-copy-url="{{ request.scheme }}://{{ request.get_host }}{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" aria-label="Copiar link de {{ professional.name }}">Copiar link</button></div></div>{% endfor %}
         </div></details>{% endif %}
       {% else %}<p class="operation-muted">A página pública ainda está desativada. Peça ao Master para ativar “Página pública” no cadastro da empresa.</p>{% endif %}
     </section>
@@ -80,4 +81,5 @@
 </div>
 </section>
 <script src="{% static 'js/portal-dashboard.js' %}" defer></script>
+<script src="{% static 'js/short-links.js' %}" defer></script>
 {% endblock %}

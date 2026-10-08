@@ -22,7 +22,11 @@ from arena.public import CourtSlotsAPIView, CourtBookingAPIView, court_reservati
 
 from core.booking_funnel import track
 
+from core.public_identity import tenant_short_link, professional_short_link
+
 urlpatterns = [
+    path("s/p/<slug:code>/", professional_short_link, name="professional-short-link"),
+    path("s/<slug:code>/", tenant_short_link, name="tenant-short-link"),
     path("api/public/<slug:slug>/funil/",track,name="public-booking-funnel"),
     path("api/v1/<slug:key>/",api_resource,name="personal-api-list"),
     path("api/v1/<slug:key>/<int:pk>/",api_resource,name="personal-api-detail"),
