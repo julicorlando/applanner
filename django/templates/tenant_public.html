@@ -3,7 +3,7 @@
 {% block title %}{{ tenant.public_seo_title|default:tenant.name }}{% endblock %}
 {% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
 {% block body_class %}public-page{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-booking.css' %}?v=20261005">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-booking.css' %}?v=20261008-cover">{% endblock %}
 {% block header %}<header class="topbar public-header"><a class="public-header__brand" href="#conteudo">{{ tenant.name }}</a><nav aria-label="Agendamento"><a href="#agendar">Agendar</a>{% if units %}<a href="#unidades">Localização e contato</a>{% endif %}</nav>{% include "theme_toggle.html" %}</header>{% endblock %}
 {% block account_notices %}{% endblock %}
 {% block trial_prompt %}{% endblock %}
