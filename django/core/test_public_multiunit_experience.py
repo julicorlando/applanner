@@ -107,3 +107,12 @@ class PublicMultiunitExperienceTests(TestCase):
         self.assertEqual(response.context['selected_unit'].public_today_hours['opens_at'],time(10))
         self.assertContains(response,'public-location-summary')
         self.assertContains(response,'10:00–19:00')
+
+    def test_booking_date_defaults_to_today_in_company_timezone_at_utc_midnight(self):
+        from datetime import datetime, timezone as datetime_timezone
+        from unittest.mock import patch
+        # UTC is already the next day while Recife is still on October 8.
+        with patch("core.views.timezone.now", return_value=datetime(2026,10,9,1,0,tzinfo=datetime_timezone.utc)):
+            response=self.client.get(reverse("tenant-public",args=[self.tenant.public_slug]))
+        self.assertEqual(response.context["public_today"],"2026-10-08")
+        self.assertContains(response,'id="booking-date" type="date" value="2026-10-08" min="2026-10-08" required')
