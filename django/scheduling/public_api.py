@@ -573,7 +573,7 @@ class CustomerAppointmentAPIView(APIView):
 
     @transaction.atomic
     def patch(self,request,token):
-        appointment=Appointment.objects.select_for_update().select_related(
+        appointment=Appointment.objects.select_for_update(of=("self",)).select_related(
             "tenant","unit","service","professional"
         ).filter(customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest()).first()
         if not appointment:
