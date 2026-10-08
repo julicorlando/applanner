@@ -1,6 +1,7 @@
 """Least-privilege platform roles. Unknown Master routes are denied by default."""
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
+from django.http import Http404
 
 PLATFORM_ROLES = {
     'master-finance': ('Financeiro da plataforma', 'master-finance-dashboard'),
@@ -38,3 +39,17 @@ class MasterAccessMiddleware:
         if name in {'master-resource-list','master-resource-create','master-resource-edit'} and kwargs.get('slug') in RESOURCES[user.role]:
             return None
         raise PermissionDenied('Ação restrita à administração da plataforma.')
+
+
+class MasterAdminGateMiddleware:
+    """Hide every Django admin endpoint unless the current session is a Master."""
+    def __init__(self,get_response):
+        self.get_response=get_response
+
+    def __call__(self,request):
+        path=request.path_info
+        if path=='/admin' or path.startswith('/admin/'):
+            user=request.user
+            if not (user.is_authenticated and user.is_active and user.is_superuser and user.is_staff):
+                raise Http404
+        return self.get_response(request)
