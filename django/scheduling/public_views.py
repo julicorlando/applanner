@@ -52,7 +52,7 @@ def _start(tenant,value):
 def _candidates(row):
     availability=AvailabilityService()
     return [professional for professional in Professional.objects.filter(
-        tenant=row.tenant,active=True
+        tenant=row.tenant,unit=row.unit,active=True
     ).order_by("name","pk") if availability.professional_offers(row.tenant,professional.pk,row.service_id)]
 
 
@@ -117,7 +117,7 @@ def appointment_page(request,token):
             if raw:
                 try:
                     candidate=Professional.objects.select_for_update().get(
-                        pk=int(raw),tenant=row.tenant,active=True
+                        pk=int(raw),tenant=row.tenant,unit=row.unit,active=True
                     )
                 except (ValueError,Professional.DoesNotExist):
                     candidate=None

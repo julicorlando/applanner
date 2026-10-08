@@ -3,6 +3,7 @@ import hashlib
 import os
 import subprocess
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from django.conf import settings
 from django.db import connection
@@ -97,6 +98,34 @@ def verify_database_backup(*,backup,user):
     )
 
 
+def _validate_restore_target(target_url):
+    """Restore only to a deliberately different database, never the live name.
+
+    Comparing database names also closes hostname alias and alternate-user bypasses.
+    A fresh target with a different name is required even on a separate server.
+    """
+    try:
+        target=urlsplit(target_url)
+        port=target.port
+        query=parse_qs(target.query,strict_parsing=True,keep_blank_values=True)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("URL do banco de destino inválida.") from exc
+    name=unquote(target.path.lstrip("/"))
+    if (
+        target.scheme not in {"postgres", "postgresql"}
+        or not target.hostname or not name or "/" in name
+        or target.fragment or port == 0
+        or set(query)-{"sslmode", "connect_timeout"}
+    ):
+        raise ValueError("Informe uma URL PostgreSQL de destino com nome de banco separado.")
+    active_name=str(connection.settings_dict.get("NAME") or "")
+    configured=urlsplit(os.getenv("DATABASE_URL", ""))
+    configured_name=unquote(configured.path.lstrip("/"))
+    if name in {active_name, configured_name}:
+        raise ValueError("Restauração sobre o banco ativo é bloqueada. Use um destino com outro nome de banco.")
+    return target_url
+
+
 def restore_database_backup(*,backup,target_url,confirm=False):
     if not confirm:
         raise ValueError("Restauração exige confirmação explícita.")
@@ -105,10 +134,9 @@ def restore_database_backup(*,backup,target_url,confirm=False):
     path=Path(backup.path)
     if not path.is_file() or _sha256(path)!=backup.checksum_sha256:
         raise ValueError("Integridade do backup inválida.")
-    if target_url==os.getenv("DATABASE_URL"):
-        raise ValueError("Restauração direta sobre o banco ativo é bloqueada. Use um banco de destino separado.")
+    target_url=_validate_restore_target(target_url)
     result=subprocess.run(
-        ["pg_restore","--clean","--if-exists","--no-owner","--no-privileges","--dbname",target_url,str(path)],
+        ["pg_restore","--exit-on-error","--single-transaction","--no-owner","--no-privileges","--dbname",target_url,str(path)],
         capture_output=True,text=True,timeout=3600,
     )
     if result.returncode!=0:

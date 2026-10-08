@@ -45,3 +45,14 @@ def icon(request,size):
     response['Cache-Control']='public, max-age=300'
     response['X-Content-Type-Options']='nosniff'
     return response
+
+
+def worker(request):
+    path=finders.find('js/app-worker.js')
+    if not path: raise Http404
+    with open(path,encoding='utf-8') as source:
+        response=HttpResponse(source.read(),content_type='application/javascript')
+    response['Cache-Control']='no-cache'
+    response['Service-Worker-Allowed']='/'
+    response['X-Content-Type-Options']='nosniff'
+    return response

@@ -539,7 +539,7 @@ class CustomerAppointmentAPIView(APIView):
         ).first()
 
     def _capabilities(self,appointment):
-        schedule=AvailabilityService().settings(appointment.tenant)
+        schedule=AvailabilityService().settings(appointment.tenant,unit=appointment.unit)
         manageable=appointment.status in [Appointment.Status.PENDING,Appointment.Status.CONFIRMED]
         minimum=timezone.now()+timedelta(minutes=schedule.cancel_notice_minutes)
         in_time=appointment.starts_at>=minimum

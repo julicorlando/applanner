@@ -4,10 +4,13 @@ from datetime import timedelta
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.http import Http404,HttpResponse
 from django.shortcuts import redirect,render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
 
 from .middleware import current_documents
 from .models import DataSubjectRequest,LegalAcceptance
@@ -39,7 +42,12 @@ def accept(request):
                     "user_agent":(request.META.get("HTTP_USER_AGENT") or "")[:500],
                 },
             )
-        return redirect(request.GET.get("next") or "/")
+        destination=request.GET.get("next") or "/"
+        if not url_has_allowed_host_and_scheme(
+            destination,allowed_hosts={request.get_host()},require_https=request.is_secure(),
+        ):
+            destination="/"
+        return redirect(destination)
     return render(request,"legal/accept.html",{"documents":pending})
 
 
@@ -102,8 +110,11 @@ def _create_dsr(*,request,request_type,name,email,phone="",details="",tenant=Non
     return row
 
 
+@never_cache
 @login_required
 def privacy_center(request):
+    if getattr(request,"support_actor",None):
+        raise PermissionDenied("Preferências e solicitações de privacidade são pessoais e não podem ser alteradas pelo acesso assistido.")
     user=request.user
     if request.method=="POST":
         action=request.POST.get("action")
@@ -154,8 +165,11 @@ def privacy_center(request):
     })
 
 
+@never_cache
 @login_required
 def privacy_export(request):
+    if getattr(request,"support_actor",None):
+        raise PermissionDenied("Dados pessoais da conta não podem ser exportados pelo acesso assistido.")
     user=request.user
     acceptances=LegalAcceptance.objects.filter(user=user).select_related("document").order_by("accepted_at")
     requests=DataSubjectRequest.objects.filter(user=user).order_by("created_at")

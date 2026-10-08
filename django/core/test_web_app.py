@@ -69,3 +69,11 @@ class WebAppTests(TestCase):
         self.assertContains(response,'apple-touch-icon')
         self.assertContains(response,'viewport-fit=cover')
         self.assertContains(response,'apple-mobile-web-app-capable')
+
+    def test_worker_is_public_javascript_with_root_scope_and_no_cached_html(self):
+        response=self.client.get(reverse('web-app-worker'))
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response['Content-Type'],'application/javascript')
+        self.assertEqual(response['Service-Worker-Allowed'],'/')
+        self.assertEqual(response['Cache-Control'],'no-cache')
+        self.assertContains(response,"request.mode === 'navigate'")

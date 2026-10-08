@@ -26,6 +26,7 @@ from .security import (
     consume_recovery_code, decrypt_secret, encrypt_secret, generate_recovery_codes,
     generate_totp_secret, issue_trusted_device, validate_trusted_device, verify_totp,
 )
+from .login_limits import attempt_budget,clear_budget,limited_response
 
 User=get_user_model()
 TRUSTED_COOKIE="applanner_trusted_device"
@@ -54,6 +55,9 @@ def login_view(request):
     if request.method=="POST":
         email=(request.POST.get("email") or "").strip().lower()
         password=request.POST.get("password") or ""
+        budget,wait=attempt_budget(request,"login",email)
+        if wait:
+            return limited_response(wait)
         user=authenticate(request,email=email,password=password)
         if not user:
             candidate=User.objects.filter(email=email).first()
@@ -81,6 +85,7 @@ def login_view(request):
             return render(request,"accounts/login.html",status=403)
 
         trusted=request.COOKIES.get(TRUSTED_COOKIE,"")
+        clear_budget(budget)
         if user.two_factor_enabled and not (trusted and validate_trusted_device(user,trusted)):
             _record_login_event(request,email,user=user,result="challenge",reason="two_factor")
             request.session["pre_2fa_user_id"]=user.pk
@@ -109,6 +114,9 @@ def two_factor_challenge(request):
         return redirect("accounts:login")
 
     if request.method=="POST":
+        budget,wait=attempt_budget(request,"two-factor",user.pk)
+        if wait:
+            return limited_response(wait)
         code=(request.POST.get("code") or "").strip().replace(" ","")
         ok=False
         step=None
@@ -125,10 +133,15 @@ def two_factor_challenge(request):
             return render(request,"accounts/two_factor_challenge.html",status=400)
 
         if step is not None:
-            user.two_factor_last_step=step
-            user.save(update_fields=["two_factor_last_step"])
+            claimed=User.objects.filter(pk=user.pk,two_factor_last_step__lt=step).update(
+                two_factor_last_step=step,
+            )
+            if not claimed:
+                messages.error(request,"Código inválido ou já utilizado.")
+                return render(request,"accounts/two_factor_challenge.html",status=400)
 
         remember=bool(request.session.pop("pre_2fa_remember",False))
+        clear_budget(budget)
         request.session.pop("pre_2fa_user_id",None)
         login(request,user,backend="django.contrib.auth.backends.ModelBackend")
         request.session["session_version"]=user.session_version

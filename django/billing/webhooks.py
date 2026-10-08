@@ -129,6 +129,7 @@ def _verify(provider_secret,request,resource_id):
     )
 
 
+@transaction.atomic
 def _reconcile_platform(event,gateway,data,resource_id):
     provider=platform_provider(gateway)
     kind=str(data.get("type") or "")
@@ -145,12 +146,12 @@ def _reconcile_platform(event,gateway,data,resource_id):
     elif kind=="payment" or action.startswith("payment."):
         remote=provider.get_payment(resource_id)
         external=str(remote.get("external_reference") or "")
-        payment=Payment.objects.filter(
+        payment=Payment.objects.select_for_update().filter(
             provider="mercadopago",provider_payment_id=resource_id
         ).first()
         if payment is None and external:
-            payment=Payment.objects.filter(
-                provider="mercadopago",provider_reference=external
+            payment=Payment.objects.select_for_update().filter(
+                provider="mercadopago",provider_reference=external,provider_payment_id=""
             ).order_by("-id").first()
         if payment is None and external.startswith("subscription:"):
             try:
@@ -158,30 +159,32 @@ def _reconcile_platform(event,gateway,data,resource_id):
             except (TypeError,ValueError):
                 subscription_id=None
             subscription=(
-                Subscription.objects.select_related("tenant","plan").filter(pk=subscription_id).first()
+                Subscription.objects.select_for_update().select_related("tenant","plan").filter(pk=subscription_id).first()
                 if subscription_id else None
             )
             if subscription:
+                if subscription.provider_environment and subscription.provider_environment!=gateway.environment:
+                    raise ValueError("Ambiente do pagamento diverge da assinatura.")
                 from .breakdown import subscription_charge_breakdown
-                remote_status=_payment_status(remote.get("status"))
-                payment=Payment.objects.create(
-                    tenant=subscription.tenant,
-                    subscription=subscription,
-                    purpose="subscription",
-                    reference_id=subscription.pk,
-                    provider="mercadopago",
-                    environment=gateway.environment,
-                    provider_reference=external,
-                    provider_payment_id=resource_id,
-                    provider_status=str(remote.get("status") or ""),
-                    amount=Decimal(str(remote.get("transaction_amount") or subscription.contracted_price or 0)),
-                    status=remote_status,
-                    paid_at=timezone.now() if remote_status==Payment.Status.PAID else None,
-                    metadata={
-                        "method":"card_recurring",
-                        "breakdown":subscription_charge_breakdown(subscription),
-                    },
-                )
+                payment=Payment.objects.filter(provider="mercadopago",provider_payment_id=resource_id).first()
+                if payment is None:
+                    payment=Payment.objects.create(
+                        tenant=subscription.tenant,
+                        subscription=subscription,
+                        purpose="subscription",
+                        reference_id=subscription.pk,
+                        provider="mercadopago",
+                        environment=gateway.environment,
+                        provider_reference=external,
+                        provider_payment_id=resource_id,
+                        provider_status=str(remote.get("status") or ""),
+                        amount=subscription.contracted_price,
+                        status=Payment.Status.PENDING,
+                        metadata={
+                            "method":"card_recurring",
+                            "breakdown":subscription_charge_breakdown(subscription),
+                        },
+                    )
         if payment:
             if payment.metadata.get("method")=="pix":
                 if external!=payment.provider_reference or payment.environment!=gateway.environment:
@@ -196,10 +199,16 @@ def _reconcile_platform(event,gateway,data,resource_id):
                 event.save(update_fields=["status","processed_at","error_message"])
                 return
             payment.provider_payment_id=resource_id
+            # Validate against the registered charge before changing state or
+            # granting access; accounting also rejects stale refund reversals.
+            from .platform_accounting import capture_accounting
+            if payment.status==Payment.Status.REFUNDED and remote.get("status") not in {"refunded","charged_back"}:
+                raise ValueError("A consulta não pode desfazer um estorno confirmado.")
+            capture_accounting(payment,remote)
             payment.provider_status=str(remote.get("status") or "")
             payment.status=_payment_status(payment.provider_status)
-            if remote.get("transaction_amount") is not None and payment.metadata.get("method")!="pix":
-                payment.amount=Decimal(str(remote["transaction_amount"]))
+            if payment.provider_status=="partially_refunded":
+                payment.status=Payment.Status.PARTIALLY_REFUNDED
             if payment.status==Payment.Status.PAID and payment.metadata.get("method")!="pix":
                 payment.paid_at=payment.paid_at or timezone.now()
                 if payment.subscription_id:
@@ -213,9 +222,6 @@ def _reconcile_platform(event,gateway,data,resource_id):
                         status=Subscription.Status.ACTIVE,
                         updated_at=timezone.now(),
                     )
-            from .platform_accounting import capture_accounting
-            try: capture_accounting(payment,remote)
-            except ValueError: pass  # Leave accounting unconfirmed; the reconciliation job retries authenticated data.
             payment.metadata={**payment.metadata,"mercadopago":remote}
             payment.save()
 
