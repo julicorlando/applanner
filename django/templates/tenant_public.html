@@ -3,8 +3,8 @@
 {% block title %}{{ tenant.public_seo_title|default:tenant.name }}{% endblock %}
 {% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
 {% block body_class %}public-page{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-booking.css' %}?v=20261008-cover">{% endblock %}
-{% block header %}<header class="topbar public-header"><a class="public-header__brand" href="#conteudo">{{ tenant.name }}</a><nav aria-label="Agendamento"><a href="#agendar">Agendar</a>{% if units %}<a href="#unidades">Localização e contato</a>{% endif %}</nav>{% include "theme_toggle.html" %}</header>{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-booking.css' %}?v=20261008-organized">{% endblock %}
+{% block header %}<header class="topbar public-header"><a class="public-header__brand" href="#conteudo">{{ tenant.name }}</a><nav aria-label="Agendamento">{% if tenant.public_booking_enabled %}<a href="#agendar">Agendar</a>{% endif %}{% if units %}<a href="#unidades">Localização e contato</a>{% endif %}</nav>{% include "theme_toggle.html" %}</header>{% endblock %}
 {% block account_notices %}{% endblock %}
 {% block trial_prompt %}{% endblock %}
 {% block footer %}<footer class="footer public-footer"><span>Agendamento com ApPlanner</span><nav aria-label="Documentos do cliente"><a href="{% url 'legal-public-document' 'privacidade' %}">Privacidade</a><a href="{% url 'legal-public-document' 'termos-clientes' %}">Termos</a><a href="{% url 'legal-public-document' 'cancelamento-clientes' %}">Cancelamento</a></nav></footer>{% endblock %}
@@ -25,12 +25,16 @@
       <p>{{ selected_professional.specialty|default:tenant.name }} · {{ tenant.name }}</p>
     {% else %}
       <h1>{{ tenant.public_headline|default:tenant.name }}</h1>
-      <p>{{ tenant.public_subheadline|default:tenant.description }}</p>
+      {% if tenant.public_subheadline or tenant.description %}<p>{{ tenant.public_subheadline|default:tenant.description }}</p>{% endif %}
     {% endif %}
-    <div class="actions"><a class="button primary" href="#agendar">{{ tenant.public_cta_label|default:"Agendar agora" }}</a><a class="button ghost" href="{% if segment == 'arena' %}#quadras{% else %}#servicos{% endif %}">{% if segment == 'arena' %}Ver quadras{% else %}Ver serviços{% endif %}</a></div>
-    {% if selected_unit %}<p><strong>Unidade selecionada: {{ selected_unit.name }}</strong>{% if units|length > 1 %} · <a href="#unidades">Escolher outra unidade</a>{% endif %}</p>{% endif %}
-    {% if selected_unit.address or selected_unit.city %}<p class="public-hero-address">{{ selected_unit.address }} {{ selected_unit.address_number }}{% if selected_unit.city %} · {{ selected_unit.city }}/{{ selected_unit.state }}{% endif %}</p>{% endif %}
-    <nav class="public-cover-links" aria-label="Conteúdo do estabelecimento">
+    <div class="actions">{% if tenant.public_booking_enabled %}<a class="button primary" href="#agendar">{{ tenant.public_cta_label|default:"Agendar agora" }}</a>{% else %}<a class="button primary" href="#unidades">Localização e contato</a>{% endif %}<a class="button ghost" href="{% if segment == 'arena' %}#quadras{% else %}#servicos{% endif %}">{% if segment == 'arena' %}Ver quadras{% else %}Ver serviços{% endif %}</a></div>
+
+  </div>
+</section>
+
+<div class="public-tabs-shell">    <nav class="public-cover-links public-section-tabs" aria-label="Conteúdo do estabelecimento">
+      {% if tenant.public_booking_enabled %}<a href="#agendar">Agendar</a>{% endif %}
+      {% if segment == 'arena' and courts %}<a href="#quadras">Quadras</a>{% endif %}
       {% if segment != 'arena' and services %}<a href="#servicos">Serviços</a>{% endif %}
       {% if segment != 'arena' and professionals and not selected_professional %}<a href="#profissionais">Profissionais</a>{% endif %}
       {% if loyalty %}<a href="#fidelidade">Fidelidade</a>{% endif %}
@@ -38,10 +42,15 @@
       {% if packages %}<a href="#pacotes">Pacotes</a>{% endif %}
       {% if memberships %}<a href="#assinaturas">Assinaturas</a>{% endif %}
       {% if reviews %}<a href="#avaliacoes">Avaliações</a>{% endif %}
-      {% if units %}<a href="#unidades">Unidades</a>{% endif %}
-    </nav>
-  </div>
+      {% if units %}<a href="#unidades">Local e horários</a>{% endif %}
+    </nav></div>
+{% if selected_unit %}
+<section class="shell public-location-summary" aria-label="Unidade do agendamento">
+  <div><span class="eyebrow">UNIDADE SELECIONADA</span><strong>{{ selected_unit.name }}</strong>{% if selected_unit.address or selected_unit.city %}<span class="public-location-address">{{ selected_unit.address }} {{ selected_unit.address_number }}{% if selected_unit.city %} · {{ selected_unit.city }}/{{ selected_unit.state }}{% endif %}</span>{% endif %}</div>
+  {% if selected_unit.public_today_hours %}<div class="public-today-hours"><span>Hoje</span><strong>{% if selected_unit.public_today_hours.not_configured %}Horário não informado{% elif selected_unit.public_today_hours.closed %}Fechado{% else %}{{ selected_unit.public_today_hours.opens_at|time:"H:i" }}–{{ selected_unit.public_today_hours.closes_at|time:"H:i" }}{% endif %}</strong></div>{% endif %}
+  <a class="button ghost" href="#unidades">{% if units|length > 1 %}Escolher outra unidade{% else %}Localização e horários{% endif %}</a>
 </section>
+{% endif %}
 
 {% if tenant.public_booking_enabled %}
 {% if segment == 'arena' %}
@@ -122,19 +131,19 @@
 {% endif %}
 {% if segment != 'arena' and professionals and not selected_professional %}
 <section class="shell section" id="profissionais">
-  <div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Profissionais de {{ selected_unit.name|default:tenant.name }}.</h2><p>Clique no profissional para abrir a agenda exclusiva dele.</p></div>
+  <div class="section-head"><span class="eyebrow">EQUIPE</span><h2>Escolha seu profissional.</h2><p>Conheça a equipe de {{ selected_unit.name|default:tenant.name }} e veja os horários de cada profissional.</p></div>
   <div class="segment-grid public-choice-grid">
     {% for professional in professionals %}
       {% if professional.public_slug %}
       <a class="public-choice-card public-professional-card" href="{% url 'professional-public' public_slug professional.public_slug %}" aria-label="Abrir agenda de {{ professional.name }}">
-        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% endif %}
+        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% else %}<span class="public-professional-initial" aria-hidden="true">{{ professional.name|slice:':1' }}</span>{% endif %}
         <span>{{ professional.specialty|default:"Profissional" }}</span>
         <h3>{{ professional.name }}</h3>
         <span class="public-choice-card__action">Ver agenda e horários →</span>
       </a>
       {% else %}
       <article class="public-choice-card public-professional-card public-choice-card--disabled">
-        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% endif %}
+        {% if professional.photo %}<img class="public-professional-card__photo" src="{% url 'public-professional-image' professional.pk %}" alt="Foto de {{ professional.name }}">{% else %}<span class="public-professional-initial" aria-hidden="true">{{ professional.name|slice:':1' }}</span>{% endif %}
         <span>{{ professional.specialty|default:"Profissional" }}</span>
         <h3>{{ professional.name }}</h3>
         <span class="public-choice-card__action">Agenda exclusiva indisponível</span>
@@ -185,12 +194,12 @@
 {% endif %}
 
 {% if reviews %}
-<section class="shell section" id="avaliacoes"><div class="section-head"><span class="eyebrow">AVALIAÇÕES</span><h2>Avaliações dos clientes.</h2><p>Exibimos somente nome, data e nota.</p></div><div class="segment-grid">{% for review in reviews %}<article class="public-review-card"><h3>{{ review.customer_name }}</h3><p>{{ review.created_at|date:"d/m/Y" }}</p><div class="public-rating" aria-label="Nota {{ review.rating }} de 5"><span>{{ review.rating }}/5</span><div class="public-rating__track"><i style="width:{% widthratio review.rating 5 100 %}%"></i></div></div></article>{% endfor %}</div></section>
+<section class="shell section" id="avaliacoes"><div class="section-head"><span class="eyebrow">AVALIAÇÕES</span><h2>Avaliações dos clientes.</h2></div><div class="segment-grid">{% for review in reviews %}<article class="public-review-card"><h3>{{ review.customer_name }}</h3><p>{{ review.created_at|date:"d/m/Y" }}</p><div class="public-rating" aria-label="Nota {{ review.rating }} de 5"><span>{{ review.rating }}/5</span><div class="public-rating__track"><i style="width:{% widthratio review.rating 5 100 %}%"></i></div></div></article>{% endfor %}</div></section>
 {% endif %}
 
 {% if units %}
 <section class="shell section" id="unidades">
-  <div class="section-head"><span class="eyebrow">UNIDADES</span><h2>Escolha onde deseja ser atendido.</h2><p id="nearest-unit-status">Se você permitir a localização do dispositivo, destacamos automaticamente a unidade mais próxima.</p></div>
+  <div class="section-head"><span class="eyebrow">UNIDADES</span><h2>{% if units|length > 1 %}Nossas unidades.{% else %}Localização e horários.{% endif %}</h2><p id="nearest-unit-status">Se você permitir a localização do dispositivo, destacamos automaticamente a unidade mais próxima.</p></div>
   <div class="segment-grid" id="public-units-grid">
     {% for unit in units %}
     <article tabindex="0" role="group" aria-label="Unidade {{ unit.name }}" class="public-unit-card{% if selected_unit.pk == unit.pk %} is-selected{% endif %}" data-unit-card="{{ unit.pk }}" data-lat="{% if unit.latitude != None %}{{ unit.latitude|floatformat:"7u" }}{% endif %}" data-lng="{% if unit.longitude != None %}{{ unit.longitude|floatformat:"7u" }}{% endif %}">

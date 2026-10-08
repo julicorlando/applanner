@@ -162,3 +162,22 @@ No Master → Página inicial, configure a logo padrão, a logo do tema claro, a
 No celular, a operação mostra atalhos inferiores de acordo com o papel do usuário e os módulos disponíveis. A tela Hoje permite consultar outra data pelo calendário e pela faixa de dias da semana, mantendo a unidade selecionada. O profissional acessa a própria agenda; acesso bloqueado por assinatura mostra apenas Pagamento. As ações e permissões de atendimento seguem as regras existentes.
 
 A migração `contenthub.0005` adiciona os três campos opcionais sem alterar a logo já cadastrada. A página inicial destaca o agendamento, a equipe e o relacionamento, com condições comerciais obtidas dos planos cadastrados no Master.
+
+
+### ApPlanner como aplicativo no celular
+
+A navegação móvel usa o cabeçalho compacto e os atalhos inferiores de acordo com o perfil e os módulos do usuário. Nas telas de operação, aparece a opção “ApPlanner no seu celular → Adicionar”. Quando o navegador oferece instalação, o botão abre a confirmação nativa; caso contrário, mostra instruções para adicionar à tela inicial. No iPhone, use Compartilhar → Adicionar à Tela de Início e mantenha “Abrir como App da Web” ativo quando disponível. A sugestão pode ser fechada durante a sessão e fica oculta quando aberto como aplicativo.
+
+O app instalado abre em janela própria a partir do ícone, com autenticação e navegação conforme o perfil. O ícone usa o favicon configurado pelo Master, ajustado ao formato dos lançadores móveis; sem personalização usa a identidade oficial. No navegador comum, a barra de endereço continua sob controle do próprio navegador. É necessário acesso à internet para consultar e realizar operações.
+
+Manifesto público: `GET /imagens/app.webmanifest`. Ícones PNG: `GET /imagens/app/180.png`, `/imagens/app/192.png` e `/imagens/app/512.png`. Não há service worker ou armazenamento offline de agenda, pagamentos e dados de clientes nesta versão.
+
+
+### Valor correto de PUBLIC_BASE_URL no Coolify
+
+No campo de nome da variável, use `PUBLIC_BASE_URL`; no campo de valor, use apenas `https://applanner.com.br`. Não repita `PUBLIC_BASE_URL=` dentro do valor. A inicialização normaliza esse prefixo quando colado por engano, evitando que ele apareça nos links curtos, links de e-mail e outras URLs geradas a partir da configuração pública. Salve a variável e faça redeploy para aplicar a alteração.
+
+
+### Organização da página pública
+
+A página apresenta a capa com identidade e chamada de agendamento, atalhos horizontais por seção e um resumo da unidade selecionada com endereço e horário de hoje. A reserva fica em destaque, seguida da equipe, quadras ou serviços, produtos e benefícios disponíveis, avaliações e informações completas das unidades. Os atalhos exibem apenas seções disponíveis. Os cards de serviço colocam nome, preço e duração em evidência; profissionais sem foto mostram uma inicial. A navegação de serviços mantém o mesmo catálogo do agendamento, sem duplicar os serviços ou alterar a unidade escolhida.

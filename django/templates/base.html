@@ -3,7 +3,13 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="{% url 'web-app-manifest' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% url 'web-app-icon' 180 %}?v={{ platform_branding.updated_at|date:'U'|default:'1' }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ApPlanner">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#f5f7fa">
   <script src="{% static 'js/theme.js' %}"></script>
   <title>{% block title %}ApPlanner{% endblock %}</title>
@@ -81,7 +87,7 @@
   {% if messages %}
   <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
   {% endif %}
-  <main id="conteudo">{% if simple_mode and not request.billing_locked %}<div class="shell simple-breadcrumb"><a href="{% url 'portal-home' %}">← Voltar ao início</a><span>Modo simples</span></div>{% endif %}{% block account_notices %}{% include "billing/due_notice.html" %}{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
+  <main id="conteudo">{% include "app_install.html" %}{% if simple_mode and not request.billing_locked %}<div class="shell simple-breadcrumb"><a href="{% url 'portal-home' %}">← Voltar ao início</a><span>Modo simples</span></div>{% endif %}{% block account_notices %}{% include "billing/due_notice.html" %}{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
 {% endblock %}{% block content %}{% endblock %}</main>
   {% block footer %}<footer class="footer">
     <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>
@@ -97,6 +103,7 @@
     <span>© {% now "Y" %} ApPlanner</span>
   </footer>{% endblock %}
   {% include "mobile_workspace_nav.html" %}
+  <script src="{% static 'js/app-install.js' %}" defer></script>
   {% block trial_prompt %}{% include "billing/trial_prompt.html" %}{% endblock %}
 </body>
 </html>

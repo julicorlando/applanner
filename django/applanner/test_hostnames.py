@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from .hostnames import public_allowed_host
+from .hostnames import normalize_public_base_url, public_allowed_host
 
 
 class PublicHostTests(SimpleTestCase):
@@ -12,3 +12,18 @@ class PublicHostTests(SimpleTestCase):
                       "https://example.test/path", "https://[invalid"):
             with self.subTest(url=value):
                 self.assertEqual(public_allowed_host(value),"")
+
+
+class PublicBaseURLTests(SimpleTestCase):
+    def test_url_and_accidentally_pasted_assignment_produce_the_same_origin(self):
+        for value in ('https://applanner.com.br/', ' PUBLIC_BASE_URL=https://applanner.com.br/ ',
+                      'PUBLIC_BASE_URL="https://applanner.com.br/"', '"PUBLIC_BASE_URL=https://applanner.com.br/"'):
+            with self.subTest(value=value):
+                normalized=normalize_public_base_url(value)
+                self.assertEqual(normalized,'https://applanner.com.br')
+                self.assertEqual(public_allowed_host(normalized),'applanner.com.br')
+
+    def test_empty_origin_and_unrelated_assignments_are_not_invented(self):
+        self.assertEqual(normalize_public_base_url(''),'')
+        value=normalize_public_base_url('OTHER_URL=https://example.test')
+        self.assertEqual(public_allowed_host(value),'')

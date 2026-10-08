@@ -1,6 +1,6 @@
 from pathlib import Path
 import environ
-from .hostnames import public_allowed_host
+from .hostnames import normalize_public_base_url, public_allowed_host
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(DJANGO_DEBUG=(bool, False), SECURE_SSL_REDIRECT=(bool, True), EMAIL_USE_TLS=(bool, True))
@@ -14,7 +14,7 @@ FIELD_ENCRYPTION_KEY = env("DJANGO_FIELD_ENCRYPTION_KEY")
 TRUSTED_DEVICE_DAYS = env.int("TRUSTED_DEVICE_DAYS", default=30)
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost","127.0.0.1"])
-PUBLIC_BASE_URL = env("PUBLIC_BASE_URL",default="")
+PUBLIC_BASE_URL = normalize_public_base_url(env("PUBLIC_BASE_URL",default=""))
 _public_host = public_allowed_host(PUBLIC_BASE_URL)
 if _public_host and _public_host not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(_public_host)

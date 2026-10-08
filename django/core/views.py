@@ -294,6 +294,8 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
     if selected_unit is None:
         selected_unit=(professional.unit if professional and professional.unit_id else (units[0] if units else None))
     if selected_unit:
+        selected_unit=next((unit for unit in units if unit.pk==selected_unit.pk),selected_unit)
+        selected_unit.public_today_hours=next((hour for hour in getattr(selected_unit,'public_hours',[]) if hour['is_today']),None)
         professionals=[item for item in professionals if item.unit_id==selected_unit.pk]
         services=[item for item in services if item.unit_id in (None,selected_unit.pk)]
         from copy import copy

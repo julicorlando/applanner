@@ -95,3 +95,15 @@ class PublicMultiunitExperienceTests(TestCase):
         self.assertNotIn('/admin/',header)
         self.assertIn('Localização e contato',header)
         self.assertIn('theme-toggle',header)
+
+    def test_selected_location_summary_uses_the_selected_units_hours(self):
+        from django.utils import timezone
+        from zoneinfo import ZoneInfo
+        weekday=timezone.now().astimezone(ZoneInfo(self.tenant.timezone)).isoweekday()
+        UnitBusinessHours.objects.update_or_create(tenant=self.tenant,unit=self.second,weekday=weekday,
+            defaults={'opens_at':time(10),'closes_at':time(19),'closed':False,'active':True})
+        response=self.client.get(reverse('tenant-public',args=[self.tenant.public_slug]),{'unit':self.second.pk})
+        self.assertEqual(response.context['selected_unit'].pk,self.second.pk)
+        self.assertEqual(response.context['selected_unit'].public_today_hours['opens_at'],time(10))
+        self.assertContains(response,'public-location-summary')
+        self.assertContains(response,'10:00–19:00')
