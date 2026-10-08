@@ -697,7 +697,9 @@ def subscription_modules(request):
                 tenant=tenant,module=module,status=TenantModuleAddon.Status.ACTIVE
             ).first()
             module.current_extra_quantity=active_extra.quantity if active_extra else 0
+    from core.public_identity import verification_status
     return render(request,"billing/modules.html",{
+        "verification":verification_status(tenant),
         "subscription":subscription,"available":available,
         "requests":ModuleRequest.objects.filter(tenant=tenant).select_related("module").order_by("-created_at")[:100],
         "active_addons":TenantModuleAddon.objects.filter(

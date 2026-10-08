@@ -1069,7 +1069,12 @@ def home(request):
     unit=selected_unit(request,tenant)
     public_professionals=(tenant.professionals.filter(active=True,public_slug__isnull=False,**({"unit":unit} if unit else {}))
                           .exclude(public_slug="").order_by("name") if tenant.public_enabled else [])
+    from .public_identity import short_url
+    public_professionals=list(public_professionals)
+    for professional in public_professionals:
+        professional.short_link=short_url(professional)
     return render(request,"portal/home.html",{
+        "short_link":short_url(tenant,unit),
         "tenant":tenant,"modules":modules,"contracted_modules":contracted,
         "public_professionals":public_professionals,
         "arena_mode":segment_enabled(tenant,"arena"),

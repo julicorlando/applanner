@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404,render
 from tenants.models import Tenant,Unit
 from .models import BlogPost,LandingPage
+from core.public_identity import verification_status
 
 
 def public_directory(request):
@@ -13,13 +14,15 @@ def public_directory(request):
     ).prefetch_related("units").order_by("name")[:200]
     data=[]
     for tenant in rows:
+        verified=verification_status(tenant)["verified"]
         active_units=list(tenant.units.filter(active=True).order_by("-is_primary","name","pk"))
         has_primary=any(unit.is_primary for unit in active_units)
         for index,unit in enumerate(active_units):
             display_primary=unit.is_primary or (not has_primary and index==0)
             data.append({
                 "name":tenant.name if display_primary else f"{tenant.name} · {unit.name}",
-                "tenant_name":tenant.name,
+                "tenant_name":tenant.name,"verified":verified,
+                "logo_url":f"/imagens/empresa/{tenant.pk}/logo/?unit={unit.pk}" if (unit.logo or tenant.logo) else "",
                 "unit":{"id":unit.pk,"name":unit.name,"city":unit.city,"state":unit.state,
                         "latitude":unit.latitude,"longitude":unit.longitude,"phone":unit.phone,
                         "whatsapp":unit.whatsapp,"website":unit.website},
@@ -68,6 +71,7 @@ def public_directory_page(request):
 
     cards=[]
     for tenant in rows[:300]:
+        verified=verification_status(tenant)["verified"]
         active_units=list(tenant.units.filter(active=True).order_by("-is_primary","name","pk"))
         has_primary=any(unit.is_primary for unit in active_units)
         for index,unit in enumerate(active_units):
@@ -76,7 +80,7 @@ def public_directory_page(request):
             if latitude is not None and unit.latitude is not None and unit.longitude is not None:
                 distance=_distance_km(latitude,longitude,unit.latitude,unit.longitude)
             cards.append({
-                "tenant":tenant,"unit":unit,"nearest_unit":unit,
+                "tenant":tenant,"unit":unit,"nearest_unit":unit,"verified":verified,
                 "distance_km":distance,
                 "display_name":tenant.name if display_primary else f"{tenant.name} · {unit.name}",
             })

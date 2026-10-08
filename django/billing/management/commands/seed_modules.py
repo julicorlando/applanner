@@ -80,6 +80,11 @@ MODULES={
         "description":"Conexões autorizadas com provedores de pagamento, Pix, conciliação e webhooks por estabelecimento.",
         "active":True,"sort_order":80,"addon_sellable":True,
     },
+    "verified-business":{
+        "name":"Empresa verificada",
+        "description":"Selo de cadastro completo após sete dias, exibido na página pública e no Explorar. Valor definido pelo Master.",
+        "active":True,"sort_order":85,"addon_sellable":True,
+    },
 }
 
 # Slugs criados durante a replatform que não existem no catálogo tenant-facing do PHP.
@@ -92,7 +97,10 @@ class Command(BaseCommand):
     def handle(self,*args,**options):
         for slug,defaults in MODULES.items():
             payload={"addon_sellable":False,"sort_order":0,**defaults}
-            Module.objects.update_or_create(slug=slug,defaults=payload)
+            if slug == "verified-business":
+                Module.objects.get_or_create(slug=slug,defaults=payload)
+            else:
+                Module.objects.update_or_create(slug=slug,defaults=payload)
         Module.objects.filter(slug__in=DJANGO_ONLY_ALIASES).update(active=False)
         self.stdout.write(self.style.SUCCESS(
             f"{len(MODULES)} módulos do catálogo legado sincronizados."

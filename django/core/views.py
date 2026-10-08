@@ -353,7 +353,9 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         "saude":("AGENDAMENTO DE SAÚDE","Escolha seu atendimento e um profissional disponível.","Atendimento"),
         "arena":("RESERVA NA ARENA","Escolha a atividade e um horário disponível.","Atividade"),
         "barbearia":("AGENDAMENTO NA BARBEARIA","Escolha o serviço e o profissional para seu atendimento.","Serviço")}
+    from .public_identity import verification_status
     return {
+        "company_verified":verification_status(tenant)["verified"],
         "public_today":tenant_today.isoformat(),
         "tenant":tenant,"services":services,"professionals":professionals,"units":units,
         "selected_unit":selected_unit,

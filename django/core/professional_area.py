@@ -201,7 +201,9 @@ def professional_area(request):
     if referral_campaign and not referral_campaign.professional_referrals_enabled:
         referral_campaign=None
 
+    from .public_identity import short_url
     return render(request,"portal/professional_area.html",{
+        "short_link":short_url(professional),
         "professional":professional,"upcoming":upcoming[:15],"current":current,"upcoming_count":upcoming.count(),
         "completed_month":appointments.filter(starts_at__gte=month_start,starts_at__lt=now,
                                                status=Appointment.Status.COMPLETED).count(),

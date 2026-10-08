@@ -8,7 +8,7 @@
     <article class="directory-card">
       <a class="directory-card__overlay" href="{% url 'tenant-public' card.tenant.public_slug|default:card.tenant.slug %}?unit={{ card.unit.pk }}#agendar" aria-label="Abrir {{ card.display_name }} e agendar"></a>
       <div class="directory-card__content">
-        {% if card.tenant.logo %}<img class="professional-avatar" src="{% url 'public-tenant-image' card.tenant.pk 'logo' %}" alt="Logo de {{ card.tenant.name }}" loading="lazy">{% endif %}
+        <div class="public-business-identity">{% if card.unit.logo or card.tenant.logo %}<img class="professional-avatar" src="{% url 'public-tenant-image' card.tenant.pk 'logo' %}?unit={{ card.unit.pk }}" alt="Logo de {{ card.tenant.name }}" loading="lazy" width="72" height="72">{% else %}<span class="public-logo-placeholder" aria-label="{{ card.tenant.name }}">{{ card.tenant.name|first|upper }}</span>{% endif %}{% if card.verified %}{% include "verified_business_badge.html" %}{% endif %}</div>
         <span class="directory-card__segment">{{ card.tenant.category_label }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
         <h3>{{ card.display_name }}</h3>
         <p>{{ card.tenant.description|truncatechars:180 }}</p>

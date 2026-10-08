@@ -140,7 +140,9 @@ def tenant_branding(request):
         messages.success(request,"Página da unidade atualizada." if selected_unit else "Página pública atualizada.")
         from django.urls import reverse
         return redirect(reverse("tenant-branding")+(f"?unit={selected_unit.pk}" if selected_unit else "?company=1"))
-    return render(request,"portal/branding.html",{"tenant":tenant,"form":form,"unit_choices":units,"selected_unit":selected_unit})
+    from .public_identity import short_url, verification_status
+    return render(request,"portal/branding.html",{"tenant":tenant,"form":form,"unit_choices":units,"selected_unit":selected_unit,
+        "short_link":short_url(tenant,selected_unit), "verification":verification_status(tenant)})
 
 
 def _image_response(image):
