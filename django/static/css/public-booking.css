@@ -18,7 +18,7 @@
 .public-page .public-choice-card h3{font-size:1.1rem;margin:8px 0;color:var(--ink)}
 .public-page .public-choice-card p{color:var(--muted);font-size:.9rem}.public-page .public-choice-card.is-selected{border:2px solid var(--accent);background:var(--soft)}
 .public-page .booking-service-catalog .public-choice-grid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
-.public-page .booking-service-catalog h3{display:none}
+.public-page .booking-service-catalog>h3{display:none}
 .booking-enhanced #booking-service{position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none}
 .booking-enhanced #booking-service + small{display:none}.booking-enhanced label[for=booking-service]{display:none}
 .booking-progress{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
