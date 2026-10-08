@@ -199,7 +199,7 @@ class ImprovementsTests(TestCase):
             self.assertEqual(self.client.get(reverse(destination)).status_code,200)
             for url in ['/admin/','/app/','/api/scheduling/appointments/',reverse('master-resource-list',args=['usuarios']),
                         reverse('master-company-lifecycle',args=[self.company.pk,'delete'])]:
-                self.assertEqual(self.client.get(url).status_code,403,(role,url))
+                self.assertEqual(self.client.get(url).status_code,404 if url.startswith("/admin/") else 403,(role,url))
             self.assertEqual(self.client.post(reverse('master-resource-create',args=['usuarios']),{}).status_code,403)
         self.client.force_login(User.objects.get(role='master-finance'))
         self.assertEqual(self.client.get(reverse('master-resource-create',args=['despesas'])).status_code,200)
