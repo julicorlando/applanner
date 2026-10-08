@@ -1,3 +1,4 @@
+from pathlib import Path
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -13,7 +14,7 @@ from tenants.models import Tenant,Unit
 class ImageSizeForm(forms.ModelForm):
     def clean(self):
         data=super().clean()
-        for field in ("logo","cover"):
+        for field in ("logo","cover","logo_light","logo_dark","favicon"):
             uploaded=data.get(field)
             if uploaded and getattr(uploaded,"size",0)>5*1024*1024:
                 self.add_error(field,"Imagem deve ter no máximo 5 MB.")
@@ -23,10 +24,21 @@ class ImageSizeForm(forms.ModelForm):
 class PlatformHomepageForm(ImageSizeForm):
     class Meta:
         model=PlatformHomepage
-        fields=["logo","hero_title","hero_description","closing_title","medical_segment_visible"]
+        fields=["logo","logo_light","logo_dark","favicon","hero_title","hero_description","closing_title","medical_segment_visible"]
         labels={"logo":"Logo personalizada (opcional)","hero_title":"Título principal",
-                "hero_description":"Descrição principal","closing_title":"Chamada final",
+                "logo_light":"Logo do sistema · tema claro", "logo_dark":"Logo do sistema · tema escuro",
+                "favicon":"Ícone da aba do navegador", "hero_description":"Descrição principal","closing_title":"Chamada final",
                 "medical_segment_visible":"Exibir Médico / Clínica e Clínicas publicamente"}
+        help_texts={"logo":"Logo padrão, usada quando não houver uma logo específica para o tema.",
+            "logo_light":"PNG ou WebP com fundo transparente recomendado. Até 5 MB.",
+            "logo_dark":"Envie uma versão com contraste para fundos escuros. Até 5 MB.",
+            "favicon":"PNG ou ICO quadrado recomendado, com pelo menos 32 × 32 pixels. Até 5 MB."}
+
+    def clean_favicon(self):
+        image=self.cleaned_data.get("favicon")
+        if image and Path(image.name).suffix.lower() not in {".png",".ico"}:
+            raise forms.ValidationError("Envie o ícone no formato PNG ou ICO.")
+        return image
 
 
 class TenantBrandingForm(ImageSizeForm):
@@ -156,7 +168,7 @@ def _image_response(image):
     from pathlib import Path
     suffix=Path(image.name).suffix.lower()
     content_type={".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",
-                  ".webp":"image/webp",".gif":"image/gif"}.get(suffix,"application/octet-stream")
+                  ".webp":"image/webp",".gif":"image/gif",".ico":"image/vnd.microsoft.icon"}.get(suffix,"application/octet-stream")
     response=FileResponse(stream,content_type=content_type)
     response["X-Content-Type-Options"]="nosniff"
     response["Cache-Control"]="public, max-age=300"
@@ -164,7 +176,16 @@ def _image_response(image):
 
 
 def public_platform_logo(request):
-    return _image_response(get_object_or_404(PlatformHomepage,pk=1).logo)
+    row=get_object_or_404(PlatformHomepage,pk=1)
+    theme=request.GET.get("theme")
+    if theme not in {None,"light","dark"}:
+        raise Http404
+    image=getattr(row,"logo_"+theme) if theme else row.logo
+    return _image_response(image or row.logo or row.logo_light or row.logo_dark)
+
+
+def public_platform_favicon(request):
+    return _image_response(get_object_or_404(PlatformHomepage,pk=1).favicon)
 
 
 def public_tenant_image(request,pk,kind):

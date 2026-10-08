@@ -4,23 +4,23 @@
 {% block content %}
 <section class="marketing-hero shell">
   <div class="hero-copy">
-    <span class="eyebrow hero-badge">✦ PARA QUEM QUER VENDER MAIS E ATENDER MELHOR</span>
+    <span class="eyebrow hero-badge">✦ SUA AGENDA CHEIA COMEÇA COM UMA EXPERIÊNCIA MELHOR</span>
     <h1>{{ platform_branding.hero_title|default:"Transforme horários livres em clientes." }}</h1>
     <p class="lead">{{ platform_branding.hero_description|default:"Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar." }} Experimente grátis pelo período indicado no plano escolhido.</p>
+    <p class="hero-outcome">Seu cliente escolhe o serviço e o horário. Sua equipe recebe a reserva e segue o dia com tudo organizado.</p>
     <div class="actions">
       <a class="button primary" href="#planos">Começar meu teste grátis →</a>
       <a class="button ghost" href="#como-funciona">Ver como funciona</a>
-      <a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
-      <a class="button ghost" href="/account/login/">Já tenho conta</a>
+
     </div>
     <div class="trust-row">
-      <span>✓ Sem cartão quando o plano permitir</span><span>✓ Cancele quando quiser</span><span>✓ Plano por segmento</span>
+      <span>✓ Página de agendamento própria</span><span>✓ Equipe e unidades organizadas</span><span>✓ Funciona no celular</span>
     </div>
   </div>
     <div class="product-window product-window--live" aria-label="Demonstração ilustrativa do painel ApPlanner com agenda em movimento">
     <div class="window-head">
       <span></span><span></span><span></span>
-      <b class="preview-live-status"><i aria-hidden="true"></i>Demonstração ao vivo</b>
+      <b class="preview-live-status"><i aria-hidden="true"></i>Exemplo de agenda</b>
     </div>
     <div class="window-stats">
       <div><small>Agenda</small><strong>✓</strong><span>horários online</span></div>
@@ -39,6 +39,7 @@
   <script src="{% static 'js/home-live-preview.js' %}" defer></script>
 </section>
 
+<section class="shell section sales-benefits" aria-labelledby="sales-benefits-title"><div class="section-head"><span class="eyebrow">MENOS TRABALHO NA ROTINA</span><h2 id="sales-benefits-title">Da primeira reserva ao próximo retorno.</h2><p>Uma experiência fácil para o cliente e uma operação clara para quem atende.</p></div><div class="segment-grid"><article><span aria-hidden="true">◷</span><h3>Agendamentos a qualquer hora</h3><p>Compartilhe seu link e deixe o cliente encontrar serviços, profissionais e horários disponíveis.</p></article><article><span aria-hidden="true">✂</span><h3>Cada profissional, sua agenda</h3><p>Organize horários, bloqueios e atendimentos por unidade, com a equipe no mesmo sistema.</p></article><article><span aria-hidden="true">↗</span><h3>Clientes que voltam</h3><p>Use os módulos de relacionamento, WhatsApp e fidelidade disponíveis no seu plano para acompanhar o cliente.</p></article></div><p class="sales-plan-note">Recursos e integrações dependem dos módulos contratados.</p></section>
 <section class="shell section sales-steps" id="como-funciona"><div class="section-head"><span class="eyebrow">CONFIGURAÇÃO SIMPLES</span><h2>Comece em 3 passos.</h2><p>Do cadastro ao primeiro atendimento: tudo em um só lugar.</p></div><div class="segment-grid">
   <article><span>01</span><h3>Escolha o plano</h3><p>Selecione um plano pronto ou monte uma combinação de módulos para sua empresa.</p></article>
   <article><span>02</span><h3>Prepare sua equipe</h3><p>Cadastre os serviços, os profissionais, os horários e sua página pública.</p></article>
@@ -46,7 +47,7 @@
 </div></section>
 
 <section class="shell section" id="planos">
-  <div class="section-head"><span class="eyebrow">ESCOLHA COMO COMEÇAR</span><h2>Planos para o seu momento.</h2><p>Preços e condições definidos no painel Master. O teste grátis depende do plano escolhido.</p></div>
+  <div class="section-head"><span class="eyebrow">ESCOLHA COMO COMEÇAR</span><h2>Planos para o seu momento.</h2><p>Escolha a estrutura ideal para sua equipe. Confira o período de teste e as condições de cada plano antes de começar.</p></div>
   <div class="pricing-grid">
     {% for plan in plans %}
     <article class="pricing-card {% if plan.featured %}featured{% endif %}">
@@ -87,12 +88,12 @@
 </section>
 
 <section class="shell section feature-band">
-  <div><span class="eyebrow">POR TRÁS DA EXPERIÊNCIA</span><h2>Feito para operar, não só para parecer bonito.</h2></div>
+  <div><span class="eyebrow">POR TRÁS DA EXPERIÊNCIA</span><h2>Mais tempo para atender. Mais clareza para crescer.</h2></div>
   <div class="feature-list">
     <p><b>Pagamentos</b><span>Pix, cartão tokenizado, recorrência e conciliação.</span></p>
     <p><b>Relacionamento</b><span>WhatsApp, e-mail, CRM, fidelidade e campanhas.</span></p>
     <p><b>Gestão</b><span>Financeiro, estoque, comissões e indicadores.</span></p>
-    <p><b>Segurança</b><span>2FA, RBAC, auditoria, LGPD e isolamento multi-tenant.</span></p>
+    <p><b>Segurança</b><span>Autenticação em duas etapas, acesso por função e proteção dos dados de cada empresa.</span></p>
   </div>
 </section>
 

@@ -81,6 +81,36 @@ class ImprovementsTests(TestCase):
         self.client.post(reverse('operation-today-action',args=[self.app.pk]),{'action':'complete','payment_method':'fake'})
         self.app.refresh_from_db();self.assertEqual(self.app.status,'confirmed')
 
+    def test_agenda_date_selection_stays_scoped_to_unit(self):
+        next_day=self.day+timedelta(days=1)
+        self.app.starts_at+=timedelta(days=1);self.app.ends_at+=timedelta(days=1);self.app.save()
+        url=reverse('operation-today')
+        self.assertNotContains(self.client.get(url),"Cliente chegou")
+        self.assertEqual(self.client.get(url).context['rows'],[])
+        response=self.client.get(url,{'date':next_day.isoformat(),'unit':self.unit.pk})
+        self.assertContains(response,'Ana')
+        self.assertEqual(response.context['day'],next_day)
+        self.assertEqual(len(response.context['week_days']),7)
+        self.assertEqual(self.client.get(url,{'date':next_day.isoformat(),'unit':self.other.pk}).context['rows'],[])
+        for invalid in ['bad-date','9999-12-31']:
+            response=self.client.get(url,{'date':invalid,'unit':self.unit.pk})
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(response.context['day'],self.day)
+
+    def test_mobile_shortcuts_obey_role_and_payment_lock(self):
+        from core.mobile_workspace import navigation
+        from django.test import RequestFactory
+        request=RequestFactory().get('/app/');request.user=self.owner;request.session={}
+        owner_items=navigation(request)['mobile_workspace_nav']
+        self.assertTrue(any(item['title']=='Agenda' for item in owner_items))
+        self.owner.role='reception';self.owner.save()
+        items=navigation(request)['mobile_workspace_nav']
+        self.assertFalse(any(item['title']=='Financeiro' for item in items))
+        request.billing_locked=True
+        self.assertEqual([item['title'] for item in navigation(request)['mobile_workspace_nav']],['Pagamento'])
+        request.billing_locked=False;self.owner.role='professional'
+        self.assertEqual([item['title'] for item in navigation(request)['mobile_workspace_nav']],['Minha agenda'])
+
     def test_reception_can_use_today_but_cannot_view_management_indicators(self):
         self.owner.role='reception';self.owner.save()
         self.assertEqual(self.client.get(reverse('operation-today')).status_code,200)

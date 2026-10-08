@@ -28,6 +28,9 @@ class BlogPost(TimeStampedModel):
 class PlatformHomepage(models.Model):
     """Conteúdo público da página inicial, editável pelo Master."""
     logo=models.ImageField(upload_to="platform/",blank=True)
+    logo_light=models.ImageField(upload_to="platform/",blank=True)
+    logo_dark=models.ImageField(upload_to="platform/",blank=True)
+    favicon=models.ImageField(upload_to="platform/",blank=True)
     hero_title=models.CharField(max_length=160,default="Transforme horários livres em clientes.")
     hero_description=models.CharField(max_length=400,default="Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar.")
     closing_title=models.CharField(max_length=160,default="Organize hoje. Escale amanhã.")
