@@ -539,7 +539,7 @@ class CustomerAppointmentAPIView(APIView):
         ).first()
 
     def _capabilities(self,appointment):
-        schedule=AvailabilityService().settings(appointment.tenant)
+        schedule=AvailabilityService().settings(appointment.tenant,unit=appointment.unit)
         manageable=appointment.status in [Appointment.Status.PENDING,Appointment.Status.CONFIRMED]
         minimum=timezone.now()+timedelta(minutes=schedule.cancel_notice_minutes)
         in_time=appointment.starts_at>=minimum
@@ -573,7 +573,7 @@ class CustomerAppointmentAPIView(APIView):
 
     @transaction.atomic
     def patch(self,request,token):
-        appointment=Appointment.objects.select_for_update().select_related(
+        appointment=Appointment.objects.select_for_update(of=("self",)).select_related(
             "tenant","unit","service","professional"
         ).filter(customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest()).first()
         if not appointment:

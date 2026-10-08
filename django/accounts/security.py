@@ -72,12 +72,10 @@ def generate_recovery_codes(user, count: int = 8):
 
 def consume_recovery_code(user, code: str) -> bool:
     digest=hashlib.sha256(code.strip().upper().encode()).hexdigest()
-    row=RecoveryCode.objects.filter(user=user,code_hash=digest,used_at__isnull=True).first()
-    if not row:
-        return False
-    row.used_at=timezone.now()
-    row.save(update_fields=["used_at"])
-    return True
+    # The predicate and write occur in one SQL statement, so only one caller wins.
+    return RecoveryCode.objects.filter(
+        user=user,code_hash=digest,used_at__isnull=True,
+    ).update(used_at=timezone.now())==1
 
 
 def issue_trusted_device(user, *, label="", user_agent="", ip_address=None):

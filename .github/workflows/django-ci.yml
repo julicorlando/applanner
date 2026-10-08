@@ -105,3 +105,9 @@ jobs:
         run: node --test tests-js/*.test.cjs
       - name: Run tests
         run: python manage.py test --settings=applanner.test_settings
+      - name: Install PostgreSQL client for isolated restore drill
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client-16
+      - name: Verify backup restoration in disposable PostgreSQL database
+        env:
+          APPLANNER_BACKUP_RESTORE_SMOKE: "true"
+        run: python manage.py test operations.test_backup_restore --settings=applanner.test_settings

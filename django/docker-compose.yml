@@ -36,6 +36,7 @@ x-app-environment: &app-environment
   LEGACY_MYSQL_PASSWORD: ${LEGACY_MYSQL_PASSWORD:-}
   LEGACY_APP_KEY: ${LEGACY_APP_KEY:-}
   BACKUP_DIR: ${BACKUP_DIR:-/app/media/backups}
+  BOOTSTRAP_LOCK_TIMEOUT: ${BOOTSTRAP_LOCK_TIMEOUT:-120}
   MASTER_WHATSAPP_GATEWAY_URL: http://master-whatsapp:3100
   MASTER_WHATSAPP_GATEWAY_TOKEN: ${MASTER_WHATSAPP_GATEWAY_TOKEN:-}
   TENANT_WHATSAPP_GATEWAY_URL: http://tenant-whatsapp:3100
@@ -71,6 +72,8 @@ services:
     environment: *app-environment
     command: ["celery","-A","applanner","worker","-l","INFO","--concurrency=2"]
     depends_on:
+      web:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
@@ -84,6 +87,8 @@ services:
     environment: *app-environment
     command: ["celery","-A","applanner","beat","-l","INFO","--scheduler","django_celery_beat.schedulers:DatabaseScheduler"]
     depends_on:
+      web:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:

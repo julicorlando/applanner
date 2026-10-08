@@ -69,3 +69,5 @@
  .adaptive-ui input:not([type=checkbox]):not([type=radio]),.adaptive-ui select,.adaptive-ui textarea{font-size:16px;min-height:44px}
  .adaptive-ui .button{min-height:44px}.public-footer{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
 }
+
+.app-update-notice{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom,0px));left:16px;right:16px;max-width:500px;margin:auto;z-index:100;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 35px var(--shadow-color)}.app-update-notice p{margin:0 0 12px}.app-update-notice .button{margin-right:8px}

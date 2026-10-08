@@ -1,12 +1,7 @@
 #!/bin/sh
 set -eu
 
-python manage.py migrate --noinput
-python manage.py seed_modules
-python manage.py seed_sales_plans
-python manage.py seed_rbac
-python manage.py seed_periodic_tasks
-python manage.py collectstatic --noinput
+python manage.py bootstrap_application --lock-timeout "${BOOTSTRAP_LOCK_TIMEOUT:-120}"
 
 exec gunicorn applanner.wsgi:application \
   --bind 0.0.0.0:8000 \

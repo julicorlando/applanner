@@ -105,5 +105,6 @@
   {% include "mobile_workspace_nav.html" %}
   <script src="{% static 'js/app-install.js' %}" defer></script>
   {% block trial_prompt %}{% include "billing/trial_prompt.html" %}{% endblock %}
+  <script src="{% static 'js/app-worker-registration.js' %}" data-app-worker-url="{% url 'web-app-worker' %}" defer></script>
 </body>
 </html>
