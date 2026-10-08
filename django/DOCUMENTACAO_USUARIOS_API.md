@@ -153,3 +153,12 @@ O botão anterior de compactação local do dashboard passa a se chamar
 - Elegibilidade: sete dias completos desde a criação da empresa, empresa ativa e todas as etapas do cadastro inicial concluídas, incluindo página e pagamentos. O selo aparece somente enquanto o módulo estiver habilitado e os requisitos forem atendidos. Confirma a conclusão do cadastro no ApPlanner; não representa uma avaliação externa de qualidade.
 - O Explorar mostra a logo da unidade (ou a da empresa), com uma inicial como alternativa, e o selo quando elegível. `GET /api/directory/` retorna também `logo_url` e `verified` em cada resultado.
 - A publicação requer `python manage.py migrate`: cria o catálogo do adicional e os códigos dos cadastros existentes. O preço permanece sob definição do Master.
+
+
+### Identidade da plataforma e navegação móvel
+
+No Master → Página inicial, configure a logo padrão, a logo do tema claro, a logo do tema escuro e o ícone da aba do navegador. As logos específicas acompanham o seletor de tema em todas as telas que usam o cabeçalho da plataforma. Se uma versão não for enviada, usa-se a logo padrão ou a outra versão disponível; sem nenhuma imagem, permanece a logo oficial. O ícone aceita PNG ou ICO e os arquivos têm limite de 5 MB. Os campos podem ser limpos separadamente.
+
+No celular, a operação mostra atalhos inferiores de acordo com o papel do usuário e os módulos disponíveis. A tela Hoje permite consultar outra data pelo calendário e pela faixa de dias da semana, mantendo a unidade selecionada. O profissional acessa a própria agenda; acesso bloqueado por assinatura mostra apenas Pagamento. As ações e permissões de atendimento seguem as regras existentes.
+
+A migração `contenthub.0005` adiciona os três campos opcionais sem alterar a logo já cadastrada. A página inicial destaca o agendamento, a equipe e o relacionamento, com condições comerciais obtidas dos planos cadastrados no Master.

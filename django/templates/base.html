@@ -8,7 +8,7 @@
   <script src="{% static 'js/theme.js' %}"></script>
   <title>{% block title %}ApPlanner{% endblock %}</title>
   <meta name="description" content="{% block description %}Agenda, operação, pagamentos e relacionamento em uma plataforma preparada para o seu negócio.{% endblock %}">
-  <link rel="icon" type="image/png" href="{% static 'images/applanner-logo.png' %}">
+  {% if platform_branding.favicon %}<link rel="icon" href="{% url 'public-platform-favicon' %}?v={{ platform_branding.updated_at|date:'U' }}">{% else %}<link rel="icon" type="image/png" href="{% static 'images/applanner-logo.png' %}">{% endif %}
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <link rel="stylesheet" href="{% static 'css/refresh.css' %}">
   <link rel="stylesheet" href="{% static 'css/nightfall.css' %}">
@@ -19,13 +19,17 @@
   {% block extra_css %}{% endblock %}
   <link rel="stylesheet" href="{% static 'css/adaptive-layout.css' %}">
   <script src="{% static 'js/adaptive-layout.js' %}" defer></script>
+<link rel="stylesheet" href="{% static 'css/mobile-brand.css' %}?v=20261008">
 {% if simple_mode %}<link rel="stylesheet" href="{% static 'css/simple-mode.css' %}">{% endif %}
 </head>
 <body class="adaptive-ui {% if simple_mode %}simple-mode{% endif %} {% block body_class %}{% endblock %}">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
   {% block header %}<header class="topbar">
     <a class="brand" href="/" aria-label="ApPlanner início">
-      {% if platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="ApPlanner">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="ApPlanner">{% endif %}
+      {% if platform_branding.logo_light or platform_branding.logo_dark %}
+        <img class="platform-logo platform-logo-custom brand-theme-light" src="{% url 'public-platform-logo' %}?theme=light&amp;v={{ platform_branding.updated_at|date:'U' }}" alt="ApPlanner">
+        <img class="platform-logo platform-logo-custom brand-theme-dark" src="{% url 'public-platform-logo' %}?theme=dark&amp;v={{ platform_branding.updated_at|date:'U' }}" alt="ApPlanner">
+      {% elif platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="ApPlanner">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="ApPlanner">{% endif %}
     </a>
     {% if simple_mode %}<nav class="simple-primary-nav" aria-label="Ações principais">{% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento</a>{% else %}{% for item in simple_nav %}<a href="{{ item.url }}">{{ item.title }}</a>{% endfor %}{% endif %}</nav><details class="simple-more"><summary>Mais opções</summary>{% endif %}
     <nav class="nav">
@@ -92,6 +96,7 @@
     </nav>
     <span>© {% now "Y" %} ApPlanner</span>
   </footer>{% endblock %}
+  {% include "mobile_workspace_nav.html" %}
   {% block trial_prompt %}{% include "billing/trial_prompt.html" %}{% endblock %}
 </body>
 </html>

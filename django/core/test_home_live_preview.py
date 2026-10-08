@@ -7,7 +7,7 @@ class HomeLivePreviewTests(TestCase):
         response=self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code,200)
-        self.assertContains(response,"Demonstração ao vivo")
+        self.assertContains(response,"Exemplo de agenda")
         self.assertContains(response,'data-live-preview')
         self.assertContains(response,"home-live-preview.")
         self.assertContains(response,"Novo cliente")

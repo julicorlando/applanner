@@ -56,6 +56,40 @@ class BrandingTests(TestCase):
         self.assertContains(response,'class="platform-logo platform-logo-custom"')
         self.assertContains(response,"/imagens/logo/")
 
+    def test_theme_logos_and_favicon_upload_are_independent(self):
+        self.client.force_login(self.master)
+        response=self.client.post("/master/pagina-inicial/",{
+            "logo_light":picture("light.png"),"logo_dark":picture("dark.png"),
+            "favicon":picture("tab.png"),"hero_title":"Título","hero_description":"Descrição",
+            "closing_title":"Chamada",
+        })
+        self.assertEqual(response.status_code,302)
+        row=PlatformHomepage.objects.get(pk=1)
+        self.assertTrue(row.logo_light and row.logo_dark and row.favicon)
+        for theme,field in [("light",row.logo_light),("dark",row.logo_dark)]:
+            response=self.client.get("/imagens/logo/",{"theme":theme})
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(response["Content-Disposition"],f'inline; filename="{field.name.split("/")[-1]}"')
+            self.assertTrue(b"".join(response.streaming_content))
+        response=self.client.get("/imagens/favicon/")
+        self.assertEqual(response["Content-Type"],"image/png")
+        self.assertTrue(b"".join(response.streaming_content))
+        self.assertEqual(self.client.get("/imagens/logo/",{"theme":"invalid"}).status_code,404)
+        home=self.client.get("/")
+        self.assertContains(home,"brand-theme-light")
+        self.assertContains(home,"brand-theme-dark")
+        self.assertContains(home,"/imagens/favicon/?v=")
+        row.logo_dark="";row.save()
+        self.assertEqual(self.client.get("/imagens/logo/",{"theme":"dark"}).status_code,200)
+
+    def test_favicon_rejects_non_image_and_unsupported_format(self):
+        from core.branding import PlatformHomepageForm
+        data={"hero_title":"Título","hero_description":"Descrição","closing_title":"Chamada"}
+        form=PlatformHomepageForm(data,{"favicon":SimpleUploadedFile("tab.png",b"not an image")})
+        self.assertFalse(form.is_valid());self.assertIn("favicon",form.errors)
+        form=PlatformHomepageForm(data,{"favicon":picture("tab.gif")})
+        self.assertFalse(form.is_valid());self.assertIn("favicon",form.errors)
+
     def test_private_unauthorized_branding_and_public_only_image(self):
         staff=User.objects.create_user(email="other-brand@example.com",password="StrongPassword!123")
         self.client.force_login(staff)

@@ -1,6 +1,6 @@
 """Daily actions, schedule utilization and tenant-isolated customer timeline."""
 from collections import Counter
-from datetime import datetime,timedelta,time
+from datetime import datetime,timedelta,time,date
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 from django import forms
@@ -41,6 +41,15 @@ def today(request):
     if not tenant: return redirect('portal-home')
     now=timezone.now()
     day=now.astimezone(ZoneInfo(tenant.timezone or 'America/Recife')).date()
+    actual_day=day
+    if request.GET.get('date'):
+        try:
+            chosen=date.fromisoformat(request.GET['date'])
+            if not 1900 <= chosen.year <= 2100: raise ValueError
+            day=chosen
+        except ValueError: messages.error(request,'Escolha uma data válida para consultar a agenda.')
+    week_start=day-timedelta(days=day.weekday())
+    week_days=[week_start+timedelta(days=i) for i in range(7)]
     start,end=day_bounds(tenant,day)
     arena=segment_enabled(tenant,'arena')
     if arena:
@@ -53,13 +62,13 @@ def today(request):
         row.can_start=row.starts_at<=now and row.status in {'pending','confirmed','waiting'}
         row.can_finish=row.starts_at<=now and row.status in {'pending','confirmed','waiting','in_progress'}
     queue=[]
-    if not arena and segment_enabled(tenant,'barbearia') and has_capability(request.user,'barber.manage'):
+    if day==actual_day and not arena and segment_enabled(tenant,'barbearia') and has_capability(request.user,'barber.manage'):
         from barber.models import BarberQueueEntry
         queue=BarberQueueEntry.objects.filter(tenant=tenant,status__in=['waiting','called','in_service']).filter(
             Q(assigned_professional__unit=unit)|Q(assigned_professional__isnull=True,preferred_professional__unit=unit)|
             Q(assigned_professional__isnull=True,preferred_professional__isnull=True,service__unit=unit)).select_related('service')[:50]
     counts=Counter(row.status for row in rows)
-    return render(request,'portal/today.html',{'tenant':tenant,'unit':unit,'rows':rows,'queue':queue,'day':day,'arena':arena,
+    return render(request,'portal/today.html',{'tenant':tenant,'unit':unit,'rows':rows,'queue':queue,'day':day,'actual_day':actual_day,'week_days':week_days,'arena':arena,
         'total':len(rows),'late':sum(r.late for r in rows),'waiting':counts['waiting'],'progress':counts['in_progress'],'completed':counts['completed']})
 
 @login_required
