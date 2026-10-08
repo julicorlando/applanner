@@ -33,6 +33,8 @@ class ArenaPublicBookingTests(TestCase):
     def test_public_page_uses_courts_without_professionals_or_services(self):
         page=self.client.get(reverse("tenant-public",args=[self.tenant.slug]))
         self.assertContains(page,"Quadra Azul")
+        today=timezone.now().astimezone(ZoneInfo(self.tenant.timezone)).date().isoformat()
+        self.assertContains(page,f'id="arena-date" type="date" value="{today}" min="{today}" required')
         self.assertContains(page,"Escolha quadra, data e horário")
         self.assertNotContains(page,"booking-professional")
         self.assertNotContains(page,"booking-service")
