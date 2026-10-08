@@ -9,8 +9,6 @@
   const button = form.querySelector('button[type="submit"]');
   const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
   const slug = form.dataset.publicSlug;
-  const today = new Date();
-  date.min = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
   const picker = createBookingSlotPicker({
     container: document.getElementById('arena-slots'), input: slot,
     status: document.getElementById('arena-slot-status'),
