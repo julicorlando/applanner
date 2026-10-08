@@ -41,6 +41,7 @@ MIDDLEWARE = [
     "operations.maintenance.MaintenanceModeMiddleware",
     "operations.middleware.SupportImpersonationMiddleware",
     "accounts.middleware.SessionVersionMiddleware",
+    "accounts.master_access.MasterAdminGateMiddleware",
     "billing.access_middleware.SubscriptionAccessMiddleware",
     "accounts.middleware.MustChangePasswordMiddleware",
     "accounts.route_middleware.CapabilityRouteMiddleware",
