@@ -7,9 +7,9 @@
 .public-page .tenant-hero h1{max-width:760px;font-size:clamp(1.8rem,3.4vw,2.8rem);margin:12px 0;line-height:1.13}
 .public-page .tenant-hero p{max-width:760px;margin:10px 0;font-size:.95rem}
 .public-page .tenant-profile-logo{position:relative;width:76px;height:76px;object-fit:cover;border-radius:50%;margin:0 0 12px;border:3px solid var(--paper)}
-.public-page .tenant-hero--has-cover{padding-top:155px;background:#172233}
-.public-page .tenant-cover{position:absolute;inset:0 0 auto;width:100%;height:145px;object-fit:cover;z-index:-1;opacity:.7;transform:none;border-radius:0}
-.public-page .tenant-hero--has-cover .tenant-hero__content{position:static}
+.public-page .tenant-hero--has-cover{padding:28px 0;background:var(--surface)}
+.public-page .tenant-cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:-2;opacity:1;transform:none;border-radius:inherit}
+.public-page .tenant-hero--has-cover .tenant-hero__content{position:relative;isolation:isolate;display:flex;flex-direction:column;justify-content:center;min-height:390px;padding:clamp(34px,5vw,72px)}
 .public-page .tenant-hero--has-cover :is(h1,p,strong,.eyebrow){color:#fff}
 .public-page .public-cover-links{gap:8px;margin-top:20px}.public-page .public-cover-links a{font-size:.8rem;padding:6px 12px}
 .public-page .section{padding-block:32px;scroll-margin-top:16px}
@@ -39,7 +39,7 @@
 .public-page [hidden]{display:none!important}
 @media(max-width:760px){
  .public-page .public-header{padding:12px 16px;gap:12px}.public-header__brand{max-width:60%;font-size:.85rem}.public-header nav a{font-size:.75rem}.public-header nav a:first-child{display:none}
- .public-page .tenant-hero{padding:24px 0}.public-page .tenant-hero--has-cover{padding-top:150px}.public-page .tenant-hero h1{font-size:1.9rem}.public-page .tenant-hero .actions{flex-wrap:wrap}
+ .public-page .tenant-hero{padding:24px 0}.public-page .tenant-hero--has-cover{padding:16px 0}.public-page .tenant-hero--has-cover .tenant-hero__content{min-height:430px;padding:28px 22px;justify-content:flex-end}.public-page .tenant-hero h1{font-size:1.9rem}.public-page .tenant-hero .actions{flex-wrap:wrap}
  .public-page .section{padding-block:24px}.public-page #agendar>.panel{padding:18px}
  .booking-layout{grid-template-columns:1fr;gap:20px}.booking-summary{position:static;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}.booking-summary h3,.booking-summary>small{grid-column:1/-1}.booking-summary p{margin:0;overflow-wrap:anywhere}
  .booking-progress{gap:6px}.booking-progress button{font-size:.7rem;padding:7px 9px}
@@ -50,7 +50,7 @@
 @media(prefers-reduced-motion:reduce){.public-page *{scroll-behavior:auto!important}}
 
 .public-page{--action:var(--tenant-accent,#245eac)}
-.public-page .tenant-hero .tenant-cover{z-index:0}
+.public-page .tenant-hero .tenant-cover{z-index:-2}
 @media(max-width:760px){
  .public-page:has(.booking-enhanced){padding-bottom:105px}
  .booking-navigation{position:fixed;left:0;right:0;bottom:0;padding:12px 16px;border-top:1px solid var(--line);box-shadow:0 -6px 24px var(--shadow-color);margin:0}
