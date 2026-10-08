@@ -22,9 +22,12 @@ from arena.public import CourtSlotsAPIView, CourtBookingAPIView, court_reservati
 
 from core.booking_funnel import track
 
+from core.web_app import manifest as web_app_manifest, icon as web_app_icon
 from core.public_identity import tenant_short_link, professional_short_link
 
 urlpatterns = [
+    path("imagens/app.webmanifest",web_app_manifest,name="web-app-manifest"),
+    path("imagens/app/<int:size>.png",web_app_icon,name="web-app-icon"),
     path("s/p/<slug:code>/", professional_short_link, name="professional-short-link"),
     path("s/<slug:code>/", tenant_short_link, name="tenant-short-link"),
     path("api/public/<slug:slug>/funil/",track,name="public-booking-funnel"),
