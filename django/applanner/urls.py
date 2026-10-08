@@ -42,6 +42,7 @@ urlpatterns = [
     path("imagens/profissional/<int:pk>/",public_professional_image,name="public-professional-image"),
     path("imagens/noticia/<int:pk>/",public_blog_image,name="public-blog-image"),
     path("", home, name="home"),
+    path("admin", admin.site.index),
     path("admin/", admin.site.urls),
     path("account/", include("accounts.urls")),
     path("", include("billing.urls")),
