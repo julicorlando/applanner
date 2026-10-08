@@ -111,6 +111,21 @@ class ImprovementsTests(TestCase):
         request.billing_locked=False;self.owner.role='professional'
         self.assertEqual([item['title'] for item in navigation(request)['mobile_workspace_nav']],['Minha agenda'])
 
+    def test_master_home_has_mobile_navigation_without_exposing_it_on_public_pages(self):
+        from core.mobile_workspace import navigation
+        from django.test import RequestFactory
+        request=RequestFactory().get('/')
+        request.user=User.objects.create_user(email='mobile-master@example.test',password='test-only',is_superuser=True,is_staff=True)
+        request.session={}
+        items=navigation(request)['mobile_workspace_nav']
+        self.assertEqual([item['title'] for item in items],['Painel','Empresas','Financeiro','WhatsApp'])
+        self.assertTrue(items[0]['active'])
+        request.billing_locked=True
+        self.assertEqual([item['title'] for item in navigation(request)['mobile_workspace_nav']],['Pagamento'])
+        request.billing_locked=False
+        request.path='/p/teste/'
+        self.assertEqual(navigation(request),{})
+
     def test_reception_can_use_today_but_cannot_view_management_indicators(self):
         self.owner.role='reception';self.owner.save()
         self.assertEqual(self.client.get(reverse('operation-today')).status_code,200)
