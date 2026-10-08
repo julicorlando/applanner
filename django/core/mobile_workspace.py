@@ -4,11 +4,11 @@ from django.urls import reverse
 
 def navigation(request):
     user=getattr(request,'user',None)
-    if not user or not user.is_authenticated or not request.path.startswith(('/app/','/master/','/billing/')):
+    if not user or not user.is_authenticated or not (request.path=='/' or request.path.startswith(('/app/','/master/','/billing/'))):
         return {}
     if getattr(request,'billing_locked',False):
         items=[{'title':'Pagamento','icon':'card','url':reverse('billing-subscription-status')}]
-    elif request.path.startswith('/master/') and user.is_superuser:
+    elif (request.path=='/' or request.path.startswith('/master/')) and user.is_superuser:
         items=[{'title':'Painel','icon':'home','url':reverse('master-home')},
                {'title':'Empresas','icon':'users','url':reverse('master-resource-list',args=['empresas'])},
                {'title':'Financeiro','icon':'card','url':reverse('master-finance-dashboard')},
@@ -38,5 +38,5 @@ def navigation(request):
             if len(items)==4: break
         if not items: items=[{'title':'Início','icon':'home','url':reverse('portal-home')}]
     for item in items:
-        item['active']=request.path==item['url'] or (item['url'] not in {'/app/','/master/'} and request.path.startswith(item['url']))
+        item['active']=(request.path=='/' and item['icon']=='home') or request.path==item['url'] or (item['url'] not in {'/app/','/master/'} and request.path.startswith(item['url']))
     return {'mobile_workspace_nav':items}
