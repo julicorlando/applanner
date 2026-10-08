@@ -61,7 +61,7 @@
   <div class="panel"><form id="arena-booking" class="portal-form" data-public-slug="{{ public_slug }}">{% csrf_token %}
     <div class="portal-module-grid">
       <div class="form-field"><label for="arena-court">Quadra</label><select id="arena-court" required><option value="">Selecione uma quadra</option>{% for court in courts %}<option value="{{ court.pk }}" data-min="{{ court.minimum_minutes }}" data-max="{{ court.maximum_minutes }}">{{ court.name }}</option>{% endfor %}</select></div>
-      <div class="form-field"><label for="arena-date">Data</label><input id="arena-date" type="date" required></div>
+      <div class="form-field"><label for="arena-date">Data</label><input id="arena-date" type="date" value="{{ public_today }}" min="{{ public_today }}" required></div>
       <div class="form-field"><label for="arena-duration">Duração</label><select id="arena-duration" required></select></div>
     </div>
     <div class="form-field booking-times"><label id="arena-slot-label">Horários disponíveis</label><input type="hidden" id="arena-slot"><div id="arena-slots" class="booking-slots" role="group" aria-labelledby="arena-slot-label"></div><small id="arena-slot-status" role="status" aria-live="polite">Escolha quadra e data para ver os horários.</small></div>
@@ -89,7 +89,7 @@
         <div class="form-field"{% if units|length == 1 %} hidden{% endif %}><label for="booking-unit">Unidade</label><select id="booking-unit" required>{% for unit in units %}<option value="{{ unit.pk }}" {% if selected_unit.pk == unit.pk %}selected{% endif %}>{{ unit.name }}{% if unit.city %} · {{ unit.city }}{% endif %}{% if unit.state %}/{{ unit.state }}{% endif %}</option>{% endfor %}</select><small>Você pode trocar a unidade antes de confirmar o agendamento.</small></div>
         <div class="form-field"><label for="booking-service">{{ booking_wording.2 }}</label><select id="booking-service" required><option value="">Selecione</option>{% for service in services %}<option value="{{ service.pk }}" data-name="{{ service.name }}" data-price="{{ service.price|floatformat:"2u" }}" data-duration="{{ service.duration_minutes }}">{{ service.name }} · R$ {{ service.price }}</option>{% endfor %}</select></div>
         <div class="form-field"><label for="booking-professional">Profissional</label><select id="booking-professional"><option value="">Qualquer profissional disponível</option>{% for professional in professionals %}<option value="{{ professional.pk }}" data-unit-id="{{ professional.unit_id|default:'' }}" data-all-services="{{ professional.public_all_services|yesno:'true,false' }}" data-service-ids="{{ professional.public_service_ids }}" {% if selected_professional.pk == professional.pk %}selected{% endif %}>{{ professional.name }}{% if professional.specialty %} · {{ professional.specialty }}{% endif %}</option>{% endfor %}</select></div>
-        <div class="form-field"><label for="booking-date">Data</label><input id="booking-date" type="date" required></div>
+        <div class="form-field"><label for="booking-date">Data</label><input id="booking-date" type="date" value="{{ public_today }}" min="{{ public_today }}" required></div>
       </div>
       {% if online_payment_choices %}<fieldset class="form-field"><legend>Como deseja pagar?</legend><div class="booking-slots">
         {% if payment_settings.allow_pay_on_site %}<label class="button ghost"><input type="radio" name="payment_choice" value="on_site" checked> Pagar na unidade</label>{% endif %}
