@@ -1,6 +1,6 @@
 from django.test import TestCase
 from accounts.models import User
-from finance.models import CashSession,Product
+from finance.models import Product
 from finance.services import close_cash_session,create_sale,open_cash_session
 from tenants.models import Tenant
 

@@ -1,9 +1,7 @@
 """Deterministic runner shared by real conversations and the no-side-effect simulator."""
-from datetime import timedelta
 from decimal import Decimal,InvalidOperation
 import re
 import unicodedata
-from django.utils import timezone
 from .master_integrations import call_api,call_ai
 
 

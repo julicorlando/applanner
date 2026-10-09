@@ -5,6 +5,7 @@ import time
 from decimal import Decimal, InvalidOperation
 
 import requests
+from core.redaction import redact_sensitive_text
 
 
 def validate_charge_amount(value):
@@ -79,6 +80,7 @@ class MercadoPagoProvider:
                     "O pagador não pode ser a mesma conta Mercado Pago que recebe a cobrança. "
                     "Informe um e-mail de comprador diferente e, em testes, entre no Mercado Pago com a conta compradora."
                 )
+            message=redact_sensitive_text(message,secrets=(self.access_token,))
             raise MercadoPagoError(f"Mercado Pago HTTP {response.status_code}: {message}")
         return data
 

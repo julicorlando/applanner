@@ -20,7 +20,7 @@ from rest_framework.views import APIView
 from tenants.models import Tenant,Unit
 from .availability import AvailabilityService
 from .models import (
-    Appointment, AppointmentRescheduleHistory, Customer, Professional, Service,
+    Appointment, AppointmentRescheduleHistory, Professional, Service,
 )
 
 

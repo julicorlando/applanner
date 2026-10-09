@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import EmailVerificationToken,User
-from applanner.transactional_email import queue_email,render_email
+from applanner.transactional_email import render_email
 from communications.models import Notification
 from communications.tasks import send_notification
 from operations.models import PlatformEmailTemplate

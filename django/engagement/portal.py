@@ -56,15 +56,9 @@ def domains(request):
 
 from decimal import Decimal
 
-from django import forms
 from django.conf import settings
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied,ValidationError
-from django.shortcuts import get_object_or_404,redirect,render
 
 from scheduling.models import Appointment,Customer,Service
-from tenants.models import Tenant
 from .models import (
     CustomerMembership,CustomerPackage,LoyaltyAccount,LoyaltyReferral,LoyaltyReward,
     ServicePackage,TenantLoyaltySettings,WaitlistEntry,
@@ -73,14 +67,6 @@ from .services import (
     complete_referral,consume_package_credit,create_membership,earn_points,issue_reward,
     match_waitlist,purchase_package,redeem_reward,
 )
-
-
-def _tenant(request):
-    if request.user.tenant_id:return request.user.tenant
-    if request.user.is_superuser:
-        tid=request.session.get("portal_tenant_id")
-        if tid:return Tenant.objects.filter(pk=tid).first()
-    raise PermissionDenied("Selecione uma empresa.")
 
 
 class PurchaseForm(forms.Form):

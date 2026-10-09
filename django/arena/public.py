@@ -20,7 +20,7 @@ from billing.payment_services import create_tenant_pix, has_connected_tenant_gat
 from billing.segment_access import segment_enabled
 from tenants.models import Tenant
 
-from .models import Court, Reservation, SportsSettings
+from .models import Court, Reservation
 from .services import ArenaReservationService
 
 

@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import CharField,Q
+from django.db.models import CharField
 from django.db.models.functions import Cast
 from django.db.models.fields.json import KeyTextTransform
 from django.shortcuts import render,redirect,get_object_or_404

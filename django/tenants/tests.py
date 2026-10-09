@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from django.core import mail
 from django.test import TestCase
-from django.utils import timezone
 
 from accounts.models import User
 from billing.models import Plan,Subscription

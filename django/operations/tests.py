@@ -1,4 +1,3 @@
-from django.core.cache import cache
 from django.test import TestCase
 
 from accounts.models import User

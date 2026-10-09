@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 from accounts.models import User
-from arena.models import Court,Game,Modality,Tournament,TournamentTeam
+from arena.models import Court,Modality,Tournament,TournamentTeam
 from arena.operations import add_game_player,create_game,generate_knockout_bracket,record_match_result
 from tenants.models import Tenant
 

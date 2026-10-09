@@ -15,7 +15,7 @@ from scheduling.models import Appointment
 from .models import (
     AutoCommand, AutoCommandItem, AutoCommandPayment, AutoSettings, CRMEvent, DeliveryTerm,
     Estimate, EstimateItem, Job, JobMaterialUsage, JobStatusHistory, JobStep,
-    VehicleMaintenance, VehicleProfile,
+    VehicleProfile,
 )
 
 

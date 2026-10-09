@@ -8,7 +8,7 @@ from django.utils import timezone
 from finance.models import Product, ProductReservation
 from tenants.models import Tenant
 from .models import (
-    Appointment, Customer, Professional, ProfessionalAvailability, Service,
+    Appointment, Professional, ProfessionalAvailability, Service,
 )
 
 

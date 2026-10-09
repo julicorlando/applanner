@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from django.test import TestCase,override_settings
+from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import User

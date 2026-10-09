@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from communications.models import Notification
-from .models import Appointment, AppointmentReminderLog, TenantScheduleSettings
+from .models import Appointment, AppointmentReminderLog
 
 
 def _dispatch_notification(pk):

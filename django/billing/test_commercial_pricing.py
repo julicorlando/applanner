@@ -1,13 +1,13 @@
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import patch,Mock
+from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from accounts.models import User
-from tenants.models import Tenant,Unit
+from tenants.models import Tenant
 from communications.models import UserNotification,Notification
-from .models import Plan,Subscription,SubscriptionPriceChange,Module,TenantModuleAddon,Payment,PixCharge
+from .models import Plan,Subscription,SubscriptionPriceChange,Module,TenantModuleAddon,Payment
 from .commercial_pricing import cycle_price,offer,schedule_plan_renewals,prepare_price_changes
 from .breakdown import subscription_charge_breakdown
 

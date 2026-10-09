@@ -1,10 +1,10 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase
 
 from core.management.commands.bootstrap_application import (
-    BOOTSTRAP_COMMANDS, BOOTSTRAP_LOCK_KEY, Command, release_initialization_lock,
+    BOOTSTRAP_COMMANDS, BOOTSTRAP_LOCK_KEY, Command,
 )
 
 

@@ -4,6 +4,7 @@ import requests
 
 from django.conf import settings
 from .phone import whatsapp_number
+from core.redaction import redact_sensitive_text
 
 
 class WhatsAppProviderError(RuntimeError):
@@ -33,6 +34,9 @@ def send_text(to,text):
     except ValueError:
         payload={}
     if not response.ok:
-        raise WhatsAppProviderError(str(payload.get("error") or response.text)[:500])
+        message=payload.get("error") if isinstance(payload,dict) else None
+        raise WhatsAppProviderError(redact_sensitive_text(message or response.text)[:500])
+    if not isinstance(payload,dict):
+        raise WhatsAppProviderError("Resposta inválida do WhatsApp.")
     messages=payload.get("messages") or []
     return str(messages[0].get("id") or "") if messages else ""
