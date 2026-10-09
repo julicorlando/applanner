@@ -31,3 +31,29 @@ storage/logs/
 
 # Dumps reais usados apenas em homologação local
 django/legacy-dumps/
+
+# Generated state / build / sensitive archives
+.mypy_cache/
+.ruff_cache/
+node_modules/
+*.tmp
+*.old
+*.log
+*.log.*
+*.pfx
+*.p12
+*.key
+*.pem
+*.zip.enc
+storage/private/backups/
+storage/update-backups/
+storage/private/cleanup-manifests/
+storage/cache/*
+!storage/cache/.gitkeep
+storage/rate_limits/*
+!storage/rate_limits/.gitkeep
+storage/updates/
+storage/installed.lock
+!storage/logs/.gitkeep
+.gitleaks-report*
+pip-audit-report*

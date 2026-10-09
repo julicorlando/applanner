@@ -1,3 +1,4 @@
+from core.redaction import redact_sensitive_text
 import hashlib
 import shutil
 from decimal import Decimal
@@ -46,14 +47,14 @@ def run_homologation(*,user):
             checks["database"]=cursor.fetchone()[0]==1
     except Exception as exc:
         checks["database"]=False
-        checks["database_error"]=str(exc)[:200]
+        checks["database_error"]=redact_sensitive_text(exc)[:200]
         score-=Decimal("35")
     try:
         cache.set("homologation_probe","ok",30)
         checks["cache"]=cache.get("homologation_probe")=="ok"
     except Exception as exc:
         checks["cache"]=False
-        checks["cache_error"]=str(exc)[:200]
+        checks["cache_error"]=redact_sensitive_text(exc)[:200]
         score-=Decimal("15")
 
     settings_obj,_=PlatformOperationSettings.objects.get_or_create(pk=1)

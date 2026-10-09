@@ -1,3 +1,4 @@
+from core.redaction import redact_sensitive_text
 from datetime import timedelta
 import hashlib
 import os
@@ -70,7 +71,7 @@ def create_database_backup():
         return backup
     except Exception as exc:
         backup.status=Backup.Status.FAILED
-        backup.error_message=str(exc)[:500]
+        backup.error_message=redact_sensitive_text(exc)[:500]
         backup.completed_at=timezone.now()
         backup.save(update_fields=["status","error_message","completed_at"])
         if path.exists():

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
 import pino from 'pino';
+import { loggerOptions } from './logging.js';
 import QRCode from 'qrcode';
 
 const secret=process.env.MASTER_WHATSAPP_GATEWAY_TOKEN || '';
@@ -10,7 +11,7 @@ const callback='http://web:8000/webhooks/tenant-whatsapp/';
 const root='/app/session/tenant';
 const sessions=new Map();
 const sendsInFlight=new Map();
-const logger=pino({level:'warn'});
+const logger=pino(loggerOptions);
 const jidPattern=/^\d{10,20}@(s\.whatsapp\.net|lid)$/;
 const phonePattern=/^\d{10,20}$/;
 const textOf=m=>m?.conversation || m?.extendedTextMessage?.text || m?.ephemeralMessage?.message?.conversation || '';

@@ -4,7 +4,6 @@ import logging
 import smtplib
 import socket
 import ssl
-from email.utils import parseaddr
 
 import dns.exception
 import dns.resolver
@@ -21,11 +20,10 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from accounts.models import User
 from core.crypto import encrypt_text
 from core.models import AuditLog
 from operations.models import PlatformEmailTemplate,PlatformSMTPSettings
-from applanner.transactional_email import TEMPLATES,render_email,validate_copy
+from applanner.transactional_email import TEMPLATES,validate_copy
 from tenants.models import TenantOnboarding
 
 logger=logging.getLogger(__name__)

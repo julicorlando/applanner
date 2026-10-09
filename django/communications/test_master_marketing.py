@@ -1,5 +1,4 @@
 import secrets
-from unittest.mock import patch
 
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile

@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 from django.test import TestCase
-from accounts.models import User
 from engagement.domains import create_tenant_domain,verify_tenant_domain
 from engagement.models import TenantDomain
 from tenants.models import Tenant

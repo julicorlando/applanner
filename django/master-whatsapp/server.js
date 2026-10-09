@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
 import pino from 'pino';
+import { loggerOptions } from './logging.js';
 import QRCode from 'qrcode';
 
 const secret = process.env.MASTER_WHATSAPP_GATEWAY_TOKEN || '';
@@ -25,7 +26,7 @@ let reconnect;
 let pending = [];
 let callbackError = '';
 let flushing = false;
-const logger = pino({ level: 'warn' });
+const logger = pino(loggerOptions);
 const contactJid = /^\d{10,20}@(s\.whatsapp\.net|lid)$/;
 
 function inboundText(message) {

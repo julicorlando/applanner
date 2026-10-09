@@ -39,6 +39,7 @@ def _management(request):
 
 
 def gateway(tenant,method,path,payload=None):
+    from core.redaction import redact_sensitive_text
     token=settings.MASTER_WHATSAPP_GATEWAY_TOKEN
     address=settings.TENANT_WHATSAPP_GATEWAY_URL
     if not token or not address:
@@ -49,10 +50,12 @@ def gateway(tenant,method,path,payload=None):
         data=response.json()
     except (requests.RequestException,ValueError) as exc:
         raise ValueError("O serviço de WhatsApp da empresa está indisponível.") from exc
+    if not isinstance(data,dict):
+        raise ValueError("Resposta inválida do serviço de WhatsApp.")
     if not response.ok:
         if response.status_code==403:
             raise ValueError("O gateway recusou a autenticação (403). Confira o mesmo MASTER_WHATSAPP_GATEWAY_TOKEN nos serviços web e tenant-whatsapp e faça o redeploy.")
-        raise ValueError(data.get("error") or "Não foi possível concluir a ação no WhatsApp.")
+        raise ValueError(redact_sensitive_text(data.get("error") or "Não foi possível concluir a ação no WhatsApp."))
     return data
 
 

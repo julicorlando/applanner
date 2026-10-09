@@ -4,7 +4,6 @@ import time
 from contextvars import ContextVar
 from uuid import uuid4
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 

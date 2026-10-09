@@ -6,7 +6,7 @@ from core.templatetags.display_pt import homologation_record
 from core.test_post_deploy_fixes import PostDeployFixesTests
 from operations.models import SupportTicket
 from tenants.models import Unit, UnitBusinessHours
-from scheduling.models import Appointment, Professional, ProfessionalAvailability, Service
+from scheduling.models import Appointment, Professional, Service
 from billing.models import TenantModuleAddon
 
 

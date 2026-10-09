@@ -316,7 +316,7 @@ def platform_payment_gateway(request):
     })
 
 
-from communications.master_whatsapp import (  # noqa: E402
+from communications.master_whatsapp import (  # noqa: E402, F401
     master_whatsapp_inbox,master_whatsapp_status,master_whatsapp_connect,
     master_whatsapp_disconnect,master_whatsapp_receive,master_whatsapp_conversation,
 )
@@ -593,7 +593,6 @@ def resource_form(request,slug,pk=None):
     config,model=_config(slug)
     if slug=="solicitacoes-modulos" and pk is None:
         messages.info(request,"Para liberar o WhatsApp, selecione a empresa em Operação e abra Conectar WhatsApp da empresa. Solicitações de contratação são abertas pela própria empresa.")
-        from django.urls import reverse
         from tenants.models import Tenant
         selected=request.session.get("portal_tenant_id")
         if selected and Tenant.objects.filter(pk=selected).exists():
@@ -781,7 +780,7 @@ def _approve_account_deletion(row,actor,*,notify=True):
     """Encerra a operação da empresa preservando somente registros necessários para auditoria."""
     from accounts.models import SecurityEvent,User
     from applanner.transactional_email import queue_email
-    from billing.models import PaymentGateway,Payment,Subscription,SubscriptionHistory
+    from billing.models import PaymentGateway,Subscription,SubscriptionHistory
     from billing.payment_services import platform_provider
     from core.models import AuditLog
     from operations.models import BillingSupportRequest,SupportTicket

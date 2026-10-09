@@ -9,4 +9,5 @@ exec gunicorn applanner.wsgi:application \
   --threads "${GUNICORN_THREADS:-2}" \
   --timeout "${GUNICORN_TIMEOUT:-60}" \
   --access-logfile - \
+  --access-logformat '%({x-request-id}o)s %(m)s %(s)s %(L)s' \
   --error-logfile -

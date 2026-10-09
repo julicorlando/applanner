@@ -5,7 +5,7 @@ from django.utils import timezone
 from accounts.models import User
 from tenants.models import Tenant
 from . import test_platform_pix as fixtures
-from .models import Payment, PixCharge, Subscription
+from .models import Payment, PixCharge
 from .pix_reconciliation import reconcile_pix_charge
 from .tasks import reconcile_pending_pix
 from .webhooks import _reconcile_platform

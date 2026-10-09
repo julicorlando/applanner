@@ -111,6 +111,7 @@ def _master(request):
 
 
 def _gateway(method, path, payload=None):
+    from core.redaction import redact_sensitive_text
     token=settings.MASTER_WHATSAPP_GATEWAY_TOKEN
     address=settings.MASTER_WHATSAPP_GATEWAY_URL
     if not token or not address:
@@ -124,8 +125,10 @@ def _gateway(method, path, payload=None):
         data=response.json()
     except (requests.RequestException,ValueError) as exc:
         raise ValueError("O serviço de WhatsApp do Master está indisponível.") from exc
+    if not isinstance(data,dict):
+        raise ValueError("Resposta inválida do serviço de WhatsApp.")
     if not response.ok:
-        raise ValueError(data.get("error") or "Não foi possível concluir a ação no WhatsApp.")
+        raise ValueError(redact_sensitive_text(data.get("error") or "Não foi possível concluir a ação no WhatsApp."))
     return data
 
 

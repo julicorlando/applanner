@@ -1,7 +1,7 @@
 import math
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404,render
-from tenants.models import Tenant,Unit
+from tenants.models import Tenant
 from .models import BlogPost,LandingPage
 from core.public_identity import verification_status
 

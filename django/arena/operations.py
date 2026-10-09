@@ -10,7 +10,7 @@ from finance.models import FinancialTransaction,Product,ProductStockMovement
 from .models import (
     ArenaCommand,ArenaCommandItem,ArenaCommandStockMovement,
     ClassAttendance,ClassMakeup,ClassStudent,Game,GamePlayer,
-    Reservation,SportsClass,Tournament,TournamentMatch,
+    Tournament,TournamentMatch,
 )
 
 

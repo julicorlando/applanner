@@ -12,7 +12,7 @@ from billing.models import Plan,Subscription,Payment
 from scheduling.models import Professional,Service,Appointment,Customer
 from communications.models import Notification
 from operations.models import SupportTicket,SupportMessage,RuntimeEvent,TenantActivity
-from operations.telemetry import RuntimeMonitoringMiddleware,request_trace,trace_id,record_event
+from operations.telemetry import RuntimeMonitoringMiddleware,request_trace,trace_id
 from operations.tasks import prune_runtime_history
 from core.company_health import company_health
 from core.models import AuditLog

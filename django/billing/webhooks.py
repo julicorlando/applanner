@@ -1,7 +1,6 @@
 import hashlib
 import json
 from decimal import Decimal
-from dateutil.relativedelta import relativedelta
 
 from django.db import transaction
 from django.http import JsonResponse
@@ -13,7 +12,6 @@ from .mercadopago import MercadoPagoProvider
 from .models import (
     Payment,
     PixCharge,
-    CheckoutSession,
     PaymentGateway,
     Subscription,
     TenantPaymentConnection,

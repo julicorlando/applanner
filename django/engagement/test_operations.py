@@ -9,7 +9,7 @@ from engagement.models import CustomerMembership,LoyaltyReferral,ServicePackage,
 from engagement.services import advance_months,complete_referral,create_membership,purchase_package
 from engagement.tasks import bill_due_memberships
 from finance.models import FinancialTransaction
-from scheduling.models import Customer,Service
+from scheduling.models import Customer
 from tenants.models import Tenant
 
 

@@ -1,3 +1,4 @@
+from core.redaction import redact_sensitive_text
 import socket
 import time
 
@@ -25,24 +26,24 @@ def platform_health_check():
             cursor.execute("SELECT 1")
             cursor.fetchone()
     except Exception as exc:
-        errors.append("database:"+str(exc)[:180])
+        errors.append("database:"+redact_sensitive_text(exc)[:180])
         record_incident(
             category="database",
             severity=OperationalIncident.Severity.CRITICAL,
             title="Falha no health check do PostgreSQL",
-            details=str(exc)[:1000],
+            details=redact_sensitive_text(exc)[:1000],
         )
     try:
         cache.set("health_probe","ok",20)
         if cache.get("health_probe")!="ok":
             raise RuntimeError("Redis probe mismatch")
     except Exception as exc:
-        errors.append("cache:"+str(exc)[:180])
+        errors.append("cache:"+redact_sensitive_text(exc)[:180])
         record_incident(
             category="application",
             severity=OperationalIncident.Severity.CRITICAL,
             title="Falha no health check do Redis",
-            details=str(exc)[:1000],
+            details=redact_sensitive_text(exc)[:1000],
         )
     heartbeat.finished_at=timezone.now()
     heartbeat.duration_ms=int((time.monotonic()-start)*1000)

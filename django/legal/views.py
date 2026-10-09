@@ -9,7 +9,6 @@ from django.http import Http404,HttpResponse
 from django.shortcuts import redirect,render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 
 from .middleware import current_documents

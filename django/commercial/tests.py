@@ -7,7 +7,7 @@ from accounts.permissions import has_capability
 from billing.models import Plan
 
 from .models import CommercialProfile,Lead,Proposal
-from .services import accept_proposal,claim_lead,project_commission
+from .services import accept_proposal,claim_lead
 
 
 class CommercialFlowTests(TestCase):

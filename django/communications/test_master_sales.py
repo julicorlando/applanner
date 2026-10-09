@@ -1,5 +1,3 @@
-import json
-from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
 from billing.models import Plan

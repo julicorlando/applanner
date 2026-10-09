@@ -8,15 +8,14 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied,ValidationError
 from django.db import transaction
-from django.db.models import Q,Sum
+from django.db.models import Q
 from django.shortcuts import render,redirect,get_object_or_404
-from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from accounts.permissions import require_any_capability,has_capability
 from billing.entitlements import module_enabled
 from billing.segment_access import segment_enabled
-from scheduling.models import Appointment,Customer,Professional,ProfessionalAvailability,ProfessionalBreak,ProfessionalTimeOff
+from scheduling.models import Appointment,Customer,Professional
 from scheduling.settlement import settle_appointment
 from finance.platform_dashboard import PeriodForm
 from .portal import _require_tenant

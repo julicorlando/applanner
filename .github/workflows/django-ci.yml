@@ -14,6 +14,7 @@ on:
 
 jobs:
   test:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
 
     services:
@@ -86,6 +87,15 @@ jobs:
         run: docker build -t applanner-master-whatsapp-test ./master-whatsapp
       - name: Django system check
         run: python manage.py check
+      - name: Django production security checks
+        run: |
+          python - <<'PY'
+          import os, secrets
+          os.environ.update(DJANGO_SETTINGS_MODULE="applanner.settings", SECURE_SSL_REDIRECT="true",
+                            DJANGO_SECRET_KEY=secrets.token_urlsafe(64))
+          from django.core.management import execute_from_command_line
+          execute_from_command_line(["manage.py", "check", "--deploy", "--fail-level", "WARNING"])
+          PY
       - name: Collect static files
         run: python manage.py collectstatic --noinput
       - name: Check migrations are committed
