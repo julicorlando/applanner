@@ -1,0 +1,13 @@
+{% if mobile_workspace_nav %}
+<section class="app-install-strip" data-app-install-strip aria-label="Adicionar ApPlanner ao celular" hidden>
+  <div><strong>ApPlanner no seu celular</strong><span>Abra pela tela inicial, como um aplicativo.</span></div>
+  <button class="button" type="button" data-app-install>Adicionar</button>
+  <button class="app-install-dismiss" type="button" data-app-install-dismiss aria-label="Fechar sugestão de instalação">×</button>
+</section>
+<dialog class="app-install-dialog" data-app-install-dialog aria-labelledby="app-install-title">
+  <h2 id="app-install-title">ApPlanner na tela inicial</h2>
+  <p data-app-install-instructions>No menu do navegador, escolha “Instalar aplicativo” ou “Adicionar à tela inicial”. Depois, abra o ApPlanner pelo novo ícone.</p>
+  <p>A instalação depende das opções disponíveis no seu navegador.</p>
+  <form method="dialog"><button class="button primary">Entendi</button></form>
+</dialog>
+{% endif %}

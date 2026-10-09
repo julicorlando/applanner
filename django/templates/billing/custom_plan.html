@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Monte o seu plano — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="section-head"><span class="eyebrow">PLANO SOB MEDIDA</span><h1>Monte o seu ApPlanner.</h1><p>Selecione as funções que seu negócio precisa. Nossa equipe prepara uma proposta para você.</p></div>
+  <form method="post" class="portal-form panel">{% csrf_token %}
+    {% for field in form %}
+      <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+    {% endfor %}
+    <button class="button primary" type="submit">Solicitar minha proposta</button>
+  </form>
+</section>
+{% endblock %}

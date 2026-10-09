@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Estabelecimentos — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Encontre estabelecimentos.</h1><p>Encontre unidades em até 30 km, da mais próxima à mais distante.</p><p id="location-status" role="status"></p></div><button class="button ghost" id="nearby" type="button">{% if located %}Atualizar localização{% else %}Encontrar perto de mim{% endif %}</button></div>
+  <div class="segment-grid">
+    {% for card in cards %}
+    <article class="directory-card">
+      <a class="directory-card__overlay" href="{% url 'tenant-public' card.tenant.public_slug|default:card.tenant.slug %}?unit={{ card.unit.pk }}#agendar" aria-label="Abrir {{ card.display_name }} e agendar"></a>
+      <div class="directory-card__content">
+        <div class="public-business-identity">{% if card.unit.logo or card.tenant.logo %}<img class="professional-avatar" src="{% url 'public-tenant-image' card.tenant.pk 'logo' %}?unit={{ card.unit.pk }}" alt="Logo de {{ card.tenant.name }}" loading="lazy" width="72" height="72">{% else %}<span class="public-logo-placeholder" aria-label="{{ card.tenant.name }}">{{ card.tenant.name|first|upper }}</span>{% endif %}{% if card.verified %}{% include "verified_business_badge.html" %}{% endif %}</div>
+        <span class="directory-card__segment">{{ card.tenant.category_label }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
+        <h3>{{ card.display_name }}</h3>
+        <p>{{ card.tenant.description|truncatechars:180 }}</p>
+        {% with unit=card.unit %}<p class="directory-card__location">{{ unit.city }}{% if unit.state %}/{{ unit.state }}{% endif %}{% if unit.district %} · {{ unit.district }}{% endif %}{% if unit.address %}<br>{{ unit.address }}{% if unit.address_number %}, {{ unit.address_number }}{% endif %}{% endif %}</p>{% endwith %}
+        <span class="directory-card__cta">Abrir página e agendar <span aria-hidden="true">→</span></span>
+      </div>
+    </article>
+    {% empty %}<div class="panel"><p>{% if located %}Nenhuma unidade com localização cadastrada foi encontrada em até 30 km.{% else %}Nenhum estabelecimento está publicado no diretório.{% endif %}</p>{% if request.user.is_superuser %}<p>Ative <strong>Página pública</strong> no cadastro da empresa em <a href="{% url 'master-resource-list' 'empresas' %}">Master → Empresas</a>. Empresas em teste também podem aparecer.</p>{% endif %}</div>{% endfor %}
+  </div>
+  {% if located %}<p class="operation-muted"><small>Distâncias aproximadas. Dados de localização: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> e BrasilAPI.</small></p>{% endif %}
+</section>
+<script>
+const nearby=document.getElementById('nearby');
+const status=document.getElementById('location-status');
+function locate(){
+  if(!navigator.geolocation){status.textContent='Localização indisponível neste dispositivo. Exibindo todos os estabelecimentos.';return;}
+  status.textContent='Obtendo sua localização…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const u=new URL(window.location.href);
+    u.searchParams.set('lat',pos.coords.latitude);
+    u.searchParams.set('lon',pos.coords.longitude);
+    window.location.replace(u.toString());
+  },()=>{status.textContent='Não foi possível obter sua localização. Permita o acesso no navegador para buscar unidades em até 30 km.';},{timeout:8000,maximumAge:300000});
+}
+nearby.addEventListener('click',locate);
+if(!new URL(window.location.href).searchParams.has('lat'))locate();
+</script>
+{% endblock %}

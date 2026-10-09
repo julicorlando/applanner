@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% block dark-mode-vars %}
+<link rel="stylesheet" href="{% static 'admin/css/dark_mode.css' %}">
+<script src="{% static 'js/theme.js' %}"></script>
+{% endblock %}
+{% block extrahead %}{{ block.super }}
+<script src="{% static 'js/postal-code.js' %}" data-postal-code-url="{% url 'accounts:postal-code-lookup' %}" defer></script>
+<style>
+#user-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#user-tools .theme-toggle{display:grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid currentColor;border-radius:50%;background:transparent;color:inherit;cursor:pointer}
+.theme-icon-sun{display:none}html[data-theme="dark"] .theme-icon-sun{display:block}html[data-theme="dark"] .theme-icon-moon{display:none}
+.theme-toggle:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+</style>
+{% endblock %}

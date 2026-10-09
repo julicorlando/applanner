@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Atender {{ entry.customer.name }} · Lista de espera{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'professional-area' %}">← Minha área</a><span class="eyebrow">LISTA DE ESPERA</span><h1>Atender {{ entry.customer.name }}</h1><p>{{ entry.service.name }} · {{ entry.service.duration_minutes }} minutos · Preferência: {{ entry.preferred_date|date:"d/m/Y"|default:"qualquer data" }} / {{ entry.get_period_display }}.</p></div></div>
+  {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
+  <article class="panel"><h2>Marcar um horário</h2><p>Escolha uma data para ver horários livres na sua agenda. O horário é conferido novamente ao confirmar.</p>
+    <form method="get" class="portal-form"><div class="form-field"><label for="waitlist-day">Data</label><input id="waitlist-day" type="date" name="dia" value="{{ day|date:'Y-m-d' }}" min="{{ today|date:'Y-m-d' }}" required></div><button class="button ghost" type="submit">Ver horários</button></form>
+    {% if slots %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="schedule"><input type="hidden" name="day" value="{{ day|date:'Y-m-d' }}"><fieldset><legend>Horários disponíveis em {{ day|date:"d/m/Y" }}</legend><div class="time-slots" style="display:flex;flex-wrap:wrap;gap:10px">{% for slot in slots %}<label class="button ghost" style="cursor:pointer"><input type="radio" name="starts_at" value="{{ slot.value }}" {% if forloop.first %}checked{% endif %}> {{ slot.label }}</label>{% endfor %}</div></fieldset><p><button class="button primary" type="submit">Agendar cliente</button></p></form>{% else %}<p>Não há horários livres nesta data. Escolha outra data ou inicie um atendimento avulso se puder atender agora.</p>{% endif %}
+  </article>
+  <article class="panel" style="margin-top:18px"><h2>Atendimento avulso agora</h2><p>Inicia o atendimento imediatamente, fora dos horários publicados, desde que sua agenda não esteja ocupada, em intervalo ou afastamento. Depois, registre a forma de pagamento e os produtos vendidos para lançar as comissões.</p><form method="post">{% csrf_token %}<input type="hidden" name="day" value="{{ day|date:'Y-m-d' }}"><button class="button primary" name="action" value="instant" type="submit">Iniciar atendimento agora</button></form></article>
+</section>
+{% endblock %}

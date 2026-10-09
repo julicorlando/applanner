@@ -1,0 +1,210 @@
+from django.db import models
+from core.models import TimeStampedModel
+
+
+class Tenant(TimeStampedModel):
+    class Status(models.TextChoices):
+        TRIAL="trial","Teste"
+        ACTIVE="active","Ativo"
+        SUSPENDED="suspended","Suspenso"
+        CANCELLED="cancelled","Cancelado"
+
+    name=models.CharField(max_length=150)
+    slug=models.SlugField(max_length=120,unique=True)
+    public_slug=models.SlugField(max_length=120,unique=True,null=True,blank=True)
+    public_short_code=models.CharField(max_length=16,unique=True,null=True,blank=True)
+    public_booking_enabled=models.BooleanField(default=True)
+    public_enabled=models.BooleanField(default=False)
+    category=models.CharField(max_length=60,blank=True)
+    description=models.TextField(blank=True)
+    document=models.CharField(max_length=32,blank=True)
+    email=models.EmailField(blank=True)
+    phone=models.CharField(max_length=32,blank=True)
+    logo=models.ImageField(upload_to="tenant/logo/",blank=True)
+    cover=models.ImageField(upload_to="tenant/cover/",blank=True)
+    primary_color=models.CharField(max_length=7,default="#2563eb")
+    menu_color=models.CharField(max_length=7,default="#17213b")
+    menu_text_color=models.CharField(max_length=7,default="#dce3f7")
+    background_color=models.CharField(max_length=7,default="#f4f6fb")
+    text_color=models.CharField(max_length=7,default="#17213b")
+    font_family=models.CharField(max_length=40,default="Inter")
+    font_size=models.PositiveSmallIntegerField(default=15)
+    accepted_payment_methods=models.JSONField(default=list,blank=True)
+    public_sections=models.JSONField(default=list,blank=True)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.TRIAL,db_index=True)
+    onboarding_step=models.PositiveSmallIntegerField(default=1)
+    locale=models.CharField(max_length=10,default="pt-br")
+    default_locale=models.CharField(max_length=10,default="pt-br")
+    timezone=models.CharField(max_length=64,default="America/Recife")
+    public_layout=models.CharField(max_length=24,default="editorial")
+    public_headline=models.CharField(max_length=120,blank=True)
+    public_subheadline=models.CharField(max_length=300,blank=True)
+    public_cta_label=models.CharField(max_length=60,blank=True)
+    public_announcement=models.CharField(max_length=160,blank=True)
+    public_accent_color=models.CharField(max_length=7,blank=True)
+    public_section_order=models.JSONField(default=list,blank=True)
+    public_seo_title=models.CharField(max_length=70,blank=True)
+    public_seo_description=models.CharField(max_length=180,blank=True)
+    public_instagram=models.CharField(max_length=120,blank=True)
+    metadata=models.JSONField(default=dict,blank=True)
+    deleted_at=models.DateTimeField(null=True,blank=True)
+    archived_at=models.DateTimeField(null=True,blank=True,db_index=True)
+    archive_snapshot=models.JSONField(default=dict,blank=True)
+    is_demo=models.BooleanField(default=False)
+    simple_mode=models.BooleanField(default=False,editable=False,verbose_name="Modo simples")
+
+    def save(self, *args, **kwargs):
+        from core.public_identity import assign_short_code
+        assign_short_code(self, kwargs)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def category_label(self):
+        labels={"barbearia":"Barbearia","salao":"Salão de beleza","salão":"Salão de beleza",
+                "arena":"Arena esportiva","auto":"Automotivo","automotivo":"Automotivo",
+                "medico":"Médico","médico":"Médico","saude":"Saúde","saúde":"Saúde"}
+        return labels.get((self.category or "").strip().lower(),self.category or "Estabelecimento")
+
+
+class Unit(TimeStampedModel):
+    tenant=models.ForeignKey(Tenant,on_delete=models.CASCADE,related_name="units")
+    name=models.CharField(max_length=150)
+    address=models.CharField(max_length=255,blank=True)
+    address_number=models.CharField(max_length=20,blank=True)
+    address_complement=models.CharField(max_length=120,blank=True)
+    district=models.CharField(max_length=100,blank=True)
+    city=models.CharField(max_length=100,blank=True)
+    state=models.CharField(max_length=2,blank=True)
+    postal_code=models.CharField(max_length=10,blank=True)
+    latitude=models.DecimalField(max_digits=10,decimal_places=7,null=True,blank=True)
+    longitude=models.DecimalField(max_digits=10,decimal_places=7,null=True,blank=True)
+    geocoded_at=models.DateTimeField(null=True,blank=True)
+    phone=models.CharField(max_length=32,blank=True)
+    whatsapp=models.CharField(max_length=30,blank=True)
+    email=models.EmailField(blank=True)
+    instagram=models.CharField(max_length=190,blank=True)
+    facebook=models.URLField(max_length=255,blank=True)
+    tiktok=models.CharField(max_length=190,blank=True)
+    website=models.URLField(max_length=255,blank=True)
+    map_url=models.URLField(max_length=500,blank=True)
+    amenities=models.JSONField(default=list,blank=True)
+    payment_methods=models.JSONField(default=list,blank=True)
+    public_notes=models.CharField(max_length=500,blank=True)
+    logo=models.ImageField(upload_to="unit/logo/",blank=True)
+    cover=models.ImageField(upload_to="unit/cover/",blank=True)
+    public_settings=models.JSONField(default=dict,blank=True)
+    schedule_overrides=models.JSONField(default=dict,blank=True)
+    is_primary=models.BooleanField(default=False)
+    active=models.BooleanField(default=True)
+
+    class Meta:
+        indexes=[
+            models.Index(fields=["tenant","active"]),
+            models.Index(fields=["active","latitude","longitude"]),
+        ]
+        constraints=[
+            models.UniqueConstraint(
+                fields=["tenant"],
+                condition=models.Q(is_primary=True),
+                name="uq_primary_unit_per_tenant",
+            ),
+        ]
+
+    def save(self,*args,**kwargs):
+        address_fields=("postal_code","address","address_number","district","city","state")
+        previous=type(self).objects.filter(pk=self.pk).values(*address_fields,"latitude","longitude").first() if self.pk else None
+        update_fields=kwargs.get("update_fields")
+        address_changed=bool(previous and any(
+            getattr(self,field)!=previous[field] and (update_fields is None or field in update_fields)
+            for field in address_fields
+        ))
+        coordinates_changed=bool(previous and any(
+            getattr(self,field)!=previous[field] and (update_fields is None or field in update_fields)
+            for field in ("latitude","longitude")
+        ))
+        if address_changed:
+            self.geocoded_at=None
+            if not coordinates_changed:
+                self.latitude=self.longitude=None
+            if update_fields is not None:
+                kwargs["update_fields"]=set(update_fields)|{"geocoded_at"}
+                if not coordinates_changed:
+                    kwargs["update_fields"]|={"latitude","longitude"}
+        super().save(*args,**kwargs)
+        if self.active and self.postal_code and (self.latitude is None or self.longitude is None):
+            from django.db import transaction
+            from .tasks import queue_unit_geocoding
+            transaction.on_commit(lambda unit_id=self.pk:queue_unit_geocoding(unit_id))
+
+    def __str__(self):
+        return f"{self.tenant} — {self.name}"
+
+
+class UnitBusinessHours(TimeStampedModel):
+    tenant=models.ForeignKey(Tenant,on_delete=models.CASCADE,related_name="unit_business_hours")
+    unit=models.ForeignKey(Unit,on_delete=models.CASCADE,related_name="business_hours")
+    weekday=models.PositiveSmallIntegerField(choices=[
+        (1,"Segunda-feira"),(2,"Terça-feira"),(3,"Quarta-feira"),(4,"Quinta-feira"),
+        (5,"Sexta-feira"),(6,"Sábado"),(7,"Domingo"),
+    ])
+    opens_at=models.TimeField(null=True,blank=True)
+    closes_at=models.TimeField(null=True,blank=True)
+    closed=models.BooleanField(default=False)
+    active=models.BooleanField(default=True)
+
+    class Meta:
+        ordering=["weekday"]
+        constraints=[
+            models.UniqueConstraint(fields=["unit","weekday"],name="uq_unit_business_hours_day"),
+            models.CheckConstraint(
+                condition=models.Q(weekday__gte=1,weekday__lte=7),
+                name="unit_business_hours_weekday_iso",
+            ),
+        ]
+        indexes=[models.Index(fields=["tenant","unit","active"],name="unit_hours_tenant_unit_idx")]
+
+    def clean(self):
+        super().clean()
+        from django.core.exceptions import ValidationError
+        if self.unit_id and self.tenant_id and self.unit.tenant_id!=self.tenant_id:
+            raise ValidationError("A unidade precisa pertencer à mesma empresa.")
+        if not self.closed:
+            if not self.opens_at or not self.closes_at:
+                raise ValidationError("Informe abertura e fechamento, ou marque o dia como fechado.")
+            if self.closes_at<=self.opens_at:
+                raise ValidationError("O horário de fechamento deve ser posterior ao de abertura.")
+
+    def __str__(self):
+        return f"{self.unit} — dia {self.weekday}"
+
+
+class TenantOnboarding(models.Model):
+    tenant=models.OneToOneField(Tenant,primary_key=True,on_delete=models.CASCADE,related_name="onboarding")
+    required=models.BooleanField(default=False)
+    email_verification_waived_at=models.DateTimeField(null=True,blank=True)
+    email_verification_waived_by=models.ForeignKey("accounts.User",null=True,blank=True,on_delete=models.SET_NULL,related_name="onboarding_email_waivers")
+    company_done=models.BooleanField(default=False)
+    branding_done=models.BooleanField(default=False)
+    unit_done=models.BooleanField(default=False)
+    professional_done=models.BooleanField(default=False)
+    service_done=models.BooleanField(default=False)
+    schedule_done=models.BooleanField(default=False)
+    payment_done=models.BooleanField(default=False)
+    public_page_done=models.BooleanField(default=False)
+    completed_at=models.DateTimeField(null=True,blank=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+
+class TenantStatusHistory(models.Model):
+    tenant=models.ForeignKey(Tenant,on_delete=models.CASCADE,related_name="status_history")
+    from_status=models.CharField(max_length=40)
+    to_status=models.CharField(max_length=40)
+    reason=models.CharField(max_length=500)
+    changed_by=models.ForeignKey("accounts.User",on_delete=models.PROTECT,related_name="tenant_status_changes")
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes=[models.Index(fields=["tenant","created_at"],name="tenant_status_hist_idx")]

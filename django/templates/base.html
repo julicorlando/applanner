@@ -1,0 +1,110 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="{% url 'web-app-manifest' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% url 'web-app-icon' 180 %}?v={{ platform_branding.updated_at|date:'U'|default:'1' }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ApPlanner">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f5f7fa">
+  <script src="{% static 'js/theme.js' %}"></script>
+  <title>{% block title %}ApPlanner{% endblock %}</title>
+  <meta name="description" content="{% block description %}Agenda, operação, pagamentos e relacionamento em uma plataforma preparada para o seu negócio.{% endblock %}">
+  {% if platform_branding.favicon %}<link rel="icon" href="{% url 'public-platform-favicon' %}?v={{ platform_branding.updated_at|date:'U' }}">{% else %}<link rel="icon" type="image/png" href="{% static 'images/applanner-logo.png' %}">{% endif %}
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/refresh.css' %}">
+  <link rel="stylesheet" href="{% static 'css/nightfall.css' %}">
+  <link rel="stylesheet" href="{% static 'css/usability.css' %}">
+  <link rel="stylesheet" href="{% static 'css/theme.css' %}?v=20261004-billing">
+  <script src="{% static 'js/form-validation-pt.js' %}?v=20261004" defer></script>
+  <script src="{% static 'js/postal-code.js' %}" data-postal-code-url="{% url 'accounts:postal-code-lookup' %}" defer></script>
+  {% block extra_css %}{% endblock %}
+  <link rel="stylesheet" href="{% static 'css/adaptive-layout.css' %}">
+  <script src="{% static 'js/adaptive-layout.js' %}" defer></script>
+<link rel="stylesheet" href="{% static 'css/mobile-brand.css' %}?v=20261008">
+{% if simple_mode %}<link rel="stylesheet" href="{% static 'css/simple-mode.css' %}">{% endif %}
+</head>
+<body class="adaptive-ui {% if simple_mode %}simple-mode{% endif %} {% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  {% block header %}<header class="topbar">
+    <a class="brand" href="/" aria-label="ApPlanner início">
+      {% if platform_branding.logo_light or platform_branding.logo_dark %}
+        <img class="platform-logo platform-logo-custom brand-theme-light" src="{% url 'public-platform-logo' %}?theme=light&amp;v={{ platform_branding.updated_at|date:'U' }}" alt="ApPlanner">
+        <img class="platform-logo platform-logo-custom brand-theme-dark" src="{% url 'public-platform-logo' %}?theme=dark&amp;v={{ platform_branding.updated_at|date:'U' }}" alt="ApPlanner">
+      {% elif platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="ApPlanner">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="ApPlanner">{% endif %}
+    </a>
+    {% if simple_mode %}<nav class="simple-primary-nav" aria-label="Ações principais">{% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento</a>{% else %}{% for item in simple_nav %}<a href="{{ item.url }}">{{ item.title }}</a>{% endfor %}{% endif %}</nav><details class="simple-more"><summary>Mais opções</summary>{% endif %}
+    <nav class="nav">
+      {% if request.user.is_authenticated %}
+        {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
+        <a href="/">Painel</a>
+        {% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a>{% endif %}{% endif %}
+        {% if request.user.tenant_id and request.user.role != 'professional' %}<a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}
+        {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
+        {% if request.user.is_superuser and request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
+        <a href="/account/2fa/setup/">Segurança</a>
+        <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
+        {% endif %}<form method="post" action="/account/logout/" class="nav-form">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form>
+      {% else %}
+        <a href="/directory/">Explorar</a>
+        <a href="/planos/">Planos</a>
+        <a href="/#segmentos">Segmentos</a>
+        <a class="nav-cta" href="/account/login/">Entrar</a>
+      {% endif %}
+    </nav>
+    {% if simple_mode %}</details>{% endif %}
+    <details class="mobile-nav"><summary>Menu</summary><div class="mobile-nav-links">
+      {% if request.user.is_authenticated %}
+      {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
+      <a href="/">Painel</a>{% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a><a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}{% endif %}
+      {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
+      {% if request.user.is_superuser and request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
+      <a href="/account/2fa/setup/">Segurança</a>
+      <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
+      {% endif %}<form method="post" action="/account/logout/">{% csrf_token %}<button type="submit">Sair</button></form>
+      {% else %}
+      <a href="/directory/">Explorar estabelecimentos</a>
+      <a href="/planos/">Ver planos</a>
+      <a href="/#segmentos">Segmentos</a>
+      <a href="/account/login/">Entrar</a>
+      <a href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
+      {% endif %}
+    </div></details>
+    {% include "theme_toggle.html" %}
+  </header>{% endblock %}
+  {% if request.support_actor %}
+    <div class="panel" role="status" style="margin:12px auto;max-width:1100px;padding:14px">
+      Acesso assistido ativo por {{ request.support_actor.email }}. Suas ações são registradas.
+      <form method="post" action="{% url 'support-end-access' %}" style="display:inline">
+        {% csrf_token %}<button class="button" type="submit">Encerrar acesso</button>
+      </form>
+    </div>
+  {% endif %}
+  {% if messages %}
+  <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
+  {% endif %}
+  <main id="conteudo">{% include "app_install.html" %}{% if simple_mode and not request.billing_locked %}<div class="shell simple-breadcrumb"><a href="{% url 'portal-home' %}">← Voltar ao início</a><span>Modo simples</span></div>{% endif %}{% block account_notices %}{% include "billing/due_notice.html" %}{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
+{% endblock %}{% block content %}{% endblock %}</main>
+  {% block footer %}<footer class="footer">
+    <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>
+    <nav class="footer-legal" aria-label="Documentos legais">
+      <a href="{% url 'legal-public-document' 'privacidade' %}">Privacidade</a>
+      <a href="{% url 'legal-public-document' 'termos-empresas' %}">Termos · Empresas</a>
+      <a href="{% url 'legal-public-document' 'termos-clientes' %}">Termos · Clientes</a>
+      <a href="{% url 'legal-public-document' 'cancelamento-empresas' %}">Cancelamento · Empresas</a>
+      <a href="{% url 'legal-public-document' 'cancelamento-clientes' %}">Cancelamento · Clientes</a>
+      <a href="{% url 'legal-public-privacy-request' %}">Solicitação de privacidade</a>
+      {% if request.user.is_authenticated %}<a href="{% url 'legal-privacy-center' %}">Meus dados e privacidade</a>{% endif %}
+    </nav>
+    <span>© {% now "Y" %} ApPlanner</span>
+  </footer>{% endblock %}
+  {% include "mobile_workspace_nav.html" %}
+  <script src="{% static 'js/app-install.js' %}" defer></script>
+  {% block trial_prompt %}{% include "billing/trial_prompt.html" %}{% endblock %}
+  <script src="{% static 'js/app-worker-registration.js' %}" data-app-worker-url="{% url 'web-app-worker' %}" defer></script>
+</body>
+</html>

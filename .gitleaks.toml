@@ -1,0 +1,70 @@
+title = "ApPlanner secret policy"
+[extend]
+useDefault = true
+
+[[allowlists]]
+condition = "AND"
+description = "Reviewed synthetic fixture / documentation placeholder (not a service credential)"
+regexTarget = "secret"
+paths = ["(?:^|/)django/DOCUMENTACAO_USUARIOS_API\\.md$"]
+regexes = ["^ap_SEU_TOKEN$"]
+
+[[allowlists]]
+condition = "AND"
+description = "Reviewed synthetic fixture / documentation placeholder (not a service credential)"
+regexTarget = "secret"
+paths = ["(?:^|/)django/billing/test_subscription_access\\.py$"]
+regexes = ["^monthly_price=$"]
+
+[[allowlists]]
+condition = "AND"
+description = "Reviewed synthetic fixture / documentation placeholder (not a service credential)"
+regexTarget = "secret"
+paths = ["(?:^|/)django/billing/test_tenant_gateway\\.py$"]
+regexes = ["^TEST\\-123456789012345$"]
+
+[[allowlists]]
+condition = "AND"
+description = "Reviewed synthetic fixture / documentation placeholder (not a service credential)"
+regexTarget = "secret"
+paths = ["(?:^|/)django/billing/test_master_gateway\\.py$"]
+regexes = ["^TEST\\-123456789012345$"]
+
+[[allowlists]]
+condition = "AND"
+description = "Reviewed synthetic fixture / documentation placeholder (not a service credential)"
+regexTarget = "secret"
+paths = ["(?:^|/)django/billing/test_master_gateway\\.py$"]
+regexes = ["^TEST\\-123456789012345$"]
+
+[[allowlists]]
+condition = "AND"
+description = "Reviewed synthetic fixture / documentation placeholder (not a service credential)"
+regexTarget = "secret"
+paths = ["(?:^|/)django/billing/test_master_gateway\\.py$"]
+regexes = ["^TEST\\-123456789012345$"]
+
+[[allowlists]]
+condition = "AND"
+description = "Reviewed synthetic fixture / documentation placeholder (not a service credential)"
+regexTarget = "secret"
+paths = ["(?:^|/)django/billing/test_nfse_automation\\.py$"]
+regexes = ["^nfseXmlGZipB64$"]
+
+[[allowlists]]
+condition = "AND"
+description = "Reviewed synthetic fixture / documentation placeholder (not a service credential)"
+regexTarget = "secret"
+paths = ["(?:^|/)tests/e2e/mysql_environment_smoke\\.php$"]
+regexes = ["^customer_manage_token_hash$"]
+
+[[rules]]
+id = "php-fixed-password"
+description = "Hardcoded PHP environment credential"
+regex = '''(?i)['"](?:password|app_key|secret_key)['"]\s*=>\s*['"]([^'"\r\n]+)['"]'''
+secretGroup = 1
+[[rules.allowlists]]
+condition = "AND"
+paths = ['(?:^|/)config/database\.example\.php$']
+regexTarget = "secret"
+regexes = ['^senha$']

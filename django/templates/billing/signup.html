@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Criar conta — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'billing-plans' %}">← Planos</a><span class="eyebrow">COMEÇAR</span><h1>Crie sua empresa.</h1><p>Seu ambiente será criado separado dos demais clientes.</p></div></div>
+  {% if proposal %}<p class="payment-hint">Proposta aceita: <strong>{{ proposal.title }}</strong> · R$ {{ proposal.final_price }} por mês. Use o e-mail indicado na proposta.</p>{% endif %}
+  <aside class="panel" aria-live="polite"><h2 id="signup-plan-name">{{ selected_plan.name|default:"Condições do plano" }}</h2><p id="signup-plan-trial">{% if selected_plan.trial_days %}{{ selected_plan.trial_days }} dias de teste{% if selected_plan.trial_without_card %} sem cartão e sem cobrança agora{% endif %}.{% else %}Escolha um plano para conferir as condições.{% endif %}</p><p id="signup-plan-price">{% if selected_plan %}R$ {{ selected_plan.monthly_price }} por mês.{% endif %}</p><p id="signup-plan-composition"></p><p id="signup-plan-billing">{% if selected_plan.trial_days and selected_plan.trial_without_card %}Para continuar após o teste, será necessário pagar o ciclo escolhido.{% endif %}</p></aside>
+  {{ plan_conditions|json_script:"signup-plan-conditions" }}
+  <script src="{% static 'js/signup-plan.js' %}" defer></script>
+  <form method="post" class="portal-form panel">{% csrf_token %}
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}{% if field.is_hidden %}{{ field }}{% else %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
+    <button class="button primary">Criar conta e continuar</button>
+  </form>
+</section>
+{% endblock %}

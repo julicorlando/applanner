@@ -1,0 +1,247 @@
+from celery import shared_task
+from datetime import timedelta
+from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
+from django.utils import timezone
+from django.utils.html import escape
+
+from .models import MarketingDelivery, Notification
+
+
+@shared_task(bind=True,max_retries=3,autoretry_for=(ValueError,KeyError),retry_backoff=True)
+def process_master_chatbot(self,message_id):
+    from .master_whatsapp_flow import process_master_automation
+    process_master_automation(message_id)
+
+
+@shared_task
+def retry_master_chatbot_queue():
+    from .tenant_graph_services import reconcile as reconcile_tenant
+    reconcile_tenant()
+    from .models import MasterWhatsAppFlow,MasterWhatsAppMessage
+    flow=MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).first()
+    if not flow:
+        return 0
+    from .master_graph_services import reconcile
+    reconcile()
+    recent=max(flow.updated_at,timezone.now()-timedelta(hours=2))
+    ids=list(MasterWhatsAppMessage.objects.filter(
+        direction="in",flow_processed_at__isnull=True,created_at__gte=recent,
+        conversation__human_handoff=False,
+    ).order_by("id").values_list("id",flat=True)[:100])
+    for pk in ids:
+        process_master_chatbot.delay(pk)
+    return len(ids)
+
+
+@shared_task(bind=True,max_retries=5)
+def send_notification(self,notification_id):
+    import time
+    from operations.telemetry import record_event,trace_id
+    start=time.monotonic();rid=trace_id();tenant_id=None
+    try:
+        with transaction.atomic():
+            notification=Notification.objects.select_for_update().filter(pk=notification_id).first()
+            if not notification or notification.status!=Notification.Status.QUEUED:
+                return
+            if notification.scheduled_at and notification.scheduled_at>timezone.now():
+                return
+
+            rid=notification.trace_id;tenant_id=notification.tenant_id
+            if notification.template_key=="subscription_price_change":
+                from billing.models import SubscriptionPriceChange
+                change=SubscriptionPriceChange.objects.select_related("subscription").filter(pk=notification.payload.get("price_change_id"),subscription__tenant_id=notification.tenant_id).first()
+                if not change or change.status=="cancelled" or change.subscription.status=="cancelled":
+                    notification.status=Notification.Status.SKIPPED
+                    notification.save(update_fields=["status"])
+                    return
+            if notification.template_key=="subscription_due":
+                from billing.reminders import reminder_is_current
+                if not reminder_is_current(notification):
+                    notification.status=Notification.Status.SKIPPED
+                    notification.save(update_fields=["status"])
+                    return
+
+            if notification.channel==Notification.Channel.EMAIL:
+                subject=notification.payload.get("subject") or "ApPlanner"
+                text=notification.payload.get("text") or notification.payload.get("message") or ""
+                html=notification.payload.get("html")
+                message=EmailMultiAlternatives(
+                    subject=subject,
+                    body=text,
+                    to=[notification.destination],
+                )
+                if html:
+                    message.attach_alternative(html,"text/html")
+                message.send(fail_silently=False)
+            elif notification.channel==Notification.Channel.WHATSAPP:
+                if notification.template_key=="return_invitation":
+                    from engagement.return_automation import deliver_return_invitation
+                    provider_id=deliver_return_invitation(notification)
+                    if notification.status==Notification.Status.SKIPPED:
+                        return
+                elif notification.template_key=="subscription_due":
+                    from .master_whatsapp import send_billing_reminder
+                    provider_id=send_billing_reminder(notification)
+                elif notification.template_key in {"appointment_confirmation","appointment_reminder","appointment_feedback"}:
+                    from .tenant_whatsapp import send_appointment_notification
+                    provider_id=send_appointment_notification(notification)
+                    if notification.status==Notification.Status.SKIPPED:
+                        return
+                else:
+                    from .whatsapp import send_text
+                    provider_id=send_text(
+                        notification.destination,
+                        notification.payload.get("text") or notification.payload.get("message") or "",
+                    )
+                notification.provider_reference=provider_id
+            else:
+                raise RuntimeError(f"Canal ainda sem provider ativo: {notification.channel}")
+
+            notification.status=Notification.Status.SENT
+            notification.sent_at=timezone.now()
+            notification.error_message=""
+            notification.save(update_fields=["status","sent_at","error_message","provider_reference"])
+        record_event(request_id=rid,tenant_id=tenant_id,component="notification",operation=f"send_notification:{notification_id}",duration_ms=(time.monotonic()-start)*1000)
+    except Exception as exc:
+        record_event(request_id=rid,tenant_id=tenant_id,component="notification",operation=f"send_notification:{notification_id}",status_code=503,duration_ms=(time.monotonic()-start)*1000,error_type=type(exc).__name__)
+        if self.request.retries>=self.max_retries:
+            Notification.objects.filter(
+                pk=notification_id,status=Notification.Status.QUEUED
+            ).update(
+                status=Notification.Status.FAILED,
+                error_message=f"{exc.__class__.__name__}: falha definitiva após tentativas de entrega"[:500],
+            )
+            return
+        raise self.retry(exc=exc,countdown=min(300,2**self.request.retries))
+
+
+@shared_task
+def process_notification_queue(limit=100):
+    ids=list(
+        Notification.objects
+        .filter(status=Notification.Status.QUEUED)
+        .filter(scheduled_at__isnull=True)
+        .order_by("created_at")
+        .values_list("id",flat=True)[:limit]
+    )
+    scheduled_ids=list(
+        Notification.objects
+        .filter(status=Notification.Status.QUEUED,scheduled_at__lte=timezone.now())
+        .order_by("scheduled_at")
+        .values_list("id",flat=True)[:limit]
+    )
+    for notification_id in dict.fromkeys(ids+scheduled_ids):
+        send_notification.delay(notification_id)
+    return len(set(ids+scheduled_ids))
+
+
+@shared_task(bind=True,max_retries=4,autoretry_for=(Exception,),retry_backoff=True)
+def send_marketing_delivery(self,delivery_id):
+    with transaction.atomic():
+        delivery=(
+            MarketingDelivery.objects
+            .select_for_update()
+            .select_related("campaign","lead")
+            .filter(pk=delivery_id)
+            .first()
+        )
+        if not delivery or delivery.status!=MarketingDelivery.Status.QUEUED:
+            return
+        if (delivery.lead.status!="active" or not delivery.lead.consent_at
+                or not delivery.campaign.active):
+            delivery.status=MarketingDelivery.Status.SKIPPED
+            delivery.save(update_fields=["status","updated_at"])
+            if delivery.campaign.active and not delivery.campaign.deliveries.filter(status=MarketingDelivery.Status.QUEUED).exists():
+                delivery.campaign.status=delivery.campaign.Status.COMPLETED
+                delivery.campaign.completed_at=timezone.now()
+                delivery.campaign.save(update_fields=["status","completed_at","updated_at"])
+            return
+
+        from django.conf import settings
+        base=settings.PUBLIC_BASE_URL.rstrip("/")
+        if not base.startswith("https://"):
+            raise RuntimeError("PUBLIC_BASE_URL HTTPS é obrigatório para o descadastro de campanhas.")
+        html=delivery.campaign.body if "<" in delivery.campaign.body else escape(delivery.campaign.body).replace("\n","<br>")
+        unsubscribe_url=f"{base}/tracking/email/unsubscribe/{delivery.lead.unsubscribe_token}/"
+        html+=f'<p><a href="{escape(unsubscribe_url)}">Cancelar recebimento de e-mails</a></p>'
+        pixel=f'<img src="{base}/tracking/email/{delivery.tracking_token}/open.gif" width="1" height="1" alt="" />'
+        html=html+pixel
+        if delivery.campaign.card_link_url:
+            tracked=f"{base}/tracking/email/{delivery.tracking_token}/click/"
+            html=html.replace(delivery.campaign.card_link_url,tracked)
+        message=EmailMultiAlternatives(
+            subject=delivery.campaign.subject,
+            body=delivery.campaign.body+f"\n\nCancelar recebimento: {unsubscribe_url}",
+            to=[delivery.lead.email],
+        )
+        message.attach_alternative(html,"text/html")
+        message.send(fail_silently=False)
+
+        delivery.status=MarketingDelivery.Status.SENT
+        delivery.sent_at=timezone.now()
+        delivery.error_message=""
+        delivery.save(update_fields=["status","sent_at","error_message","updated_at"])
+
+        campaign=delivery.campaign
+        campaign.sent_count=campaign.deliveries.filter(status=MarketingDelivery.Status.SENT).count()
+        campaign.failed_count=campaign.deliveries.filter(status=MarketingDelivery.Status.FAILED).count()
+        remaining=campaign.deliveries.filter(status=MarketingDelivery.Status.QUEUED).exists()
+        if not remaining:
+            campaign.status=campaign.Status.COMPLETED
+            campaign.completed_at=timezone.now()
+        else:
+            campaign.status=campaign.Status.SENDING
+        campaign.save(update_fields=["sent_count","failed_count","status","completed_at","updated_at"])
+
+
+@shared_task
+def process_marketing_deliveries(limit=100):
+    ids=list(
+        MarketingDelivery.objects
+        .filter(status=MarketingDelivery.Status.QUEUED,campaign__active=True)
+        .order_by("created_at")
+        .values_list("id",flat=True)[:limit]
+    )
+    for delivery_id in ids:
+        send_marketing_delivery.delay(delivery_id)
+    return len(ids)
+@shared_task
+def send_chatbot_reply(conversation_id, body):
+    from .models import WhatsAppConversation, WhatsAppMessage
+    from .whatsapp import send_text
+    from scheduling.models import Appointment
+
+    conversation=WhatsAppConversation.objects.select_related("appointment").get(pk=conversation_id)
+    if conversation.appointment_id and (conversation.appointment.status in {
+        Appointment.Status.COMPLETED,Appointment.Status.CANCELLED,Appointment.Status.NO_SHOW,
+    } or conversation.context.get("cancel_requested_appointment_id")==conversation.appointment_id):
+        return
+    provider_id=send_text(conversation.wa_id,body)
+    WhatsAppMessage.objects.create(
+        conversation=conversation,tenant=conversation.tenant,
+        provider_message_id=provider_id or None,
+        direction=WhatsAppMessage.Direction.OUT,
+        sender_type=WhatsAppMessage.SenderType.BOT,
+        message_type="text",body=body,status=WhatsAppMessage.Status.SENT,
+    )
+
+
+@shared_task
+def deliver_master_flow_message(delivery_id):
+    from .master_graph_services import deliver
+    return deliver(delivery_id)
+
+
+@shared_task
+def process_tenant_chatbot(message_id):
+    from .models import WhatsAppMessage
+    from .tenant_graph_services import advance
+    row=WhatsAppMessage.objects.filter(pk=message_id,direction='in').first()
+    if row:advance(row.conversation_id,row.pk)
+
+
+@shared_task
+def deliver_tenant_flow_message(delivery_id):
+    from .tenant_graph_services import deliver
+    return deliver(delivery_id)

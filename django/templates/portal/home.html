@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Operação — {{ tenant.name }} · ApPlanner{% endblock %}
+{% block content %}
+<div class="shell form-actions"><a class="button" href="{% url 'operation-today' %}">Hoje</a>{% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' or request.user.role == 'barber-manager' or request.user.role == 'arena-manager' or request.user.role == 'auto-manager' %}<a class="button" href="{% url 'operation-performance' %}">Indicadores</a>{% endif %}<a class="button" href="{% url 'portal-setup' %}">Revisar configuração</a></div>
+<section class="shell portal-page operation-dashboard">
+  <header class="portal-heading operation-heading">
+    <div><span class="eyebrow">PAINEL DA EMPRESA</span><h1>{{ tenant.name }}</h1><p>Encontre rapidamente o que precisa para atender seus clientes.</p></div>
+    <div class="operation-heading-actions">
+      {% if request.user.is_superuser or request.user.role == 'master' %}<a class="button ghost" href="{% url 'master-resource-create' 'despesas' %}">Despesa da plataforma</a><a class="button ghost" href="{% url 'master-finance-dashboard' %}">Financeiro do Master</a>{% endif %}
+      <button class="button ghost portal-view-toggle" id="portal-view-toggle" type="button" aria-pressed="false" aria-controls="operation-dashboard-content"><span aria-hidden="true">◐</span> Compactar painel</button>
+      {% if request.user.is_superuser or request.user.role == 'owner' %}<a class="button ghost" href="{% url 'portal-setup' %}">Configurar minha operação</a>{% endif %}
+      {% if arena_mode %}<a class="button primary" href="{% url 'portal-resource-create' 'arena' 'reservas' %}">Nova reserva <span aria-hidden="true">＋</span></a>{% else %}{% for item in modules %}{% if item.slug == 'agenda' %}<a class="button primary" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">Novo agendamento <span aria-hidden="true">＋</span></a>{% endif %}{% endfor %}{% endif %}
+      {% if request.user.is_superuser %}<a class="button ghost" href="{% url 'portal-home' %}?trocar=1">Trocar empresa</a>{% endif %}
+    </div>
+  </header>
+
+  <div id="operation-dashboard-content">
+  {% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' %}
+  <section class="panel"><h2>Ativação · {{ activation.unit.name|default:"Cadastre uma unidade" }}</h2><p>{{ activation.completed }} de {{ activation.total }} configurações concluídas.</p><progress value="{{ activation.progress }}" max="100" aria-label="Progresso da ativação">{{ activation.progress }}%</progress><ul>{% for step in activation.pending %}<li><a href="{{ step.url }}">{{ step.title }}</a></li>{% empty %}<li>Configurações cadastradas. Teste um agendamento antes de divulgar.</li>{% endfor %}</ul><a class="button" href="{% url 'portal-setup' %}">Revisar primeiros passos</a> <a class="button" href="{% url 'booking-funnel' %}">Funil de agendamento</a></section>
+  {% endif %}
+  <nav class="operation-quick-links" aria-label="Atalhos da operação">
+    {% if tenant.public_enabled %}<a class="button" href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">Página pública ↗</a>{% endif %}
+    {% if request.user.is_superuser or request.user.role == 'owner' %}<a class="button" href="{% url 'tenant-ratings' %}">Avaliações da equipe</a><a class="button" href="{% url 'tenant-payment-gateway' %}">Recebimentos</a><a class="button" href="{% url 'tenant-whatsapp-settings' %}">WhatsApp</a>{% endif %}
+    {% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' %}<a class="button" href="{% url 'reception-access' %}">Cadastrar recepção</a>{% endif %}
+    <a class="button" href="{% url 'portal-diagnostics' %}">Diagnóstico</a><a class="button" href="{% url 'communications-deliveries' %}">Notificações aos clientes</a>
+  </nav>
+  <div class="operation-utilities operation-secondary-content">
+    <section class="panel operation-share" aria-labelledby="operation-share-title">
+      <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">↗</span><div><span class="eyebrow">PRESENÇA ONLINE</span><h2 id="operation-share-title">Links para compartilhar</h2></div></div>
+      {% if tenant.public_enabled %}
+        <div class="operation-share-row"><div><strong>Página do estabelecimento</strong><span>Envie para o cliente conhecer seus serviços e agendar.</span></div><div class="operation-share-actions"><a class="button" href="{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" target="_blank" rel="noopener">Abrir página</a><button class="button operation-copy" type="button" data-copy-url="{{ request.scheme }}://{{ request.get_host }}{% url 'tenant-public' tenant.public_slug|default:tenant.slug %}" aria-label="Copiar link do estabelecimento">Copiar link</button></div></div>
+        {% include "short_link_share.html" %}
+        {% if public_professionals %}<details class="operation-professionals"><summary>Links dos profissionais <span aria-hidden="true">⌄</span></summary><div class="operation-professional-list">
+          {% for professional in public_professionals %}<div class="operation-share-row"><div><strong>{{ professional.name }}</strong><span>Página individual para agendamento</span>{% include "short_link_share.html" with short_link=professional.short_link share_id=professional.pk %}</div><div class="operation-share-actions"><a class="button" href="{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" target="_blank" rel="noopener">Abrir</a><button class="button operation-copy" type="button" data-copy-url="{{ request.scheme }}://{{ request.get_host }}{% url 'professional-public' tenant.public_slug|default:tenant.slug professional.public_slug %}" aria-label="Copiar link de {{ professional.name }}">Copiar link</button></div></div>{% endfor %}
+        </div></details>{% endif %}
+      {% else %}<p class="operation-muted">A página pública ainda está desativada. Peça ao Master para ativar “Página pública” no cadastro da empresa.</p>{% endif %}
+    </section>
+    {% if request.user.is_superuser or request.user.role == 'owner' %}
+    <section class="panel operation-payments" aria-labelledby="operation-payments-title">
+      <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">◈</span><div><span class="eyebrow">RECEBIMENTOS</span><h2 id="operation-payments-title">Pagamentos da empresa</h2></div></div>
+      <p>Conecte sua conta Mercado Pago para receber cobranças de clientes por Pix ou cartão. A assinatura do ApPlanner é separada.</p>
+      <a class="button" href="{% url 'tenant-payment-gateway' %}">Gerenciar Mercado Pago <span aria-hidden="true">→</span></a>
+      <a class="button" href="{% url 'tenant-ratings' %}">Avaliações da equipe <span aria-hidden="true">→</span></a>
+      <a class="button" href="{% url 'tenant-whatsapp-settings' %}">Conectar WhatsApp da empresa <span aria-hidden="true">→</span></a>
+    </section>
+    {% endif %}
+  </div>
+
+  {% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' %}
+  <section class="panel operation-access operation-secondary-content" aria-labelledby="operation-access-title">
+    <div class="operation-panel-heading"><span class="operation-panel-icon" aria-hidden="true">♙</span><div><span class="eyebrow">EQUIPE</span><h2 id="operation-access-title">Acesso da recepção</h2></div></div>
+    <p>Crie um usuário para a recepção cuidar de agenda, clientes e comunicação. O financeiro continua disponível apenas para a gestão.</p>
+    <a class="button" href="{% url 'reception-access' %}">Cadastrar recepção <span aria-hidden="true">→</span></a>
+  </section>
+  {% endif %}
+
+  <section class="panel operation-diagnostics operation-secondary-content" aria-labelledby="diagnostics-title">
+    <div class="operation-section-heading"><div><span class="eyebrow">SAÚDE DA OPERAÇÃO</span><h2 id="diagnostics-title">Diagnóstico rápido</h2><p>Veja o que está pronto para receber clientes e o que precisa de atenção.</p></div><a class="button" href="{% url 'portal-diagnostics' %}">Abrir diagnóstico completo →</a></div>
+    <div class="diagnostic-strip">{% for check in operation_health %}<a class="diagnostic-item {% if check.ok %}is-ok{% else %}is-pending{% endif %}" href="{{ check.url }}"><span aria-hidden="true">{% if check.ok %}✓{% else %}!{% endif %}</span><strong>{{ check.label }}</strong><small>{% if check.ok %}Pronto{% else %}Atenção{% endif %}</small></a>{% endfor %}</div>
+  </section>
+
+  <section class="operation-modules" aria-labelledby="operation-modules-title">
+    <div class="operation-section-heading"><div><span class="eyebrow">OPERAÇÃO</span><h2 id="operation-modules-title">Suas ferramentas</h2><p>As áreas disponíveis seguem as permissões da sua equipe e os módulos do seu plano.</p></div><span class="operation-module-count">{{ modules|length }} módulos</span></div>
+    <div class="portal-module-grid">
+      {% for item in modules %}
+        <article class="portal-module-card operation-module operation-module-{{ item.slug }}">
+          <div class="operation-module-top"><span class="portal-module-kicker">{{ forloop.counter|stringformat:"02d" }}</span><span class="operation-module-label">{{ item.resources|length }} {{ item.resources|length|pluralize:"função,funções" }}</span></div>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.description }}</p>
+          <div class="portal-resource-links">
+            {% for resource in item.resources %}<a href="{% url 'portal-resource-list' item.slug resource.slug %}">{{ resource.title }} <span aria-hidden="true">→</span></a>{% endfor %}
+          </div>
+        </article>
+      {% empty %}<div class="panel operation-empty"><h3>Nenhum módulo disponível</h3><p>Peça ao responsável da empresa para revisar seu acesso.</p></div>{% endfor %}
+    </div>
+  </section>
+  {% if contracted_modules %}<section class="operation-modules operation-secondary-content" aria-labelledby="contracted-title"><div class="operation-section-heading"><div><span class="eyebrow">SEU PLANO</span><h2 id="contracted-title">Módulos contratados</h2><p>Funções incluídas no plano e módulos adicionais liberados para {{ tenant.name }}.</p></div><span class="operation-module-count">{{ contracted_modules|length }} módulos</span></div>
+    <div class="portal-module-grid">{% for item in contracted_modules %}<article class="portal-module-card"><h3>{{ item.name }}</h3><p>{{ item.description }}</p>{% if item.route %}<a href="{% url 'portal-resource-list' item.route.0 item.route.1 %}">Abrir módulo →</a>{% elif item.gateway %}<a href="{% url 'tenant-payment-gateway' %}">Abrir integrações bancárias →</a>{% elif item.documentation %}<a href="{% url 'accounts:documentation' %}">Documentação e chaves da API →</a>{% else %}<span>Consulte as funções disponíveis para seu perfil acima.</span>{% endif %}</article>{% endfor %}</div>
+  </section>{% endif %}
+</div>
+</section>
+<script src="{% static 'js/portal-dashboard.js' %}" defer></script>
+<script src="{% static 'js/short-links.js' %}" defer></script>
+{% endblock %}
