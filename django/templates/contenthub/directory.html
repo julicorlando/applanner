@@ -1,9 +1,15 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Estabelecimentos — ApPlanner{% endblock %}
+{% block description %}Encontre estabelecimentos, conheça os serviços e escolha onde agendar. Permita a localização para consultar unidades em até 30 km.{% endblock %}
+{% block body_class %}experience-page experience-directory{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-experience.css' %}?v=20261009">{% endblock %}
 {% block content %}
 <section class="shell portal-page">
-  <div class="portal-heading"><div><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Encontre estabelecimentos.</h1><p>Encontre unidades em até 30 km, da mais próxima à mais distante.</p><p id="location-status" role="status"></p></div><button class="button ghost" id="nearby" type="button">{% if located %}Atualizar localização{% else %}Encontrar perto de mim{% endif %}</button></div>
-  <div class="segment-grid">
+  <div class="experience-intro"><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Seu próximo atendimento<br>começa por aqui.</h1><p>Conheça os estabelecimentos, escolha uma unidade e encontre o horário que funciona para você.</p></div>
+  <div class="experience-location-bar"><div><strong>{% if located %}Unidades em até 30 km{% else %}Encontre uma unidade perto de você{% endif %}</strong><p>{% if located %}Da mais próxima à mais distante, com a distância aproximada em quilômetros.{% else %}Permita sua localização para consultar unidades em até 30 km. Sem ela, você pode navegar pelas páginas publicadas.{% endif %}</p><p id="location-status" role="status" aria-live="polite"></p></div><button class="button primary" id="nearby" type="button">{% if located %}Atualizar localização{% else %}Encontrar perto de mim{% endif %}</button></div>
+  <div class="experience-results-heading"><h2>{% if located %}Perto de você{% else %}Explore os estabelecimentos{% endif %}</h2><p>Abra a página para conhecer serviços, profissionais e horários.</p></div>
+  <div class="segment-grid experience-results">
     {% for card in cards %}
     <article class="directory-card">
       <a class="directory-card__overlay" href="{% url 'tenant-public' card.tenant.public_slug|default:card.tenant.slug %}?unit={{ card.unit.pk }}#agendar" aria-label="Abrir {{ card.display_name }} e agendar"></a>
