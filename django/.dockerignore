@@ -1,0 +1,27 @@
+# COPY . must never include credentials or generated/customer files.
+.env
+.env.*
+!.env.example
+.git
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+node_modules
+**/node_modules
+*.sqlite3
+*.log
+*.bak*
+*.tmp
+*.pfx
+*.p12
+*.pem
+*.key
+media
+staticfiles
+legacy-dumps
+.coverage
+htmlcov
