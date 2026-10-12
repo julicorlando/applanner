@@ -12,6 +12,8 @@ class FinancialCategory(models.Model):
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="financial_categories")
     name=models.CharField(max_length=120)
     type=models.CharField(max_length=12,choices=Type.choices,default=Type.BOTH)
+    statement_line=models.CharField(max_length=32,blank=True,choices=[("gross_revenue","Receita operacional"),("deductions","Deduções / tributos sobre receita"),("direct_costs","Custos diretos"),("operating_expenses","Despesas operacionais"),("financial_income","Receitas financeiras"),("financial_expenses","Despesas financeiras"),("income_tax","Tributos sobre resultado"),("inventory_asset","Compra de estoque / ativo, fora da DRE")])
+    expense_nature=models.CharField(max_length=12,blank=True,choices=[("fixed","Fixa"),("variable","Variável")])
     active=models.BooleanField(default=True)
     created_at=models.DateTimeField(auto_now_add=True)
 
@@ -360,3 +362,5 @@ class ProductEvent(models.Model):
         ]
 
 from .advanced_models import CashMovement, MaterialConsumption, ServiceMaterial  # noqa: F401,E402
+
+from .market_models import CommissionPolicy, CommissionTier, CommissionSnapshot, GiftCard, GiftCardEntry  # noqa: F401,E402

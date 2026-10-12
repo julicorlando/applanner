@@ -47,7 +47,7 @@ def cash_balance(session):
         type="income",
         paid_at__gte=session.opened_at,
         paid_at__lte=end,
-        payment_method__in=["pix+cash", "pix+dinheiro"],
+        payment_method__in=["pix+cash", "pix+dinheiro", "card+cash", "card+dinheiro"],
     ).exclude(source_type="barber_command")
     for row in mixed:
         online = TenantPaymentTransaction.objects.filter(
@@ -63,6 +63,7 @@ def cash_balance(session):
 
     payments = BarberCommandPayment.objects.filter(
         tenant=session.tenant,
+        voided_at__isnull=True,
         command__status="closed",
         received_at__gte=session.opened_at,
         received_at__lte=end,
@@ -82,6 +83,16 @@ def cash_balance(session):
             command__professional__unit__isnull=True,
         )
     command_cash = payments.aggregate(v=Sum("amount"))["v"] or Decimal(0)
+    from .models import GiftCardEntry
+
+    gift_cash = GiftCardEntry.objects.filter(
+        tenant=session.tenant,
+        kind="issue",
+        card__unit=session.unit,
+        card__issue_payment_method="cash",
+        created_at__gte=session.opened_at,
+        created_at__lte=end,
+    ).aggregate(v=Sum("amount"))["v"] or Decimal(0)
     supply = session.movements.filter(type="supply").aggregate(v=Sum("amount"))[
         "v"
     ] or Decimal(0)
@@ -89,7 +100,13 @@ def cash_balance(session):
         "v"
     ] or Decimal(0)
     return (
-        session.opening_amount + income + command_cash - expense + supply - withdrawal
+        session.opening_amount
+        + income
+        + command_cash
+        + gift_cash
+        - expense
+        + supply
+        - withdrawal
     ).quantize(Decimal(".01"))
 
 
@@ -231,12 +248,19 @@ def consume_material(
     return row
 
 
+@transaction.atomic
 def consume_recipe(appointment, user):
-    for material in (
+    rows = list(
         appointment.service.materials.filter(tenant=appointment.tenant, active=True)
         .filter(Q(product__unit=appointment.unit) | Q(product__unit__isnull=True))
         .order_by("product_id")
-    ):
+    )
+    list(
+        Product.objects.select_for_update()
+        .filter(tenant=appointment.tenant, pk__in=[r.product_id for r in rows])
+        .order_by("pk")
+    )
+    for material in rows:
         consume_material(
             tenant=appointment.tenant,
             product_id=material.product_id,

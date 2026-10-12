@@ -5,6 +5,9 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
 
 TASKS=[
+    ("Conciliar cartões de reservas","billing.tenant_card_reconciliation.reconcile_pending_tenant_cards",5,"minutes"),
+    ("Conciliar entrega SMS","communications.mobile_delivery.reconcile_sms_delivery",5,"minutes"),
+    ("Processar Push do aplicativo","communications.mobile_delivery.process_push_queue",1,"minutes"),
     ("Emitir e consultar NFS-e MEI","billing.tasks.reconcile_fiscal_documents",5,"minutes"),
     ("Limpar histórico técnico","operations.tasks.prune_runtime_history",24,"hours"),
     ("Processar notificações","communications.tasks.process_notification_queue",1,"minutes"),

@@ -1,7 +1,7 @@
 /* Only fingerprinted public static files can enter this cache. Account data stays online. */
 'use strict';
 const CACHE_PREFIX = 'applanner-static-';
-const CACHE_NAME = CACHE_PREFIX + '20261012-v1';
+const CACHE_NAME = CACHE_PREFIX + '20261012-v2';
 const STATIC_FILE = /^\/static\/.+\.[a-f0-9]{12}\.(?:css|js|png|jpg|jpeg|webp|svg|woff2?)$/i;
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
@@ -33,3 +33,6 @@ self.addEventListener('fetch', event => {
     return response;
   })());
 });
+
+self.addEventListener('push',event=>{let data={};try{data=event.data?.json()||{};}catch{}const target=new URL(data.url||'/',self.location.origin);const url=target.origin===self.location.origin?target.pathname+target.search:'/';event.waitUntil(self.registration.showNotification(String(data.title||'ApPlanner').slice(0,120),{body:String(data.body||'Abra o aplicativo para conferir sua agenda.').slice(0,240),tag:String(data.tag||'applanner'),data:{url}}));});
+self.addEventListener('notificationclick',event=>{event.notification.close();const target=new URL(event.notification.data?.url||'/',self.location.origin);if(target.origin!==self.location.origin)return;event.waitUntil((async()=>{const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});for(const client of windows){if('focus'in client){await client.navigate(target.href);return client.focus();}}return self.clients.openWindow(target.href);})());});

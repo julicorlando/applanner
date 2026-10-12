@@ -179,6 +179,7 @@ class TenantScheduleSettings(models.Model):
     allow_full_payment=models.BooleanField(default=False,verbose_name="Permitir pagamento total por Pix no agendamento")
     online_booking_payments_enabled=models.BooleanField(default=False,
         verbose_name="Ativar cobrança online ao agendar")
+    card_booking_payments_enabled=models.BooleanField(default=False,verbose_name="Permitir cartão antecipado tokenizado")
     deposit_percent=models.PositiveSmallIntegerField(default=30,verbose_name="Percentual do sinal")
     updated_at=models.DateTimeField(auto_now=True)
 

@@ -45,9 +45,12 @@ def open_command(*,tenant,user,appointment=None,customer=None,professional=None,
     if appointment:
         if appointment.tenant_id!=tenant.id:
             raise ValidationError("Agendamento pertence a outro tenant.")
+        appointment=Appointment.objects.select_for_update().get(pk=appointment.pk,tenant=tenant)
         existing=BarberCommand.objects.filter(tenant=tenant,appointment=appointment).first()
         if existing:
             return existing
+        if appointment.status in {"completed","cancelled","no_show"}:
+            raise ValidationError("Este atendimento já está encerrado. Abra uma comanda avulsa para uma nova operação.")
         customer=customer or appointment.customer
         professional=professional or appointment.professional
 
@@ -177,6 +180,8 @@ def recalculate_command(command):
 
 @transaction.atomic
 def register_payment(*,command,user,method,amount):
+    if method=="gift_card":
+        raise ValidationError("Aplique o vale-presente pelo registro de saldo validado.")
     command=BarberCommand.objects.select_for_update().get(pk=command.pk)
     if command.status!=BarberCommand.Status.OPEN:
         raise ValidationError("A comanda está fechada.")
@@ -202,15 +207,42 @@ def close_command(*,command,user):
         raise ValidationError("Comanda cancelada não pode ser fechada.")
 
     recalculate_command(command)
-    paid=sum((payment.amount for payment in command.payments.all()),Decimal("0"))
+    paid=sum((payment.amount for payment in command.payments.filter(voided_at__isnull=True)),Decimal("0"))
     if _money(paid)<command.total_amount:
         raise ValidationError("Pagamentos não cobrem o total da comanda.")
 
+    appointment=None
     if command.appointment_id:
+        appointment=Appointment.objects.select_for_update().get(pk=command.appointment_id,tenant=command.tenant)
+        if hasattr(appointment,'settlement'):
+            raise ValidationError('Este atendimento já possui encerramento financeiro. Confira os lançamentos antes de fechar a comanda.')
+    product_ids=set(command.items.filter(product__isnull=False).values_list('product_id',flat=True))
+    if appointment:
+        from django.db.models import Q
+        product_ids.update(appointment.service.materials.filter(tenant=command.tenant,active=True).filter(Q(product__unit=appointment.unit)|Q(product__unit__isnull=True)).values_list('product_id',flat=True))
+    list(Product.objects.select_for_update().filter(tenant=command.tenant,pk__in=product_ids).order_by('pk'))
+    if appointment:
         from finance.advanced_services import consume_recipe
-        consume_recipe(command.appointment,user)
+        consume_recipe(appointment,user)
+    from finance.models import CommissionPolicy
+    from finance.commission_engine import calculate,material_cost,save_snapshot
+    list(CommissionPolicy.objects.select_for_update().filter(tenant=command.tenant,
+         professional_id__in=command.items.filter(professional__isnull=False).values('professional_id')).order_by('professional_id','pk'))
+    material_remaining=material_cost(command.appointment) if command.appointment_id else Decimal(0)
+    for item in command.items.select_related("product","service","professional").order_by('pk'):
+        result=None
+        if item.professional_id and item.item_type in {'service','product'}:
+            is_material_service=item.is_primary_service or (command.appointment_id and item.service_id==command.appointment.service_id and item.professional_id==command.appointment.professional_id)
+            cost=material_remaining if is_material_service else Decimal(0)
+            if is_material_service:
+                material_remaining=Decimal(0)
+            result=calculate(tenant=command.tenant,professional=item.professional,gross=item.total_amount,
+                             service=item.service if item.item_type=='service' else None,
+                             product=item.product if item.item_type=='product' else None,materials=cost)
+            if result:
+                item.commission_amount_snapshot=result[0]
+                item.save(update_fields=['commission_amount_snapshot'])
 
-    for item in command.items.select_related("product","service","professional").all():
         if item.item_type==BarberCommandItem.ItemType.PRODUCT and item.product_id:
             product=Product.objects.select_for_update().get(pk=item.product_id)
             if product.stock<item.quantity:
@@ -227,8 +259,8 @@ def close_command(*,command,user):
                 reason=f"Comanda #{command.pk}",
             )
 
-        if item.professional_id and item.commission_amount_snapshot and item.commission_amount_snapshot>0:
-            ProfessionalCommission.objects.get_or_create(
+        if item.professional_id and (result or (item.commission_amount_snapshot and item.commission_amount_snapshot>0)):
+            commission_row,_=ProfessionalCommission.objects.get_or_create(
                 tenant=command.tenant,
                 professional=item.professional,
                 source_type="command_"+item.item_type,
@@ -238,6 +270,7 @@ def close_command(*,command,user):
                     "commission_amount":item.commission_amount_snapshot,
                 },
             )
+            save_snapshot(commission_row,result)
 
     if command.tip_professional_id and command.tip_amount>0:
         ProfessionalCommission.objects.get_or_create(
@@ -251,14 +284,15 @@ def close_command(*,command,user):
             },
         )
 
-    payment_method="mixed" if command.payments.values("method").distinct().count()>1 else (
-        command.payments.values_list("method",flat=True).first() or "other"
+    payment_method="mixed" if command.payments.filter(voided_at__isnull=True).values("method").distinct().count()>1 else (
+        command.payments.filter(voided_at__isnull=True).values_list("method",flat=True).first() or "other"
     )
     FinancialTransaction.objects.get_or_create(
         tenant=command.tenant,
         source_type="barber_command",
         source_id=command.pk,
         defaults={
+            "unit":command.appointment.unit if command.appointment_id else command.professional.unit if command.professional_id else None,
             "type":FinancialTransaction.Type.INCOME,
             "description":f"Comanda #{command.pk}",
             "amount":command.total_amount,

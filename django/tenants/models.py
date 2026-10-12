@@ -208,3 +208,5 @@ class TenantStatusHistory(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["tenant","created_at"],name="tenant_status_hist_idx")]
+
+from .groups import BusinessGroup,GroupCompany,GroupRoyalty  # noqa: F401,E402

@@ -287,7 +287,8 @@ def mercadopago_platform_webhook(request):
 def mercadopago_tenant_webhook(request,slug):
     if request.method!="POST":
         return JsonResponse({"detail":"Method not allowed"},status=405)
-    tenant=Tenant.objects.filter(public_slug=slug).first()
+    from django.db.models import Q
+    tenant=Tenant.objects.filter(Q(public_slug=slug)|Q(public_slug__isnull=True,slug=slug)).first()
     if not tenant:
         return JsonResponse({"detail":"Tenant não encontrado."},status=404)
 
@@ -342,8 +343,15 @@ def mercadopago_tenant_webhook(request,slug):
                     tenant=tenant,connection=connection,external_reference=external
                 ).first()
             if tx:
+                if tx.method=="card":
+                    from .tenant_card_integrity import validate_card_event
+                    validate_card_event(tx,remote,resource_id)
                 tx.provider_transaction_id=resource_id
-                tx.status=_tenant_status(remote.get("status"))
+                if tx.method=="card":
+                    from .tenant_card_integrity import card_status
+                    tx.status=card_status(remote)
+                else:
+                    tx.status=_tenant_status(remote.get("status"))
                 fee=sum(
                     Decimal(str(item.get("amount") or 0))
                     for item in remote.get("fee_details",[])

@@ -22,7 +22,9 @@ def validate_charge_amount(value):
 
 
 class MercadoPagoError(RuntimeError):
-    pass
+    def __init__(self,message,http_status=None):
+        super().__init__(message)
+        self.http_status=http_status
 
 
 class MercadoPagoProvider:
@@ -81,7 +83,7 @@ class MercadoPagoProvider:
                     "Informe um e-mail de comprador diferente e, em testes, entre no Mercado Pago com a conta compradora."
                 )
             message=redact_sensitive_text(message,secrets=(self.access_token,))
-            raise MercadoPagoError(f"Mercado Pago HTTP {response.status_code}: {message}")
+            raise MercadoPagoError(f"Mercado Pago HTTP {response.status_code}: {message}",http_status=response.status_code)
         return data
 
     def test_connection(self):
@@ -131,6 +133,10 @@ class MercadoPagoProvider:
 
     def cancel_subscription(self,reference):
         return self._request("PUT",f"/preapproval/{reference}",{"status":"canceled"})
+
+    def search_payments(self,external_reference):
+        from urllib.parse import quote
+        return self._request("GET","/v1/payments/search?external_reference="+quote(external_reference,safe=""))
 
     def get_payment(self,reference):
         return self._request("GET",f"/v1/payments/{reference}")

@@ -11,7 +11,7 @@ from .unit_scope import selected_unit
 
 AGENDA_FIELDS=["minimum_notice_minutes","maximum_days_ahead","slot_interval_minutes","buffer_minutes",
                "customer_can_cancel","customer_can_reschedule","cancel_notice_minutes",
-               "reminder_24h_enabled","reminder_2h_enabled"]
+               "reminder_24h_enabled","reminder_2h_enabled","card_booking_payments_enabled"]
 
 class UnitScheduleForm(forms.ModelForm):
     class Meta:

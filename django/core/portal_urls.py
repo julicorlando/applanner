@@ -10,12 +10,17 @@ from engagement.referrals import referrals
 from .booking_funnel import dashboard as booking_funnel
 
 from .professional_blocks import blocks
+from .business_groups import dashboard as business_groups
+from communications import mobile_portal
 from .calendar_view import calendar,move
 from .global_search import search
 from .work_notes import notes,photo
 from .professional_materials import materials
 
 urlpatterns = [
+    path("profissional/notificacoes/",mobile_portal.user_preferences,name="professional-notification-preferences"),
+    path("profissional/notificacoes/push/",mobile_portal.subscription,name="professional-push-subscription"),
+    path("grupos/",business_groups,name="business-groups"),
     path("profissional/consumo/<int:pk>/",materials,name="professional-materials"),
     path("busca/",search,name="operation-search"),
     path("profissional/busca/",search,name="professional-search"),

@@ -27,8 +27,16 @@ from core.public_identity import tenant_short_link, professional_short_link
 
 from scheduling.customer_portal import portal as customer_portal
 from scheduling.bundles import BundleAPIView,bundle_page
+from scheduling import card_payments
+from communications import mobile_portal
 
 urlpatterns = [
+    path("p/<slug:slug>/notificacoes/",mobile_portal.customer_preferences,name="customer-notification-preferences"),
+    path("p/<slug:slug>/notificacoes/push/",mobile_portal.subscription,name="customer-push-subscription"),
+    path("account/notificacoes/push/",mobile_portal.subscription,name="user-push-subscription"),
+    path("account/notificacoes/",mobile_portal.user_preferences,name="user-notification-preferences"),
+    path("agendamento/<str:token>/cartao/",card_payments.page,name="public-appointment-card"),
+    path("agendamento/<str:token>/cartao/processar/",card_payments.submit,name="public-appointment-card-submit"),
     path("api/public/<slug:slug>/bundle/",BundleAPIView.as_view(),name="public-bundle-api"),
     path("p/<slug:slug>/sequencia/",bundle_page,name="public-bundle-booking"),
     path("p/<slug:slug>/cliente/",customer_portal,name="customer-portal"),

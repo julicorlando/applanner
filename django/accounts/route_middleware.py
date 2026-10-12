@@ -1,3 +1,4 @@
+import re
 from django.core.exceptions import PermissionDenied
 
 from .permissions import has_capability
@@ -19,7 +20,7 @@ RECEPTION_MUTATION_PREFIXES=(
 
 
 def _reception_mutation_allowed(path):
-    return any(path.startswith(prefix) for prefix in RECEPTION_MUTATION_PREFIXES)
+    return bool(re.fullmatch(r"/app/barbearia/comandas/[0-9]+/vale/",path)) or any(path.startswith(prefix) for prefix in RECEPTION_MUTATION_PREFIXES)
 
 
 PREFIX_CAPABILITIES={
