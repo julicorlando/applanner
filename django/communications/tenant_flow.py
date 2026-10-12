@@ -35,6 +35,9 @@ def company_facts(tenant):
     booking=('Para consultar horários, escolher unidade/serviço/profissional e confirmar, acesse '+url+'. O chatbot não reserva nem confirma horários: a confirmação ocorre na agenda pública.') if tenant.public_enabled and tenant.public_booking_enabled else 'A agenda pública ainda não está disponível. Nossa equipe pode ajudar com o agendamento.'
     methods={'pix':'Pix','cash':'Dinheiro','credit_card':'Cartão de crédito','debit_card':'Cartão de débito','card':'Cartão'}
     payments=', '.join(methods.get(str(m),str(m)) for m in (tenant.accepted_payment_methods or []) if isinstance(m,str))
+    unit_payments='\n'.join(u.name+': '+', '.join(methods.get(m,m) for m in (u.payment_methods or []) if isinstance(m,str)) for u in units if u.payment_methods)
+    amenities='\n'.join(u.name+': '+', '.join(m for m in (u.amenities or []) if isinstance(m,str)) for u in units if u.amenities)
+    unit_contacts='\n'.join(u.name+': '+' · '.join(v for v in [u.phone,u.whatsapp,u.email] if v) for u in units if u.phone or u.whatsapp or u.email)
     return {
         'empresa':f'Você está falando com {tenant.name}. '+tenant.description[:600],
         'servicos':catalog or 'Nossa equipe pode informar os serviços e valores disponíveis.',
@@ -43,7 +46,9 @@ def company_facts(tenant):
         'profissionais':team or 'Nossa equipe pode confirmar os profissionais disponíveis.',
         'agendamento':booking,
         'pagamentos':('Formas cadastradas: '+payments+'. Não confirmo recebimento de pagamento por mensagem.') if payments else 'Nossa equipe confirma as formas de pagamento. Não confirmo recebimento por mensagem.',
-        'contato':' · '.join(v for v in [tenant.phone,tenant.email,tenant.public_instagram] if v) or 'Você pode solicitar atendimento humano nesta conversa.',
+        'pagamentos_unidades':unit_payments[:3500] or 'A equipe confirma as formas de pagamento da unidade escolhida.',
+        'comodidades':amenities[:3500] or 'A equipe confirma as comodidades da unidade escolhida.',
+        'contato':((' · '.join(v for v in [tenant.phone,tenant.email,tenant.public_instagram] if v)+'\n'+unit_contacts).strip())[:3500] or 'Você pode solicitar atendimento humano nesta conversa.',
     }
 
 
@@ -63,6 +68,9 @@ def company_ai(tenant,flow,node,variables,incoming):
     if not flow.ai_enabled:return answer_company(tenant,incoming)
     shared=MasterWhatsAppFlow.objects.filter(pk=1).first()
     if not shared or not shared.ai_enabled or not shared.ai_key_encrypted or not shared.ai_model:raise ValueError('A IA central ainda não está configurada.')
+    if node.get('config',{}).get('customer_service'):
+        from .customer_service_agent import service_answer
+        return service_answer(shared,node,variables,incoming,facts=company_facts(tenant),scope='informações públicas da empresa '+tenant.name)
     from .master_assistant import grounded_answer
     return grounded_answer(shared,node,{},incoming,facts=company_facts(tenant),scope='informações públicas da empresa '+tenant.name,
         outside_text='Posso te ajudar com os serviços e informações da '+tenant.name+' 😊 Para essa dúvida, nossa equipe precisa confirmar. Escolha atendimento humano no próximo passo.')

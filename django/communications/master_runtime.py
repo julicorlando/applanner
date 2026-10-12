@@ -118,18 +118,34 @@ def run_graph(graph,flow,state,context,waiting,incoming,*,resume=False,simulatio
             elif kind in {'api','ai'}:
                 external+=1
                 if external>3:raise ValueError('Limite de integrações por execução atingido.')
-                if simulation:
+                if simulation and kind=='ai' and cfg.get('customer_service'):
+                    from .customer_service_agent import service_answer
+                    value=service_answer(flow,node,variables,incoming,simulation=True)
+                    trace[-1]['result']='simulado, sem chamada externa'
+                elif simulation:
                     value={'simulated':True,'result':'Resposta simulada'} if kind=='api' else 'Resposta simulada da IA.'
                     trace[-1]['result']='simulado, sem chamada externa'
                 elif kind=='api':value=call_api(flow,node,variables,f'flow-{event_key}-{node["id"]}-{index}')
                 elif ai_handler:value=ai_handler(flow,node,variables,incoming)
+                elif cfg.get('customer_service'):
+                    from .customer_service_agent import service_answer
+                    value=service_answer(flow,node,variables,incoming)
                 elif cfg.get('applanner_only'):
                     from .master_assistant import grounded_answer
                     value=grounded_answer(flow,node,variables,incoming)
                 else:value=call_ai(flow,node,variables,incoming)
+                from .customer_service_agent import ServiceReply
+                agent_handoff=False
+                if isinstance(value,ServiceReply):
+                    variables['_service_agent_intent']=value.intent
+                    variables['_service_agent_reason']=value.reason
+                    agent_handoff=value.handoff
+                    value=value.text
                 variables[cfg['variable']]=value
                 if kind=='ai' and cfg.get('send_output',True):say(value)
-                state=out.get('next','')
+                if agent_handoff:
+                    handoff=True;state=''
+                else:state=out.get('next','')
             elif kind=='wait':waiting='wait';wake=cfg['seconds']
             elif kind=='handoff':say(cfg.get('text') or flow.handoff);handoff=True;state=''
             elif kind=='finish':say(cfg.get('text','Obrigado pelo contato!'));state=''
