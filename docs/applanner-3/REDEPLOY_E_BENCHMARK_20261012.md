@@ -81,6 +81,14 @@ Migrations aditivas: finance 0009 (tipo de estoque, caixa/consumos/fichas) e sch
 - Após redeploy: health check, landing, login, seleção de unidade, reserva simples e múltipla, agenda, conclusão com insumos, comissão/caixa e tentativa de acesso indevido. Confirmar entrega SMTP/WhatsApp conforme configuração real.
 - Não há evidência de deploy ou backup da produção nesta sessão. A publicação depende do ambiente Coolify ao qual não foi disponibilizado acesso.
 
+## Evidências da entrega consolidada
+
+- Navegador: 11 novas telas com HTTP 200 e sem erros JavaScript; sem overflow em 320, 390, 768, 1024 e 1440 px.
+- Agendamento múltiplo real em dados isolados: duas reservas sequenciais confirmadas via interface mobile.
+- Axe verificou temas claro/escuro: identificou rótulos ausentes no caixa, corrigidos na revisão final; nova execução deve confirmar o resultado.
+- Primeiro CI completo descobriu 718 testes e encontrou duas falhas da mesma causa na consulta Arena (colisão de variável). Corrigido e verificado por 38 testes direcionados; novo CI completo obrigatório.
+- Segurança do commit 7d7a9a55 aprovada: https://github.com/julicorlando/applanner/actions/runs/38301760419.
+
 ## Referências externas
 
 - https://appbarber.com.br/funcionalidades/ — comunicação, agenda, site, estoque/comandas e recursos gerais.

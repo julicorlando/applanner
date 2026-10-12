@@ -122,8 +122,8 @@ class ArenaReservationService:
 
         for row in hours:
             cursor=datetime.combine(day,row.start_time,tzinfo=tz)
-            limit=datetime.combine(day,row.end_time,tzinfo=tz)
-            while cursor+timedelta(minutes=duration_minutes)<=limit:
+            closing_at=datetime.combine(day,row.end_time,tzinfo=tz)
+            while cursor+timedelta(minutes=duration_minutes)<=closing_at:
                 end=cursor+timedelta(minutes=duration_minutes)
                 if self.is_available(
                     tenant,court,cursor,end,
