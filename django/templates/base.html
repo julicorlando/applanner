@@ -45,6 +45,7 @@
       {% if request.user.is_authenticated %}
         {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
         <a href="/">Painel</a>
+        <a href="{% if request.user.is_superuser %}{% url 'master-global-search' %}{% elif request.user.role == 'professional' %}{% url 'professional-search' %}{% else %}{% url 'operation-search' %}{% endif %}">Buscar</a>
         {% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a>{% endif %}{% endif %}
         {% if request.user.tenant_id and request.user.role != 'professional' %}<a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}
         {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}

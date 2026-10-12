@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "finance","communications","barber","arena","engagement","auto","commercial","healthcare","legal","operations","growth","contenthub",
 ]
 MIDDLEWARE = [
+    "core.work_notes.PrivateMediaGuard",
     "django.middleware.security.SecurityMiddleware",
     "operations.telemetry.RuntimeMonitoringMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",

@@ -66,6 +66,10 @@ class FinancialTransaction(TimeStampedModel):
 
 
 class Product(TimeStampedModel):
+    class Kind(models.TextChoices):
+        RETAIL="retail","Revenda"
+        INTERNAL="internal","Uso interno / insumo"
+    kind=models.CharField(max_length=12,choices=Kind.choices,default=Kind.RETAIL)
     class CommissionType(models.TextChoices):
         NONE="none","Sem comissão"
         PERCENT="percent","Percentual"
@@ -354,3 +358,5 @@ class ProductEvent(models.Model):
             models.Index(fields=["event_type","created_at"],name="finance_product_evt_idx"),
             models.Index(fields=["tenant","created_at"],name="finance_product_tenant_idx"),
         ]
+
+from .advanced_models import CashMovement, MaterialConsumption, ServiceMaterial  # noqa: F401,E402

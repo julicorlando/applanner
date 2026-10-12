@@ -14,6 +14,7 @@
     <div class="form-field"><label for="directory-segment">Segmento</label><select id="directory-segment" name="segment"><option value="">Todos os segmentos</option>{% for value,label in categories %}<option value="{{ value }}"{% if segment == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
     <div class="form-field"><label for="directory-radius">Distância máxima</label><select id="directory-radius" name="radius"{% if not located %} disabled{% endif %}><option value="5"{% if radius == 5 %} selected{% endif %}>5 km</option><option value="10"{% if radius == 10 %} selected{% endif %}>10 km</option><option value="20"{% if radius == 20 %} selected{% endif %}>20 km</option><option value="30"{% if radius == 30 %} selected{% endif %}>30 km</option></select></div>
     <div class="form-field"><label for="directory-rating">Avaliação da empresa</label><select id="directory-rating" name="rating"><option value="">Todas as avaliações</option><option value="3"{% if min_rating == 3 %} selected{% endif %}>3 ou mais</option><option value="4"{% if min_rating == 4 %} selected{% endif %}>4 ou mais</option><option value="5"{% if min_rating == 5 %} selected{% endif %}>5 estrelas</option></select></div>
+    <label class="checkbox-choice-group"><input type="checkbox" name="today" value="1"{% if today_only %} checked{% endif %}> Tem horário hoje</label>
     <button class="button primary" type="submit">Buscar</button><a class="button" href="{% url 'public-directory' %}">Limpar filtros</a>
     {% if not located %}<small>A distância fica disponível ao permitir sua localização. O CEP filtra as unidades com esse endereço cadastrado.</small>{% endif %}
   </form>
@@ -25,7 +26,7 @@
       <div class="directory-card__content">
         <div class="public-business-identity">{% if card.unit.logo or card.tenant.logo %}<img class="professional-avatar" src="{% url 'public-tenant-image' card.tenant.pk 'logo' %}?unit={{ card.unit.pk }}" alt="Logo de {{ card.tenant.name }}" loading="lazy" width="72" height="72">{% else %}<span class="public-logo-placeholder" aria-label="{{ card.tenant.name }}">{{ card.tenant.name|first|upper }}</span>{% endif %}{% if card.verified %}{% include "verified_business_badge.html" %}{% endif %}</div>
         <span class="directory-card__segment">{{ card.tenant.category_label }}{% if card.distance_km != None %} · {{ card.distance_km|floatformat:1 }} km{% endif %}</span>
-        <h3>{{ card.display_name }}</h3>
+        <h3>{{ card.display_name }}</h3>{% if card.today_slot %}<p class="flash success">Tem horário hoje · {{ card.today_slot.label }} · {{ card.today_slot.resource }}</p><small>Disponibilidade consultada agora; o horário é validado novamente ao reservar.</small>{% endif %}
         {% if card.rating %}<p class="directory-rating">★ {{ card.rating.average|floatformat:1 }} <small>· {{ card.rating.total }} avaliações da empresa</small></p>{% endif %}
         <p>{{ card.tenant.description|truncatechars:180 }}</p>
         {% with unit=card.unit %}<p class="directory-card__location">{{ unit.city }}{% if unit.state %}/{{ unit.state }}{% endif %}{% if unit.district %} · {{ unit.district }}{% endif %}{% if unit.address %}<br>{{ unit.address }}{% if unit.address_number %}, {{ unit.address_number }}{% endif %}{% endif %}</p>{% endwith %}

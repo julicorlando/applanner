@@ -89,6 +89,8 @@ def create_sale(
     subtotal=Decimal("0")
     for raw in raw_items:
         product=locked_products[int(raw["product_id"])]
+        if product.kind != "retail":
+            raise ValidationError("Insumos de uso interno não podem ser vendidos.")
         quantity=Decimal(str(raw.get("quantity") or 0))
         if quantity<=0:
             raise ValidationError("Quantidade deve ser maior que zero.")
@@ -244,6 +246,13 @@ def cancel_sale(*,sale,user,reason):
 @transaction.atomic
 def open_cash_session(*,tenant,user,opening_amount=0,unit=None,notes=""):
     from .models import CashSession
+    from tenants.models import Unit,Tenant
+    if unit:
+        if unit.tenant_id != tenant.pk:
+            raise ValidationError("A unidade pertence a outra empresa.")
+        Unit.objects.select_for_update().get(pk=unit.pk,tenant=tenant)
+    else:
+        Tenant.objects.select_for_update().get(pk=tenant.pk)
     if CashSession.objects.filter(tenant=tenant,unit=unit,status=CashSession.Status.OPEN).exists():
         raise ValidationError("Já existe um caixa aberto para esta unidade.")
     return CashSession.objects.create(
@@ -254,23 +263,12 @@ def open_cash_session(*,tenant,user,opening_amount=0,unit=None,notes=""):
 
 @transaction.atomic
 def close_cash_session(*,session,user,closing_amount,notes=""):
-    from django.db.models import Sum
     from .models import CashSession
     session=CashSession.objects.select_for_update().get(pk=session.pk)
     if session.status!=CashSession.Status.OPEN:
         raise ValidationError("Caixa já está fechado.")
-    cash_methods=["cash","dinheiro"]
-    income=FinancialTransaction.objects.filter(
-        tenant=session.tenant,unit=session.unit,status=FinancialTransaction.Status.PAID,
-        type=FinancialTransaction.Type.INCOME,paid_at__gte=session.opened_at,
-        payment_method__in=cash_methods,
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
-    expense=FinancialTransaction.objects.filter(
-        tenant=session.tenant,unit=session.unit,status=FinancialTransaction.Status.PAID,
-        type=FinancialTransaction.Type.EXPENSE,paid_at__gte=session.opened_at,
-        payment_method__in=cash_methods,
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
-    expected=_money(session.opening_amount+income-expense)
+    from .advanced_services import cash_balance
+    expected=cash_balance(session)
     closing=_money(closing_amount)
     session.closing_amount=closing
     session.expected_amount=expected

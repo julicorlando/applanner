@@ -4,7 +4,7 @@
 {% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
 {% block body_class %}public-page experience-page experience-business{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-booking.css' %}?v=20261008-organized"><link rel="stylesheet" href="{% static 'css/public-experience.css' %}?v=20261009">{% endblock %}
-{% block header %}<header class="topbar public-header"><a class="public-header__brand" href="#conteudo">{{ tenant.name }}</a><nav aria-label="Agendamento">{% if tenant.public_booking_enabled %}<a href="#agendar">Agendar</a>{% endif %}{% if units %}<a href="#unidades">Localização e contato</a>{% endif %}</nav>{% include "theme_toggle.html" %}</header>{% endblock %}
+{% block header %}<header class="topbar public-header"><a class="public-header__brand" href="#conteudo">{{ tenant.name }}</a><nav aria-label="Agendamento"><a href="{% url 'customer-portal' tenant.public_slug|default:tenant.slug %}">Meus agendamentos</a>{% if tenant.public_booking_enabled %}<a href="#agendar">Agendar</a>{% endif %}{% if units %}<a href="#unidades">Localização e contato</a>{% endif %}</nav>{% include "theme_toggle.html" %}</header>{% endblock %}
 {% block account_notices %}{% endblock %}
 {% block trial_prompt %}{% endblock %}
 {% block footer %}<footer class="footer public-footer"><span>Agendamento com ApPlanner</span><nav aria-label="Documentos do cliente"><a href="{% url 'legal-public-document' 'privacidade' %}">Privacidade</a><a href="{% url 'legal-public-document' 'termos-clientes' %}">Termos</a><a href="{% url 'legal-public-document' 'cancelamento-clientes' %}">Cancelamento</a></nav></footer>{% endblock %}
@@ -80,7 +80,7 @@
 </section>
 {% else %}
 <section class="shell section" id="agendar">
-  <div class="section-head"><span class="eyebrow">{{ booking_wording.0 }}</span><h2>{{ booking_wording.1 }}</h2><p>Escolha o serviço, encontre um horário e revise seu agendamento antes de confirmar.</p></div>
+  <div class="section-head">{% if segment != 'auto' %}<a class="button" href="{% url 'public-bundle-booking' tenant.public_slug|default:tenant.slug %}?unit={{ selected_unit.pk }}">Agendar vários serviços</a>{% endif %}<span class="eyebrow">{{ booking_wording.0 }}</span><h2>{{ booking_wording.1 }}</h2><p>Escolha o serviço, encontre um horário e revise seu agendamento antes de confirmar.</p></div>
   <div class="panel">
     <form id="public-booking" class="portal-form" data-today="{{ public_today }}">{% csrf_token %}
       <div id="servicos" class="booking-service-catalog"><h3>Escolha seu serviço</h3>

@@ -58,7 +58,7 @@ class SaleForm(forms.Form):
     unit=forms.ModelChoiceField(queryset=Unit.objects.none(),required=False,label="Unidade")
     def __init__(self,*args,tenant=None,**kwargs):
         super().__init__(*args,**kwargs)
-        self.fields["product"].queryset=Product.objects.filter(tenant=tenant,active=True).order_by("name")
+        self.fields["product"].queryset=Product.objects.filter(tenant=tenant,active=True,kind="retail").order_by("name")
         self.fields["customer"].queryset=Customer.objects.filter(tenant=tenant,active=True).order_by("name")
         self.fields["professional"].queryset=Professional.objects.filter(tenant=tenant,active=True).order_by("name")
         self.fields["unit"].queryset=Unit.objects.filter(tenant=tenant,active=True).order_by("name")
@@ -123,21 +123,29 @@ def cash(request):
     if request.user.role=="reception":
         raise PermissionDenied("A recepção não possui acesso à gestão do caixa.")
     tenant=_tenant(request)
-    open_session=CashSession.objects.filter(tenant=tenant,status=CashSession.Status.OPEN).select_related("unit","opened_by").first()
+    from core.unit_scope import selected_unit
+    from .advanced_services import move_cash,cash_balance
+    unit=selected_unit(request,tenant)
+    open_session=CashSession.objects.filter(tenant=tenant,unit=unit,status=CashSession.Status.OPEN).select_related("unit","opened_by").first()
     form=CashOpenForm(request.POST or None,tenant=tenant)
     if request.method=="POST":
         action=request.POST.get("action")
         try:
             if action=="open" and form.is_valid():
-                open_cash_session(tenant=tenant,user=request.user,**form.cleaned_data)
+                opened=open_cash_session(tenant=tenant,user=request.user,**form.cleaned_data)
+                if opened.unit_id:
+                    request.session[f"operation_unit_{tenant.pk}"]=opened.unit_id
                 messages.success(request,"Caixa aberto.")
+            elif action=="movement" and open_session:
+                move_cash(session=open_session,user=request.user,kind=request.POST.get("kind"),amount=request.POST.get("amount"),reason=request.POST.get("reason", ""),key=request.POST.get("key", ""))
+                messages.success(request,"Movimento de dinheiro registrado.")
             elif action=="close" and open_session:
                 close_cash_session(session=open_session,user=request.user,closing_amount=request.POST.get("closing_amount"),notes=request.POST.get("notes",""))
                 messages.success(request,"Caixa fechado e conferido.")
         except (ValidationError,ValueError) as exc: messages.error(request,str(exc))
         return redirect("finance-cash")
     return render(request,"finance/cash.html",{
-        "session":open_session,"form":form,
+        "session":open_session,"form":form,"cash_balance":cash_balance(open_session) if open_session else None,"movement_key":secrets.token_urlsafe(24),
         "history":CashSession.objects.filter(tenant=tenant).select_related("unit").order_by("-opened_at")[:50],
     })
 

@@ -55,6 +55,7 @@ def _distance_km(lat1,lon1,lat2,lon2):
 
 
 def public_directory_page(request):
+    today_only = request.GET.get("today") == "1"
     query = request.GET.get("q", "").strip()[:120]
     category = request.GET.get("segment", "")
     categories = [("barbearia", "Barbearias, salões e estética"), ("arena", "Arenas esportivas"), ("auto", "Automotivo")]
@@ -119,5 +120,13 @@ def public_directory_page(request):
         cards.sort(key=lambda row:(row["distance_km"] is None,row["distance_km"] or 0,row["display_name"]))
     else:
         cards.sort(key=lambda row:(row["tenant"].name,not row["unit"].is_primary,row["unit"].name))
-    return render(request,"contenthub/directory.html",{"cards":cards,"located":latitude is not None,"query":query,"segment":category,"categories":categories,"radius":radius,"min_rating":min_rating,"latitude":latitude,"longitude":longitude})
+    if today_only:
+        from scheduling.discovery import today_slot
+        available_cards=[]
+        for card in cards:
+            card["today_slot"]=today_slot(card["tenant"],card["unit"])
+            if card["today_slot"]:
+                available_cards.append(card)
+        cards=available_cards
+    return render(request,"contenthub/directory.html",{"cards":cards,"located":latitude is not None,"query":query,"today_only":today_only,"segment":category,"categories":categories,"radius":radius,"min_rating":min_rating,"latitude":latitude,"longitude":longitude})
 

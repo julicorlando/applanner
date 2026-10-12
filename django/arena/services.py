@@ -103,7 +103,7 @@ class ArenaReservationService:
 
     def slots(
         self,tenant,court,day,duration_minutes,modality=None,
-        exclude_reservation_id=None,exclude_waitlist_id=None,public_rules=True
+        exclude_reservation_id=None,exclude_waitlist_id=None,public_rules=True,limit=None
     ):
         duration_minutes=max(
             court.minimum_minutes,
@@ -146,6 +146,8 @@ class ArenaReservationService:
                             "pricing_multiplier":quote["multiplier"],
                             "pricing_adjustments":quote["details"],
                         })
+                        if limit and len(output)>=limit:
+                            return output
                 cursor+=timedelta(minutes=step)
         return output
 

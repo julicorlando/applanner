@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Preparar minha empresa · ApPlanner{% endblock %}
+{% block body_class %}guided-account-page{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow onboarding-page">
   <div class="portal-heading"><div><span class="eyebrow">PRIMEIROS PASSOS</span><h1>Vamos preparar {{ tenant.name }}.</h1><p>Etapa {{ progress|add:1 }} de {{ total }} · {{ label }}. Suas respostas ficam salvas a cada etapa.</p></div></div>
