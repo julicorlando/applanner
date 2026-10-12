@@ -14,7 +14,7 @@ def manifest(request):
         'id':'/', 'name':'ApPlanner', 'short_name':'ApPlanner', 'lang':'pt-BR',
         'description':'Sua agenda, equipe e gestão no celular.',
         'start_url':reverse('home'), 'scope':'/', 'display':'standalone',
-        'background_color':'#f5f7fa', 'theme_color':'#f5f7fa',
+        'background_color':'#f8fafc', 'theme_color':'#f8fafc',
         'icons':[{'src':reverse('web-app-icon',args=[size])+f'?v={version}',
                   'sizes':f'{size}x{size}','type':'image/png','purpose':'any maskable'} for size in (192,512)],
     },content_type='application/manifest+json')
@@ -30,7 +30,7 @@ def icon(request,size):
         with Image.open(source) as image:
             # Leave the identity inside the circular safe area used by mobile launchers.
             artwork=ImageOps.contain(ImageOps.exif_transpose(image).convert('RGBA'),(int(size*.56),int(size*.56)),Image.Resampling.LANCZOS)
-            canvas=Image.new('RGBA',(size,size),'#f5f7fa')
+            canvas=Image.new('RGBA',(size,size),'#f8fafc')
             canvas.alpha_composite(artwork,((size-artwork.width)//2,(size-artwork.height)//2))
             output=BytesIO();canvas.convert('RGB').save(output,format='PNG')
             return output.getvalue()

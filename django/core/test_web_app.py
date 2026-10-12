@@ -38,9 +38,9 @@ class WebAppTests(TestCase):
         image=Image.open(BytesIO(response.content))
         self.assertEqual(image.size,(192,192))
         self.assertEqual(image.getpixel((96,96)),(255,0,0))
-        self.assertEqual(image.getpixel((0,0)),(245,247,250))
+        self.assertEqual(image.getpixel((0,0)),(248,250,252))
         # A wide source stays wide inside the square canvas, rather than stretching vertically.
-        self.assertEqual(image.getpixel((96,40)),(245,247,250))
+        self.assertEqual(image.getpixel((96,40)),(248,250,252))
         self.assertEqual(response['X-Content-Type-Options'],'nosniff')
 
     def test_apple_icon_and_invalid_size(self):

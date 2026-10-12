@@ -15,7 +15,7 @@
       button.setAttribute("aria-pressed", String(dark));
     });
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = dark ? "#101722" : "#f5f7fa";
+    if (meta) meta.content = dark ? "#0e1623" : "#f8fafc";
   }
   function preferredTheme() { return preference === "dark" || preference === "light" ? preference : media.matches ? "dark" : "light"; }
   apply(preferredTheme());

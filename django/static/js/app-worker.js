@@ -1,7 +1,7 @@
 /* Only fingerprinted public static files can enter this cache. Account data stays online. */
 'use strict';
 const CACHE_PREFIX = 'applanner-static-';
-const CACHE_NAME = CACHE_PREFIX + '20261008-v1';
+const CACHE_NAME = CACHE_PREFIX + '20261012-v1';
 const STATIC_FILE = /^\/static\/.+\.[a-f0-9]{12}\.(?:css|js|png|jpg|jpeg|webp|svg|woff2?)$/i;
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
