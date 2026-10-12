@@ -389,7 +389,8 @@ def master_whatsapp_flow(request):
             row.save()
             messages.success(request,"Fluxo do Master salvo.")
             return redirect("master-whatsapp-flow")
-    return render(request,"master/whatsapp_flow.html",{"form":form,"flow":flow,"commercial_template":commercial_graph()})
+    from .customer_service_agent import specialist_graph
+    return render(request,"master/whatsapp_flow.html",{"form":form,"flow":flow,"commercial_template":commercial_graph(),"service_template":specialist_graph()})
 
 
 @csrf_exempt

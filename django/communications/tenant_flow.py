@@ -63,6 +63,9 @@ def company_ai(tenant,flow,node,variables,incoming):
     if not flow.ai_enabled:return answer_company(tenant,incoming)
     shared=MasterWhatsAppFlow.objects.filter(pk=1).first()
     if not shared or not shared.ai_enabled or not shared.ai_key_encrypted or not shared.ai_model:raise ValueError('A IA central ainda não está configurada.')
+    if node.get('config',{}).get('customer_service'):
+        from .customer_service_agent import service_answer
+        return service_answer(shared,node,variables,incoming,facts=company_facts(tenant),scope='informações públicas da empresa '+tenant.name)
     from .master_assistant import grounded_answer
     return grounded_answer(shared,node,{},incoming,facts=company_facts(tenant),scope='informações públicas da empresa '+tenant.name,
         outside_text='Posso te ajudar com os serviços e informações da '+tenant.name+' 😊 Para essa dúvida, nossa equipe precisa confirmar. Escolha atendimento humano no próximo passo.')

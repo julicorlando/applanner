@@ -42,6 +42,8 @@ def advance_graph(conversation_id,message_id=None,resume=False):
         result={'state':state,'context':context,'waiting':'','messages':[flow.handoff],'handoff':True,'wake_seconds':None,'error':''}
     else:result=run_graph(flow.graph,flow,state,context,waiting,body,resume=resume,event_key=event_key)
     sync_sales_lead(conversation,result['context']['variables'])
+    if result['handoff']:
+        MasterFlowDelivery.objects.filter(conversation=conversation,status__in=['queued','failed']).update(status='cancelled')
     # Messages persist before any delivery. Broker outages are recovered by beat.
     for index,text in enumerate(result['messages']):
         delivery,_=MasterFlowDelivery.objects.get_or_create(event_key=f'{event_key}-{index}',defaults={'conversation':conversation,'body':text[:4096]})
@@ -117,7 +119,7 @@ def sync_sales_lead(conversation,variables):
         try:validate_email(variables['email'])
         except ValidationError:pass
         else:lead.email=variables['email'][:254]
-    fields={'Empresa':'empresa','Unidades':'unidades','Profissionais':'profissionais','Plano de interesse':'plano_interesse','Necessidade':'necessidade','Dúvida':'ultima_duvida','Pergunta inicial':'pergunta'}
+    fields={'Empresa':'empresa','Unidades':'unidades','Profissionais':'profissionais','Plano de interesse':'plano_interesse','Necessidade':'necessidade','Dúvida':'ultima_duvida','Pergunta inicial':'pergunta','Intenção do atendimento':'_service_agent_intent','Motivo do encaminhamento':'_service_agent_reason'}
     note='[Chatbot ApPlanner]\n'+'\n'.join(f'{label}: {variables[key][:1000]}' for label,key in fields.items() if variables.get(key))
     end='[/Chatbot ApPlanner]'
     clean=re.sub(r'\[Chatbot ApPlanner\].*?\[/Chatbot ApPlanner\]', '',lead.notes,flags=re.S).strip()

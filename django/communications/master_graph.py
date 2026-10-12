@@ -41,6 +41,9 @@ def validate_graph(graph):
         kind=node['type']
         if kind in {'input','set','api','ai'}:variable(config.get('variable',''))
         if kind=='ai' and 'applanner_only' in config and type(config['applanner_only']) is not bool:raise ValidationError('A restrição ApPlanner deve ser ativada ou desativada.')
+        if kind=='ai' and 'customer_service' in config:
+            if type(config['customer_service']) is not bool:raise ValidationError('O perfil de atendimento deve ser ativado ou desativado.')
+            if config['customer_service'] and config.get('applanner_only') is not True:raise ValidationError('O especialista precisa usar a base aprovada.')
         if kind=='input' and config.get('validation','text') not in {'text','email','phone','number'}:raise ValidationError('Validação de entrada inválida.')
         if kind=='knowledge' and (not isinstance(config.get('variable'),str) or not re.fullmatch(r'[a-z_][a-z0-9_]{0,39}',config['variable'])):raise ValidationError('Variável da pergunta inválida.')
         if kind=='condition':

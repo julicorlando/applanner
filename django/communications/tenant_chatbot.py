@@ -60,7 +60,8 @@ def builder(request):
         else:
             form.save();messages.success(request,'Chatbot da empresa salvo. A configuração da API central foi preservada.')
             return redirect('tenant-whatsapp-chatbot')
-    return render(request,'master/whatsapp_flow.html',{'tenant':tenant,'tenant_flow':True,'form':form,'flow':flow,'commercial_template':company_graph(),'shared_ai_ready':ready,'shared_ai_model':shared.ai_model if shared else ''})
+    from .customer_service_agent import specialist_graph
+    return render(request,'master/whatsapp_flow.html',{'service_template':specialist_graph(tenant=True),'tenant':tenant,'tenant_flow':True,'form':form,'flow':flow,'commercial_template':company_graph(),'shared_ai_ready':ready,'shared_ai_model':shared.ai_model if shared else ''})
 
 
 @login_required
