@@ -314,7 +314,7 @@ def _public_tenant_context(tenant,professional=None,selected_unit=None):
         Appointment.Status.WAITING,Appointment.Status.IN_PROGRESS,
     ]
     products=list(
-        Product.objects.filter(tenant=tenant,active=True).select_related("unit")
+        Product.objects.filter(tenant=tenant,active=True,kind="retail").select_related("unit")
         .annotate(
             reserved_stock=Sum(
                 "reservations__quantity",

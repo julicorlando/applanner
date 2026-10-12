@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "finance","communications","barber","arena","engagement","auto","commercial","healthcare","legal","operations","growth","contenthub",
 ]
 MIDDLEWARE = [
+    "core.work_notes.PrivateMediaGuard",
     "django.middleware.security.SecurityMiddleware",
     "operations.telemetry.RuntimeMonitoringMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -63,7 +64,7 @@ TEMPLATES=[{
         "django.template.context_processors.request",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
-        "core.mobile_workspace.navigation","core.branding.platform_branding","core.simple_mode.company_context","core.unit_scope.operation_unit_context","billing.access.trial_prompt","billing.reminders.payment_reminder",
+        "core.mobile_workspace.navigation","core.workspace.navigation","core.branding.platform_branding","core.simple_mode.company_context","core.unit_scope.operation_unit_context","billing.access.trial_prompt","billing.reminders.payment_reminder",
     ]},
 }]
 DATABASES={"default":env.db("DATABASE_URL")}

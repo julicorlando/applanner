@@ -62,6 +62,10 @@ class ArenaPublicBookingTests(TestCase):
         self.assertEqual(response.status_code,200)
         slots=response.json()["slots"]
         self.assertTrue(slots)
+        from arena.services import ArenaReservationService
+        limited=ArenaReservationService().slots(self.tenant,self.court,self.day,60,limit=1)
+        self.assertEqual(len(limited),1)
+        self.assertEqual(limited[0]["value"],slots[0]["value"])
         start=next(row for row in slots if row["value"].startswith(f"{self.day}T10:00"))
         data={"court_id":self.court.pk,"starts_at":start["value"],"duration":60,
               "name":"Cliente Teste","phone":"81999999999","payment":"onsite"}

@@ -120,6 +120,8 @@ def add_product_item(*,command,product,professional=None,quantity=1,unit_price=N
     command=BarberCommand.objects.select_for_update().get(pk=command.pk)
     if command.status!=BarberCommand.Status.OPEN:
         raise ValidationError("A comanda está fechada.")
+    if product.kind != "retail":
+        raise ValidationError("Use o registro de consumo interno para insumos.")
     if product.tenant_id!=command.tenant_id:
         raise ValidationError("Produto pertence a outro tenant.")
 
@@ -203,6 +205,10 @@ def close_command(*,command,user):
     paid=sum((payment.amount for payment in command.payments.all()),Decimal("0"))
     if _money(paid)<command.total_amount:
         raise ValidationError("Pagamentos não cobrem o total da comanda.")
+
+    if command.appointment_id:
+        from finance.advanced_services import consume_recipe
+        consume_recipe(command.appointment,user)
 
     for item in command.items.select_related("product","service","professional").all():
         if item.item_type==BarberCommandItem.ItemType.PRODUCT and item.product_id:

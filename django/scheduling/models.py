@@ -360,3 +360,36 @@ class AppointmentReminderLog(models.Model):
             models.UniqueConstraint(fields=["appointment","reminder_key","channel"],name="uq_appointment_reminder"),
         ]
         indexes=[models.Index(fields=["tenant","status","created_at"])]
+
+
+class CustomerAccessChallenge(models.Model):
+    import uuid as _uuid
+    id = models.UUIDField(primary_key=True,default=_uuid.uuid4,editable=False)
+    tenant = models.ForeignKey('tenants.Tenant',on_delete=models.CASCADE)
+    customer = models.ForeignKey(Customer,null=True,blank=True,on_delete=models.CASCADE)
+    code_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used_at = models.DateTimeField(null=True,blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AppointmentWorkNote(models.Model):
+    tenant = models.ForeignKey('tenants.Tenant',on_delete=models.PROTECT)
+    appointment = models.ForeignKey(Appointment,on_delete=models.PROTECT,related_name='work_notes')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    text = models.TextField(max_length=4000)
+    photo = models.ImageField(upload_to='private/worknotes/',blank=True)
+    photo_consent = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AppointmentBundle(models.Model):
+    tenant = models.ForeignKey('tenants.Tenant',on_delete=models.PROTECT)
+    unit = models.ForeignKey('tenants.Unit',on_delete=models.PROTECT)
+    idempotency_key = models.CharField(max_length=100)
+    fingerprint = models.CharField(max_length=64)
+    appointments = models.ManyToManyField(Appointment,related_name='bundles')
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['tenant','idempotency_key'],name='uq_appointment_bundle_key')]

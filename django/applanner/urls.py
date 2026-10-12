@@ -25,7 +25,13 @@ from core.booking_funnel import track
 from core.web_app import manifest as web_app_manifest, icon as web_app_icon, worker as web_app_worker
 from core.public_identity import tenant_short_link, professional_short_link
 
+from scheduling.customer_portal import portal as customer_portal
+from scheduling.bundles import BundleAPIView,bundle_page
+
 urlpatterns = [
+    path("api/public/<slug:slug>/bundle/",BundleAPIView.as_view(),name="public-bundle-api"),
+    path("p/<slug:slug>/sequencia/",bundle_page,name="public-bundle-booking"),
+    path("p/<slug:slug>/cliente/",customer_portal,name="customer-portal"),
     path("imagens/app-worker.js",web_app_worker,name="web-app-worker"),
     path("imagens/app.webmanifest",web_app_manifest,name="web-app-manifest"),
     path("imagens/app/<int:size>.png",web_app_icon,name="web-app-icon"),

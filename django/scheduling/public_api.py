@@ -438,7 +438,7 @@ class PublicBookingAPIView(APIView):
             from finance.models import Product,ProductReservation
             locked=list(
                 Product.objects.select_for_update().filter(
-                    tenant=tenant,active=True,pk__in=product_ids,
+                    tenant=tenant,active=True,pk__in=product_ids,kind="retail",
                 ).filter(Q(unit__isnull=True)|Q(unit=unit))
             )
             by_id={product.pk:product for product in locked}

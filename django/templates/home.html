@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}ApPlanner — agenda e gestão para sua barbearia{% endblock %}
-{% block description %}Organize os horários, os profissionais e os resultados da sua barbearia. Seus clientes agendam pelo link, no celular, a qualquer hora. Conheça os planos ApPlanner.{% endblock %}
+{% block title %}ApPlanner — agende com facilidade e faça seu negócio crescer{% endblock %}
+{% block description %}Organize agendamentos, equipe, clientes e resultados. Soluções para barbearias, salões, estética, arenas e serviços automotivos. Conheça o ApPlanner.{% endblock %}
 {% block body_class %}landing-home{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/homepage.css' %}?v=20261009">{% endblock %}
 {% block content %}
 <section class="marketing-hero shell" aria-labelledby="home-title">
   <div class="hero-copy">
-    <span class="eyebrow">AGENDA E GESTÃO PARA BARBEARIAS</span>
-    <h1 id="home-title">{% if platform_branding.hero_title and platform_branding.hero_title != "Transforme horários livres em clientes." %}{{ platform_branding.hero_title }}{% else %}Sua barbearia organizada.<br><span>Seus clientes agendando a qualquer hora.</span>{% endif %}</h1>
-    <p class="lead">{% if platform_branding.hero_description and platform_branding.hero_description != "Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar." %}{{ platform_branding.hero_description }}{% else %}Organize os horários da equipe, acompanhe os resultados e ofereça um jeito fácil de agendar pelo celular.{% endif %}</p>
+    <span class="eyebrow">AGENDA, GESTÃO E CRESCIMENTO</span>
+    <h1 id="home-title">{% if platform_branding.hero_title and platform_branding.hero_title != "Transforme horários livres em clientes." %}{{ platform_branding.hero_title }}{% else %}Agende com facilidade.<br><span>Faça seu negócio crescer.</span>{% endif %}</h1>
+    <p class="lead">{% if platform_branding.hero_description and platform_branding.hero_description != "Receba agendamentos online, organize sua equipe e acompanhe as vendas no mesmo lugar." %}{{ platform_branding.hero_description }}{% else %}Organize agendamentos, clientes, equipe e pagamentos em uma plataforma que acompanha a rotina do seu negócio.{% endif %}</p>
     <div class="actions">
-      <a class="button primary" href="#planos">Experimentar grátis →</a>
+      <a class="button primary" href="#planos">Começar teste grátis →</a>
       <a class="button ghost" href="#demonstracao">Ver demonstração</a>
 
     </div>
@@ -20,27 +20,11 @@
       <span>✓ Link próprio de agendamento</span><span>✓ Agenda por profissional e unidade</span><span>✓ Acesso pelo computador ou celular</span>
     </div>
   </div>
-    <div class="product-window product-window--live" aria-label="Demonstração ilustrativa do painel ApPlanner com agenda em movimento">
-    <div class="window-head">
-      <span></span><span></span><span></span>
-      <b class="preview-live-status"><i aria-hidden="true"></i>Exemplo de agenda</b>
-    </div>
-    <div class="window-stats">
-      <div><small>Agenda</small><strong>✓</strong><span>horários online</span></div>
-      <div><small>Ocupação</small><strong>↗</strong><span>visão da equipe</span></div>
-      <div><small>Gestão</small><strong>↑</strong><span>resultados reunidos</span></div>
-    </div>
-    <div class="agenda-preview-viewport" aria-hidden="true">
-      <div class="agenda-preview agenda-preview--live" data-live-preview>
-        <div><time>09:00</time><span class="event"><b>Cliente confirmado</b><small>Corte · João</small></span></div>
-        <div><time>10:30</time><span class="event accent"><b>Próximo horário</b><small>Pagamento integrado</small></span></div>
-        <div><time>14:00</time><span class="event"><b>Agendamento online</b><small>Barba · Carlos</small></span></div>
-        <div><time>15:30</time><span class="event"><b>Novo cliente</b><small>Reserva recebida pelo link</small></span></div>
-      </div>
-    </div>
-    <p class="home-preview-caption">Prévia ilustrativa da agenda.</p>
-  </div>
-  <script src="{% static 'js/home-live-preview.js' %}" defer></script>
+    <figure class="home-real-preview">
+      <div class="home-preview-label"><span aria-hidden="true">◷</span> Sua operação, com mais clareza</div>
+      <img src="{% static 'images/premium-dashboard-demo-960.webp' %}" srcset="{% static 'images/premium-dashboard-demo-640.webp' %} 640w, {% static 'images/premium-dashboard-demo-960.webp' %} 960w, {% static 'images/premium-dashboard-demo.webp' %} 1440w" sizes="(max-width: 900px) calc(100vw - 48px), 660px" width="1440" height="1000" alt="Captura do painel ApPlanner com menu lateral, indicadores e atalhos, usando dados fictícios de homologação." fetchpriority="high">
+      <figcaption>Painel real do ApPlanner · dados fictícios de demonstração.</figcaption>
+    </figure>
 </section>
 
 <nav class="shell home-section-nav" aria-label="Conheça o ApPlanner"><a href="#beneficios">O que você ganha</a><a href="#demonstracao">Como é agendar</a><a href="#como-funciona">Primeiros passos</a><a href="#planos">Planos</a></nav>
@@ -53,6 +37,15 @@
 <section class="shell section home-demo" id="demonstracao" aria-labelledby="demo-title">
   <div class="home-demo-copy"><span class="eyebrow">FÁCIL PARA QUEM AGENDA</span><h2 id="demo-title">Seu link. Seu cliente.<br>O horário que funciona.</h2><p>Coloque o link na bio do Instagram ou compartilhe com seus clientes. Eles consultam os serviços e escolhem um horário disponível.</p><ol class="home-booking-steps"><li><b>Escolha do serviço</b><span>Preço e duração à vista.</span></li><li><b>Profissional, dia e horário</b><span>Disponibilidade da unidade escolhida.</span></li><li><b>Dados e confirmação</b><span>Uma reserva para acompanhar na agenda.</span></li></ol><a class="home-text-link" href="{% url 'public-directory' %}">Conhecer páginas de estabelecimentos →</a></div>
   <div class="home-phone-wrap"><div class="home-phone" aria-label="Exemplo ilustrativo da escolha de horário no celular"><div class="home-phone-top"><span aria-hidden="true">✂</span><b>Barbearia exemplo</b><small>Unidade Centro</small></div><div class="home-phone-content"><span class="eyebrow">AGENDAMENTO</span><h3>Seu próximo corte começa aqui.</h3><div class="home-service-example"><b>Corte + barba</b><span>Exemplo de serviço · 45 min</span></div><p>Escolha um horário</p><div class="home-slot-examples" aria-hidden="true"><span>09:00</span><span>10:30</span><span class="selected">14:00</span><span>15:30</span></div><div class="home-confirm-example">Serviço e horário escolhidos ✓</div><small>Prévia ilustrativa, sem criar uma reserva.</small></div></div></div>
+</section>
+
+<section class="shell section home-operations" id="gestao" aria-labelledby="operations-title">
+  <div class="section-head"><span class="eyebrow">DA AGENDA À GESTÃO</span><h2 id="operations-title">Uma rotina conectada.<br>Mais tempo para atender.</h2><p>Ative os módulos adequados ao seu negócio e acompanhe a operação por unidade.</p></div>
+  <div class="segment-grid">
+    <article><span aria-hidden="true">◷</span><h3>Agenda e equipe</h3><p>Organize profissionais, jornadas, intervalos e folgas. Cada unidade tem sua própria configuração de atendimento.</p><a class="home-text-link" href="#demonstracao">Conheça o agendamento →</a></article>
+    <article><span aria-hidden="true">↗</span><h3>Financeiro e resultados</h3><p>Reúna receitas, despesas, vendas e comissões nos módulos contratados. Veja os números da operação em um só lugar.</p><a class="home-text-link" href="{% url 'billing-plans' %}">Compare os módulos →</a></article>
+    <article><span aria-hidden="true">◌</span><h3>Atendimento por WhatsApp</h3><p>Configure a conexão e as automações disponíveis para comunicar agendamentos e lembretes. O envio depende da integração ativa.</p><a class="home-text-link" href="{% url 'billing-plans' %}">Veja as opções de comunicação →</a></article>
+  </div>
 </section>
 
 <section class="shell section sales-steps" id="como-funciona"><div class="section-head"><span class="eyebrow">DO CADASTRO AO PRIMEIRO AGENDAMENTO</span><h2>Comece com o essencial.</h2><p>Escolha um plano e prepare a operação no seu ritmo.</p></div><div class="segment-grid">
@@ -81,8 +74,8 @@
 
 <section class="shell section" id="segmentos">
   <div class="section-head">
-    <span class="eyebrow">OUTRAS FORMAS DE ATENDER</span>
-    <h2>Seu negócio tem outra rotina?</h2>
+    <span class="eyebrow">SOLUÇÕES POR SEGMENTO</span>
+    <h2>Cada negócio tem seu jeito de atender.</h2>
     <p>O ApPlanner também tem módulos para salões e estética, arenas esportivas e serviços automotivos.</p>
   </div>
   <div class="segment-grid">

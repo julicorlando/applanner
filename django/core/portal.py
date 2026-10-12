@@ -224,7 +224,7 @@ PORTAL_MODULES = {
             "produtos": {
                 "model": "finance.Product",
                 "title": "Produtos",
-                "fields": ["unit","name","sku","code","category","description","cost_price","sale_price","stock","minimum_stock","unit_label","commission_type","commission_value","active"],
+                "fields": ["kind","unit","name","sku","code","category","description","cost_price","sale_price","stock","minimum_stock","unit_label","commission_type","commission_value","active"],
                 "columns": ["name","sku","sale_price","stock","minimum_stock","active"],
                 "order": "name",
             },
@@ -743,6 +743,9 @@ def _model_form(model, resource, *args, tenant=None, unit=None, **kwargs):
     if tenant and not segment_enabled(tenant,"auto") and "vehicle" in fields:
         fields.remove("vehicle")
     Form=modelform_factory(model,form=OperationModelForm,fields=fields,widgets=_widgets_for(model,fields))
+    if model._meta.label_lower=="finance.product" and args and args[0] is not None and "kind" not in args[0]:
+        data=args[0].copy(); data["kind"]=getattr(kwargs.get("instance"),"kind","retail")
+        args=(data,*args[1:])
     form=Form(*args,tenant=tenant,**kwargs)
     if unit:
         from core.unit_scope import scope_queryset

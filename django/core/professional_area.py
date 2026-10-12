@@ -1,4 +1,5 @@
 from decimal import Decimal
+from billing.entitlements import module_enabled
 from datetime import date,datetime,timedelta
 from zoneinfo import ZoneInfo
 from types import SimpleNamespace
@@ -289,7 +290,7 @@ class SettlementForm(forms.Form):
     def __init__(self,*args,tenant,appointment=None,prepaid_full=False,**kwargs):
         super().__init__(*args,**kwargs)
         self.prepaid_full=prepaid_full
-        self.fields["product"].queryset=Product.objects.filter(tenant=tenant,active=True,stock__gt=0).order_by("name")
+        self.fields["product"].queryset=Product.objects.filter(tenant=tenant,active=True,stock__gt=0,kind="retail").order_by("name")
         if appointment is not None:
             self.fields["reserved_products"].queryset=Product.objects.filter(
                 tenant=tenant,active=True,reservations__appointment=appointment,
@@ -352,6 +353,7 @@ def professional_appointment(request,pk):
             return redirect("professional-area")
     return render(request,"portal/professional_appointment.html",{
         "professional":professional,"appointment":appointment,"form":form,
+        "can_use_materials":module_enabled(appointment.tenant,"stock") or module_enabled(appointment.tenant,"products"),
         "reserved_product_reservations":list(appointment.product_reservations.all()),
         "paid_booking_payment":paid,"prepaid_full":prepaid_full,
         "can_settle":appointment.status in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED,
@@ -410,6 +412,7 @@ def reception_appointment(request,pk):
 
     return render(request,"portal/professional_appointment.html",{
         "professional":professional,"appointment":appointment,"form":form,
+        "can_use_materials":module_enabled(appointment.tenant,"stock") or module_enabled(appointment.tenant,"products"),
         "reserved_product_reservations":list(appointment.product_reservations.all()),
         "paid_booking_payment":paid,"prepaid_full":prepaid_full,
         "reception_mode":True,

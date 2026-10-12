@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load l10n %}
 {% block title %}Resumo financeiro — {{ tenant.name }}{% endblock %}
-{% block content %}
+{% block content %}<div class="shell form-actions"><a class="button" href="{% url 'finance-statement' %}">Resultado por competência</a><a class="button" href="{% url 'finance-cash' %}">Caixa, sangria e suprimento</a><a class="button" href="{% url 'finance-materials' %}">Insumos e consumo</a></div>
 <section class="shell portal-page">
   <header class="portal-heading"><div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">FINANCEIRO · {{ month }}</span><h1>Receitas e despesas</h1><p>O valor principal é o líquido: receitas brutas menos despesas pagas no mês.</p></div><a class="button ghost" href="{% url 'portal-resource-list' 'financeiro' 'lancamentos' %}">Ver lançamentos</a></header>
   <div class="finance-summary-grid"><article class="panel finance-detail finance-gross"><span>Receitas brutas</span><strong>R$ {{ gross|floatformat:2|localize }}</strong><small>Total de entradas pagas</small></article><article class="panel finance-detail finance-expenses"><span>Despesas</span><strong>R$ {{ expenses|floatformat:2|localize }}</strong><small>Total de saídas pagas</small></article><article class="panel finance-detail finance-net"><span>Receita líquida</span><strong>R$ {{ net|floatformat:2|localize }}</strong><small>Valor disponível após despesas</small></article></div>

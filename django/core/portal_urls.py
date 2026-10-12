@@ -9,7 +9,21 @@ from engagement.referrals import referrals
 
 from .booking_funnel import dashboard as booking_funnel
 
+from .professional_blocks import blocks
+from .calendar_view import calendar,move
+from .global_search import search
+from .work_notes import notes,photo
+from .professional_materials import materials
+
 urlpatterns = [
+    path("profissional/consumo/<int:pk>/",materials,name="professional-materials"),
+    path("busca/",search,name="operation-search"),
+    path("profissional/busca/",search,name="professional-search"),
+    path("calendario/",calendar,name="operation-calendar"),
+    path("agenda/agendamentos/<int:pk>/mover/",move,name="operation-calendar-move"),
+    path("profissional/ficha/<int:pk>/",notes,name="appointment-work-notes"),
+    path("profissional/foto/<int:pk>/",photo,name="appointment-work-photo"),
+    path("profissional/bloqueios/",blocks,name="professional-blocks"),
     path("funil-agendamento/",booking_funnel,name="booking-funnel"),
     path('hoje/',operation_insights.today,name='operation-today'),
     path('hoje/<int:pk>/acao/',operation_insights.appointment_action,name='operation-today-action'),

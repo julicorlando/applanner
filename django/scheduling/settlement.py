@@ -80,6 +80,8 @@ def settle_appointment(
     now=timezone.now()
     sale=None
     if attended:
+        from finance.advanced_services import consume_recipe
+        consume_recipe(appointment,user)
         if sale_items:
             sale=create_sale(
                 tenant=appointment.tenant,unit=appointment.unit,user=user,customer=appointment.customer,
@@ -97,15 +99,15 @@ def settle_appointment(
                           "amount":price,"payment_method":finance_method,"competence_at":timezone.localdate(),
                           "status":FinancialTransaction.Status.PAID,"paid_at":now},
             )
-            if professional.commission_percent:
-                amount=(price*professional.commission_percent/Decimal("100")).quantize(Decimal("0.01"))
-                if amount>0:
-                    ProfessionalCommission.objects.get_or_create(
-                        tenant=appointment.tenant,professional=professional,source_type="appointment",
-                        source_id=appointment.pk,
-                        defaults={"gross_amount":price,"rate_percent":professional.commission_percent,
-                                  "commission_amount":amount},
-                    )
+            from barber.services import _service_commission
+            amount=_service_commission(appointment.tenant,professional,appointment.service,price)
+            if amount>0:
+                ProfessionalCommission.objects.get_or_create(
+                    tenant=appointment.tenant,professional=professional,source_type="appointment",
+                    source_id=appointment.pk,
+                    defaults={"gross_amount":price,"rate_percent":None,
+                              "commission_amount":amount},
+                )
     settlement=AppointmentSettlement.objects.create(
         appointment=appointment,tenant=appointment.tenant,professional=professional,
         attended=attended,payment_method=payment_method if attended else "",sale=sale,settled_by=user,

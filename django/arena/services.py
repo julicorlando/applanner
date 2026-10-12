@@ -103,7 +103,7 @@ class ArenaReservationService:
 
     def slots(
         self,tenant,court,day,duration_minutes,modality=None,
-        exclude_reservation_id=None,exclude_waitlist_id=None,public_rules=True
+        exclude_reservation_id=None,exclude_waitlist_id=None,public_rules=True,limit=None
     ):
         duration_minutes=max(
             court.minimum_minutes,
@@ -122,8 +122,8 @@ class ArenaReservationService:
 
         for row in hours:
             cursor=datetime.combine(day,row.start_time,tzinfo=tz)
-            limit=datetime.combine(day,row.end_time,tzinfo=tz)
-            while cursor+timedelta(minutes=duration_minutes)<=limit:
+            closing_at=datetime.combine(day,row.end_time,tzinfo=tz)
+            while cursor+timedelta(minutes=duration_minutes)<=closing_at:
                 end=cursor+timedelta(minutes=duration_minutes)
                 if self.is_available(
                     tenant,court,cursor,end,
@@ -146,6 +146,8 @@ class ArenaReservationService:
                             "pricing_multiplier":quote["multiplier"],
                             "pricing_adjustments":quote["details"],
                         })
+                        if limit and len(output)>=limit:
+                            return output
                 cursor+=timedelta(minutes=step)
         return output
 
