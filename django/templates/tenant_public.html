@@ -2,8 +2,8 @@
 {% load static %}
 {% block title %}{{ tenant.public_seo_title|default:tenant.name }}{% endblock %}
 {% block description %}{{ tenant.public_seo_description|default:tenant.description }}{% endblock %}
-{% block body_class %}public-page{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-booking.css' %}?v=20261008-organized">{% endblock %}
+{% block body_class %}public-page experience-page experience-business{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-booking.css' %}?v=20261008-organized"><link rel="stylesheet" href="{% static 'css/public-experience.css' %}?v=20261009">{% endblock %}
 {% block header %}<header class="topbar public-header"><a class="public-header__brand" href="#conteudo">{{ tenant.name }}</a><nav aria-label="Agendamento">{% if tenant.public_booking_enabled %}<a href="#agendar">Agendar</a>{% endif %}{% if units %}<a href="#unidades">Localização e contato</a>{% endif %}</nav>{% include "theme_toggle.html" %}</header>{% endblock %}
 {% block account_notices %}{% endblock %}
 {% block trial_prompt %}{% endblock %}
@@ -19,7 +19,7 @@
     <div class="public-business-identity">{% if tenant.logo %}<img class="tenant-profile-logo" src="{% url 'public-tenant-image' tenant.pk 'logo' %}?unit={{ selected_unit.pk }}" alt="Foto de perfil de {{ tenant.name }}">{% endif %}{% if company_verified %}{% include "verified_business_badge.html" %}{% endif %}</div>
     {% if tenant.cover %}<img class="tenant-cover" src="{% url 'public-tenant-image' tenant.pk 'cover' %}?unit={{ selected_unit.pk }}" alt="Capa de {{ tenant.name }}">{% endif %}
     {% if selected_professional and selected_professional.photo %}<img class="professional-avatar" src="{% url 'public-professional-image' selected_professional.pk %}" alt="Foto de {{ selected_professional.name }}">{% endif %}
-    <span class="eyebrow">{{ tenant.category|default:"AGENDE ONLINE" }}</span>
+    <span class="eyebrow">{{ tenant.category_label|default:"AGENDE ONLINE" }}</span>
     {% if selected_professional %}
       <h1>{{ selected_professional.name }}</h1>
       <p>{{ selected_professional.specialty|default:tenant.name }} · {{ tenant.name }}</p>
@@ -55,7 +55,7 @@
 {% if tenant.public_booking_enabled %}
 {% if segment == 'arena' %}
 <section class="shell section" id="agendar">
-  <div class="section-head"><span class="eyebrow">RESERVA NA ARENA</span><h2>Escolha quadra, data e horário.</h2></div>
+  <div class="section-head"><span class="eyebrow">RESERVA NA ARENA</span><h2>Escolha quadra, data e horário.</h2><p>Consulte os horários disponíveis e revise os dados antes de confirmar sua reserva.</p></div>
   {% if arena_access_enabled %}
   {% if courts %}
   <div class="panel"><form id="arena-booking" class="portal-form" data-public-slug="{{ public_slug }}">{% csrf_token %}
@@ -80,7 +80,7 @@
 </section>
 {% else %}
 <section class="shell section" id="agendar">
-  <div class="section-head"><span class="eyebrow">{{ booking_wording.0 }}</span><h2>{{ booking_wording.1 }}</h2></div>
+  <div class="section-head"><span class="eyebrow">{{ booking_wording.0 }}</span><h2>{{ booking_wording.1 }}</h2><p>Escolha o serviço, encontre um horário e revise seu agendamento antes de confirmar.</p></div>
   <div class="panel">
     <form id="public-booking" class="portal-form" data-today="{{ public_today }}">{% csrf_token %}
       <div id="servicos" class="booking-service-catalog"><h3>Escolha seu serviço</h3>
