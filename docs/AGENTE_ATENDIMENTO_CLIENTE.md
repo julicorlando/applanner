@@ -31,3 +31,9 @@ O provedor recebe a mensagem atual, a política fixa e a base pública seleciona
 A memória de repetição permanece no contexto criptografado existente e é apagada quando a conversa/fluxo é reiniciado. Ela não constitui um histórico completo enviado à IA.
 
 Handoff depende da equipe acompanhar a central. O bot não promete prazo, disponibilidade de atendente ou uma solução já executada. A avaliação com mocks/simulador não comprova a entrega real do WhatsApp ou a qualidade do modelo escolhido.
+
+## Atualizar a base de conhecimento
+
+No Master, as perguntas frequentes públicas ativas complementam a base padrão do ApPlanner (até 20 respostas, limitadas por tamanho). Respostas desativadas não são enviadas. Mantenha preços nos planos cadastrados e não publique credenciais nessa base.
+
+Nas empresas, atualize serviços, unidades, horários, equipe, contatos, comodidades e formas de pagamento cadastradas por unidade. A IA consulta somente a empresa da conversa. Informações ausentes devem ser confirmadas pela equipe.

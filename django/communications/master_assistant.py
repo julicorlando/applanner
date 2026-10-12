@@ -4,7 +4,11 @@ from .master_sales import FAQ,plans_text,commercial_graph
 
 
 def assistant_facts():
-    return {f'fact_{i}':answer or plans_text() for i,(_,answer) in enumerate(FAQ)}
+    from contenthub.models import FAQItem
+    facts={f'fact_{i}':answer or plans_text() for i,(_,answer) in enumerate(FAQ)}
+    for item in FAQItem.objects.filter(active=True).order_by('sort_order','pk')[:20]:
+        facts[f'faq_{item.pk}']=(item.question+'\n'+item.answer)[:1000]
+    return facts
 
 
 def assistant_prompt():

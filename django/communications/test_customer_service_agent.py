@@ -154,3 +154,14 @@ class TenantCustomerServiceTests(TestCase):
         self.assertNotIn("CATÁLOGO PRIVADO B", payload)
         self.assertNotIn("CLIENTE PRIVADO", payload)
         self.assertEqual(provider.call_args.args[3], "central-agent-test")
+
+
+class ApprovedKnowledgeTests(TestCase):
+    def test_master_uses_only_active_public_faq_answers(self):
+        from contenthub.models import FAQItem
+        from .master_assistant import assistant_facts
+        visible = FAQItem.objects.create(question="Como começar?", answer="Cadastre sua equipe.", active=True)
+        hidden = FAQItem.objects.create(question="Interno", answer="CONTEÚDO OCULTO", active=False)
+        facts = assistant_facts()
+        self.assertIn("Cadastre sua equipe.", facts[f"faq_{visible.pk}"])
+        self.assertNotIn(f"faq_{hidden.pk}", facts)
