@@ -105,6 +105,8 @@ def command_detail(request,pk):
         BarberCommand.objects.select_related("customer","professional","appointment").prefetch_related("items","payments"),
         pk=pk,tenant=tenant,
     )
+    from .prepaid import sync_card_credit
+    sync_card_credit(command)
     paid=sum((row.amount for row in command.payments.filter(voided_at__isnull=True)),Decimal("0"))
     balance=max(Decimal("0"),command.total_amount-paid)
     return render(request,"barber/command_detail.html",{

@@ -646,7 +646,7 @@ class CustomerAppointmentAPIView(APIView):
 
     @transaction.atomic
     def delete(self,request,token):
-        appointment=Appointment.objects.select_for_update().select_related("tenant").filter(
+        appointment=Appointment.objects.select_for_update(of=("self",)).select_related("tenant").filter(
             customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest()
         ).first()
         if not appointment:

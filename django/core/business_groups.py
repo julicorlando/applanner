@@ -96,7 +96,10 @@ def dashboard(request):
                         )
                         .filter(
                             Q(public_slug=invite.cleaned_data["slug"])
-                            | Q(public_slug__isnull=True,slug=invite.cleaned_data["slug"])
+                            | Q(
+                                public_slug__isnull=True,
+                                slug=invite.cleaned_data["slug"],
+                            )
                         )
                         .first()
                     )
@@ -130,6 +133,10 @@ def dashboard(request):
                         pk=request.POST.get("company"),
                         tenant=tenant,
                     )
+                    if action in {"accept", "revoke"} and getattr(
+                        request, "support_actor", None
+                    ):
+                        raise PermissionDenied
                     if (
                         action in {"accept", "revoke"}
                         and not user.is_superuser

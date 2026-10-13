@@ -196,6 +196,7 @@ class PolicyForm(forms.ModelForm):
                     not threshold.is_finite()
                     or not rate.is_finite()
                     or threshold < 0
+                    or threshold > Decimal("9999999999.99")
                     or not 0 <= rate <= 100
                     or threshold != threshold.quantize(Decimal(".01"))
                     or rate != rate.quantize(Decimal(".01"))

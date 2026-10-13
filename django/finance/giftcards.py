@@ -132,6 +132,16 @@ def redeem(*, tenant, user, code, command, key, amount):
     from barber.models import BarberCommandPayment
     from django.db.models import Sum
 
+    if command.appointment_id:
+        from scheduling.models import Appointment
+
+        Appointment.objects.select_for_update().get(
+            pk=command.appointment_id, tenant=tenant
+        )
+    from barber.prepaid import require_resolved, sync_card_credit
+
+    require_resolved(command)
+    sync_card_credit(command)
     paid = command.payments.filter(voided_at__isnull=True).aggregate(v=Sum("amount"))[
         "v"
     ] or Decimal(0)

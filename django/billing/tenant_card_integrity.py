@@ -8,6 +8,7 @@ def validate_card_event(tx, remote, resource_id):
             amount.is_finite()
             and amount == tx.gross_amount
             and remote.get("currency_id") == "BRL"
+            and bool(str(resource_id))
             and str(remote.get("id")) == str(resource_id)
             and tx.provider_transaction_id in ("", str(resource_id))
             and remote.get("external_reference") == tx.external_reference
@@ -23,6 +24,12 @@ def validate_card_event(tx, remote, resource_id):
         "authorized",
     }:
         valid = False
+    if (
+        tx.status == "partially_refunded"
+        and remote.get("status") == "approved"
+        and Decimal(str(remote.get("transaction_amount_refunded", 0) or 0)) <= 0
+    ):
+        valid = False
     if not valid:
         raise ValueError("Evento de cartão não corresponde à cobrança autorizada.")
 
@@ -31,6 +38,11 @@ def card_status(remote):
     status = str(remote.get("status", ""))
     if status == "approved":
         refunded = Decimal(str(remote.get("transaction_amount_refunded", 0) or 0))
+        if (
+            refunded >= Decimal(str(remote.get("transaction_amount", 0)))
+            and refunded > 0
+        ):
+            return "refunded"
         return "partially_refunded" if refunded > 0 else "paid"
     return {
         "refunded": "refunded",

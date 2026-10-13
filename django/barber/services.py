@@ -180,14 +180,22 @@ def recalculate_command(command):
 
 @transaction.atomic
 def register_payment(*,command,user,method,amount):
-    if method=="gift_card":
+    if method in {"gift_card","prepaid_card"}:
         raise ValidationError("Aplique o vale-presente pelo registro de saldo validado.")
     command=BarberCommand.objects.select_for_update().get(pk=command.pk)
+    if command.appointment_id:
+        Appointment.objects.select_for_update().get(pk=command.appointment_id,tenant=command.tenant)
+    from .prepaid import require_resolved,sync_card_credit
+    require_resolved(command);sync_card_credit(command)
     if command.status!=BarberCommand.Status.OPEN:
         raise ValidationError("A comanda está fechada.")
     amount=_money(amount)
     if amount<=0:
         raise ValidationError("Valor do pagamento inválido.")
+    if command.payments.filter(method="prepaid_card").exists():
+        paid=sum((row.amount for row in command.payments.filter(voided_at__isnull=True)),Decimal(0))
+        if amount>max(command.total_amount-paid,Decimal(0)):
+            raise ValidationError("O valor supera o saldo restante após o cartão antecipado.")
     return BarberCommandPayment.objects.create(
         command=command,
         tenant=command.tenant,
@@ -206,6 +214,10 @@ def close_command(*,command,user):
     if command.status!=BarberCommand.Status.OPEN:
         raise ValidationError("Comanda cancelada não pode ser fechada.")
 
+    if command.appointment_id:
+        Appointment.objects.select_for_update().get(pk=command.appointment_id,tenant=command.tenant)
+    from .prepaid import require_resolved,sync_card_credit
+    require_resolved(command);sync_card_credit(command)
     recalculate_command(command)
     paid=sum((payment.amount for payment in command.payments.filter(voided_at__isnull=True)),Decimal("0"))
     if _money(paid)<command.total_amount:

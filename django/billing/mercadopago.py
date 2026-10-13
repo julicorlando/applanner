@@ -80,7 +80,8 @@ class MercadoPagoProvider:
             if "payer and collector cannot be the same user" in message.lower():
                 raise MercadoPagoError(
                     "O pagador não pode ser a mesma conta Mercado Pago que recebe a cobrança. "
-                    "Informe um e-mail de comprador diferente e, em testes, entre no Mercado Pago com a conta compradora."
+                    "Informe um e-mail de comprador diferente e, em testes, entre no Mercado Pago com a conta compradora.",
+                    http_status=response.status_code,
                 )
             message=redact_sensitive_text(message,secrets=(self.access_token,))
             raise MercadoPagoError(f"Mercado Pago HTTP {response.status_code}: {message}",http_status=response.status_code)
@@ -221,7 +222,12 @@ class MercadoPagoProvider:
             "status_detail":str(data.get("status_detail") or ""),
             "payment_method_id":str(data.get("payment_method_id") or payment_method_id),
             "payment_type_id":str(data.get("payment_type_id") or ""),
-            "transaction_amount":Decimal(str(data.get("transaction_amount") or amount)),
+            "transaction_amount":Decimal(str(data.get("transaction_amount",amount))),
+            "currency_id":data.get("currency_id"),
+            "live_mode":data.get("live_mode"),
+            "collector_id":data.get("collector_id"),
+            "external_reference":data.get("external_reference"),
+            "transaction_amount_refunded":data.get("transaction_amount_refunded",0),
             "fee_amount":fee,
             "net_received_amount":net,
         }

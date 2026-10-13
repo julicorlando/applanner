@@ -67,11 +67,17 @@ class CardBookingTests(TestCase):
             "fee_amount": Decimal("1"),
             "net_received_amount": Decimal("49"),
             "transaction_amount": Decimal("50"),
+            "currency_id": "BRL",
+            "live_mode": False,
+            "collector_id": 123,
         }
 
     def test_tokenized_card_is_charged_once_with_server_price(self):
         provider = Mock()
-        provider.create_tokenized_card_payment.return_value = self.remote()
+        provider.create_tokenized_card_payment.side_effect = lambda **kwargs: {
+            **self.remote(),
+            "external_reference": kwargs["external_reference"],
+        }
         with patch("billing.payment_services.tenant_provider", return_value=provider):
             first = self.client.post(
                 self.url, self.data, content_type="application/json"
@@ -203,3 +209,75 @@ class CardBookingTests(TestCase):
 
         self.assertEqual(card_status({"status": "authorized"}), "pending")
         self.assertEqual(card_status({"status": "approved"}), "paid")
+
+    def test_prepaid_card_is_credited_once_in_command_and_only_remainder_is_received(
+        self,
+    ):
+        from barber.services import (
+            open_command,
+            add_service_item,
+            register_payment,
+            close_command,
+        )
+        from barber.prepaid import sync_card_credit
+
+        tx = TenantPaymentTransaction.objects.create(
+            tenant=self.tenant,
+            connection=self.connection,
+            reference_type="appointment",
+            reference_id=self.appt.pk,
+            external_reference="COMMAND-DEPOSIT",
+            method="card",
+            gross_amount=20,
+            net_amount=19,
+            fee_amount=1,
+            status="paid",
+            paid_at=timezone.now(),
+            idempotency_key="command-card",
+        )
+        command = open_command(
+            tenant=self.tenant, user=self.owner, appointment=self.appt
+        )
+        add_service_item(command=command, service=self.service, professional=self.pro)
+        sync_card_credit(command)
+        sync_card_credit(command)
+        self.assertEqual(command.payments.filter(external_payment=tx).count(), 1)
+        with self.assertRaises(
+            __import__(
+                "django.core.exceptions", fromlist=["ValidationError"]
+            ).ValidationError
+        ):
+            register_payment(command=command, user=self.owner, method="cash", amount=50)
+        register_payment(command=command, user=self.owner, method="cash", amount=30)
+        close_command(command=command, user=self.owner)
+        self.assertEqual(cash_balance(self.session), 130)
+        self.assertEqual(
+            cash_flow(
+                self.tenant, timezone.localdate(), timezone.localdate(), self.unit
+            )["income"],
+            50,
+        )
+
+    def test_pending_card_cannot_be_followed_by_a_second_manual_receipt(self):
+        from barber.services import open_command, add_service_item, register_payment
+        from django.core.exceptions import ValidationError
+
+        TenantPaymentTransaction.objects.create(
+            tenant=self.tenant,
+            connection=self.connection,
+            reference_type="appointment",
+            reference_id=self.appt.pk,
+            external_reference="PENDING-CARD",
+            method="card",
+            gross_amount=50,
+            net_amount=50,
+            status="pending",
+            idempotency_key="pending-card-command",
+        )
+        command = open_command(
+            tenant=self.tenant, user=self.owner, appointment=self.appt
+        )
+        add_service_item(command=command, service=self.service, professional=self.pro)
+        with self.assertRaises(ValidationError):
+            register_payment(command=command, user=self.owner, method="cash", amount=50)
+        self.assertFalse(command.payments.exists())

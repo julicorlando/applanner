@@ -146,7 +146,7 @@ def report(tenant, start, end, unit=None):
                 "label": label,
                 "line": "direct_costs",
                 "amount": value,
-                "source": "Snapshot de custo",
+                "source": "Custo registrado na venda",
                 "nature": "variable",
             }
         )
@@ -157,7 +157,7 @@ def report(tenant, start, end, unit=None):
             "label": "Insumos consumidos",
             "line": "direct_costs",
             "amount": value,
-            "source": "Ledger de consumo",
+            "source": "Registros de consumo",
             "nature": "variable",
         }
     )
@@ -275,7 +275,7 @@ def cash_flow(tenant, start, end, unit=None):
         voided_at__isnull=True,
         received_at__gte=first,
         received_at__lt=after,
-    ).exclude(method="gift_card")
+    ).exclude(method__in=["gift_card","prepaid_card"])
     prepayments = TenantPaymentTransaction.objects.filter(
         tenant=tenant,
         reference_type="appointment",

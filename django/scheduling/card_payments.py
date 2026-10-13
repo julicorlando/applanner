@@ -29,6 +29,21 @@ class CardForm(forms.Form):
 
 
 def eligible(row):
+    from barber.models import BarberCommandPayment
+
+    if (
+        row.tenant.deleted_at
+        or row.tenant.archived_at
+        or BarberCommandPayment.objects.filter(
+            command__appointment=row,
+            tenant=row.tenant,
+            voided_at__isnull=True,
+            external_payment__isnull=True,
+        ).exists()
+    ):
+        raise ValidationError(
+            "A reserva não pode iniciar outro pagamento online. Confira a comanda com o estabelecimento."
+        )
     config = AvailabilityService().settings(row.tenant, unit=row.unit)
     if (
         not config.online_booking_payments_enabled
@@ -83,6 +98,14 @@ def page(request, token):
 @require_POST
 @transaction.atomic
 def submit(request, token):
+    preview = _appointment(token)
+    from barber.models import BarberCommand
+
+    list(
+        BarberCommand.objects.select_for_update()
+        .filter(tenant=preview.tenant, appointment=preview)
+        .order_by("pk")
+    )
     row = _appointment(token, lock=True)
     _, wait = attempt_budget(request, "booking-card", row.pk)
     if wait:

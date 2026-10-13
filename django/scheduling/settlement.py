@@ -21,7 +21,7 @@ def settle_appointment(
     command=BarberCommand.objects.select_for_update().filter(tenant=professional.tenant,appointment_id=appointment_id).first()
     if command and command.status in {'open','closed'}:
         raise ValidationError("Este atendimento possui uma comanda. Conclua pela comanda para evitar duplicidade financeira.")
-    appointment=Appointment.objects.select_for_update().select_related("service","customer","tenant").get(
+    appointment=Appointment.objects.select_for_update(of=("self",)).select_related("service","customer","tenant").get(
         pk=appointment_id,tenant=professional.tenant,professional=professional,
     )
     if hasattr(appointment,"settlement") or appointment.status not in {
@@ -34,6 +34,8 @@ def settle_appointment(
     if attended and payment_method not in {"pix","card","cash","transfer","other"}:
         raise ValidationError("Escolha a forma de pagamento recebida.")
     from billing.models import TenantPaymentTransaction
+    if TenantPaymentTransaction.objects.filter(tenant=appointment.tenant,reference_type="appointment",reference_id=appointment.pk,method="card",status__in=["created","pending"]).exists():
+        raise ValidationError("Existe cartão antecipado em processamento. Aguarde a conciliação antes de encerrar.")
     paid_online=TenantPaymentTransaction.objects.filter(tenant=appointment.tenant,
         reference_type="appointment",reference_id=appointment.pk,
         status=TenantPaymentTransaction.Status.PAID).order_by("-paid_at","-pk").first()
@@ -55,7 +57,7 @@ def settle_appointment(
     if reserved_ids:
         from finance.models import ProductReservation
         reservations=list(
-            ProductReservation.objects.select_for_update().select_related("product").filter(
+            ProductReservation.objects.select_for_update(of=("self",)).select_related("product").filter(
                 appointment=appointment,tenant=appointment.tenant,product_id__in=reserved_ids,
                 product__active=True,
             )

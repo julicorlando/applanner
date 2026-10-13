@@ -1,5 +1,4 @@
 from datetime import timedelta
-from decimal import Decimal
 from secrets import token_hex
 
 from django.db import transaction
@@ -411,8 +410,8 @@ def create_tenant_card_payment(
             description=f"ApPlanner {reference_type} #{reference_id}",
             idempotency_key=idempotency,
         )
-        if Decimal(str(remote.get("transaction_amount",amount))) != amount:
-            raise ValueError("Resposta do provedor não corresponde ao valor autorizado.")
+        from .tenant_card_integrity import validate_card_event
+        validate_card_event(tx,remote,str(remote.get("id","")))
         tx.provider_transaction_id=remote["id"]
         from .tenant_card_integrity import card_status
         tx.status=card_status(remote)

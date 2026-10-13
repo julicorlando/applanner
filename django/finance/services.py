@@ -213,11 +213,12 @@ def create_sale(
 
 @transaction.atomic
 def cancel_sale(*,sale,user,reason):
-    sale=Sale.objects.select_for_update().select_related("tenant").get(pk=sale.pk)
+    sale=Sale.objects.select_for_update(of=("self",)).select_related("tenant").get(pk=sale.pk)
     if sale.status==Sale.Status.CANCELLED:
         return sale
 
-    for item in sale.items.select_related("product").all():
+    list(Product.objects.select_for_update().filter(tenant=sale.tenant,pk__in=sale.items.values("product_id")).order_by("pk"))
+    for item in sale.items.select_related("product").order_by("product_id"):
         product=Product.objects.select_for_update().get(pk=item.product_id)
         product.stock=product.stock+item.quantity
         product.save(update_fields=["stock","updated_at"])

@@ -48,6 +48,8 @@ NOTIFICATION_TYPES = {
 
 @register.filter
 def payment_method_pt(value):
+    if value=="prepaid_card":return "Cartão antecipado"
+    if value=="gift_card":return "Vale-presente"
     return PAYMENT_METHODS.get(str(value or "").lower(), value or "—")
 
 
