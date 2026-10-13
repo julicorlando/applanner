@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Planos — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="section-head"><span class="eyebrow">PLANOS</span><h1>Escolha a estrutura certa para o seu negócio.</h1><p>Os recursos e preços abaixo vêm diretamente do catálogo administrado no Master.</p></div>
+  <div class="pricing-grid">
+    {% for card in cards %}
+    <article class="pricing-card {% if card.plan.featured %}featured{% endif %}">
+      {% if card.plan.featured %}<span class="status-pill">Mais escolhido</span>{% endif %}
+      <h2>{{ card.plan.name }}</h2>
+      <p>{{ card.plan.description|default:"Agenda e gestão em uma plataforma modular." }}</p>
+      <div class="price-line"><small>R$</small><strong>{{ card.plan.monthly_price }}</strong><span>/mês</span></div>
+      {% if card.plan.trial_days %}<div class="trial-highlight">{{ card.plan.trial_days }} dias de teste{% if card.plan.trial_without_card %} sem cartão{% endif %}</div>{% endif %}
+      <ul class="sales-feature-list">
+        {% for item in card.plan.features.included_features %}<li>{{ item }}</li>{% endfor %}
+        {% for module in card.modules %}<li>{{ module.name }}</li>{% endfor %}
+      </ul>
+      <a class="button primary" href="{% url 'billing-signup' %}?plan={{ card.plan.pk }}">{% if card.plan.trial_days %}Testar {{ card.plan.trial_days }} dias grátis{% else %}Escolher {{ card.plan.name }}{% endif %}</a>
+      {% if card.offer.promotion_months %}<p class="payment-hint">Oferta no ciclo mensal: R$ {{ card.offer.amount }} por {{ card.offer.promotion_months }} meses após o teste. Depois R$ {{ card.offer.regular }}/mês. Condições registradas na contratação.</p>{% endif %}
+    </article>
+    {% empty %}<div class="panel"><p>Nenhum plano público disponível.</p></div>{% endfor %}
+    {% if medical_plan %}<article class="pricing-card" aria-label="{{ medical_plan.name }} indisponível">
+      <span class="status-pill">Em preparação</span><h2>{{ medical_plan.name }}</h2>
+      <p>{{ medical_plan.description }}</p><p>O cadastro para este segmento está temporariamente desativado.</p>
+    </article>{% endif %}
+  </div>
+  {% if cards %}<section class="panel" style="margin-top:24px"><h2>Compare o que está incluído</h2><p>Compare módulos, limites e preços. As funções específicas de cada segmento estão nos cartões acima. “Consultar” indica um limite ainda não definido no catálogo. O teste grátis segue os mesmos limites do plano; liberações especiais são autorizadas pelo Master.</p><div class="table-card" style="overflow-x:auto"><table class="portal-table"><caption>Catálogo atual de planos públicos</caption><thead><tr><th>Recurso ou condição</th>{% for card in cards %}<th scope="col">{{ card.plan.name }}</th>{% endfor %}</tr></thead><tbody>
+    <tr><th scope="row">Mensalidade</th>{% for card in cards %}<td>R$ {{ card.plan.monthly_price|floatformat:2 }}</td>{% endfor %}</tr>
+    <tr><th scope="row">Teste grátis</th>{% for card in cards %}<td>{% if card.plan.trial_days %}{{ card.plan.trial_days }} dias{% if card.plan.trial_without_card %}, sem cartão{% endif %}{% else %}Sem período de teste{% endif %}</td>{% endfor %}</tr>
+    {% for row in comparison %}<tr><th scope="row">{{ row.label }}</th>{% for value in row.values %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}
+    </tbody></table></div></section>{% endif %}
+  <div class="panel" style="margin-top:24px"><h2>Precisa de outra combinação?</h2><p>Escolha as funções do seu negócio e receba uma proposta personalizada.</p><a class="button ghost" href="{% url 'billing-custom-plan' %}">Monte o seu plano →</a></div>
+</section>
+{% endblock %}

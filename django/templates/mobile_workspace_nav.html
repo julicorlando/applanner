@@ -1,0 +1,7 @@
+{% if mobile_workspace_nav %}
+<nav class="mobile-workspace-nav" aria-label="Navegação da operação">
+  {% for item in mobile_workspace_nav %}<a href="{{ item.url }}" {% if item.active %}aria-current="page"{% endif %}><span class="workspace-nav-icon" aria-hidden="true">{% include "workspace_icon.html" with icon=item.icon %}</span><span>{{ item.title }}</span></a>{% endfor %}
+  <button type="button" data-mobile-menu aria-label="Abrir mais opções"><span class="workspace-nav-icon" aria-hidden="true">{% include "workspace_icon.html" with icon="more" %}</span><span>Mais</span></button>
+</nav>
+{% load static %}<script src="{% static 'js/mobile-workspace.js' %}" defer></script>
+{% endif %}

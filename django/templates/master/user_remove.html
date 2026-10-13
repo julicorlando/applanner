@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Excluir acesso — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <header class="portal-heading"><div><a class="back-link" href="{% url 'master-resource-list' 'usuarios' %}">← Usuários</a><span class="eyebrow">MASTER · SEGURANÇA</span><h1>Excluir acesso do usuário</h1><p>Esta ação encerra o acesso de <strong>{{ target.email }}</strong>{% if target.tenant %} à empresa {{ target.tenant.name }}{% endif %}.</p></div></header>
+  <div class="panel">
+    <h2>O que acontecerá</h2>
+    <p>A conta será desativada, o e-mail e os dados de login serão anonimizados, e sessões, papéis e tokens de API deixarão de funcionar. Registros de atendimentos, pagamentos, suporte e auditoria permanecerão para preservar o histórico da plataforma.</p>
+    <p>Esta operação não exclui a empresa nem seus outros usuários. Para cadastrar a mesma pessoa novamente, use um novo cadastro.</p>
+    <form method="post" class="portal-form">{% csrf_token %}
+      <div class="form-field"><label for="confirm-email">Digite {{ target.email }} para confirmar</label><input id="confirm-email" type="email" name="confirm_email" required autocomplete="off" spellcheck="false"></div>
+      <div class="form-actions"><button class="button primary" type="submit">Confirmar exclusão do acesso</button><a class="button ghost" href="{% url 'master-resource-list' 'usuarios' %}">Cancelar</a></div>
+    </form>
+  </div>
+</section>
+{% endblock %}

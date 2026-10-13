@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ proposal.title }} — Comercial{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div><a class="back-link" href="{% url 'commercial-dashboard' %}">← Comercial</a><span class="eyebrow">PROPOSTA</span><h1>{{ proposal.title }}</h1><p>{{ proposal.customer_name }} · {{ proposal.customer_email }}</p></div>
+    <div><strong style="font-size:2rem">R$ {{ proposal.final_price }}</strong><small style="display:block;color:var(--muted)">{{ proposal.plan.name }}</small></div>
+  </div>
+  <div class="dashboard-grid">
+    <article class="panel">
+      <h2>Resumo</h2>
+      <div class="module-row"><span></span><div><strong>Status</strong><small>{{ proposal.get_status_display }}</small></div></div>
+      <div class="module-row"><span></span><div><strong>Aprovação</strong><small>{{ proposal.get_approval_status_display }}</small></div></div>
+      <div class="module-row"><span></span><div><strong>Desconto</strong><small>{{ proposal.discount_percent }}%</small></div></div>
+      {% if proposal.expires_at %}<div class="module-row"><span></span><div><strong>Validade</strong><small>{{ proposal.expires_at }}</small></div></div>{% endif %}
+      <h3>Módulos</h3><div class="trust-row">{% for module in proposal.modules %}<span>{{ module }}</span>{% empty %}<span>Plano base</span>{% endfor %}</div>
+    </article>
+    <article class="panel">
+      <h2>Link público</h2><div class="form-field"><input value="{{ public_url }}" readonly onclick="this.select()"></div>
+      {% if proposal.status == "draft" %}<form method="post" action="{% url 'commercial-proposal-action' proposal.pk %}">{% csrf_token %}<input type="hidden" name="action" value="send"><button class="button primary">Marcar como enviada</button></form>{% endif %}
+      {% if request.user.is_superuser and proposal.approval_status == "pending" %}
+      <div class="form-actions"><form method="post" action="{% url 'commercial-proposal-action' proposal.pk %}">{% csrf_token %}<input type="hidden" name="action" value="approve"><button class="button primary">Aprovar</button></form><form method="post" action="{% url 'commercial-proposal-action' proposal.pk %}">{% csrf_token %}<input type="hidden" name="action" value="reject"><button class="button ghost">Rejeitar</button></form></div>
+      {% endif %}
+      {% if proposal.accepted_at %}<div class="status-pill" style="margin-top:16px">Aceita em {{ proposal.accepted_at }}</div>{% endif %}
+    </article>
+  </div>
+  <article class="panel" style="margin-top:14px"><h2>Observações comerciais</h2><p>{{ proposal.notes|linebreaks }}</p></article>
+</section>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load static display_pt %}
+{% block title %}{{ resource.title }} — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">{{ module.title }}</span><h1>{{ resource.title }}</h1></div>
+    {% if can_create %}<a class="button primary" href="{% url 'portal-resource-create' module_slug resource_slug %}">{% if resource_slug == 'agendamentos' %}Novo agendamento{% elif resource_slug == 'profissionais' %}Novo profissional{% elif resource_slug == 'servicos' %}Novo serviço{% elif resource_slug == 'reservas' %}Nova reserva{% elif resource_slug == 'clientes' %}Novo cliente{% else %}Adicionar: {{ resource.title }}{% endif %}</a>{% endif %}
+  </div>
+  {% if professional_capacity %}<div class="panel" role="status" style="margin-bottom:16px">
+    <strong>{{ professional_capacity.used }} profissionais ativos{% if professional_capacity.limit != None %} de {{ professional_capacity.limit }} autorizados{% elif professional_capacity.unlimited %} · Sem limite autorizado pelo Master{% else %} · Limite não definido no catálogo{% endif %}</strong>.
+    {% if professional_capacity.overridden %}<p>Liberação especial do Master aplicada.</p>{% endif %}
+    {% if professional_capacity.exceeded %}<p>Os cadastros existentes foram preservados. Para ativar novos, desative um profissional ou solicite ampliação ao Master.</p>{% endif %}
+    <a href="{% url 'billing-subscription-status' %}">Ver meu plano e limites →</a>
+    {% include "portal/professional_extra_link.html" %}
+  </div>{% endif %}
+  <form class="portal-search" method="get"><input type="search" name="q" value="{{ q }}" placeholder="Pesquisar">{% if unit_choices %}<label>Unidade <select name="unit">{% for unit in unit_choices %}<option value="{{ unit.pk }}"{% if selected_unit == unit.pk|stringformat:"s" %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label>{% endif %}{% if agenda_filters %}<label>Período <select name="period"><option value="">Todas as datas</option><option value="today"{% if period == 'today' %} selected{% endif %}>Hoje</option><option value="upcoming"{% if period == 'upcoming' %} selected{% endif %}>Próximos atendimentos</option><option value="cancelled"{% if period == 'cancelled' %} selected{% endif %}>Cancelados</option><option value="history"{% if period == 'history' %} selected{% endif %}>Histórico</option></select></label><label>Situação <select name="status"><option value="">Todas as situações</option>{% for value,label in status_choices %}<option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>{% endif %}<button class="button" type="submit">Filtrar</button></form>
+  {% if module_slug == 'agenda' and resource_slug == 'agendamentos' or module_slug == 'arena' and resource_slug == 'reservas' %}<p class="payment-hint" id="agenda-live-status" role="status" aria-live="polite">Agenda atualizada automaticamente a cada 15 segundos.</p>{% endif %}
+  <div class="table-card">
+    <table class="portal-table">
+      <thead><tr>{% if resource_slug == 'clientes' %}<th>Histórico</th>{% endif %}{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th></th></tr></thead>
+      <tbody{% if module_slug == 'agenda' and resource_slug == 'agendamentos' or module_slug == 'arena' and resource_slug == 'reservas' %} data-live-agenda="agendamentos"{% endif %}>
+      {% for row in rows %}
+        <tr>
+          {% if resource_slug == 'clientes' %}<td><a href="{% url 'customer-history' row.obj.pk %}">Histórico e preferências</a></td>{% endif %}
+          {% for cell in row.cells %}<td>{{ cell }}{% if customer_column != None and forloop.counter0 == customer_column %}<br>{% include "portal/customer_name_difference.html" with appointment=row.obj only %}{% endif %}</td>{% endfor %}
+          <td class="table-actions">
+            {% if row.obj|homologation_record %}<span class="status-pill" title="Identificado pelo nome do cadastro. Revise antes de atender.">Homologação</span>{% endif %}
+            {% if module_slug == 'agenda' and resource_slug == 'agendamentos' and request.user.role == 'reception' %}<a href="{% url 'reception-appointment' row.obj.pk %}">Atendimento</a>{% endif %}
+            {% if resource.detail %}<a href="{% url 'portal-resource-detail' module_slug resource_slug row.obj.pk %}">Abrir</a>{% endif %}
+            {% if can_edit %}<a href="{% url 'portal-resource-edit' module_slug resource_slug row.obj.pk %}">Editar</a>{% endif %}
+            {% if module_slug == 'agenda' and resource_slug == 'profissionais' and can_manage_professionals %}<a href="{% url 'professional-access' row.obj.pk %}">{% if row.obj.user_id %}Gerenciar acesso{% else %}Criar acesso{% endif %}</a>{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="99" class="empty-table">Nenhum registro encontrado.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% if module_slug == 'agenda' and resource_slug == 'agendamentos' or module_slug == 'arena' and resource_slug == 'reservas' %}<script src="{% static 'js/live-agenda.js' %}" defer></script>{% endif %}
+{% endblock %}

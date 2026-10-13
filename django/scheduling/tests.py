@@ -1,0 +1,239 @@
+import hashlib
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
+from django.core.signing import dumps
+from django.test import TestCase
+from django.utils import timezone
+
+from accounts.models import User
+from tenants.models import Tenant
+from .availability import AvailabilityService
+from .models import Appointment, AppointmentRating, Customer, Professional, ProfessionalAvailability, Service
+
+
+class AvailabilityServiceTests(TestCase):
+    def setUp(self):
+        self.tenant=Tenant.objects.create(name="Demo",slug="demo",status=Tenant.Status.ACTIVE)
+        self.user=User.objects.create(email="owner@example.com",tenant=self.tenant)
+        self.customer=Customer.objects.create(tenant=self.tenant,name="Cliente")
+        self.service=Service.objects.create(tenant=self.tenant,name="Corte",duration_minutes=60,price=50)
+        self.professional=Professional.objects.create(tenant=self.tenant,name="Profissional")
+        self.professional.services.add(self.service)
+        ProfessionalAvailability.objects.create(
+            tenant=self.tenant,
+            professional=self.professional,
+            weekday=1,
+            start_time=time(8,0),
+            end_time=time(12,0),
+        )
+
+    def test_slots_respect_existing_appointment(self):
+        monday=date(2030,1,7)
+        slots=AvailabilityService().slots(
+            self.tenant,self.service.pk,self.professional.pk,monday,public_rules=False
+        )
+        self.assertTrue(any(slot["label"]=="08:00" for slot in slots))
+
+        tz=ZoneInfo("America/Recife")
+        Appointment.objects.create(
+            tenant=self.tenant,
+            customer=self.customer,
+            professional=self.professional,
+            service=self.service,
+            starts_at=datetime(2030,1,7,8,0,tzinfo=tz),
+            ends_at=datetime(2030,1,7,9,0,tzinfo=tz),
+            status=Appointment.Status.CONFIRMED,
+            created_by=self.user,
+        )
+        slots=AvailabilityService().slots(
+            self.tenant,self.service.pk,self.professional.pk,monday,public_rules=False
+        )
+        self.assertFalse(any(slot["label"]=="08:00" for slot in slots))
+
+
+class PublicBookingFlowTests(TestCase):
+    def setUp(self):
+        from django.utils import timezone
+        self.tenant=Tenant.objects.create(
+            name="Public Demo",slug="public-demo",public_slug="public-demo",
+            public_enabled=True,public_booking_enabled=True,status=Tenant.Status.ACTIVE,
+        )
+        self.service=Service.objects.create(
+            tenant=self.tenant,name="Atendimento",duration_minutes=30,price=60
+        )
+        self.professionals=[]
+        tomorrow=timezone.localdate()+__import__("datetime").timedelta(days=1)
+        self.day=tomorrow
+        for idx in range(2):
+            professional=Professional.objects.create(
+                tenant=self.tenant,name=f"Profissional {idx+1}",public_slug=f"prof-{idx+1}"
+            )
+            professional.services.add(self.service)
+            ProfessionalAvailability.objects.create(
+                tenant=self.tenant,professional=professional,weekday=tomorrow.isoweekday(),
+                start_time=time(8,0),end_time=time(18,0),
+            )
+            self.professionals.append(professional)
+
+    def test_next_date_suggestion_respects_conflicts_and_booking_window(self):
+        from .models import TenantScheduleSettings
+        day=self.day-timedelta(days=1)
+        query={"service_id":self.service.pk,"professional_id":self.professionals[0].pk,
+            "date":day.isoformat(),"suggest_next":"1"}
+        url=f"/api/public/{self.tenant.public_slug}/availability/"
+        response=self.client.get(url,query)
+        self.assertEqual(response.status_code,200)
+        self.assertFalse(response.json()["slots"])
+        self.assertEqual(response.json()["next_available"]["date"],self.day.isoformat())
+        customer=Customer.objects.create(tenant=self.tenant,name="Ocupado")
+        Appointment.objects.create(tenant=self.tenant,customer=customer,professional=self.professionals[0],service=self.service,
+            starts_at=datetime.combine(self.day,time(8),tzinfo=ZoneInfo("America/Recife")),
+            ends_at=datetime.combine(self.day,time(9),tzinfo=ZoneInfo("America/Recife")),status="confirmed")
+        self.assertEqual(self.client.get(url,query).json()["next_available"]["label"],"09:00")
+        schedule,_=TenantScheduleSettings.objects.get_or_create(tenant=self.tenant)
+        schedule.maximum_days_ahead=0
+        schedule.save()
+        self.assertIsNone(self.client.get(url,query).json()["next_available"])
+
+    def test_next_date_respects_unit_closure(self):
+        from tenants.models import Unit,UnitBusinessHours
+        unit=Unit.objects.create(tenant=self.tenant,name="Unidade fechada")
+        self.service.unit=unit
+        self.service.save()
+        professional=self.professionals[0]
+        professional.unit=unit
+        professional.save()
+        UnitBusinessHours.objects.create(tenant=self.tenant,unit=unit,weekday=self.day.isoweekday(),closed=True)
+        response=self.client.get(f"/api/public/{self.tenant.public_slug}/availability/",
+            {"unit_id":unit.pk,"service_id":self.service.pk,"professional_id":professional.pk,
+                "date":(self.day-timedelta(days=1)).isoformat(),"suggest_next":"1"})
+        self.assertEqual(response.status_code,200)
+        self.assertIsNone(response.json()["next_available"])
+
+    def test_next_date_is_optional_and_filters_ineligible_professionals(self):
+        url=f"/api/public/{self.tenant.public_slug}/availability/"
+        query={"service_id":self.service.pk,"date":(self.day-timedelta(days=1)).isoformat()}
+        self.assertNotIn("next_available",self.client.get(url,query).json())
+        for professional in self.professionals:
+            professional.services.clear()
+            professional.services_restricted=True
+            professional.save()
+        query["suggest_next"]="1"
+        self.assertIsNone(self.client.get(url,query).json()["next_available"])
+
+    def test_availability_can_choose_any_professional(self):
+        response=self.client.get(
+            f"/api/public/{self.tenant.public_slug}/availability/",
+            {"service_id":self.service.pk,"date":self.day.isoformat()},
+        )
+        self.assertEqual(response.status_code,200)
+        payload=response.json()
+        self.assertTrue(payload["auto_professional"])
+        self.assertTrue(payload["slots"])
+        self.assertIn("professional_id",payload["slots"][0])
+
+    def test_booking_without_professional_auto_assigns_and_returns_management_url(self):
+        availability=self.client.get(
+            f"/api/public/{self.tenant.public_slug}/availability/",
+            {"service_id":self.service.pk,"date":self.day.isoformat()},
+        ).json()
+        start=availability["slots"][0]["value"]
+        response=self.client.post(
+            f"/api/public/{self.tenant.public_slug}/book/",
+            {
+                "service_id":self.service.pk,"starts_at":start,
+                "name":"Cliente Teste","phone":"81999999999",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code,201)
+        payload=response.json()
+        self.assertTrue(payload["professional"]["id"])
+        self.assertEqual(payload["service"]["name"],self.service.name)
+        self.assertEqual(payload["service"]["price"],"60.00")
+        self.assertEqual(payload["timezone"],"America/Recife")
+        self.assertIn("ends_at",payload)
+        self.assertIn("/agendamento/",payload["manage_url"])
+        appointment=Appointment.objects.get(pk=payload["id"])
+        self.assertIsNotNone(appointment.professional_id)
+        self.assertEqual(appointment.status,Appointment.Status.CONFIRMED)
+
+    def test_professional_public_page_exists(self):
+        response=self.client.get(
+            f"/p/{self.tenant.public_slug}/profissional/{self.professionals[0].public_slug}/"
+        )
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,self.professionals[0].name)
+        self.assertContains(response,"AGENDAMENTO ONLINE")
+
+    def test_public_booking_shows_slot_buttons_instead_of_dropdown(self):
+        response=self.client.get(f"/p/{self.tenant.public_slug}/")
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'id="booking-slots"')
+        self.assertContains(response,'js/booking-slots.')
+        self.assertNotContains(response,'<select id="booking-slot"')
+
+    def test_reschedule_shows_slot_buttons_instead_of_dropdown(self):
+        from django.utils import timezone
+        customer=Customer.objects.create(tenant=self.tenant,name="Cliente Teste")
+        token="token-de-teste"
+        start=timezone.now()+timedelta(days=7)
+        appointment=Appointment.objects.create(
+            tenant=self.tenant,customer=customer,service=self.service,
+            professional=self.professionals[0],starts_at=start,
+            ends_at=start+timedelta(minutes=30),status=Appointment.Status.CONFIRMED,
+            customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest(),
+        )
+        response=self.client.get(f"/agendamento/{token}/")
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'id="manage-slots"')
+        self.assertContains(response,'id="manage-submit" type="submit" disabled')
+        self.assertNotContains(response,'<select id="manage-slot"')
+
+
+class PublicRatingFlowTests(TestCase):
+    def setUp(self):
+        self.tenant=Tenant.objects.create(
+            name="Empresa Avaliação",slug="empresa-avaliacao",status=Tenant.Status.ACTIVE,
+        )
+        self.customer=Customer.objects.create(tenant=self.tenant,name="Cliente Avaliação")
+        self.service=Service.objects.create(
+            tenant=self.tenant,name="Corte",duration_minutes=30,price=40,
+        )
+        self.professional=Professional.objects.create(
+            tenant=self.tenant,name="Profissional Avaliação",public_slug="profissional-avaliacao",
+        )
+        start=timezone.now()-timedelta(hours=1)
+        self.appointment=Appointment.objects.create(
+            tenant=self.tenant,customer=self.customer,service=self.service,
+            professional=self.professional,starts_at=start,
+            ends_at=start+timedelta(minutes=30),status=Appointment.Status.COMPLETED,
+        )
+        self.token=dumps(
+            {"appointment":self.appointment.pk},
+            salt="appointment-rating",
+            compress=True,
+        )
+        self.url=f"/avaliar/{self.token}/"
+
+    def test_public_rating_uses_visual_scale_instead_of_select(self):
+        response=self.client.get(self.url)
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,"Como foi o atendimento?")
+        self.assertContains(response,'name="score" value="1"')
+        self.assertContains(response,'name="score" value="5"')
+        self.assertContains(response,"Muito insatisfeito")
+        self.assertContains(response,"Muito satisfeito")
+        self.assertContains(response,"ratings.")
+        self.assertNotContains(response,'<select id="score"')
+
+    def test_public_rating_submits_score_with_existing_backend_contract(self):
+        response=self.client.post(self.url,{"score":"5"})
+        self.assertEqual(response.status_code,302)
+        rating=AppointmentRating.objects.get(appointment=self.appointment)
+        self.assertEqual(rating.score,5)
+
+        response=self.client.get(self.url)
+        self.assertContains(response,"Obrigado pela sua avaliação!")
+        self.assertContains(response,"5 de 5")

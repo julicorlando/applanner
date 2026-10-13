@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.title }} — Prontuário{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'portal-resource-list' module_slug resource_slug %}">← Prontuários</a><span class="eyebrow">PRONTUÁRIO CRIPTOGRAFADO</span><h1>{{ entry.title }}</h1><p>{{ entry.customer }} · {{ entry.professional }} · {{ entry.get_record_type_display }}</p></div></div>
+  <article class="panel medical-record-content">{{ content|linebreaks }}</article>
+</section>
+{% endblock %}
