@@ -1,10 +1,12 @@
 from django.urls import path
 from . import portal,tenant_chatbot
+from .mobile_portal import tenant_channels
 from .tenant_whatsapp import tenant_whatsapp_settings
 
 from .delivery_center import dashboard as deliveries,retry as delivery_retry
 
 urlpatterns=[
+    path("canais/",tenant_channels,name="tenant-delivery-channels"),
     path("entregas/",deliveries,name="communications-deliveries"),
     path("entregas/<int:pk>/reenviar/",delivery_retry,name="communications-delivery-retry"),
     path("chatbot/",tenant_chatbot.builder,name="tenant-whatsapp-chatbot"),

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Master — ApPlanner{% endblock %}
-{% block content %}
+{% block content %}<div class="shell form-actions"><a class="button" href="{% url 'master-delivery-providers' %}">Provedores Push / SMS</a></div>
 <section class="shell portal-page">
   <div class="portal-heading"><div><span class="eyebrow">VISÃO GERAL · MASTER</span><h1>Central da plataforma</h1><p>Planos, empresas, comunicação e operação em um único lugar.</p></div><a class="button primary" href="{% url 'master-resource-list' 'planos' %}">Gerenciar planos <span aria-hidden="true">↗</span></a></div>
   {% include "master/console_summary.html" %}

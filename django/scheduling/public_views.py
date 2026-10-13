@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from django.contrib import messages
 from django.core.signing import dumps
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
@@ -16,7 +17,7 @@ from .models import Appointment,AppointmentRescheduleHistory,Professional
 def _appointment(token,lock=False):
     qs=Appointment.objects.select_related("tenant","customer","service").prefetch_related("product_reservations__product")
     if lock:
-        qs=qs.select_for_update()
+        qs=qs.select_for_update(of=("self",))
     return get_object_or_404(qs,customer_manage_token_hash=hashlib.sha256(token.encode()).hexdigest())
 
 
@@ -64,7 +65,7 @@ def appointment_page(request,token):
     amount=row.booking_payment_amount or (row.service_price_snapshot if row.service_price_snapshot is not None else row.service.price)
     payments=TenantPaymentTransaction.objects.filter(tenant=row.tenant,reference_type="appointment",
         reference_id=row.pk).order_by("-created_at")
-    payment=payments.first()
+    payment=payments.filter(status="paid").first() or payments.first()
     payment_connected=has_connected_tenant_gateway(row.tenant)
     payment_reason=""
     if row.status not in {Appointment.Status.PENDING,Appointment.Status.CONFIRMED}:
@@ -164,8 +165,14 @@ def appointment_page(request,token):
             messages.success(request,"Agendamento remarcado.")
             return redirect("public-appointment-page",token=token)
 
+    from .card_payments import eligible
+    try:
+        eligible(row)
+        can_pay_card=not payments.filter(status="paid").exists()
+    except (ValidationError,ValueError,RuntimeError):
+        can_pay_card=False
     return render(request,"scheduling/public_appointment.html",{
-        "appointment":row,"token":token,"capabilities":_caps(row),
+        "appointment":row,"token":token,"capabilities":_caps(row),"can_pay_card":can_pay_card,
         "payment":payment,"payment_amount":amount,"payment_connected":payment_connected,
         "can_pay":not payment_reason,"payment_reason":payment_reason,
         "professionals":_candidates(row),

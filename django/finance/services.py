@@ -126,7 +126,8 @@ def create_sale(
         idempotency_fingerprint=fingerprint if idempotency_key else "",
     )
 
-    for product,quantity,unit_price,item_discount,item_total in normalized:
+    allocated=Decimal("0")
+    for index,(product,quantity,unit_price,item_discount,item_total) in enumerate(normalized):
         commission=Decimal("0")
         rate=None
         if professional:
@@ -136,6 +137,13 @@ def create_sale(
             elif product.commission_type==Product.CommissionType.FIXED:
                 commission=_money(product.commission_value)
 
+        from .commission_engine import calculate,save_snapshot
+        net_gross=_money(total-allocated) if index==len(normalized)-1 else _money(item_total*total/subtotal) if subtotal else Decimal(0)
+        allocated+=net_gross
+        result=calculate(tenant=tenant,professional=professional,gross=net_gross,product=product) if professional else None
+        if result:
+            commission=result[0]
+            rate=Decimal(result[1]['rate'])
         item=SaleItem.objects.create(
             sale=sale,
             product=product,
@@ -161,16 +169,17 @@ def create_sale(
             reason=f"Venda #{sale.pk}",
         )
 
-        if professional and commission>0:
-            ProfessionalCommission.objects.create(
+        if professional and (commission>0 or result):
+            commission_row=ProfessionalCommission.objects.create(
                 tenant=tenant,
                 professional=professional,
                 source_type="product",
                 source_id=item.pk,
-                gross_amount=item_total,
+                gross_amount=net_gross if result else item_total,
                 rate_percent=rate,
                 commission_amount=commission,
             )
+            save_snapshot(commission_row,result)
 
     FinancialTransaction.objects.create(
         tenant=tenant,
@@ -204,11 +213,12 @@ def create_sale(
 
 @transaction.atomic
 def cancel_sale(*,sale,user,reason):
-    sale=Sale.objects.select_for_update().select_related("tenant").get(pk=sale.pk)
+    sale=Sale.objects.select_for_update(of=("self",)).select_related("tenant").get(pk=sale.pk)
     if sale.status==Sale.Status.CANCELLED:
         return sale
 
-    for item in sale.items.select_related("product").all():
+    list(Product.objects.select_for_update().filter(tenant=sale.tenant,pk__in=sale.items.values("product_id")).order_by("pk"))
+    for item in sale.items.select_related("product").order_by("product_id"):
         product=Product.objects.select_for_update().get(pk=item.product_id)
         product.stock=product.stock+item.quantity
         product.save(update_fields=["stock","updated_at"])

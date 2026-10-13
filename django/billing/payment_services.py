@@ -410,17 +410,23 @@ def create_tenant_card_payment(
             description=f"ApPlanner {reference_type} #{reference_id}",
             idempotency_key=idempotency,
         )
+        from .tenant_card_integrity import validate_card_event
+        validate_card_event(tx,remote,str(remote.get("id","")))
         tx.provider_transaction_id=remote["id"]
-        tx.status=_tenant_tx_status(remote["status"])
+        from .tenant_card_integrity import card_status
+        tx.status=card_status(remote)
+        if tx.status==TenantPaymentTransaction.Status.PAID:
+            tx.paid_at=timezone.now()
         tx.fee_amount=remote["fee_amount"]
         tx.net_amount=remote["net_received_amount"]
         tx.save(update_fields=[
-            "provider_transaction_id","status","fee_amount","net_amount","updated_at"
+            "provider_transaction_id","status","fee_amount","net_amount","paid_at","updated_at"
         ])
         return tx
-    except Exception:
+    except Exception as exc:
+        definite=getattr(exc,'http_status',None) in {400,401,403,404,422}
         TenantPaymentTransaction.objects.filter(pk=tx.pk).update(
-            status=TenantPaymentTransaction.Status.FAILED,
+            status=TenantPaymentTransaction.Status.FAILED if definite else TenantPaymentTransaction.Status.PENDING,
             updated_at=timezone.now(),
         )
         raise

@@ -123,6 +123,8 @@ class BarberCommandPayment(models.Model):
     amount=models.DecimalField(max_digits=12,decimal_places=2)
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="barber_payments_received")
     received_at=models.DateTimeField()
+    voided_at=models.DateTimeField(null=True,blank=True)
+    external_payment=models.OneToOneField("billing.TenantPaymentTransaction",null=True,blank=True,on_delete=models.PROTECT,related_name="command_credit")
 
     class Meta:
         indexes=[models.Index(fields=["command","received_at"],name="barber_command_payment_idx")]

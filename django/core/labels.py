@@ -4,6 +4,7 @@ from django.core.exceptions import FieldDoesNotExist
 
 
 FIELD_LABELS = {
+    "card_booking_payments_enabled":"Permitir cartão antecipado",
     "kind":"Tipo de estoque",
     "new_base_price": "Novo valor base por ciclo", "effective_at": "Renovação a partir de", "applied_at": "Aplicado em",
     "provider_fee_payment": "Pagamento relacionado à taxa do provedor",

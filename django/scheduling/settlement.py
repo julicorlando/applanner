@@ -17,7 +17,11 @@ def settle_appointment(
     *,appointment_id,professional,user,attended,payment_method="",
     reserved_product_ids=None,product_id=None,quantity=1,
 ):
-    appointment=Appointment.objects.select_for_update().select_related("service","customer","tenant").get(
+    from barber.models import BarberCommand
+    command=BarberCommand.objects.select_for_update().filter(tenant=professional.tenant,appointment_id=appointment_id).first()
+    if command and command.status in {'open','closed'}:
+        raise ValidationError("Este atendimento possui uma comanda. Conclua pela comanda para evitar duplicidade financeira.")
+    appointment=Appointment.objects.select_for_update(of=("self",)).select_related("service","customer","tenant").get(
         pk=appointment_id,tenant=professional.tenant,professional=professional,
     )
     if hasattr(appointment,"settlement") or appointment.status not in {
@@ -30,13 +34,15 @@ def settle_appointment(
     if attended and payment_method not in {"pix","card","cash","transfer","other"}:
         raise ValidationError("Escolha a forma de pagamento recebida.")
     from billing.models import TenantPaymentTransaction
+    if TenantPaymentTransaction.objects.filter(tenant=appointment.tenant,reference_type="appointment",reference_id=appointment.pk,method="card",status__in=["created","pending"]).exists():
+        raise ValidationError("Existe cartão antecipado em processamento. Aguarde a conciliação antes de encerrar.")
     paid_online=TenantPaymentTransaction.objects.filter(tenant=appointment.tenant,
         reference_type="appointment",reference_id=appointment.pk,
-        status=TenantPaymentTransaction.Status.PAID).exists()
+        status=TenantPaymentTransaction.Status.PAID).order_by("-paid_at","-pk").first()
     if attended and paid_online and appointment.booking_payment==Appointment.BookingPayment.FULL:
-        finance_method="pix"
+        finance_method=paid_online.method
     elif attended and paid_online and appointment.booking_payment==Appointment.BookingPayment.PARTIAL:
-        finance_method="pix+"+payment_method
+        finance_method=paid_online.method+"+"+payment_method
     else:
         finance_method=payment_method
     raw_reserved=reserved_product_ids or []
@@ -51,7 +57,7 @@ def settle_appointment(
     if reserved_ids:
         from finance.models import ProductReservation
         reservations=list(
-            ProductReservation.objects.select_for_update().select_related("product").filter(
+            ProductReservation.objects.select_for_update(of=("self",)).select_related("product").filter(
                 appointment=appointment,tenant=appointment.tenant,product_id__in=reserved_ids,
                 product__active=True,
             )
@@ -81,6 +87,11 @@ def settle_appointment(
     sale=None
     if attended:
         from finance.advanced_services import consume_recipe
+        from finance.models import Product
+        from django.db.models import Q
+        ids={int(item['product_id']) for item in sale_items}
+        ids.update(appointment.service.materials.filter(tenant=appointment.tenant,active=True).filter(Q(product__unit=appointment.unit)|Q(product__unit__isnull=True)).values_list('product_id',flat=True))
+        list(Product.objects.select_for_update().filter(tenant=appointment.tenant,pk__in=ids).order_by('pk'))
         consume_recipe(appointment,user)
         if sale_items:
             sale=create_sale(
@@ -101,13 +112,19 @@ def settle_appointment(
             )
             from barber.services import _service_commission
             amount=_service_commission(appointment.tenant,professional,appointment.service,price)
-            if amount>0:
-                ProfessionalCommission.objects.get_or_create(
+            from finance.commission_engine import calculate,material_cost,save_snapshot
+            result=calculate(tenant=appointment.tenant,professional=professional,gross=price,
+                             service=appointment.service,materials=material_cost(appointment))
+            if result:
+                amount=result[0]
+            if amount>0 or result:
+                commission,_=ProfessionalCommission.objects.get_or_create(
                     tenant=appointment.tenant,professional=professional,source_type="appointment",
                     source_id=appointment.pk,
                     defaults={"gross_amount":price,"rate_percent":None,
                               "commission_amount":amount},
                 )
+                save_snapshot(commission,result)
     settlement=AppointmentSettlement.objects.create(
         appointment=appointment,tenant=appointment.tenant,professional=professional,
         attended=attended,payment_method=payment_method if attended else "",sale=sale,settled_by=user,

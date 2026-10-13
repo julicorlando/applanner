@@ -95,6 +95,12 @@ def send_notification(self,notification_id):
                         notification.payload.get("text") or notification.payload.get("message") or "",
                     )
                 notification.provider_reference=provider_id
+            elif notification.channel==Notification.Channel.SMS:
+                from .mobile_delivery import send_sms
+                notification.provider_reference=send_sms(notification)
+                if notification.status in {Notification.Status.SKIPPED,Notification.Status.FAILED}:
+                    notification.save(update_fields=["status","error_message","provider_reference"])
+                    return
             else:
                 raise RuntimeError(f"Canal ainda sem provider ativo: {notification.channel}")
 

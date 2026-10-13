@@ -84,6 +84,8 @@ def queue_appointment_reminders():
                     queued+=int(_queue_reminder(appointment,"24h",Notification.Channel.EMAIL,appointment.customer.email))
 
         if settings_obj.reminder_2h_enabled and timedelta(hours=2)<=delta<=timedelta(hours=3):
+            from communications.mobile_delivery import queue_sms
+            queued+=int(bool(queue_sms(appointment,"reminder_2h")))
             if appointment.customer.email:
                 with transaction.atomic():
                     queued+=int(_queue_reminder(appointment,"2h",Notification.Channel.EMAIL,appointment.customer.email))

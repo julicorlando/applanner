@@ -1,4 +1,5 @@
 from .global_search import search as global_search
+from communications.mobile_portal import providers
 from django.urls import path
 from . import master, master_console, master_retention, simple_mode
 from .branding import platform_homepage
@@ -16,6 +17,7 @@ from operations.master_support import ticket_detail as support_ticket
 from operations.monitoring import dashboard as runtime_monitor
 
 urlpatterns=[
+    path("provedores-notificacao/",providers,name="master-delivery-providers"),
     path("busca/",global_search,name="master-global-search"),
     path("empresas/<int:pk>/modo-simples/",simple_mode.set_mode,name="master-company-simple-mode"),
     path("fiscal/configuracao/",fiscal_settings,name="master-fiscal-settings"),
