@@ -24,6 +24,11 @@
     const money = value => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(Number(value));
     if (offer) document.getElementById('signup-plan-price').textContent = `Total do ciclo ${labels[cycle.value]}: ${money(offer.amount)}${offer.months ? `. Promoção por ${offer.months} meses após o teste; depois ${money(offer.regular)}/mês.` : '.'}${Number(offer.saving) > 0 ? ` Economia por ciclo: ${money(offer.saving)}.` : ''}`;
     document.getElementById('signup-plan-composition').textContent = plan ? `Plano: ${offer ? money(offer.amount) : '—'} · Unidades incluídas: ${plan.included_units} · Profissionais incluídos: ${plan.included_professionals ?? 'Consultar'}. Adicionais pagos: R$ 0,00. Unidades, profissionais e módulos extras só são cobrados após contratação adicional.` : '';
+    const explanation = document.getElementById('signup-payment-explanation');
+    if (explanation) explanation.textContent = plan?.days && plan.withoutCard
+      ? 'Você não informa dados do cartão nem paga agora. A forma escolhida será usada para continuar após o teste; nenhuma cobrança é feita por este formulário.'
+      : plan?.days ? 'Este plano exige configurar o pagamento para iniciar o teste. A próxima tela apresenta as condições antes de qualquer confirmação.'
+      : 'Após criar a conta, confira e conclua o pagamento para liberar o acesso. Este formulário não efetua a cobrança.';
     document.getElementById('signup-plan-billing').textContent = !plan ? '' : plan.days && plan.withoutCard ? 'Para continuar após o teste, será necessário pagar o ciclo escolhido.' : plan.days ? 'Este plano exige configurar o pagamento para iniciar o teste. Confira as condições de cobrança no checkout.' : 'Pagamento necessário para liberar o acesso.';
   }
   select.addEventListener('change', update);

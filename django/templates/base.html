@@ -27,7 +27,7 @@
   <link rel="stylesheet" href="{% static 'css/adaptive-layout.css' %}">
   <script src="{% static 'js/adaptive-layout.js' %}" defer></script>
 <link rel="stylesheet" href="{% static 'css/mobile-brand.css' %}?v=20261008">
-<link rel="stylesheet" href="{% static 'css/premium.css' %}?v=20261012">
+<link rel="stylesheet" href="{% static 'css/premium.css' %}?v=20261019">
 <script src="{% static 'js/workspace.js' %}" defer></script>
 {% if simple_mode %}<link rel="stylesheet" href="{% static 'css/simple-mode.css' %}">{% endif %}
 </head>
@@ -41,6 +41,7 @@
       {% elif platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="ApPlanner">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="ApPlanner">{% endif %}
     </a>
     {% if simple_mode %}<nav class="simple-primary-nav" aria-label="Ações principais">{% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento</a>{% else %}{% for item in simple_nav %}<a href="{{ item.url }}">{{ item.title }}</a>{% endfor %}{% endif %}</nav><details class="simple-more"><summary>Mais opções</summary>{% endif %}
+    {% if workspace_master and not simple_mode %}{% include "master/top_nav.html" %}{% else %}
     <nav class="nav">
       {% if request.user.is_authenticated %}
         {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
@@ -62,6 +63,7 @@
         <a class="nav-cta" href="/planos/">Teste grátis</a>
       {% endif %}
     </nav>
+    {% endif %}
     {% if simple_mode %}</details>{% endif %}
     <details class="mobile-nav"><summary>Menu</summary><div class="mobile-nav-links">
       {% if request.user.is_authenticated %}
@@ -71,7 +73,9 @@
       {% if request.user.is_superuser and request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
       <a href="/account/2fa/setup/">Segurança</a>
       <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
-      {% endif %}<form method="post" action="/account/logout/">{% csrf_token %}<button type="submit">Sair</button></form>
+      {% endif %}
+      {% if workspace_groups and not simple_mode %}<div class="mobile-module-menu"><strong>Áreas de trabalho</strong>{% for group in workspace_groups %}<details><summary>{{ group.title }}</summary><nav aria-label="{{ group.title }}">{% for item in group.items %}<a href="{{ item.url }}"{% if item.active %} aria-current="page"{% endif %}>{{ item.title }}</a>{% endfor %}</nav></details>{% endfor %}</div>{% endif %}
+      <form method="post" action="/account/logout/">{% csrf_token %}<button type="submit">Sair</button></form>
       {% else %}
       <a href="/directory/">Explorar estabelecimentos</a>
       <a href="/planos/">Ver planos</a>

@@ -1,18 +1,30 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Criar conta — ApPlanner{% endblock %}
-{% block body_class %}guided-account-page{% endblock %}
+{% block body_class %}guided-account-page signup-journey{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
   <div class="portal-heading"><div><a class="back-link" href="{% url 'billing-plans' %}">← Planos</a><span class="eyebrow">COMEÇAR</span><h1>Crie sua empresa.</h1><p>Seu ambiente será criado separado dos demais clientes.</p></div></div>
   {% if proposal %}<p class="payment-hint">Proposta aceita: <strong>{{ proposal.title }}</strong> · R$ {{ proposal.final_price }} por mês. Use o e-mail indicado na proposta.</p>{% endif %}
-  <aside class="panel" aria-live="polite"><h2 id="signup-plan-name">{{ selected_plan.name|default:"Condições do plano" }}</h2><p id="signup-plan-trial">{% if selected_plan.trial_days %}{{ selected_plan.trial_days }} dias de teste{% if selected_plan.trial_without_card %} sem cartão e sem cobrança agora{% endif %}.{% else %}Escolha um plano para conferir as condições.{% endif %}</p><p id="signup-plan-price">{% if selected_plan %}R$ {{ selected_plan.monthly_price }} por mês.{% endif %}</p><p id="signup-plan-composition"></p><p id="signup-plan-billing">{% if selected_plan.trial_days and selected_plan.trial_without_card %}Para continuar após o teste, será necessário pagar o ciclo escolhido.{% endif %}</p></aside>
+  <aside class="panel signup-plan-summary" aria-live="polite"><h2 id="signup-plan-name">{{ selected_plan.name|default:"Condições do plano" }}</h2><p id="signup-plan-trial">{% if selected_plan.trial_days %}{{ selected_plan.trial_days }} dias de teste{% if selected_plan.trial_without_card %} sem cartão e sem cobrança agora{% endif %}.{% else %}Escolha um plano para conferir as condições.{% endif %}</p><p id="signup-plan-price">{% if selected_plan %}R$ {{ selected_plan.monthly_price }} por mês.{% endif %}</p><details><summary>Limites e condições</summary><p id="signup-plan-composition"></p><p id="signup-plan-billing">{% if selected_plan.trial_days and selected_plan.trial_without_card %}Para continuar após o teste, será necessário pagar o ciclo escolhido.{% endif %}</p></details></aside>
   {{ plan_conditions|json_script:"signup-plan-conditions" }}
   <script src="{% static 'js/signup-plan.js' %}" defer></script>
-  <form method="post" class="portal-form panel">{% csrf_token %}
+  <script src="{% static 'js/signup-steps.js' %}" defer></script>
+  <ol class="signup-progress" aria-label="Etapas do cadastro" hidden data-signup-progress><li data-signup-indicator>1 · Seu negócio</li><li data-signup-indicator>2 · Sua conta</li><li data-signup-indicator>3 · Condições</li></ol>
+  <p class="signup-step-status" role="status" aria-live="polite" data-signup-status></p>
+  <form method="post" class="portal-form panel" data-signup-form>{% csrf_token %}
     {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
-    {% for field in form %}{% if field.is_hidden %}{{ field }}{% else %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
-    <button class="button primary">Criar conta e continuar</button>
+    {% for field in form %}{% if field.is_hidden %}{{ field }}{% endif %}{% endfor %}
+    <fieldset data-signup-step><legend tabindex="-1">Seu negócio</legend><p>Escolha o plano e informe onde sua equipe atende.</p>
+      {% for field in form %}{% if field.name in "plan business_name postal_code category" %}{% include "billing/signup_field.html" %}{% endif %}{% endfor %}
+    </fieldset>
+    <fieldset data-signup-step><legend tabindex="-1">Sua conta</legend><p>Estes serão seus dados para acessar e gerenciar a empresa.</p>
+      {% for field in form %}{% if field.name in "owner_name email phone password password_confirm" %}{% include "billing/signup_field.html" %}{% endif %}{% endfor %}
+    </fieldset>
+    <fieldset data-signup-step><legend tabindex="-1">Condições do plano</legend><p id="signup-payment-explanation">Confira o ciclo e a forma de pagamento antes de continuar.</p>
+      {% for field in form %}{% if not field.is_hidden and field.name not in "plan business_name postal_code category owner_name email phone password password_confirm" %}{% include "billing/signup_field.html" %}{% endif %}{% endfor %}
+    </fieldset>
+    <div class="signup-actions"><button type="button" class="button" data-signup-back hidden>Voltar</button><button type="button" class="button primary" data-signup-next hidden>Continuar</button><button type="submit" class="button primary" data-signup-submit>Criar conta e continuar</button></div>
   </form>
 </section>
 {% endblock %}
