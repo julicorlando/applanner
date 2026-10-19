@@ -16,7 +16,7 @@ from requests.exceptions import RequestException
 
 from billing.models import Module, Plan, PlanModule
 from billing.models import PaymentGateway,Payment
-from billing.payment_services import configure_mercadopago_gateway
+from billing.payment_services import GatewayConfigurationError, configure_mercadopago_gateway
 from core.labels import field_label
 from core.audit import append_audit,model_snapshot
 
@@ -302,6 +302,8 @@ def platform_payment_gateway(request):
                 webhook_secret=form.cleaned_data["webhook_secret"],
                 webhook_url=webhook_url,
             )
+        except GatewayConfigurationError as exc:
+            form.add_error(None,str(exc))
         except (ValueError,RuntimeError,RequestException):
             # Do not echo secrets or provider responses in the Master interface.
             form.add_error(None,"Não foi possível validar a conexão. Confira o ambiente, as credenciais, a chave do webhook e o HTTPS.")
