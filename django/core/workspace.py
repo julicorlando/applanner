@@ -5,7 +5,8 @@ from django.urls import reverse
 
 def navigation(request):
     user = getattr(request, "user", None)
-    private = request.path == "/" or request.path.startswith(
+    commercial_workspace = request.path.startswith("/commercial/") and not request.path.startswith(("/commercial/c/", "/commercial/proposta/"))
+    private = commercial_workspace or request.path == "/" or request.path.startswith(
         ("/app/", "/master/", "/billing/", "/account/")
     )
     if not user or not user.is_authenticated or not private:
@@ -25,7 +26,7 @@ def navigation(request):
             }
         ]
     elif user.is_superuser and (
-        request.path == "/" or request.path.startswith("/master/")
+        request.path == "/" or request.path.startswith("/master/") or commercial_workspace
     ):
         groups = [
             {
@@ -55,9 +56,18 @@ def navigation(request):
                     ),
                     link("WhatsApp", reverse("master-whatsapp"), "chat"),
                     link("Campanhas", reverse("master-marketing"), "chat"),
+                    link("Campanhas sociais", reverse("commercial-social-list"), "chat"),
                 ],
             },
         ]
+    elif commercial_workspace and not user.tenant_id:
+        from commercial.models import CommercialProfile
+        if CommercialProfile.objects.filter(user=user,active=True).exists():
+            groups = [{"title":"Comercial", "items":[
+                link("Funil de vendas",reverse("commercial-dashboard"),"users"),
+                link("Campanhas sociais",reverse("commercial-social-list"),"chat"),
+                link("Nova proposta",reverse("commercial-proposal-create"),"card"),
+            ]}]
     elif user.role == "professional":
         groups = [
             {
@@ -119,5 +129,5 @@ def navigation(request):
     return {
         "workspace_groups": groups,
         "workspace_master": user.is_superuser
-        and (request.path == "/" or request.path.startswith("/master/")),
+        and (request.path == "/" or request.path.startswith("/master/") or commercial_workspace),
     }

@@ -1,4 +1,5 @@
 import hashlib
+import uuid
 from django.conf import settings
 from django.db import models
 from core.models import TimeStampedModel
@@ -177,3 +178,67 @@ class LeadPrivacyEvent(models.Model):
 
     class Meta:
         indexes=[models.Index(fields=["lead","created_at"],name="commercial_privacy_idx")]
+
+
+class SocialCampaign(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT='draft','Rascunho'
+        ACTIVE='active','Página ativa'
+        PAUSED='paused','Pausada'
+
+    class Channel(models.TextChoices):
+        INSTAGRAM='instagram','Instagram'
+        FACEBOOK='facebook','Facebook'
+        META='meta','Instagram e Facebook'
+
+    class Objective(models.TextChoices):
+        LEAD='lead','Receber contatos'
+        TRIAL='trial','Iniciar teste grátis'
+
+    code=models.UUIDField(default=uuid.uuid4,unique=True,editable=False)
+    owner=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='social_campaigns')
+    name=models.CharField(max_length=140)
+    headline=models.CharField(max_length=180)
+    description=models.TextField(max_length=3000,blank=True)
+    caption=models.TextField(max_length=2200,blank=True)
+    channel=models.CharField(max_length=12,choices=Channel.choices,default=Channel.INSTAGRAM)
+    paid=models.BooleanField(default=False)
+    objective=models.CharField(max_length=12,choices=Objective.choices,default=Objective.LEAD)
+    status=models.CharField(max_length=12,choices=Status.choices,default=Status.DRAFT,db_index=True)
+
+    @property
+    def tracking_code(self):
+        return 'social-'+str(self.code)
+
+    class Meta:
+        ordering=['-created_at']
+
+
+def social_media_path(instance,filename):
+    import uuid
+    from pathlib import Path
+    return 'private/social/'+uuid.uuid4().hex+Path(filename).suffix.lower()
+
+
+class SocialCampaignMedia(TimeStampedModel):
+    campaign=models.ForeignKey(SocialCampaign,on_delete=models.CASCADE,related_name='media')
+    file=models.FileField(upload_to=social_media_path)
+    title=models.CharField(max_length=160)
+    placement=models.CharField(max_length=12,choices=[('feed','Feed'),('story','Stories'),('reel','Reels')],default='feed')
+    content_type=models.CharField(max_length=30)
+    size_bytes=models.PositiveIntegerField(default=0)
+    width=models.PositiveIntegerField(default=0)
+    height=models.PositiveIntegerField(default=0)
+
+    @property
+    def is_video(self):
+        return self.content_type=='video/mp4'
+
+
+class SocialCampaignContact(TimeStampedModel):
+    campaign=models.ForeignKey(SocialCampaign,on_delete=models.CASCADE,related_name='contacts')
+    lead=models.ForeignKey(Lead,on_delete=models.CASCADE,related_name='social_contacts')
+    identity_hash=models.CharField(max_length=64)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['campaign','identity_hash'],name='uq_social_campaign_contact')]
