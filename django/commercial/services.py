@@ -155,6 +155,7 @@ def anonymize_lead(*,lead,actor=None):
     lead.loss_reason=""
     lead.ip_hash=""
     lead.consent_user_agent=""
+    lead.social_contacts.all().delete()
     lead.anonymized_at=timezone.now()
     lead.do_not_contact=True
     lead.save()
