@@ -3,6 +3,9 @@ from secrets import token_hex
 
 from django.db import transaction
 from django.utils import timezone
+from requests.exceptions import RequestException, Timeout, SSLError
+
+from .mercadopago import MercadoPagoError
 
 from core.crypto import decrypt_json, decrypt_text, encrypt_json, encrypt_text
 from .mercadopago import MercadoPagoProvider, validate_charge_amount
@@ -17,26 +20,55 @@ from .models import (
 )
 
 
+class GatewayConfigurationError(ValueError):
+    """A fixed, safe message suitable for the credential setup form."""
+
+
 def configure_mercadopago_gateway(*,environment,public_key,access_token,webhook_secret,webhook_url):
     if environment not in {PaymentGateway.Environment.SANDBOX,PaymentGateway.Environment.PRODUCTION}:
-        raise ValueError("Ambiente inválido.")
+        raise GatewayConfigurationError("Ambiente inválido.")
     if not webhook_url.startswith("https://"):
-        raise ValueError("O webhook precisa usar HTTPS.")
+        raise GatewayConfigurationError("O webhook precisa usar HTTPS.")
     if environment==PaymentGateway.Environment.SANDBOX and not access_token.startswith(("TEST-","APP_USR-")):
-        raise ValueError("Use uma credencial de teste válida no ambiente de testes.")
+        raise GatewayConfigurationError("Use uma credencial de teste válida no ambiente de testes.")
     if environment==PaymentGateway.Environment.PRODUCTION and access_token.startswith("TEST-"):
-        raise ValueError("Credencial TEST- não pode ser usada em produção.")
+        raise GatewayConfigurationError("Credencial TEST- não pode ser usada em produção.")
     if len(webhook_secret)<16:
-        raise ValueError("Segredo de webhook inválido.")
+        raise GatewayConfigurationError("Segredo de webhook inválido.")
 
-    identity=MercadoPagoProvider(access_token).test_connection()
+    access_token=access_token.strip()
+    if access_token == public_key.strip() or not access_token.startswith(("APP_USR-", "TEST-")):
+        raise GatewayConfigurationError("Access Token inválido. Copie o campo Access Token, não a Public Key nem o Client Secret.")
+    try:
+        identity=MercadoPagoProvider(access_token).test_connection()
+    except MercadoPagoError as exc:
+        if exc.http_status == 401:
+            message="O Mercado Pago recusou o Access Token (HTTP 401). Copie um token válido da aplicação e confira o ambiente."
+        elif exc.http_status == 403:
+            message="O Mercado Pago negou a permissão da credencial (HTTP 403). Revise a conta e as permissões da aplicação no Mercado Pago."
+        elif exc.http_status == 429:
+            message="O Mercado Pago limitou as tentativas. Aguarde alguns minutos antes de testar novamente."
+        else:
+            message="O Mercado Pago não conseguiu validar a credencial agora. Tente novamente mais tarde."
+        raise GatewayConfigurationError(message) from exc
+    except Timeout as exc:
+        raise GatewayConfigurationError("O Mercado Pago demorou para responder. Tente novamente; nenhuma credencial foi ativada.") from exc
+    except SSLError as exc:
+        raise GatewayConfigurationError("O servidor não conseguiu verificar o certificado HTTPS do Mercado Pago. Solicite a revisão dos certificados do servidor.") from exc
+    except RequestException as exc:
+        raise GatewayConfigurationError("O servidor não conseguiu se conectar ao Mercado Pago. Verifique a saída HTTPS e o DNS do servidor.") from exc
+    try:
+        encrypted_token=encrypt_text(access_token)
+        encrypted_secret=encrypt_text(webhook_secret)
+    except (ValueError, TypeError) as exc:
+        raise GatewayConfigurationError("A chave de criptografia do servidor está inválida. Revise DJANGO_FIELD_ENCRYPTION_KEY no Coolify, preservando a chave dos dados existentes.") from exc
     gateway,_=PaymentGateway.objects.update_or_create(
         provider="mercadopago",
         environment=environment,
         defaults={
             "public_key":public_key.strip(),
-            "access_token_encrypted":encrypt_text(access_token),
-            "webhook_secret_encrypted":encrypt_text(webhook_secret),
+            "access_token_encrypted":encrypted_token,
+            "webhook_secret_encrypted":encrypted_secret,
             "webhook_url":webhook_url,
             "active":True,
             "last_tested_at":timezone.now(),

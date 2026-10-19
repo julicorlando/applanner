@@ -53,3 +53,30 @@ class PlatformGatewayMasterTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertFalse(PaymentGateway.objects.exists())
         self.assertNotContains(response,"provider failed")
+
+    def test_setup_errors_are_actionable_and_never_echo_provider_secrets(self):
+        from requests.exceptions import Timeout, ConnectionError
+        from .mercadopago import MercadoPagoError
+        self.client.force_login(self.master)
+        data={"environment":"production","public_key":"APP_USR-public",
+              "access_token":"APP_USR-private-test-token","webhook_secret":"private-webhook-secret"}
+        cases=[(MercadoPagoError(data['access_token'],http_status=401),'HTTP 401'),
+               (MercadoPagoError(data['webhook_secret'],http_status=403),'HTTP 403'),
+               (Timeout(data['access_token']),'demorou para responder'),
+               (ConnectionError(data['access_token']),'saída HTTPS')]
+        for error,message in cases:
+            with self.subTest(message=message), patch('billing.payment_services.MercadoPagoProvider.test_connection',side_effect=error):
+                response=self.client.post(self.url,data,secure=True)
+                self.assertContains(response,message)
+                self.assertNotContains(response,data['access_token'])
+                self.assertNotContains(response,data['webhook_secret'])
+                self.assertFalse(PaymentGateway.objects.exists())
+
+    @patch('billing.payment_services.MercadoPagoProvider.test_connection',return_value={'id':123})
+    def test_invalid_encryption_key_does_not_save_or_activate_gateway(self,_):
+        self.client.force_login(self.master)
+        with self.settings(FIELD_ENCRYPTION_KEY='invalid-key'):
+            response=self.client.post(self.url,{'environment':'production','access_token':'APP_USR-private-test-token',
+                'webhook_secret':'private-webhook-secret'},secure=True)
+        self.assertContains(response,'DJANGO_FIELD_ENCRYPTION_KEY')
+        self.assertFalse(PaymentGateway.objects.exists())

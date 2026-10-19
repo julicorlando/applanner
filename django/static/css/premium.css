@@ -182,11 +182,15 @@ body.landing-home .marketing-hero { max-width: 1320px; grid-template-columns: mi
 .table-scroll:focus-visible{outline:3px solid var(--brand,#0866e8);outline-offset:4px}
 
 /* Launch UX: compact discovery, progressive signup and authorized mobile navigation. */
-.master-top-nav { gap: 20px; }
-.workspace-account-menu { position: relative; }
-.workspace-account-menu > summary { cursor: pointer; padding: 12px; font-size: .85rem; font-weight: 650; }
-.workspace-account-menu > div { position: absolute; right: 0; top: 100%; z-index: 50; display: grid; min-width: 240px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); box-shadow: var(--shadow-raised); }
-.workspace-account-menu a, .workspace-account-menu button { display: block; padding: 12px; text-align: left; }
+/* Master account tools follow the sidebar flow, including on short screens. */
+.master-sidebar-tools { display: grid; gap: 8px; }
+.workspace-account-menu > summary { cursor: pointer; padding: 12px 8px; font-size: .8rem; font-weight: 650; }
+.workspace-account-menu > div { display: grid; gap: 4px; padding: 4px 0; }
+.master-sidebar-tools a, .master-sidebar-tools button { min-height: 44px; padding: 10px 8px; text-align: left; border-radius: 8px; color: #e2ecf9; font-size: .8rem; }
+.master-sidebar-tools a:hover, .master-sidebar-tools button:hover, .workspace-account-menu > summary:hover { background: #253d56; }
+.master-sidebar-tools button { width: 100%; background: transparent; border: 0; cursor: pointer; }
+.master-sidebar-tools form { margin: 0; }
+
 .master-console .master-shortcuts .shortcut-grid > a { min-height: 108px; }
 .master-console .master-shortcuts, .master-console .master-start { margin-bottom: 28px; }
 .master-console .master-start > summary { cursor: pointer; padding: 4px; }
