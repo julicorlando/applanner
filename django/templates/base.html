@@ -27,7 +27,7 @@
   <link rel="stylesheet" href="{% static 'css/adaptive-layout.css' %}">
   <script src="{% static 'js/adaptive-layout.js' %}" defer></script>
 <link rel="stylesheet" href="{% static 'css/mobile-brand.css' %}?v=20261008">
-<link rel="stylesheet" href="{% static 'css/premium.css' %}?v=20261019">
+<link rel="stylesheet" href="{% static 'css/premium.css' %}?v=20261019-sidebar">
 <script src="{% static 'js/workspace.js' %}" defer></script>
 {% if simple_mode %}<link rel="stylesheet" href="{% static 'css/simple-mode.css' %}">{% endif %}
 </head>
@@ -41,7 +41,7 @@
       {% elif platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="ApPlanner">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="ApPlanner">{% endif %}
     </a>
     {% if simple_mode %}<nav class="simple-primary-nav" aria-label="Ações principais">{% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento</a>{% else %}{% for item in simple_nav %}<a href="{{ item.url }}">{{ item.title }}</a>{% endfor %}{% endif %}</nav><details class="simple-more"><summary>Mais opções</summary>{% endif %}
-    {% if workspace_master and not simple_mode %}{% include "master/top_nav.html" %}{% else %}
+    {% if not workspace_master or simple_mode %}
     <nav class="nav">
       {% if request.user.is_authenticated %}
         {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
@@ -49,7 +49,7 @@
         <a href="{% if request.user.is_superuser %}{% url 'master-global-search' %}{% elif request.user.role == 'professional' %}{% url 'professional-search' %}{% else %}{% url 'operation-search' %}{% endif %}">Buscar</a>
         {% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a>{% endif %}{% endif %}
         {% if request.user.tenant_id and request.user.role != 'professional' %}<a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}
-        {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
+        {% if workspace_master %}<a href="{% url 'master-global-search' %}">Buscar na plataforma</a>{% endif %}{% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
         {% if request.user.is_superuser and request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
         <a href="/account/2fa/setup/">Segurança</a>
         <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
@@ -69,7 +69,7 @@
       {% if request.user.is_authenticated %}
       {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
       <a href="/">Painel</a>{% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a><a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}{% endif %}
-      {% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
+      {% if workspace_master %}<a href="{% url 'master-global-search' %}">Buscar na plataforma</a>{% endif %}{% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
       {% if request.user.is_superuser and request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
       <a href="/account/2fa/setup/">Segurança</a>
       <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>

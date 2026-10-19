@@ -7,6 +7,6 @@
     {% for group in workspace_groups %}<details class="workspace-group" open><summary>{{ group.title }}</summary><div>{% for item in group.items %}<a href="{{ item.url }}" data-workspace-link{% if item.active %} aria-current="page"{% endif %}><span aria-hidden="true">{% include 'workspace_icon.html' with icon=item.icon %}</span>{{ item.title }}</a>{% endfor %}</div></details>{% endfor %}
   </nav>
   <p class="workspace-no-results" hidden role="status">Nenhuma função encontrada. Tente outro termo.</p>
-  <div class="workspace-account"><strong>{{ request.user.first_name|default:'Sua conta' }}</strong><small>{{ request.user.get_role_display }}</small><a href="/account/2fa/setup/">Segurança da conta ↗</a></div>
+  <div class="workspace-account"><strong>{{ request.user.first_name|default:'Sua conta' }}</strong><small>{{ request.user.get_role_display }}</small>{% if workspace_master %}{% include "master/top_nav.html" %}{% else %}<a href="/account/2fa/setup/">Segurança da conta ↗</a>{% endif %}</div>
 </aside>
 {% endif %}
