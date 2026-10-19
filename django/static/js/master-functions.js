@@ -8,10 +8,18 @@ if (search) {
   const empty = document.getElementById('master-search-empty');
   const normalize = (value) => value.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
+  const initialOpen = groups.map(group => group.open);
+  function openHashGroup() {
+    const target = groups.find(group => `#${group.id}` === location.hash);
+    if (target) target.open = true;
+  }
+  window.addEventListener("hashchange", openHashGroup);
+  openHashGroup();
+
   function filterFunctions() {
     const query = normalize(search.value);
     let found = 0;
-    for (const group of groups) {
+    for (const [index, group] of groups.entries()) {
       const groupName = normalize(group.querySelector('h3').textContent);
       let inGroup = 0;
       for (const card of group.querySelectorAll('[data-master-function]')) {
@@ -20,8 +28,10 @@ if (search) {
         if (match) inGroup += 1;
       }
       group.hidden = inGroup === 0;
+      group.open = query ? inGroup > 0 : initialOpen[index];
       found += inGroup;
     }
+    if (!query) openHashGroup();
     categories.hidden = Boolean(query);
     clear.hidden = !query;
     empty.hidden = !query || found > 0;

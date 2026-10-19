@@ -180,3 +180,80 @@ body.landing-home .marketing-hero { max-width: 1320px; grid-template-columns: mi
 @media(max-width:700px){.public-page .public-header{flex-wrap:wrap}.public-page .public-header nav{order:3;flex:1 0 100%;gap:16px}.public-page .public-header nav a:first-child{display:inline-flex}.public-page .public-header nav a[href="#agendar"]{display:inline-flex}}
 .table-scroll{min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;border-radius:var(--radius-md,12px)}
 .table-scroll:focus-visible{outline:3px solid var(--brand,#0866e8);outline-offset:4px}
+
+/* Launch UX: compact discovery, progressive signup and authorized mobile navigation. */
+.master-top-nav { gap: 20px; }
+.workspace-account-menu { position: relative; }
+.workspace-account-menu > summary { cursor: pointer; padding: 12px; font-size: .85rem; font-weight: 650; }
+.workspace-account-menu > div { position: absolute; right: 0; top: 100%; z-index: 50; display: grid; min-width: 240px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); box-shadow: var(--shadow-raised); }
+.workspace-account-menu a, .workspace-account-menu button { display: block; padding: 12px; text-align: left; }
+.master-console .master-shortcuts .shortcut-grid > a { min-height: 108px; }
+.master-console .master-shortcuts, .master-console .master-start { margin-bottom: 28px; }
+.master-console .master-start > summary { cursor: pointer; padding: 4px; }
+.master-console .master-start h2 { display: inline; font-size: 1.2rem; margin: 0; }
+.master-console .master-start > summary > span { display: block; color: var(--muted); font-size: .85rem; margin-top: 6px; }
+.master-console .master-start-grid { margin-top: 20px; }
+.master-area-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.master-area-links a { padding: 8px 12px; border-radius: 24px; background: var(--soft); font-size: .82rem; color: var(--ink); text-decoration: none; }
+.master-console .master-function-group { margin-bottom: 12px; padding: 16px 20px; }
+.master-console .master-function-heading { cursor: pointer; display: list-item; list-style-position: inside; padding: 0; margin: 0; border: 0; }
+.master-console .master-function-heading > div { display: inline-block; vertical-align: middle; }
+.master-console .master-function-heading .eyebrow { display: none; }
+.master-console .master-function-heading h3 { font-size: 1rem; margin: 0 12px 0 0; }
+.master-console .master-function-heading > span { font-size: .8rem; color: var(--muted); }
+.master-console .master-function-grid { margin-top: 20px; }
+.master-console .master-function-grid > a { min-height: 96px; padding: 16px; }
+.signup-journey fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.signup-journey legend { font-size: 1.3rem; font-weight: 750; padding: 0; }
+.signup-journey fieldset > p { margin-top: 8px; color: var(--muted); }
+.signup-journey .form-field { margin-block: 16px; }
+.signup-progress { display: flex; list-style: none; padding: 0; gap: 8px; margin: 24px 0 8px; }
+.signup-progress li { flex: 1; padding: 12px; border-bottom: 3px solid var(--line); color: var(--muted); font-size: .85rem; }
+.signup-progress [aria-current] { border-color: var(--accent); color: var(--ink); font-weight: 750; }
+.signup-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.signup-step-status { color: var(--muted); font-size: .85rem; }
+body.experience-directory .portal-page { padding-top: 28px; }
+body.experience-directory .experience-intro { max-width: none; }
+body.experience-directory .experience-intro h1 { font-size: clamp(1.8rem, 3vw, 2.6rem); margin: 12px 0; }
+body.experience-directory .experience-intro > p { max-width: none; font-size: .95rem; margin-bottom: 24px; }
+body.experience-directory .directory-filters { grid-template-columns: minmax(0,2fr) minmax(0,1fr) auto; gap: 12px 16px; padding: 20px; margin-bottom: 24px; }
+.directory-search-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.directory-advanced { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 12px; }
+.directory-advanced summary { cursor: pointer; font-weight: 650; font-size: .9rem; min-height: 32px; }
+.directory-advanced-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: end; margin-top: 16px; }
+.directory-reset { font-size: .85rem; }
+body.experience-directory .experience-results-heading { margin-block: 16px; }
+body.experience-directory .experience-results-heading h2 { font-size: 1.35rem; }
+.mobile-module-menu { border-top: 1px solid var(--line); margin-block: 12px; padding-top: 16px; }
+.mobile-module-menu details { margin-block: 8px; border: 1px solid var(--line); border-radius: 10px; }
+.mobile-module-menu summary { padding: 14px; cursor: pointer; font-weight: 700; }
+.mobile-module-menu nav { display: grid; padding: 0 10px 10px; }
+.mobile-module-menu a[aria-current] { background: var(--soft); font-weight: 750; }
+@media(max-width:900px) {
+  body.experience-directory .directory-filters { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  .directory-search-actions { grid-column: 1 / -1; }
+}
+@media(max-width:560px) {
+  .signup-progress li { padding: 10px 4px; font-size: .75rem; }
+  .signup-actions .button { flex: 1; justify-content: center; }
+  body.experience-directory .directory-filters, .directory-advanced-grid { grid-template-columns: minmax(0,1fr); }
+  body.experience-directory .portal-page { padding-top: 24px; }
+  .directory-search-actions > button { flex: 1; }
+  .master-console .master-function-group { padding: 16px; }
+}
+@media(max-width:1200px) {
+  .has-workspace .topbar .nav { display: none; }
+  .has-workspace .mobile-nav { display: block; }
+}
+.signup-plan-summary h2 { font-size: 1.15rem; margin-block: 0 8px; }
+.signup-plan-summary p { font-size: .9rem; margin-block: 8px; }
+.signup-plan-summary summary { cursor: pointer; font-size: .85rem; padding-block: 8px; }
+.master-console .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media(max-width:700px) { .master-console .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.operation-module-barbearia .portal-module-kicker { color: #843c12; }
+.operation-module-label { color: var(--muted); }
+.diagnostic-item { background: var(--paper); color: var(--ink); }
+[data-theme="dark"] .operation-module .portal-module-kicker { background: var(--soft); color: var(--ink); }
+@media(max-width:560px) { .master-console .master-shortcuts .shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+body.signup-journey .shell.portal-page.narrow { max-width: 780px; }
+.signup-journey .portal-form { display: block; }

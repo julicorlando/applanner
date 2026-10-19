@@ -6,19 +6,20 @@
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/public-experience.css' %}?v=20261009">{% endblock %}
 {% block content %}
 <section class="shell portal-page">
-  <div class="experience-intro"><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Seu próximo atendimento<br>começa por aqui.</h1><p>Conheça os estabelecimentos, escolha uma unidade e encontre o horário que funciona para você.</p></div>
-  <div class="experience-location-bar"><div><strong>{% if located %}Unidades em até {{ radius }} km{% else %}Encontre uma unidade perto de você{% endif %}</strong><p>{% if located %}Da mais próxima à mais distante, com a distância aproximada em quilômetros.{% else %}Permita sua localização para consultar unidades em até 30 km. Sem ela, você pode navegar pelas páginas publicadas.{% endif %}</p><p id="location-status" role="status" aria-live="polite"></p></div><button class="button primary" id="nearby" type="button">{% if located %}Atualizar localização{% else %}Encontrar perto de mim{% endif %}</button></div>
+  <div class="experience-intro"><span class="eyebrow">APPLANNER PERTO DE VOCÊ</span><h1>Encontre seu próximo atendimento.</h1><p>Busque por nome, cidade ou CEP e escolha onde agendar.</p></div>
   <form method="get" class="directory-filters" aria-label="Filtrar estabelecimentos">
     {% if located %}<input type="hidden" name="lat" value="{{ latitude|stringformat:'f' }}"><input type="hidden" name="lon" value="{{ longitude|stringformat:'f' }}">{% endif %}
     <div class="form-field"><label for="directory-query">Nome, cidade ou CEP</label><input id="directory-query" name="q" value="{{ query }}" placeholder="Onde você quer agendar?" maxlength="120" type="search"></div>
     <div class="form-field"><label for="directory-segment">Segmento</label><select id="directory-segment" name="segment"><option value="">Todos os segmentos</option>{% for value,label in categories %}<option value="{{ value }}"{% if segment == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="directory-search-actions"><button class="button primary" type="submit">Buscar</button><button class="button" id="nearby" type="button">{% if located %}Atualizar localização{% else %}Perto de mim{% endif %}</button></div>
+    <details class="directory-advanced"{% if today_only or min_rating or located %} open{% endif %}><summary>Mais filtros{% if today_only or min_rating %} · filtros ativos{% endif %}</summary><div class="directory-advanced-grid">
     <div class="form-field"><label for="directory-radius">Distância máxima</label><select id="directory-radius" name="radius"{% if not located %} disabled{% endif %}><option value="5"{% if radius == 5 %} selected{% endif %}>5 km</option><option value="10"{% if radius == 10 %} selected{% endif %}>10 km</option><option value="20"{% if radius == 20 %} selected{% endif %}>20 km</option><option value="30"{% if radius == 30 %} selected{% endif %}>30 km</option></select></div>
     <div class="form-field"><label for="directory-rating">Avaliação da empresa</label><select id="directory-rating" name="rating"><option value="">Todas as avaliações</option><option value="3"{% if min_rating == 3 %} selected{% endif %}>3 ou mais</option><option value="4"{% if min_rating == 4 %} selected{% endif %}>4 ou mais</option><option value="5"{% if min_rating == 5 %} selected{% endif %}>5 estrelas</option></select></div>
     <label class="checkbox-choice-group"><input type="checkbox" name="today" value="1"{% if today_only %} checked{% endif %}> Tem horário hoje</label>
-    <button class="button primary" type="submit">Buscar</button><a class="button" href="{% url 'public-directory' %}">Limpar filtros</a>
-    {% if not located %}<small>A distância fica disponível ao permitir sua localização. O CEP filtra as unidades com esse endereço cadastrado.</small>{% endif %}
+    </div><p class="operation-muted">{% if located %}Unidades em até {{ radius }} km, da mais próxima à mais distante.{% else %}Permita sua localização para filtrar a distância, até 30 km. Você também pode buscar sem ela.{% endif %}</p></details>
+    <a class="directory-reset" href="{% url 'public-directory' %}">Limpar filtros</a><p id="location-status" role="status" aria-live="polite"></p>
   </form>
-  <div class="experience-results-heading"><h2>{% if located %}Perto de você{% else %}Explore os estabelecimentos{% endif %}</h2><p>Abra a página para conhecer serviços, profissionais e horários.</p></div>
+  <div class="experience-results-heading"><h2>{% if located %}Perto de você{% else %}Explore os estabelecimentos{% endif %}</h2><p>{{ cards|length }} {{ cards|length|pluralize:"unidade encontrada,unidades encontradas" }} nesta busca. Abra a página para consultar serviços e horários.</p></div>
   <div class="segment-grid experience-results">
     {% for card in cards %}
     <article class="directory-card">

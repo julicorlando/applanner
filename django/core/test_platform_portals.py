@@ -19,7 +19,7 @@ class PlatformPortalAccessTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertContains(response,'id="master-function-search"')
         self.assertContains(response,'data-master-function')
-        self.assertContains(response,'class="shortcut-grid master-category-grid"')
+        self.assertContains(response,'class="master-area-links"')
         self.assertContains(response,'js/master-functions')
 
     def test_commercial_profile_can_open_queue(self):
