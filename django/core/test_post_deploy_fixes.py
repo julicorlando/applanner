@@ -252,8 +252,10 @@ class PostDeployFixesTests(TestCase):
         self.assertEqual(_candidates(appointment),[])
 
     def test_agenda_filters_use_tenant_day_and_preserve_isolation(self):
-        now=datetime(2026,10,2,2,tzinfo=ZoneInfo("UTC")) # Still October 1 in Recife.
-        self.start=datetime(2026,10,1,23,tzinfo=ZoneInfo("America/Recife"))
+        # At 02:00 UTC it is still the previous calendar day in Recife.
+        # Keep the frozen clock near today so session expiry cannot invalidate the next request.
+        now=timezone.now().astimezone(ZoneInfo("UTC")).replace(hour=2,minute=0,second=0,microsecond=0)
+        self.start=now.astimezone(ZoneInfo("America/Recife"))
         today=self.appointment(status=Appointment.Status.CONFIRMED)
         self.start+=timedelta(days=1)
         self.appointment(status=Appointment.Status.CONFIRMED)
@@ -269,6 +271,7 @@ class PostDeployFixesTests(TestCase):
         self.assertContains(response,'value="today" selected')
         self.assertContains(response,static("js/live-agenda.js"))
         response=self.client.get(reverse("portal-resource-list",args=["agenda","agendamentos"]),{"period":"invalid","status":"invalid"})
+        self.assertEqual(response.status_code,200)
         self.assertEqual(len(response.context["rows"]),3)
 
     def test_setup_separates_optional_copy_and_payment_blockers(self):
