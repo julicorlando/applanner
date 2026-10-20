@@ -27,6 +27,10 @@ SEGMENT_PLANS = (
 class Command(BaseCommand):
     help = "Cria planos por segmento sem alterar assinaturas nem ajustes do Master."
 
+    def add_arguments(self, parser):
+        parser.add_argument("--preserve-existing", action="store_true",
+                            help="Cria planos ausentes sem alterar preços, limites, visibilidade ou vínculos existentes.")
+
     @transaction.atomic
     def handle(self, *args, **options):
         created = 0
@@ -45,6 +49,8 @@ class Command(BaseCommand):
                 },
             )
             if not new:
+                if options["preserve_existing"]:
+                    continue
                 if item["segment"]=="arena" and not (plan.features or {}).get("arena_limits_configured"):
                     features=dict(plan.features or {})
                     before=dict(features)
@@ -58,6 +64,10 @@ class Command(BaseCommand):
             created += 1
             for module in Module.objects.filter(slug__in=item["modules"]):
                 PlanModule.objects.get_or_create(plan=plan, module=module, defaults={"enabled": True})
+        if options["preserve_existing"]:
+            self.stdout.write(self.style.SUCCESS(
+                f"{created} planos base criados; configurações existentes preservadas."))
+            return
         Plan.objects.filter(name__iexact="Arena Sports").update(public_visible=False,featured=False)
         hidden=Plan.objects.filter(slug__in=("sales-pro","sales-start","sales-business"),
                                    public_visible=True).update(public_visible=False)
