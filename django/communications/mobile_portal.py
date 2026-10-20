@@ -94,17 +94,20 @@ def subscription(request, slug=None):
             raise ValidationError(
                 "Limite de dispositivos atingido. Desative um dispositivo antes de cadastrar outro."
             )
+        digest = hashlib.sha256(info["endpoint"].encode()).hexdigest()
+        identity_filter = {"user": user} if user else {"tenant": tenant, "customer": customer}
         row, _ = PushSubscription.objects.update_or_create(
-            tenant=tenant,
-            user=user,
-            customer=customer,
-            endpoint_hash=hashlib.sha256(info["endpoint"].encode()).hexdigest(),
+            **identity_filter,
+            endpoint_hash=digest,
             defaults={
+                "tenant": tenant,
+                "customer": customer,
                 "payload_encrypted": encrypt_json(info),
                 "active": True,
                 "consent_at": timezone.now(),
             },
         )
+        PushSubscription.objects.filter(endpoint_hash=digest, active=True).exclude(pk=row.pk).update(active=False)
         return JsonResponse(
             {"detail": "Notificações ativadas neste dispositivo.", "id": row.pk}
         )
@@ -171,7 +174,8 @@ def user_preferences(request):
         {
             "push_url": reverse("professional-push-subscription")
             if request.user.role == "professional"
-            else reverse("user-push-subscription")
+            else reverse("user-push-subscription"),
+            "push_audience": "master" if request.user.is_superuser else "professional" if request.user.role == "professional" else "company"
         },
     )
 

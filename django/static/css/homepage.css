@@ -67,3 +67,9 @@ body.landing-home .closing p{color:var(--muted);max-width:540px;margin:0 auto 24
 @media(max-width:900px){body.landing-home .marketing-hero{grid-template-columns:1fr;gap:36px;padding-block:48px}body.landing-home .product-window{max-width:560px;width:100%;margin:auto}body.landing-home .home-demo{gap:32px}body.landing-home .segment-grid{gap:14px}body.landing-home .segment-grid article{padding:22px}body.landing-home .home-phone-wrap{padding:18px}}
 @media(max-width:700px){body.landing-home .segment-grid,body.landing-home .home-demo{grid-template-columns:1fr}body.landing-home .section{padding-block:44px}body.landing-home .home-section-nav{gap:14px 20px;justify-content:flex-start}body.landing-home .home-section-nav a{font-size:.76rem}body.landing-home .home-plan-links{gap:18px}body.landing-home .closing{margin-block:28px 40px}}
 @media(max-width:560px){body.landing-home .hero-copy h1{font-size:clamp(2.1rem,8vw,2.7rem)}body.landing-home .marketing-hero{padding-block:36px}body.landing-home .lead{font-size:1rem}body.landing-home .actions{display:grid;grid-template-columns:1fr}body.landing-home .product-window{padding:18px}body.landing-home .home-phone-wrap{padding:20px 12px}body.landing-home .home-plan-links .button{width:100%}body.landing-home .closing{padding:36px 20px}}
+
+/* Real product captures: preserve image proportions and reserve space before loading. */
+body.landing-home .home-real-preview img{display:block;width:100%;height:auto;aspect-ratio:1440/1000}
+body.landing-home .home-booking-capture{flex-direction:column;align-items:center;gap:16px;margin:0}
+body.landing-home .home-booking-capture .home-phone img{display:block;width:100%;height:auto;aspect-ratio:390/844}
+body.landing-home .home-booking-capture figcaption{font-size:.75rem;line-height:1.5;color:var(--muted);text-align:center;max-width:300px}
