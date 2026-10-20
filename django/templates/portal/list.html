@@ -7,6 +7,9 @@
     <div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">{{ module.title }}</span><h1>{{ resource.title }}</h1></div>
     {% if can_create %}<a class="button primary" href="{% url 'portal-resource-create' module_slug resource_slug %}">{% if resource_slug == 'agendamentos' %}Novo agendamento{% elif resource_slug == 'profissionais' %}Novo profissional{% elif resource_slug == 'servicos' %}Novo serviço{% elif resource_slug == 'reservas' %}Nova reserva{% elif resource_slug == 'clientes' %}Novo cliente{% else %}Adicionar: {{ resource.title }}{% endif %}</a>{% endif %}
   </div>
+  {% if module_slug == 'agenda' and resource_slug == 'expedientes' and can_create %}
+  <p><a class="button" href="{% url 'bulk-work-schedule' %}?unit={{ selected_unit }}">Cadastrar expediente e intervalo em massa</a></p>
+  {% endif %}
   {% if professional_capacity %}<div class="panel" role="status" style="margin-bottom:16px">
     <strong>{{ professional_capacity.used }} profissionais ativos{% if professional_capacity.limit != None %} de {{ professional_capacity.limit }} autorizados{% elif professional_capacity.unlimited %} · Sem limite autorizado pelo Master{% else %} · Limite não definido no catálogo{% endif %}</strong>.
     {% if professional_capacity.overridden %}<p>Liberação especial do Master aplicada.</p>{% endif %}

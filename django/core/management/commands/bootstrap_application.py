@@ -60,4 +60,6 @@ class Command(BaseCommand):
                 kwargs={"verbosity":options["verbosity"]}
                 if name in {"migrate","collectstatic"}:
                     kwargs["interactive"]=False
+                if name in {"seed_modules", "seed_sales_plans"}:
+                    kwargs["preserve_existing"]=True
                 call_command(name,**kwargs)

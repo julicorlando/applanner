@@ -50,7 +50,7 @@ class SimpleModeTests(TestCase):
     def test_simple_dashboard_and_all_tools_are_available(self):
         self.enable();response=self.client.get(reverse('portal-home'))
         self.assertTemplateUsed(response,'portal/simple_home.html')
-        for text in ['Vamos organizar seu dia?','Novo agendamento','Clientes','Minha equipe','Outras ferramentas e configurações','Mais opções']:
+        for text in ['Vamos organizar seu dia?','Novo agendamento','Clientes','Minha equipe','Outras ferramentas e configurações','workspace-sidebar']:
             self.assertContains(response,text)
         self.assertNotContains(response,'portal-view-toggle')
         response=self.client.get(reverse('portal-resource-create',args=['agenda','clientes']))

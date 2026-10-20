@@ -94,14 +94,19 @@ DJANGO_ONLY_ALIASES={"sports","arena","barber","auto","marketing","crm","email_m
 class Command(BaseCommand):
     help="Cria/atualiza o catálogo base de módulos compatível com o legado."
 
+    def add_arguments(self, parser):
+        parser.add_argument("--preserve-existing", action="store_true",
+                            help="Cria módulos ausentes sem sobrescrever valores ou configurações existentes.")
+
     def handle(self,*args,**options):
         for slug,defaults in MODULES.items():
             payload={"addon_sellable":False,"sort_order":0,**defaults}
-            if slug == "verified-business":
+            if options["preserve_existing"] or slug == "verified-business":
                 Module.objects.get_or_create(slug=slug,defaults=payload)
             else:
                 Module.objects.update_or_create(slug=slug,defaults=payload)
-        Module.objects.filter(slug__in=DJANGO_ONLY_ALIASES).update(active=False)
+        if not options["preserve_existing"]:
+            Module.objects.filter(slug__in=DJANGO_ONLY_ALIASES).update(active=False)
         self.stdout.write(self.style.SUCCESS(
-            f"{len(MODULES)} módulos do catálogo legado sincronizados."
+            f"{len(MODULES)} módulos base verificados."
         ))

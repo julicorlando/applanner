@@ -51,6 +51,7 @@ class TenantBrandingForm(ImageSizeForm):
                 "public_subheadline":"Descrição da página pública",
                 "public_enabled":"Mostrar empresa no diretório e abrir página pública",
                 "public_booking_enabled":"Permitir agendamento na página pública"}
+        help_texts = {'logo': 'Exibida no menu lateral junto à marca ApPlanner e na página pública. Até 5 MB.'}
 
 
 @login_required
@@ -210,3 +211,16 @@ def public_blog_image(request,pk):
 
 def platform_branding(request):
     return {"platform_branding":PlatformHomepage.objects.filter(pk=1).first()}
+
+
+@login_required
+def workspace_logo(request):
+    """Company identity remains visible privately even with its public page disabled."""
+    tenant = request.user.tenant if request.user.tenant_id else None
+    if request.user.is_superuser:
+        tenant = Tenant.objects.filter(pk=request.session.get('portal_tenant_id'), deleted_at__isnull=True, archived_at__isnull=True).first()
+    if not tenant:
+        raise Http404
+    response = _image_response(tenant.logo)
+    response['Cache-Control'] = 'private, no-store'
+    return response
