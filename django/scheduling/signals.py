@@ -10,6 +10,7 @@ from .models import Appointment
 @receiver(pre_save,sender=Appointment)
 def remember_confirmation_state(sender,instance,**kwargs):
     instance._previous_start=(sender.objects.filter(pk=instance.pk).values_list("starts_at",flat=True).first() if instance.pk else None)
+    instance._previous_professional=(sender.objects.filter(pk=instance.pk).values_list("professional_id",flat=True).first() if instance.pk else None)
     instance._previous_status=(sender.objects.filter(pk=instance.pk).values_list("status",flat=True).first()
         if instance.pk else None)
 
@@ -55,6 +56,6 @@ def start_return_intelligence(sender, instance, created, **kwargs):
 
 @receiver(post_save,sender=Appointment)
 def notify_mobile_change(sender,instance,created,**kwargs):
-    if created or getattr(instance,"_previous_status",None)!=instance.status or getattr(instance,"_previous_start",None)!=instance.starts_at:
+    if created or getattr(instance,"_previous_status",None)!=instance.status or getattr(instance,"_previous_start",None)!=instance.starts_at or getattr(instance,"_previous_professional",None)!=instance.professional_id:
         from communications.mobile_delivery import appointment_event
-        appointment_event(instance)
+        appointment_event(instance,created=created)

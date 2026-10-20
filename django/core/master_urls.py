@@ -1,7 +1,7 @@
 from .global_search import search as global_search
 from communications.mobile_portal import providers
 from django.urls import path
-from . import master, master_console, master_retention, simple_mode
+from . import master, master_console, master_retention, simple_mode, customer_import_views
 from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment,master_whatsapp_simulate
 from .master_email import email_templates,smtp_settings,waive_onboarding_email
@@ -17,6 +17,10 @@ from operations.master_support import ticket_detail as support_ticket
 from operations.monitoring import dashboard as runtime_monitor
 
 urlpatterns=[
+    path("importar-clientes/", customer_import_views.upload, name="master-customer-import"),
+    path("importar-clientes/modelo.csv", customer_import_views.example, name="master-customer-import-example"),
+    path("importar-clientes/<int:pk>/", customer_import_views.detail, name="master-customer-import-detail"),
+    path("importar-clientes/<int:pk>/relatorio/", customer_import_views.report, name="master-customer-import-report"),
     path("provedores-notificacao/",providers,name="master-delivery-providers"),
     path("busca/",global_search,name="master-global-search"),
     path("empresas/<int:pk>/modo-simples/",simple_mode.set_mode,name="master-company-simple-mode"),

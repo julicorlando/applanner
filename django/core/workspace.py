@@ -70,6 +70,7 @@ def navigation(request):
         ]})
         groups.append({'title': 'Centrais e configurações', 'items': [
             link(title, reverse(route), icon) for title, route, icon in [
+                ('Importar base de clientes', 'master-customer-import', 'users'),
                 ('Comercial', 'commercial-dashboard', 'users'),
                 ('Cadastro bancário', 'master-platform-payment', 'card'),
                 ('Cobranças', 'master-charges', 'card'),
@@ -202,6 +203,8 @@ def navigation(request):
     account = [link('Segurança da conta', '/account/2fa/setup/'),
                link('Documentação e API', reverse('accounts:documentation')),
                link('Meus dados e privacidade', reverse('legal-privacy-center'))]
+    if user.is_superuser or (user.tenant_id and user.role != 'professional'):
+        account.insert(0, link('Notificações neste dispositivo', reverse('user-notification-preferences'), 'chat'))
     if not getattr(request, 'billing_locked', False):
         groups.append({'title': 'Conta e ferramentas', 'items': account})
         if user.is_superuser or tenant:

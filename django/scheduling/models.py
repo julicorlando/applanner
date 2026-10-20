@@ -394,3 +394,20 @@ class AppointmentBundle(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         constraints = [models.UniqueConstraint(fields=['tenant','idempotency_key'],name='uq_appointment_bundle_key')]
+
+
+class CustomerImportBatch(TimeStampedModel):
+    """Private staging for external customer CSV/XLSX files; source is cleared after apply."""
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.PROTECT, related_name="customer_imports")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    source_name = models.CharField(max_length=160)
+    file_hash = models.CharField(max_length=64)
+    payload_encrypted = models.TextField(blank=True)
+    mapping = models.JSONField(default=dict)
+    report = models.JSONField(default=dict)
+    state = models.CharField(max_length=16, default="preview", choices=[("preview", "Prévia"), ("applied", "Importada")])
+    expires_at = models.DateTimeField()
+    applied_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["tenant", "file_hash"], name="uq_customer_import_file")]

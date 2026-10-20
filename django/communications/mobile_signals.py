@@ -28,3 +28,25 @@ def notify_user_device(sender, instance, created, **kwargs):
                 "tag": f"notice-{instance.pk}",
             },
         )
+
+
+from django.db.models.signals import pre_save
+from .mobile_delivery import arena_event
+from .platform_events import install
+
+install()
+
+
+@receiver(pre_save, sender="arena.Reservation")
+def remember_arena_push_state(sender, instance, **kwargs):
+    instance._push_arena_previous = sender.objects.filter(pk=instance.pk).values(
+        "status", "starts_at", "court_id").first() if instance.pk else None
+
+
+@receiver(post_save, sender="arena.Reservation")
+def notify_arena_device(sender, instance, created, raw=False, **kwargs):
+    if raw:
+        return
+    current = {key: getattr(instance, key) for key in ("status", "starts_at", "court_id")}
+    if created or getattr(instance, "_push_arena_previous", None) != current:
+        arena_event(instance, created=created)

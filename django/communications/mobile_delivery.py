@@ -123,7 +123,14 @@ def queue_push(subscription, key, payload):
         subscription=subscription, key=digest, defaults={"payload": payload}
     )
     if created:
-        transaction.on_commit(lambda: send_push.delay(row.pk))
+        def dispatch():
+            try:
+                send_push.delay(row.pk)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Fila Push indisponível; entrega preservada para reconciliação (%s).", type(exc).__name__)
+        transaction.on_commit(dispatch)
     return row
 
 
@@ -157,6 +164,7 @@ def send_push(pk):
             not config
             or not config.vapid_private_encrypted
             or not row.subscription.active
+            or not subscription_is_current(row.subscription)
             or row.created_at < timezone.now() - timedelta(days=1)
         ):
             row.status = "expired"
@@ -331,34 +339,65 @@ def send_sms(notification):
     return sid
 
 
+def subscription_is_current(subscription):
+    if subscription.user_id:
+        user = subscription.user
+        return bool(user.is_active and not user.deleted_at and (
+            (user.is_superuser and subscription.tenant_id is None) or
+            (user.tenant_id is not None and user.tenant_id == subscription.tenant_id)))
+    return bool(subscription.customer_id and subscription.customer.active and
+                subscription.customer.tenant_id == subscription.tenant_id)
+
+
+def booking_staff(tenant):
+    from accounts.models import User
+    from accounts.permissions import has_capability
+    roles = {"owner", "manager", "tenant-admin", "barber-manager", "auto-manager", "arena-manager", "reception"}
+    return [user.pk for user in User.objects.filter(tenant=tenant, is_active=True,
+            deleted_at__isnull=True, role__in=roles)
+            if has_capability(user, "agenda.manage") or has_capability(user, "arena.manage")]
+
+
 @transaction.atomic
-def appointment_event(appointment):
+def appointment_event(appointment, created=False):
     event = f"appointment:{appointment.pk}:{appointment.status}:{appointment.professional_id}:{appointment.starts_at.isoformat()}"
     key = hashlib.sha256(event.encode()).hexdigest()
-    qs = PushSubscription.objects.filter(active=True, tenant=appointment.tenant)
     from django.db.models import Q
-
-    match = Q(customer=appointment.customer)
-    if appointment.professional_id and appointment.professional.user_id:
-        match |= Q(user_id=appointment.professional.user_id)
-    for sub in qs.filter(match):
-        url = (
-            "/app/profissional/"
-            if sub.user_id
-            else f"/p/{appointment.tenant.public_slug or appointment.tenant.slug}/cliente/"
-        )
-        queue_push(
-            sub,
-            key,
-            {
-                "title": "ApPlanner",
-                "body": "Sua agenda foi atualizada. Abra o aplicativo para conferir.",
-                "url": url,
-                "tag": key,
-            },
-        )
+    staff_ids = booking_staff(appointment.tenant)
+    professional = appointment.professional
+    if professional and professional.user_id and professional.user.tenant_id == appointment.tenant_id:
+        staff_ids.append(professional.user_id)
+    match = Q(customer=appointment.customer) | Q(user_id__in=staff_ids)
+    for sub in PushSubscription.objects.filter(active=True, tenant=appointment.tenant).filter(match):
+        if not subscription_is_current(sub):
+            continue
+        if sub.user_id:
+            local_day = appointment.starts_at.astimezone(ZoneInfo(appointment.tenant.timezone or "America/Recife")).date().isoformat()
+            url = "/app/calendario/?mode=day&date=" + local_day + (
+                f"&unit={appointment.unit_id}" if appointment.unit_id else "")
+            title = "Novo agendamento" if created else "Agendamento cancelado" if appointment.status == "cancelled" else "Agenda atualizada"
+        else:
+            url = f"/p/{appointment.tenant.public_slug or appointment.tenant.slug}/cliente/"
+            title = "ApPlanner · seu agendamento"
+        queue_push(sub, key, {
+            "title": title, "body": "Sua agenda foi atualizada. Abra o aplicativo para conferir.",
+            "url": url, "tag": key,
+        })
     if appointment.status in {"confirmed", "cancelled"}:
         queue_sms(appointment, appointment.status)
+
+
+def arena_event(reservation, created=False):
+    event = f"arena:{reservation.pk}:{reservation.status}:{reservation.court_id}:{reservation.starts_at.isoformat()}"
+    for sub in PushSubscription.objects.filter(active=True, tenant=reservation.tenant,
+                                               user_id__in=booking_staff(reservation.tenant)):
+        if subscription_is_current(sub):
+            queue_push(sub, event, {
+                "title": "Nova reserva" if created else "Reserva atualizada",
+                "body": "A agenda de quadras foi atualizada. Abra o aplicativo para conferir.",
+                "url": "/app/calendario/?mode=day&unit=" + str(reservation.court.unit_id or ""),
+                "tag": hashlib.sha256(event.encode()).hexdigest(),
+            })
 
 
 @shared_task
