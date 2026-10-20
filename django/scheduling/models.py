@@ -398,8 +398,8 @@ class AppointmentBundle(models.Model):
 
 class CustomerImportBatch(TimeStampedModel):
     """Private staging for external customer CSV/XLSX files; source is cleared after apply."""
-    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.PROTECT, related_name="customer_imports")
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="customer_imports")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     source_name = models.CharField(max_length=160)
     file_hash = models.CharField(max_length=64)
     payload_encrypted = models.TextField(blank=True)

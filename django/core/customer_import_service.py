@@ -97,6 +97,8 @@ def read_source(content, filename):
     except (ValueError, OSError, BadZipFile, csv.Error, KeyError, IndexError,
             ParseError, DefusedXmlException, XMLSyntaxError, InvalidFileException):
         raise ValidationError("Não foi possível ler o arquivo. Confira o formato e o cabeçalho.") from None
+    if sum(len(text(cell)) for row in rows for cell in row) > MAX_BYTES:
+        raise ValidationError("O conteúdo textual da planilha excede 5 MB. Remova colunas desnecessárias ou divida a base.")
     if len(rows) < 2:
         raise ValidationError("O arquivo deve ter cabeçalho e pelo menos um cliente.")
     headers = [text(cell) for cell in rows[0]]

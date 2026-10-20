@@ -124,3 +124,32 @@ class CustomerImportTests(TestCase):
         self.assertEqual(Customer.objects.count(), 0)
         self.assertEqual(self.client.post(detail, {"action": "preview", "name": "0", "phone": "1",
             "email": "", "birth_date": "", "preferences": ""}).status_code, 200)
+
+    def test_expired_staging_is_cleared_without_deleting_customer_data(self):
+        from communications.platform_events import reconcile_platform_events
+        existing = Customer.objects.create(tenant=self.tenant, name="Preservado", phone="81900000009")
+        batch = self.batch([["Cliente", "81900000001", "", "", ""]])
+        CustomerImportBatch.objects.filter(pk=batch.pk).update(expires_at=timezone.now()-timedelta(seconds=1))
+        reconcile_platform_events()
+        batch.refresh_from_db()
+        self.assertEqual(batch.payload_encrypted, "")
+        self.assertTrue(Customer.objects.filter(pk=existing.pk).exists())
+
+    def test_xlsx_text_expansion_is_bounded(self):
+        from openpyxl import Workbook
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append([f"Coluna {index}" for index in range(80)])
+        for _ in range(100):
+            sheet.append(["x" * 700] * 80)
+        output = BytesIO()
+        workbook.save(output)
+        with self.assertRaises(ValidationError):
+            read_source(output.getvalue(), "expanded.xlsx")
+
+    def test_import_staging_does_not_block_authorized_company_deletion(self):
+        batch = self.batch([["Cliente", "81900000001", "", "", ""]])
+        batch_id = batch.pk
+        self.tenant.delete()
+        self.assertFalse(CustomerImportBatch.objects.filter(pk=batch_id).exists())
+        self.assertTrue(User.objects.filter(pk=self.master.pk).exists())

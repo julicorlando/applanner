@@ -121,3 +121,15 @@ class StaffPushTests(TestCase):
             with suppress_platform_events():
                 Customer.objects.create(tenant=self.tenant, name="Importado", phone="81900000002")
         self.assertFalse(PushDelivery.objects.filter(subscription__user=self.master).exists())
+
+    def test_arena_new_reservation_notifies_company_without_professional_interface(self):
+        from arena.models import Court, Reservation
+        court = Court.objects.create(tenant=self.tenant, unit=self.unit, name="Quadra", slug="push-quadra")
+        PushDelivery.objects.all().delete()
+        Reservation.objects.create(tenant=self.tenant, court=court, public_id="push-arena-example",
+            customer_name="Cliente privado", customer_phone="81900000001", starts_at=self.start,
+            ends_at=self.start+timedelta(hours=1), duration_minutes=60, price_per_hour=50,
+            total_amount=50, manage_token_hash="f"*64)
+        rows = PushDelivery.objects.all()
+        self.assertEqual(list(rows.values_list("subscription__user_id", flat=True)), [self.owner.pk])
+        self.assertEqual(rows.get().payload["title"], "Nova reserva")

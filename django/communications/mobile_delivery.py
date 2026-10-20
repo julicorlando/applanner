@@ -340,6 +340,9 @@ def send_sms(notification):
 
 
 def subscription_is_current(subscription):
+    if subscription.tenant_id and (subscription.tenant.deleted_at or subscription.tenant.archived_at or
+                                    subscription.tenant.status not in {"trial", "active"}):
+        return False
     if subscription.user_id:
         user = subscription.user
         return bool(user.is_active and not user.deleted_at and (

@@ -163,19 +163,21 @@ def install():
 @shared_task
 def reconcile_platform_events():
     """Recover events from bulk updates and deadlines; never modifies billing state."""
+    from scheduling.models import CustomerImportBatch
+    now = timezone.now()
+    CustomerImportBatch.objects.filter(expires_at__lte=now).exclude(payload_encrypted="").update(payload_encrypted="")
     if not PushSubscription.objects.filter(active=True, tenant__isnull=True,
             user__is_superuser=True, user__is_active=True).exists():
         return 0
     from billing.models import Payment, Subscription
-    now = timezone.now()
     threshold = now - timedelta(days=1)
     count = 0
     for payment in Payment.objects.filter(purpose="subscription").exclude(environment__in=["sandbox", "test"]).filter(
-            Q(updated_at__gte=threshold) | Q(status="pending", due_at__lte=now)).order_by("pk").iterator(chunk_size=200):
+            Q(updated_at__gte=threshold) | Q(status="pending", due_at__gte=threshold, due_at__lte=now)).order_by("pk").iterator(chunk_size=200):
         payment_notice(payment)
         count += 1
-    for subscription in Subscription.objects.filter(Q(status__in=["past_due", "cancelled", "suspended"]) |
-            Q(status="trial", trial_ends_at__lte=now)).order_by("pk").iterator(chunk_size=200):
+    for subscription in Subscription.objects.filter(Q(status__in=["past_due", "cancelled", "suspended"], updated_at__gte=threshold) |
+            Q(status__in=["trial", "past_due"], trial_ends_at__gte=threshold, trial_ends_at__lte=now)).order_by("pk").iterator(chunk_size=200):
         subscription_notice(subscription)
         count += 1
     return count
