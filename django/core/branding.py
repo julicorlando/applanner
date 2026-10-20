@@ -30,8 +30,8 @@ class PlatformHomepageForm(ImageSizeForm):
                 "favicon":"Ícone da aba do navegador", "hero_description":"Descrição principal","closing_title":"Chamada final",
                 "medical_segment_visible":"Exibir Médico / Clínica e Clínicas publicamente"}
         help_texts={"logo":"Logo padrão, usada quando não houver uma logo específica para o tema.",
-            "logo_light":"PNG ou WebP com fundo transparente recomendado. Até 5 MB.",
-            "logo_dark":"Envie uma versão com contraste para fundos escuros. Até 5 MB.",
+            "logo_light":"Use a versão escura da logo para aparecer no tema claro. PNG ou WebP transparente. Até 5 MB.",
+            "logo_dark":"Use a versão clara da logo para aparecer no tema escuro. PNG ou WebP transparente. Até 5 MB.",
             "favicon":"PNG ou ICO quadrado recomendado, com pelo menos 32 × 32 pixels. Até 5 MB."}
 
     def clean_favicon(self):
