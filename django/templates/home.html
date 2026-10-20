@@ -3,7 +3,7 @@
 {% block title %}ApPlanner — agende com facilidade e faça seu negócio crescer{% endblock %}
 {% block description %}Organize agendamentos, equipe, clientes e resultados. Soluções para barbearias, salões, estética, arenas e serviços automotivos. Conheça o ApPlanner.{% endblock %}
 {% block body_class %}landing-home{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/homepage.css' %}?v=20261009">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/homepage.css' %}?v=20261020-real">{% endblock %}
 {% block content %}
 <section class="marketing-hero shell" aria-labelledby="home-title">
   <div class="hero-copy">
@@ -22,8 +22,8 @@
   </div>
     <figure class="home-real-preview">
       <div class="home-preview-label"><span aria-hidden="true">◷</span> Sua operação, com mais clareza</div>
-      <img src="{% static 'images/premium-dashboard-demo-960.webp' %}" srcset="{% static 'images/premium-dashboard-demo-640.webp' %} 640w, {% static 'images/premium-dashboard-demo-960.webp' %} 960w, {% static 'images/premium-dashboard-demo.webp' %} 1440w" sizes="(max-width: 900px) calc(100vw - 48px), 660px" width="1440" height="1000" alt="Captura do painel ApPlanner com menu lateral, indicadores e atalhos, usando dados fictícios de homologação." fetchpriority="high">
-      <figcaption>Painel real do ApPlanner · dados fictícios de demonstração.</figcaption>
+      <img src="{% static 'images/homepage-agenda-20261020-960.webp' %}" srcset="{% static 'images/homepage-agenda-20261020-640.webp' %} 640w, {% static 'images/homepage-agenda-20261020-960.webp' %} 960w, {% static 'images/homepage-agenda-20261020-1440.webp' %} 1440w" sizes="(max-width: 900px) calc(100vw - 48px), 660px" width="1440" height="1000" alt="Captura real e atual da agenda semanal do ApPlanner, com menu lateral, agendamentos e janelas livres; dados fictícios de demonstração." fetchpriority="high">
+      <figcaption>Agenda real do ApPlanner · dados fictícios de demonstração.</figcaption>
     </figure>
 </section>
 
@@ -36,7 +36,10 @@
 
 <section class="shell section home-demo" id="demonstracao" aria-labelledby="demo-title">
   <div class="home-demo-copy"><span class="eyebrow">FÁCIL PARA QUEM AGENDA</span><h2 id="demo-title">Seu link. Seu cliente.<br>O horário que funciona.</h2><p>Coloque o link na bio do Instagram ou compartilhe com seus clientes. Eles consultam os serviços e escolhem um horário disponível.</p><ol class="home-booking-steps"><li><b>Escolha do serviço</b><span>Preço e duração à vista.</span></li><li><b>Profissional, dia e horário</b><span>Disponibilidade da unidade escolhida.</span></li><li><b>Dados e confirmação</b><span>Uma reserva para acompanhar na agenda.</span></li></ol><a class="home-text-link" href="{% url 'public-directory' %}">Conhecer páginas de estabelecimentos →</a></div>
-  <div class="home-phone-wrap"><div class="home-phone" aria-label="Exemplo ilustrativo da escolha de horário no celular"><div class="home-phone-top"><span aria-hidden="true">✂</span><b>Barbearia exemplo</b><small>Unidade Centro</small></div><div class="home-phone-content"><span class="eyebrow">AGENDAMENTO</span><h3>Seu próximo corte começa aqui.</h3><div class="home-service-example"><b>Corte + barba</b><span>Exemplo de serviço · 45 min</span></div><p>Escolha um horário</p><div class="home-slot-examples" aria-hidden="true"><span>09:00</span><span>10:30</span><span class="selected">14:00</span><span>15:30</span></div><div class="home-confirm-example">Serviço e horário escolhidos ✓</div><small>Prévia ilustrativa, sem criar uma reserva.</small></div></div></div>
+  <figure class="home-phone-wrap home-booking-capture">
+    <div class="home-phone"><img src="{% static 'images/homepage-booking-20261020-390.webp' %}" srcset="{% static 'images/homepage-booking-20261020-390.webp' %} 390w, {% static 'images/homepage-booking-20261020-780.webp' %} 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Captura real do agendamento no celular: escolha de profissional e resumo do serviço em uma empresa de demonstração."></div>
+    <figcaption>Jornada real no celular · dados fictícios de demonstração.</figcaption>
+  </figure>
 </section>
 
 <section class="shell section home-operations" id="gestao" aria-labelledby="operations-title">

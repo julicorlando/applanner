@@ -152,6 +152,36 @@ def main():
                 for width in [390, 780]:
                     output_image(f"homepage-booking-20261020-{width}.webp", picture, width)
                 mobile.close()
+                for width in [320, 390, 768, 1440]:
+                    for theme in ["light", "dark"]:
+                        qa = browser.new_context(viewport={"width": width, "height": 1000 if width > 700 else 844},
+                            locale="pt-BR", color_scheme=theme, reduced_motion="reduce")
+                        qa.route("**/*", lambda route: route.continue_()
+                                 if urlsplit(route.request.url).hostname in {"127.0.0.1", "localhost"}
+                                 else route.abort())
+                        check = qa.new_page()
+                        errors = []
+                        check.on("pageerror", lambda error: errors.append(str(error)))
+                        response = check.goto("http://127.0.0.1:8765/", wait_until="networkidle")
+                        if response.status != 200:
+                            raise RuntimeError("A home não retornou 200.")
+                        check.evaluate("document.fonts.ready")
+                        height = check.evaluate("document.documentElement.scrollHeight")
+                        for position in range(0, height, 700):
+                            check.evaluate("position => window.scrollTo(0, position)", position)
+                            check.wait_for_timeout(60)
+                        check.evaluate("window.scrollTo(0,0)")
+                        check.wait_for_timeout(150)
+                        overflow = check.evaluate("document.documentElement.scrollWidth > innerWidth")
+                        broken = check.locator("img").evaluate_all("images => images.filter(image => !image.complete || !image.naturalWidth).map(image => image.getAttribute('src'))")
+                        if overflow or broken or errors:
+                            raise RuntimeError("Home QA: " + json.dumps({"width": width, "theme": theme,
+                                               "overflow": overflow, "broken": broken, "errors": errors}))
+                        print("APPLANNER_HOME_QA " + json.dumps({"width": width, "theme": theme,
+                              "horizontal_overflow": False, "broken_images": 0, "javascript_errors": 0}), flush=True)
+                        if theme == "light" and width in [390, 1440]:
+                            output_image(f"homepage-proof-{width}.webp", check.screenshot(animations="disabled"), width)
+                        qa.close()
                 browser.close()
         finally:
             server.shutdown()

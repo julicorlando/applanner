@@ -3,12 +3,14 @@ on:
   pull_request:
     paths:
       - django/scripts/capture_home_previews.py
+      - django/templates/home.html
+      - django/static/css/homepage.css
       - .github/workflows/home-preview-capture.yml
 permissions:
   contents: read
 jobs:
   capture:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/home-push-import-20261020'
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

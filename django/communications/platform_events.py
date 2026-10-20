@@ -72,6 +72,7 @@ def subscription_notice(subscription):
         if subscription.trial_ends_at <= timezone.now() and not subscription.payments.filter(status="paid").exists():
             after_commit_notice(f"subscription:{subscription.pk}:trial-ended:{subscription.trial_ends_at.isoformat()}",
                                 "Teste grátis encerrado", url)
+            return
     if subscription.status == "past_due":
         cycle = subscription.next_billing_at or subscription.trial_ends_at or subscription.started_at
         after_commit_notice(f"subscription:{subscription.pk}:past-due:{cycle.isoformat()}",
@@ -117,6 +118,8 @@ def changed(sender, instance, created, raw=False, **kwargs):
         return
     if label == "billing.Subscription":
         subscription_notice(instance)
+        if instance.status in {"past_due", "cancelled", "suspended"} or (instance.status == "trial" and instance.trial_ends_at and instance.trial_ends_at <= timezone.now()):
+            return
         if not created and previous and previous.get("plan_id") == instance.plan_id and previous.get("status") == instance.status:
             return
         title = "Novo teste grátis" if created and instance.status == "trial" else "Nova assinatura" if created else "Assinatura atualizada"
