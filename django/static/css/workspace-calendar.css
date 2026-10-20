@@ -1,6 +1,7 @@
 /* Shared private shell and calendar. Public marketing keeps its own navigation. */
 .has-workspace { --workspace-width: 284px; }
 .workspace-brand-logo { display:grid; place-items:center; flex:0 0 56px; background:#fff; border-radius:14px; padding:5px; }
+:root[data-theme="dark"] .workspace-brand-logo { background:#10263a; }
 .workspace-brand-logo img { width:46px; height:46px; object-fit:contain; }
 .workspace-company { display:flex; align-items:center; gap:10px; margin:-10px 0 22px; padding:12px 0; border-bottom:1px solid #40546c; font-size:.85rem; overflow-wrap:anywhere; }
 .workspace-company img { border-radius:50%; object-fit:cover; flex-shrink:0; }
