@@ -44,3 +44,14 @@
 @media(max-width:900px) { .calendar-board--month { grid-template-columns:repeat(7,minmax(120px,1fr)); } .calendar-scroll { overflow-x:auto; padding:3px; } }
 @media(max-width:700px) { .calendar-board--month .calendar-event { grid-template-columns:1fr; } .calendar-board--month .calendar-event p,.calendar-board--month .calendar-event a { grid-column:auto; } .calendar-toolbar .form-actions { margin:0; } }
 @media print { .workspace-launcher,.workspace-backdrop,.workspace-close { display:none!important; } }
+
+/* Recurring work schedules: touch-friendly controls, same design tokens. */
+.bulk-work-help { margin-block: 16px; }
+.bulk-work-form fieldset { min-width: 0; border: 0; padding: 0; margin: 0 0 24px; }
+.bulk-work-form legend { font-weight: 700; margin-bottom: 12px; }
+.bulk-work-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 24px; }
+.bulk-work-choices > div { max-height: 300px; overflow-y: auto; }
+.bulk-work-choices label { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.bulk-work-choices input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 20px; }
+.bulk-work-form input[type="time"] { width: 100%; min-height: 44px; box-sizing: border-box; }
+.bulk-work-form .form-actions { display: flex; flex-wrap: wrap; gap: 12px; }

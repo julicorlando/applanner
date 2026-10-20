@@ -172,6 +172,10 @@ def navigation(request):
                     link('Agenda · dia, semana e mês', reverse('operation-calendar'), 'calendar'),
                     link('Atendimentos de hoje', reverse('operation-today'), 'calendar'),
                 ])
+            if ('agenda', 'expedientes') in routes:
+                groups.append({'title': 'Cadastro em massa', 'items': [
+                    link('Expediente e intervalo em massa', reverse('bulk-work-schedule'), 'calendar'),
+                ]})
             from accounts.permissions import has_capability
             if has_capability(user, 'agenda.manage'):
                 groups.append({'title': 'Configuração da operação', 'items': [
