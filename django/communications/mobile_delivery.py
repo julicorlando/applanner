@@ -125,7 +125,7 @@ def queue_push(subscription, key, payload):
     if created:
         def dispatch():
             try:
-                send_push.delay(row.pk)
+                send_push.apply_async(args=(row.pk,), retry=False, ignore_result=True)
             except Exception as exc:
                 import logging
                 logging.getLogger(__name__).warning(

@@ -97,7 +97,7 @@ class StaffPushTests(TestCase):
 
     def test_broker_failure_preserves_delivery_without_failing_transaction(self):
         sub = PushSubscription.objects.get(user=self.owner)
-        with patch("communications.mobile_delivery.send_push.delay", side_effect=RuntimeError("broker unavailable")):
+        with patch("communications.mobile_delivery.send_push.apply_async", side_effect=RuntimeError("broker unavailable")):
             with self.captureOnCommitCallbacks(execute=True):
                 row = queue_push(sub, "broker-test", {"title": "Teste"})
         row.refresh_from_db()
