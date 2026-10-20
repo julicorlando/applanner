@@ -142,6 +142,8 @@ def main():
                     raise RuntimeError("A página pública não retornou 200.")
                 phone.locator("#public-booking").wait_for(state="visible")
                 phone.select_option("#booking-service", str(services[0].pk))
+                phone.get_by_role("button", name="Continuar", exact=True).click()
+                phone.locator("#booking-professional").wait_for(state="visible")
                 phone.select_option("#booking-professional", str(professionals[0].pk))
                 phone.locator("#agendar").evaluate("element => element.scrollIntoView({block:'start'})")
                 phone.evaluate("document.fonts.ready")
