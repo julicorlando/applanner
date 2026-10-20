@@ -1,6 +1,6 @@
 from django.urls import path
 from . import portal, operation_insights
-from .branding import tenant_branding
+from .branding import tenant_branding, workspace_logo
 from .unit_settings import unit_schedule_settings
 from billing.tenant_gateway import tenant_gateway
 from .professional_area import professional_area, professional_access, professional_appointment, professional_waitlist, reception_appointment
@@ -18,6 +18,7 @@ from .work_notes import notes,photo
 from .professional_materials import materials
 
 urlpatterns = [
+    path('identidade/logo/', workspace_logo, name='workspace-company-logo'),
     path("profissional/notificacoes/",mobile_portal.user_preferences,name="professional-notification-preferences"),
     path("profissional/notificacoes/push/",mobile_portal.subscription,name="professional-push-subscription"),
     path("grupos/",business_groups,name="business-groups"),

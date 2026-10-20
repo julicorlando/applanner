@@ -1,4 +1,5 @@
 import json
+import calendar as month_calendar
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from django.contrib.auth.decorators import login_required
@@ -7,7 +8,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_safe
 from scheduling.models import (
     Appointment,
     AppointmentRescheduleHistory,
@@ -28,6 +29,11 @@ def access(request):
     from billing.segment_access import segment_enabled
 
     arena = segment_enabled(tenant, "arena")
+    if request.user.role == 'professional':
+        if arena:
+            raise PermissionDenied
+        professional = get_object_or_404(Professional, tenant=tenant, user=request.user, active=True)
+        return tenant, professional.unit, False
     routes = {
         (m["slug"], r["slug"])
         for m in available_modules(request.user, tenant)
@@ -43,6 +49,7 @@ def access(request):
 
 
 @login_required
+@require_safe
 def calendar(request):
     tenant, unit, arena = access(request)
     tz = ZoneInfo(tenant.timezone or "America/Recife")
@@ -53,23 +60,33 @@ def calendar(request):
             raise ValueError
     except ValueError:
         day = today
-    mode = "day" if request.GET.get("mode") == "day" else "week"
-    first = day if mode == "day" else day - timedelta(days=day.weekday())
-    days = [first + timedelta(days=i) for i in range(1 if mode == "day" else 7)]
+    mode = request.GET.get('mode', 'week')
+    if mode not in {'day', 'week', 'month'}:
+        mode = 'week'
+    if mode == 'month':
+        days = [value for week in month_calendar.Calendar().monthdatescalendar(day.year, day.month) for value in week]
+        first = days[0]
+        month_start = day.replace(day=1)
+        previous = (month_start - timedelta(days=1)).replace(day=1)
+        following = (month_start + timedelta(days=32)).replace(day=1)
+    else:
+        first = day if mode == 'day' else day - timedelta(days=day.weekday())
+        days = [first + timedelta(days=i) for i in range(1 if mode == 'day' else 7)]
+        previous, following = first - timedelta(days=len(days)), first + timedelta(days=len(days))
     start = datetime.combine(first, time.min, tz)
     end = datetime.combine(days[-1] + timedelta(days=1), time.min, tz)
     if arena:
-        from arena.models import Reservation, Court
+        from arena.models import Reservation, Court, CourtBlock
 
         resources = Court.objects.filter(tenant=tenant, unit=unit, active=True)
         rows = Reservation.objects.filter(
-            tenant=tenant, court__unit=unit, starts_at__gte=start, starts_at__lt=end
+            tenant=tenant, court__unit=unit, ends_at__gt=start, starts_at__lt=end
         ).select_related("court", "customer")
-        blocks = []
+        blocks = CourtBlock.objects.filter(tenant=tenant, court__unit=unit, status='active', starts_at__lt=end, ends_at__gt=start).select_related('court')
     else:
         resources = Professional.objects.filter(tenant=tenant, unit=unit, active=True)
         rows = Appointment.objects.filter(
-            tenant=tenant, unit=unit, starts_at__gte=start, starts_at__lt=end
+            tenant=tenant, unit=unit, ends_at__gt=start, starts_at__lt=end
         ).select_related("professional", "service", "customer")
         blocks = ProfessionalTimeOff.objects.filter(
             tenant=tenant,
@@ -78,18 +95,30 @@ def calendar(request):
             starts_at__lt=end,
             ends_at__gt=start,
         ).select_related("professional")
+        if request.user.role == 'professional':
+            resources = resources.filter(user=request.user)
+            rows = rows.filter(professional__user=request.user)
+            blocks = blocks.filter(professional__user=request.user)
     raw = request.GET.get("resource", "")
+    all_resources = list(resources.order_by('name'))
     if raw.isdigit():
         resource = get_object_or_404(resources, pk=int(raw))
+        resources = resources.filter(pk=resource.pk)
         rows = rows.filter(**{"court" if arena else "professional": resource})
-        if not arena:
-            blocks = blocks.filter(professional=resource)
+        blocks = blocks.filter(**{'court' if arena else 'professional': resource})
     rows = list(rows.order_by("starts_at"))
+    blocks = list(blocks)
+    resources = list(resources.order_by('name'))
+    from .calendar_windows import open_windows
+    windows = open_windows(tenant, unit, resources, days, rows, blocks, tz, arena)
     columns = []
     for value in days:
         columns.append(
             {
                 "day": value,
+                "today": value == today,
+                "outside": mode == 'month' and value.month != day.month,
+                "windows": windows.get(value, []),
                 "rows": [
                     row for row in rows if row.starts_at.astimezone(tz).date() == value
                 ],
@@ -109,14 +138,18 @@ def calendar(request):
             "tenant": tenant,
             "unit": unit,
             "arena": arena,
+            "professional_mode": request.user.role == 'professional',
             "columns": columns,
-            "resources": resources,
+            "resources": all_resources,
             "resource": raw,
             "day": day,
             "mode": mode,
-            "previous": first - timedelta(days=len(days)),
-            "next": first + timedelta(days=len(days)),
-            "can_move": not arena
+            "previous": previous,
+            "next": following,
+            "today": today,
+            "appointment_count": len(rows),
+            "window_count": sum(len(items) for items in windows.values()),
+            "can_move": not arena and request.user.role != 'professional'
             and _role_resource_write(request.user, "agenda", "agendamentos"),
         },
     )
@@ -129,6 +162,7 @@ def move(request, pk):
     if (
         unit is None
         or arena
+        or request.user.role == 'professional'
         or not _role_resource_write(request.user, "agenda", "agendamentos")
     ):
         raise PermissionDenied

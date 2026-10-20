@@ -46,7 +46,8 @@ class CapabilityRouteMiddleware:
     def __call__(self,request):
         user=getattr(request,"user",None)
         if user and user.is_authenticated and user.role=="professional" and not user.is_superuser:
-            if request.path.startswith("/app/") and not request.path.startswith("/app/profissional/"):
+            own_calendar_read = request.method in {'GET', 'HEAD'} and request.path in {'/app/calendario/', '/app/identidade/logo/'}
+            if request.path.startswith("/app/") and not request.path.startswith("/app/profissional/") and not own_calendar_read:
                 raise PermissionDenied("A conta profissional acessa apenas sua própria área.")
         if (
             user and user.is_authenticated and not user.is_superuser

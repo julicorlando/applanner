@@ -62,10 +62,12 @@ class PremiumExperienceTests(TestCase):
             email="pro@premium.test", tenant=self.tenant, role="professional"
         )
         groups = navigation(self.request(user=pro))["workspace_groups"]
-        self.assertEqual(
-            [item["url"] for group in groups for item in group["items"]],
-            [reverse("professional-area")],
-        )
+        urls = [item['url'] for group in groups for item in group['items']]
+        self.assertIn(reverse('professional-area'), urls)
+        self.assertIn(reverse('professional-blocks'), urls)
+        self.assertNotIn(reverse('tenant-payment-gateway'), urls)
+        self.assertIn(reverse('operation-calendar'), urls)
+        self.assertFalse(any(url.startswith('/master/') for url in urls))
 
     def test_directory_search_selects_specific_unit_and_handles_accents(self):
         response = self.client.get(reverse("public-directory"), {"q": "olinda"})
