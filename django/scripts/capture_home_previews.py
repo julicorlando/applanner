@@ -33,6 +33,7 @@ def main():
             DJANGO_FIELD_ENCRYPTION_KEY=base64.urlsafe_b64encode(os.urandom(32)).decode(),
             SECURE_SSL_REDIRECT="false", PUBLIC_BASE_URL="http://127.0.0.1:8765",
             EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            CELERY_BROKER_URL="memory://", CELERY_RESULT_BACKEND="cache+memory://",
         )
         import django
         from django.conf import settings
