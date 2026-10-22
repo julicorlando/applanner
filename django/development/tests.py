@@ -454,6 +454,10 @@ class DevelopmentTests(TestCase):
         self.assertFalse(Delivery.objects.filter(charge=self.charge).exists())
 
     def test_new_pages_render_and_other_pages_preserved(self):
+        from billing.models import Plan, Module
+
+        plan = Plan.objects.create(name="Plano personalizado", slug="preservado-dev", monthly_price="147.33")
+        module = Module.objects.create(name="Módulo personalizado", slug="preservado-dev", addon_monthly_price="23.45")
         self.client.force_login(self.master)
         for route, args in [
             ("development-clients", []),
@@ -465,11 +469,13 @@ class DevelopmentTests(TestCase):
             self.assertEqual(
                 self.client.get(reverse(route, args=args)).status_code, 200, route
             )
-        # No changes or fixtures are written into the scheduling catalogue.
-        from billing.models import Plan, Module
-
-        self.assertEqual(Plan.objects.count(), 0)
-        self.assertEqual(Module.objects.count(), 0)
+        # Existing catalogue entries keep their configured prices and names.
+        plan.refresh_from_db()
+        module.refresh_from_db()
+        self.assertEqual(str(plan.monthly_price), "147.33")
+        self.assertEqual(str(module.addon_monthly_price), "23.45")
+        self.assertEqual(plan.name, "Plano personalizado")
+        self.assertEqual(module.name, "Módulo personalizado")
         self.assertContains(
             self.client.get(reverse("master-home")), "Clientes de desenvolvimento"
         )
