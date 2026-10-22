@@ -1,5 +1,5 @@
 {% load static %}<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>{% block title %}Pagamentos de desenvolvimento · ApPlanner{% endblock %}</title><link rel="stylesheet" href="{% static 'css/development-portal.css' %}"></head>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="same-origin"><title>{% block title %}Pagamentos de desenvolvimento · ApPlanner{% endblock %}</title><link rel="stylesheet" href="{% static 'css/development-portal.css' %}"></head>
 <body><main class="dev-shell"><header class="dev-header"><a href="{% if request.user.is_superuser %}{% url 'development-clients' %}{% else %}{% url 'development-payments' %}{% endif %}" class="dev-brand">ApPlanner <small>Clientes de desenvolvimento</small></a>{% if request.user.is_authenticated %}<form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit">Sair</button></form>{% endif %}</header>
 {% for message in messages %}<p role="status" class="dev-panel">{{ message }}</p>{% endfor %}
 {% block content %}{% endblock %}

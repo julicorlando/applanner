@@ -259,7 +259,9 @@ def activate(request, token):
             )
             return redirect("accounts:login")
     response = render(request, "development/activate.html", {"form": form})
-    response["Referrer-Policy"] = "no-referrer"
+    # Same-origin forms need Origin/Referer for Django's HTTPS CSRF checks.
+    # Keep the invitation URL private when navigating to other origins.
+    response["Referrer-Policy"] = "same-origin"
     return response
 
 
