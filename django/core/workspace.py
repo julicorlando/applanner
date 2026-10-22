@@ -71,6 +71,7 @@ def navigation(request):
         groups.append({'title': 'Centrais e configurações', 'items': [
             link(title, reverse(route), icon) for title, route, icon in [
                 ('Importar base de clientes', 'master-customer-import', 'users'),
+                ('Clientes de desenvolvimento', 'development-clients', 'users'),
                 ('Comercial', 'commercial-dashboard', 'users'),
                 ('Cadastro bancário', 'master-platform-payment', 'card'),
                 ('Cobranças', 'master-charges', 'card'),

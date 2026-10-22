@@ -1,0 +1,9 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("ativar/<str:token>/", views.activate, name="development-activate"),
+    path("pagamentos/", views.portal, name="development-payments"),
+    path("pagamentos/<int:pk>/", views.charge_detail, name="development-charge"),
+    path("pagamentos/<int:pk>/boleto/", views.boleto, name="development-boleto"),
+]
