@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import re
 import uuid
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
@@ -178,6 +179,101 @@ class DevelopmentTests(TestCase):
         self.assertIsNotNone(invitation.used_at)
         self.assertEqual(self.client.get(url).status_code, 400)
         self.assertFalse(self.customer.deliveries.exclude(status="cancelled").exists())
+
+    @override_settings(
+        CSRF_COOKIE_SECURE=True,
+        SESSION_COOKIE_SECURE=True,
+        ALLOWED_HOSTS=["applanner.example", "testserver"],
+    )
+    def test_activation_https_csrf_policy_and_real_protection(self):
+        invitation = invite(self.customer)
+        text = decrypt_json(self.customer.deliveries.first().payload_encrypted)["text"]
+        path = text.split("https://applanner.example", 1)[1].split("\n", 1)[0]
+        browser = Browser(enforce_csrf_checks=True)
+        page = browser.get(path, secure=True, HTTP_HOST="applanner.example")
+        self.assertEqual(page["Referrer-Policy"], "same-origin")
+        self.assertContains(page, '<meta name="referrer" content="same-origin">')
+        self.assertIn("no-store", page["Cache-Control"])
+        self.assertTrue(page.cookies["csrftoken"]["secure"])
+        csrf = re.search(
+            r'name="csrfmiddlewaretoken" value="([^"]+)"', page.content.decode()
+        ).group(1)
+        data = {
+            "password": "Nova-senha-forte!2026",
+            "confirmation": "Nova-senha-forte!2026",
+            "csrfmiddlewaretoken": csrf,
+        }
+        for headers, posted in [
+            ({"HTTP_ORIGIN": "null"}, data),
+            ({"HTTP_ORIGIN": "https://external.example"}, data),
+            ({"HTTP_REFERER": "https://external.example/"}, data),
+            (
+                {"HTTP_ORIGIN": "https://applanner.example"},
+                {"password": data["password"], "confirmation": data["confirmation"]},
+            ),
+        ]:
+            with self.subTest(
+                headers=headers, missing_token="csrfmiddlewaretoken" not in posted
+            ):
+                denied = browser.post(
+                    path, posted, secure=True, HTTP_HOST="applanner.example", **headers
+                )
+                self.assertEqual(denied.status_code, 403)
+        invitation.refresh_from_db()
+        self.owner.refresh_from_db()
+        self.assertIsNone(invitation.used_at)
+        self.assertFalse(self.owner.has_usable_password())
+        # Browsers without Origin use Django's strict HTTPS Referer fallback.
+        weak = dict(data, password="123", confirmation="123")
+        fallback = browser.post(
+            path,
+            weak,
+            secure=True,
+            HTTP_HOST="applanner.example",
+            HTTP_REFERER="https://applanner.example" + path,
+        )
+        self.assertEqual(fallback.status_code, 200)
+        response = browser.post(
+            path,
+            data,
+            secure=True,
+            HTTP_HOST="applanner.example",
+            HTTP_ORIGIN="https://applanner.example",
+        )
+        self.assertEqual(response.status_code, 302)
+        self.owner.refresh_from_db()
+        invitation.refresh_from_db()
+        self.assertTrue(self.owner.check_password(data["password"]))
+        self.assertIsNotNone(invitation.used_at)
+
+    @override_settings(ALLOWED_HOSTS=["applanner.example", "testserver"])
+    def test_customer_https_forms_use_same_origin_policy(self):
+        browser = Browser(enforce_csrf_checks=True)
+        browser.force_login(self.owner)
+        page = browser.get(
+            reverse("development-charge", args=[self.charge.pk]),
+            secure=True,
+            HTTP_HOST="applanner.example",
+        )
+        self.assertContains(page, '<meta name="referrer" content="same-origin">')
+        target = reverse("development-payment-refresh", args=[self.charge.pk])
+        response = browser.post(
+            target,
+            {"csrfmiddlewaretoken": browser.cookies["csrftoken"].value},
+            secure=True,
+            HTTP_HOST="applanner.example",
+            HTTP_ORIGIN="https://applanner.example",
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            browser.post(
+                target,
+                secure=True,
+                HTTP_HOST="applanner.example",
+                HTTP_ORIGIN="https://applanner.example",
+            ).status_code,
+            403,
+        )
 
     def test_activation_expiration_and_reissue_invalidate_previous_token(self):
         old = invite(self.customer)
