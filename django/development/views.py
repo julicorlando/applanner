@@ -1,20 +1,23 @@
 import base64
 import hashlib
+import json
+import uuid
 from cryptography.fernet import InvalidToken
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 from accounts.login_limits import attempt_budget, limited_response
 from core.crypto import decrypt_text
 from core.customer_import_views import require_master
 from .forms import ClientForm, ChargeForm, PasswordForm, SettlementForm
-from .models import Client, Charge, Delivery, Invitation
+from .models import Client, Charge, Delivery, Invitation, OnlinePayment
 from .services import audit, invite, save_charge, save_client, settle
 
 
@@ -330,7 +333,172 @@ def charge_detail(request, pk):
             }
         except (ValueError, TypeError, InvalidToken):
             account = None
-    return render(request, "development/charge.html", {"charge": row, "bank": account})
+    from .payments import BUSY, configured_gateway
+
+    payment = row.online_payments.order_by("-pk").first()
+    gateway = configured_gateway()
+    busy = bool(payment and payment.status in BUSY | {"paid", "refunded"})
+    return render(
+        request,
+        "development/charge.html",
+        {
+            "charge": row,
+            "bank": account,
+            "payment": payment,
+            "busy": busy,
+            "online_available": bool(
+                gateway and row.online_payments_enabled and row.amount >= 0.50
+            ),
+            "card_available": bool(gateway and gateway.public_key),
+        },
+    )
+
+
+def payable_charge(request, pk):
+    return get_object_or_404(Charge, pk=pk, client=customer_for(request))
+
+
+@login_required
+@never_cache
+@require_POST
+def pix(request, pk):
+    from .payments import start_payment
+
+    row = payable_charge(request, pk)
+    _, wait = attempt_budget(request, "development-payment", request.user.pk)
+    if wait:
+        return limited_response(wait)
+    try:
+        start_payment(row.pk, "pix", uuid.uuid4())
+    except (ValidationError, ValueError) as exc:
+        messages.error(
+            request,
+            " ".join(exc.messages)
+            if isinstance(exc, ValidationError)
+            else "Tentativa inválida.",
+        )
+    return redirect("development-charge", pk=pk)
+
+
+@login_required
+@never_cache
+@require_http_methods(["GET", "POST"])
+def card(request, pk):
+    from django.urls import reverse
+    from scheduling.card_payments import CardForm
+    from .payments import configured_gateway, start_payment
+
+    row = payable_charge(request, pk)
+    gateway = configured_gateway()
+    if request.method == "GET":
+        if (
+            row.status != "open"
+            or not row.online_payments_enabled
+            or not gateway
+            or not gateway.public_key
+        ):
+            raise PermissionDenied
+        return render(
+            request,
+            "development/card.html",
+            {
+                "charge": row,
+                "card_config": {
+                    "publicKey": gateway.public_key,
+                    "amount": str(row.amount),
+                    "email": request.user.email,
+                    "attemptId": uuid.uuid4().hex,
+                    "submitUrl": reverse("development-card", args=[pk]),
+                },
+            },
+        )
+    _, wait = attempt_budget(request, "development-payment", request.user.pk)
+    if wait:
+        return limited_response(wait)
+    if len(request.body) > 8000:
+        return JsonResponse({"detail": "Dados inválidos."}, status=400)
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError
+        form = CardForm({key: data.get(key) for key in CardForm.base_fields})
+        if not form.is_valid():
+            raise ValueError
+        payment = start_payment(
+            row.pk, "card", form.cleaned_data["attempt_id"], form.cleaned_data
+        )
+    except (ValidationError, ValueError, TypeError):
+        return JsonResponse(
+            {
+                "detail": "Não foi possível iniciar. Confira os dados e o acompanhamento da cobrança."
+            },
+            status=400,
+        )
+    return JsonResponse(
+        {
+            "status": payment.status,
+            "detail": payment.get_status_display()
+            + ". Consulte o acompanhamento antes de tentar novamente.",
+        }
+    )
+
+
+@login_required
+@never_cache
+@require_POST
+def refresh_payment(request, pk):
+    from .payments import reconcile
+
+    row = authorized_charge(request, pk)
+    _, wait = attempt_budget(request, "development-payment-refresh", request.user.pk)
+    if wait:
+        return limited_response(wait)
+    payment = row.online_payments.order_by("-pk").first()
+    if payment:
+        try:
+            reconcile(payment.pk)
+            messages.info(request, "Situação consultada no provedor de pagamento.")
+        except Exception:
+            messages.error(
+                request,
+                "Consulta indisponível. Não repita o pagamento enquanto estiver em conferência.",
+            )
+    return redirect("development-charge", pk=pk)
+
+
+@csrf_exempt
+@require_POST
+def payment_webhook(request, public_id):
+    from billing.mercadopago import MercadoPagoProvider
+    from billing.payment_services import platform_webhook_secret
+    from .payments import reconcile
+
+    row = get_object_or_404(
+        OnlinePayment.objects.select_related("gateway"), public_id=public_id
+    )
+    if len(request.body) > 32000:
+        return JsonResponse({"ok": False}, status=400)
+    # MP signs data.id in the URL. A payload status is never trusted.
+    resource_id = request.GET.get("data.id", "")
+    if not resource_id.isdecimal() or len(resource_id) > 100:
+        return JsonResponse({"ok": False}, status=400)
+    try:
+        secret = platform_webhook_secret(row.gateway)
+        valid = MercadoPagoProvider.valid_webhook_signature(
+            request.headers.get("X-Signature"),
+            request.headers.get("X-Request-Id"),
+            resource_id,
+            secret,
+        )
+    except Exception:
+        valid = False
+    if not valid:
+        return JsonResponse({"ok": False}, status=403)
+    try:
+        reconcile(row.pk, resource_id)
+    except Exception:
+        return JsonResponse({"ok": False}, status=503)
+    return JsonResponse({"ok": True})
 
 
 @login_required

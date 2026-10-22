@@ -25,7 +25,7 @@ def public_url(route, *args):
 
 def audit(request, action, row):
     append_audit(
-        user=request.user,
+        user=getattr(request, "user", None),
         request=request,
         action="development." + action,
         entity_type=row._meta.label,
@@ -124,6 +124,12 @@ def save_charge(form, client, request):
         charge.creation_key = form.cleaned_data["creation_key"]
     if charge.pk:
         old = Charge.objects.select_for_update().get(pk=charge.pk, client=client)
+        if old.online_payments.filter(
+            status__in=["creating", "pending", "unknown", "attention"]
+        ).exists():
+            raise ValidationError(
+                "Confira o pagamento online pendente antes de alterar esta cobrança."
+            )
         if old.status != "open":
             raise ValidationError("Cobranças pagas/canceladas não podem ser alteradas.")
         charge.revision = old.revision + 1
@@ -147,6 +153,15 @@ def settle(charge_id, status, note, request):
     row = Charge.objects.select_for_update().get(pk=charge_id)
     if row.status != "open" or status not in {"paid", "cancelled"}:
         raise ValidationError("Esta cobrança não está em aberto.")
+    if (
+        status == "cancelled"
+        and row.online_payments.filter(
+            status__in=["creating", "pending", "unknown", "attention"]
+        ).exists()
+    ):
+        raise ValidationError(
+            "Existe um pagamento online em conferência. Consulte o provedor antes de cancelar a cobrança."
+        )
     row.status = status
     row.paid_at = timezone.now() if status == "paid" else None
     row.settlement_note = note

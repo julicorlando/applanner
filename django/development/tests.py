@@ -456,8 +456,14 @@ class DevelopmentTests(TestCase):
     def test_new_pages_render_and_other_pages_preserved(self):
         from billing.models import Plan, Module
 
-        plan = Plan.objects.create(name="Plano personalizado", slug="preservado-dev", monthly_price="147.33")
-        module = Module.objects.create(name="Módulo personalizado", slug="preservado-dev", addon_monthly_price="23.45")
+        plan = Plan.objects.create(
+            name="Plano personalizado", slug="preservado-dev", monthly_price="147.33"
+        )
+        module = Module.objects.create(
+            name="Módulo personalizado",
+            slug="preservado-dev",
+            addon_monthly_price="23.45",
+        )
         self.client.force_login(self.master)
         for route, args in [
             ("development-clients", []),
@@ -483,22 +489,40 @@ class DevelopmentTests(TestCase):
     def test_cancelled_boleto_is_not_downloadable(self):
         settle(self.charge.pk, "cancelled", "Projeto cancelado", self.request())
         self.client.force_login(self.owner)
-        self.assertEqual(self.client.get(reverse("development-boleto", args=[self.charge.pk])).status_code, 404)
-        self.assertNotContains(self.client.get(reverse("development-charge", args=[self.charge.pk])), "financeiro@example.com")
+        self.assertEqual(
+            self.client.get(
+                reverse("development-boleto", args=[self.charge.pk])
+            ).status_code,
+            404,
+        )
+        self.assertNotContains(
+            self.client.get(reverse("development-charge", args=[self.charge.pk])),
+            "financeiro@example.com",
+        )
 
     def test_inactive_bank_is_not_exposed_in_portal(self):
         self.bank.status = "inactive"
         self.bank.save(update_fields=["status"])
         self.client.force_login(self.owner)
-        self.assertNotContains(self.client.get(reverse("development-charge", args=[self.charge.pk])), "financeiro@example.com")
+        self.assertNotContains(
+            self.client.get(reverse("development-charge", args=[self.charge.pk])),
+            "financeiro@example.com",
+        )
 
     def test_all_mutations_require_post_and_support_impersonation_is_denied(self):
         self.client.force_login(self.master)
-        self.assertEqual(self.client.get(reverse("development-client-invite", args=[self.customer.pk])).status_code, 405)
+        self.assertEqual(
+            self.client.get(
+                reverse("development-client-invite", args=[self.customer.pk])
+            ).status_code,
+            405,
+        )
         from .views import client_detail
+
         request = self.request()
         request.method = "GET"
         request.support_actor = self.master
         from django.core.exceptions import PermissionDenied
+
         with self.assertRaises(PermissionDenied):
             client_detail(request, self.customer.pk)

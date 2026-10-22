@@ -1,6 +1,7 @@
 import hashlib
 import re
 import uuid
+from decimal import Decimal
 from string import Formatter
 from django import forms
 from django.contrib.auth import get_user_model
@@ -137,7 +138,15 @@ class ChargeForm(forms.ModelForm):
 
     class Meta:
         model = Charge
-        fields = ["description", "amount", "due_date", "bank", "boleto_url", "barcode"]
+        fields = [
+            "description",
+            "amount",
+            "due_date",
+            "bank",
+            "boleto_url",
+            "barcode",
+            "online_payments_enabled",
+        ]
         widgets = {
             "due_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
         }
@@ -150,6 +159,10 @@ class ChargeForm(forms.ModelForm):
             status="active", deleted_at__isnull=True
         )
         self.fields["bank"].label = "Conta bancária já cadastrada"
+        self.fields["online_payments_enabled"].help_text = (
+            "Pix com confirmação automática e cartão usam o Mercado Pago ativo e validado do Master. "
+            "O recebedor é a conta do provedor; a conta bancária selecionada acima continua sendo usada para Pix direto/boleto."
+        )
         self.fields["bank"].label_from_instance = lambda bank: (
             f"{bank.bank_name} · {bank.holder_name}"
         )
@@ -187,12 +200,27 @@ class ChargeForm(forms.ModelForm):
     def clean(self):
         data = super().clean()
         if not (
-            data.get("bank")
+            data.get("online_payments_enabled")
+            or data.get("bank")
             or data.get("boleto_url")
             or data.get("boleto_pdf")
             or self.instance.boleto_encrypted
         ):
             raise ValidationError("Selecione uma conta bancária ou forneça um boleto.")
+        if data.get("online_payments_enabled") and not (
+            data.get("bank")
+            or data.get("boleto_url")
+            or data.get("boleto_pdf")
+            or self.instance.boleto_encrypted
+        ):
+            from .payments import configured_gateway
+
+            if not configured_gateway() or (
+                data.get("amount") and data["amount"] < Decimal("0.50")
+            ):
+                raise ValidationError(
+                    "Sem boleto/conta bancária, configure o provedor do Master e um valor online de pelo menos R$ 0,50."
+                )
         return data
 
 

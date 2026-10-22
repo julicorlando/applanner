@@ -5,6 +5,7 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
 
 TASKS=[
+    ("Conciliar Pix e cartões de desenvolvimento", "development.tasks.reconcile_development_payments", 2, "minutes"),
     ("Cobranças de clientes de desenvolvimento", "development.tasks.process_development_billing", 1, "minutes"),
     ("Alertas Push de eventos da plataforma","communications.platform_events.reconcile_platform_events",1,"minutes"),
     ("Conciliar cartões de reservas","billing.tenant_card_reconciliation.reconcile_pending_tenant_cards",5,"minutes"),

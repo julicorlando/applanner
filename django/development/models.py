@@ -70,6 +70,9 @@ class Charge(TimeStampedModel):
     paid_at = models.DateTimeField(null=True, blank=True)
     settlement_note = models.CharField(max_length=500, blank=True)
     revision = models.PositiveIntegerField(default=1)
+    online_payments_enabled = models.BooleanField(
+        "Permitir Pix e cartão pelo provedor do Master", default=True
+    )
 
     @property
     def overdue(self):
@@ -84,6 +87,54 @@ class Invitation(models.Model):
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class OnlinePayment(TimeStampedModel):
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    charge = models.ForeignKey(
+        Charge, on_delete=models.PROTECT, related_name="online_payments"
+    )
+    gateway = models.ForeignKey("billing.PaymentGateway", on_delete=models.PROTECT)
+    method = models.CharField(
+        max_length=8, choices=[("pix", "Pix"), ("card", "Cartão")]
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    charge_revision = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=16,
+        default="creating",
+        db_index=True,
+        choices=[
+            ("creating", "Iniciando"),
+            ("pending", "Aguardando pagamento"),
+            ("unknown", "Em conferência"),
+            ("paid", "Pago"),
+            ("failed", "Recusado"),
+            ("cancelled", "Cancelado/expirado"),
+            ("refunded", "Estornado"),
+            ("attention", "Revisão pelo Master"),
+        ],
+    )
+    provider_id = models.CharField(max_length=100, blank=True)
+    collector_id = models.CharField(max_length=100, blank=True)
+    pix_code = models.TextField(blank=True)
+    pix_image = models.TextField(blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    next_check_at = models.DateTimeField(default=timezone.now)
+    error_code = models.CharField(max_length=60, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["gateway", "provider_id"],
+                condition=~models.Q(provider_id=""),
+                name="dev_unique_provider_payment",
+            )
+        ]
+
+    @property
+    def reference(self):
+        return "dev-" + self.public_id.hex
 
 
 class Delivery(TimeStampedModel):

@@ -3,6 +3,7 @@ from accounts.api_access import api_resource
 from django.urls import include, path
 
 from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_webhook
+from development.views import payment_webhook as development_payment_webhook
 from core.views import healthz, home, professional_public, tenant_public
 from operations.status_page import public_status
 from core.branding import public_platform_favicon, public_platform_logo, public_tenant_image, public_professional_image, public_blog_image
@@ -32,6 +33,7 @@ from communications import mobile_portal
 
 urlpatterns = [
     path("desenvolvimento/", include("development.urls")),
+    path("webhooks/desenvolvimento/pagamentos/<uuid:public_id>/", development_payment_webhook, name="development-payment-webhook"),
     path("master/clientes-desenvolvimento/", include("development.master_urls")),
     path("p/<slug:slug>/notificacoes/",mobile_portal.customer_preferences,name="customer-notification-preferences"),
     path("p/<slug:slug>/notificacoes/push/",mobile_portal.subscription,name="customer-push-subscription"),

@@ -14,6 +14,13 @@ from .services import queue_reminder
 
 
 @shared_task
+def reconcile_development_payments():
+    from .payments import reconcile_online_payments
+
+    return reconcile_online_payments()
+
+
+@shared_task
 def process_development_billing():
     now = timezone.now()
     local = now.astimezone(ZoneInfo("America/Recife"))
