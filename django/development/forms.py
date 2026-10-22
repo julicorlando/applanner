@@ -62,6 +62,7 @@ class ClientForm(forms.ModelForm):
 
     class Meta:
         model = Client
+        labels = {"kind": "Tipo de cliente"}
         fields = [
             "kind",
             "document",
