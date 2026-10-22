@@ -27,7 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.admin","django.contrib.auth","django.contrib.contenttypes",
     "django.contrib.sessions","django.contrib.messages","django.contrib.staticfiles",
     "rest_framework","django_celery_beat","core","tenants","accounts","scheduling.apps.SchedulingConfig","billing.apps.BillingConfig",
-    "finance","communications","barber","arena","engagement","auto","commercial","healthcare","legal","operations","growth","contenthub",
+    "finance","communications","barber","arena","engagement","auto","commercial","healthcare","legal","operations","growth","contenthub","development",
 ]
 MIDDLEWARE = [
     "core.work_notes.PrivateMediaGuard",
@@ -42,6 +42,7 @@ MIDDLEWARE = [
     "operations.maintenance.MaintenanceModeMiddleware",
     "operations.middleware.SupportImpersonationMiddleware",
     "accounts.middleware.SessionVersionMiddleware",
+    "development.middleware.ClientAccessMiddleware",
     "accounts.master_access.MasterAdminGateMiddleware",
     "billing.access_middleware.SubscriptionAccessMiddleware",
     "accounts.middleware.MustChangePasswordMiddleware",
