@@ -180,7 +180,11 @@ class DevelopmentTests(TestCase):
         self.assertEqual(self.client.get(url).status_code, 400)
         self.assertFalse(self.customer.deliveries.exclude(status="cancelled").exists())
 
-    @override_settings(CSRF_COOKIE_SECURE=True, SESSION_COOKIE_SECURE=True)
+    @override_settings(
+        CSRF_COOKIE_SECURE=True,
+        SESSION_COOKIE_SECURE=True,
+        ALLOWED_HOSTS=["applanner.example", "testserver"],
+    )
     def test_activation_https_csrf_policy_and_real_protection(self):
         invitation = invite(self.customer)
         text = decrypt_json(self.customer.deliveries.first().payload_encrypted)["text"]
@@ -242,6 +246,7 @@ class DevelopmentTests(TestCase):
         self.assertTrue(self.owner.check_password(data["password"]))
         self.assertIsNotNone(invitation.used_at)
 
+    @override_settings(ALLOWED_HOSTS=["applanner.example", "testserver"])
     def test_customer_https_forms_use_same_origin_policy(self):
         browser = Browser(enforce_csrf_checks=True)
         browser.force_login(self.owner)
