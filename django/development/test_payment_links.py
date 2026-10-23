@@ -196,6 +196,10 @@ class PaymentLinkTests(TestCase):
             payload = decrypt_json(row.payload_encrypted)
             self.assertIn("/desenvolvimento/cobranca/", payload["text"])
             self.assertNotIn("52998224725", payload["text"])
+            # Field defaults retain their original timezone.now callable;
+            # pin the queue eligibility to this test's simulated clock too.
+            row.next_attempt_at = now
+            row.save(update_fields=["next_attempt_at"])
             deliver(row.pk)
             deliver(row.pk)
         self.assertEqual(gateway.call_count, 1)
