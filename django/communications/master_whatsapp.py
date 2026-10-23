@@ -6,6 +6,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 from PIL import Image, UnidentifiedImageError
@@ -130,6 +131,22 @@ def _gateway(method, path, payload=None):
     if not response.ok:
         raise ValueError(redact_sensitive_text(data.get("error") or "Não foi possível concluir a ação no WhatsApp."))
     return data
+
+
+@require_GET
+def public_master_whatsapp_chat(request):
+    """Redirect public visitors to the currently paired Master WhatsApp number."""
+    try:
+        state=_gateway("GET","/status")
+    except ValueError as exc:
+        return HttpResponse(str(exc),status=503,content_type="text/plain; charset=utf-8")
+    phone=re.sub(r"[^0-9]","",str(state.get("phone") or ""))
+    if not re.fullmatch(r"[0-9]{10,20}",phone):
+        return HttpResponse("O WhatsApp do atendimento não está conectado no momento.",status=503,content_type="text/plain; charset=utf-8")
+    text="Olá! Vim pelo site do ApPlanner e gostaria de falar com o assistente virtual."
+    response=redirect("https://wa.me/"+phone+"?text="+quote(text))
+    response["Cache-Control"]="no-store"
+    return response
 
 
 @login_required
@@ -282,13 +299,38 @@ def master_whatsapp_conversation(request,pk):
                 transaction.on_commit(lambda pk=delivery.pk:dispatch_delivery(pk))
             messages.success(request,'Mensagens do fluxo recolocadas na fila.')
         elif action=="handoff":
-            from .models import MasterFlowDelivery
-            MasterFlowDelivery.objects.filter(conversation=row,status='queued').update(status='cancelled')
-            row.flow_wake_at=None
-            row.human_handoff=request.POST.get("enabled")=="1"
-            row.save(update_fields=["human_handoff","flow_wake_at","updated_at"])
-            row.messages.filter(direction="in",flow_processed_at__isnull=True).update(flow_processed_at=timezone.now())
-            messages.success(request,"Atendimento humano ativado." if row.human_handoff else "Fluxo automático retomado.")
+            enabled=request.POST.get("enabled")=="1"
+            if enabled:
+                from .models import MasterFlowDelivery
+                MasterFlowDelivery.objects.filter(conversation=row,status="queued").update(status="cancelled")
+                row.flow_wake_at=None
+                row.human_handoff=True
+                row.save(update_fields=["human_handoff","flow_wake_at","updated_at"])
+                row.messages.filter(direction="in",flow_processed_at__isnull=True).update(flow_processed_at=timezone.now())
+                messages.success(request,"Atendimento humano ativado.")
+            else:
+                body="Como você avalia o atendimento que recebeu? Responda com uma nota de 1 a 5."
+                try:
+                    sent=_gateway("POST","/send",{"to":row.wa_id,"text":body})
+                    record_outbound_message(conversation=row,sent=sent,body=body,sent_by=request.user)
+                    from .models import MasterFlowDelivery,MasterWhatsAppFlow
+                    from core.crypto import encrypt_json
+                    MasterFlowDelivery.objects.filter(conversation=row,status="queued").update(status="cancelled")
+                    flow=MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).first()
+                    row.flow_state="__finished__"
+                    row.flow_wait_kind=""
+                    row.flow_context_encrypted=encrypt_json({"variables":{"_awaiting_service_rating":True}})
+                    row.flow_revision=flow.updated_at.isoformat() if flow else ""
+                    row.flow_wake_at=None
+                    row.flow_last_error=""
+                    row.human_handoff=False
+                    row.last_message_at=timezone.now()
+                    row.save(update_fields=["human_handoff","flow_state","flow_wait_kind","flow_context_encrypted",
+                        "flow_revision","flow_wake_at","flow_last_error","last_message_at","updated_at"])
+                    row.messages.filter(direction="in",flow_processed_at__isnull=True).update(flow_processed_at=timezone.now())
+                    messages.success(request,"Fluxo retomado. A avaliação foi enviada ao contato.")
+                except (ValueError,KeyError) as exc:
+                    messages.error(request,"Não foi possível enviar a avaliação; o atendimento humano continua ativo. "+str(exc))
         elif action=="reply":
             body=(request.POST.get("body") or "").strip()
             uploaded=request.FILES.get("attachment")
