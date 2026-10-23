@@ -29,7 +29,8 @@ def advance_graph(conversation_id,message_id=None,resume=False):
         conversation.human_handoff=True;conversation.save(update_fields=['flow_wake_at','flow_last_error','human_handoff']);return
     state=conversation.flow_state;waiting=conversation.flow_wait_kind
     context=decrypt_json(conversation.flow_context_encrypted) if conversation.flow_context_encrypted else {}
-    if state=='__finished__' or conversation.flow_revision!=revision:
+    awaiting_rating=bool(context.get('variables',{}).get('_awaiting_service_rating')) and conversation.flow_revision==revision
+    if (state=='__finished__' and not awaiting_rating) or conversation.flow_revision!=revision:
         state=flow.graph['start'];context={};waiting=''
     variables=context.setdefault('variables',{})
     from .master_sales import plans_text
@@ -38,6 +39,23 @@ def advance_graph(conversation_id,message_id=None,resume=False):
     event_key=f'in-{incoming.pk}' if incoming else f'wake-{conversation.pk}-{int(conversation.flow_wake_at.timestamp())}'
     body=incoming.body if incoming else ''
     from .master_runtime import normalized
+    if awaiting_rating and incoming:
+        rating=body.strip()
+        if rating in {'1','2','3','4','5'}:
+            variables['_service_rating']=rating
+            variables.pop('_awaiting_service_rating',None)
+            sync_sales_lead(conversation,variables)
+            incoming.flow_processed_at=timezone.now();incoming.save(update_fields=['flow_processed_at'])
+            conversation.flow_state='__finished__';conversation.flow_wait_kind=''
+            conversation.flow_context_encrypted=encrypt_json(context);conversation.flow_revision=revision
+            conversation.flow_wake_at=None;conversation.human_handoff=False;conversation.flow_last_error=''
+            conversation.save(update_fields=['flow_state','flow_wait_kind','flow_context_encrypted','flow_revision','flow_wake_at','human_handoff','flow_last_error'])
+            delivery,_=MasterFlowDelivery.objects.get_or_create(event_key=f'in-{incoming.pk}-rating-ack',defaults={
+                'conversation':conversation,'body':'Obrigado por avaliar nosso atendimento. Sua resposta foi registrada.'})
+            transaction.on_commit(lambda pk=delivery.pk:dispatch_delivery(pk))
+            return
+        variables.pop('_awaiting_service_rating',None)
+        state=flow.graph['start'];waiting=''
     if normalized(body).strip(' .!?') in {'humano','atendente','atendimento humano','falar com atendente','quero falar com atendente','atendimento','quero falar com um atendente','falar com um atendente','quero atendimento humano'}:
         result={'state':state,'context':context,'waiting':'','messages':[flow.handoff],'handoff':True,'wake_seconds':None,'error':''}
     else:result=run_graph(flow.graph,flow,state,context,waiting,body,resume=resume,event_key=event_key)
@@ -119,7 +137,7 @@ def sync_sales_lead(conversation,variables):
         try:validate_email(variables['email'])
         except ValidationError:pass
         else:lead.email=variables['email'][:254]
-    fields={'Empresa':'empresa','Unidades':'unidades','Profissionais':'profissionais','Plano de interesse':'plano_interesse','Necessidade':'necessidade','Dúvida':'ultima_duvida','Pergunta inicial':'pergunta','Intenção do atendimento':'_service_agent_intent','Motivo do encaminhamento':'_service_agent_reason'}
+    fields={'Empresa':'empresa','Unidades':'unidades','Profissionais':'profissionais','Plano de interesse':'plano_interesse','Necessidade':'necessidade','Dúvida':'ultima_duvida','Pergunta inicial':'pergunta','Intenção do atendimento':'_service_agent_intent','Motivo do encaminhamento':'_service_agent_reason','Avaliação do atendimento':'_service_rating'}
     note='[Chatbot ApPlanner]\n'+'\n'.join(f'{label}: {variables[key][:1000]}' for label,key in fields.items() if variables.get(key))
     end='[/Chatbot ApPlanner]'
     clean=re.sub(r'\[Chatbot ApPlanner\].*?\[/Chatbot ApPlanner\]', '',lead.notes,flags=re.S).strip()
