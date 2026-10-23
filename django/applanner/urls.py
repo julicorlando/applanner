@@ -10,6 +10,7 @@ from core.branding import public_platform_favicon, public_platform_logo, public_
 from tenants.onboarding import onboarding
 from communications.views import marketing_click, marketing_open, marketing_unsubscribe, whatsapp_webhook
 from communications.tenant_whatsapp import tenant_whatsapp_receive
+from communications.master_whatsapp import public_master_whatsapp_chat
 from contenthub.views import blog_post, landing, public_directory, public_directory_page
 from engagement.referrals import referral_redirect
 from scheduling.public_views import appointment_page
@@ -60,6 +61,7 @@ urlpatterns = [
     path("imagens/empresa/<int:pk>/<str:kind>/",public_tenant_image,name="public-tenant-image"),
     path("imagens/profissional/<int:pk>/",public_professional_image,name="public-professional-image"),
     path("imagens/noticia/<int:pk>/",public_blog_image,name="public-blog-image"),
+    path("atendimento/chat/", public_master_whatsapp_chat, name="public-master-whatsapp-chat"),
     path("", home, name="home"),
     path("admin", admin.site.index),
     path("admin/", admin.site.urls),
