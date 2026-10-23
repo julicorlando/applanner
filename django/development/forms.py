@@ -12,6 +12,30 @@ from finance.models import PlatformBankAccount
 from .models import Client, Charge
 
 
+class RevenueFilterForm(forms.Form):
+    month = forms.DateField(
+        label="Mês inicial",
+        input_formats=["%Y-%m"],
+        widget=forms.DateInput(format="%Y-%m", attrs={"type": "month"}),
+    )
+    client = forms.ModelChoiceField(
+        label="Cliente",
+        queryset=Client.objects.none(),
+        required=False,
+        empty_label="Todos os clientes",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["client"].queryset = Client.objects.order_by("name", "pk")
+
+    def clean_month(self):
+        value = self.cleaned_data["month"]
+        if not 2000 <= value.year <= 2100:
+            raise ValidationError("Selecione um mês entre 2000 e 2100.")
+        return value.replace(day=1)
+
+
 def validate_document(value, kind):
     value = re.sub(r"\D", "", value)
     size = 11 if kind == "cpf" else 14
@@ -222,6 +246,24 @@ class ChargeForm(forms.ModelForm):
                     "Sem boleto/conta bancária, configure o provedor do Master e um valor online de pelo menos R$ 0,50."
                 )
         return data
+
+
+class PaymentDocumentForm(forms.Form):
+    document = forms.CharField(
+        label="CPF ou CNPJ cadastrado",
+        max_length=18,
+        widget=forms.TextInput(
+            attrs={"inputmode": "numeric", "autocomplete": "off", "autofocus": True}
+        ),
+    )
+
+    def clean_document(self):
+        value = re.sub(r"\D", "", self.cleaned_data["document"])
+        if len(value) not in {11, 14}:
+            raise ValidationError(
+                "Informe o CPF ou CNPJ cadastrado para esta cobrança."
+            )
+        return value
 
 
 class SettlementForm(forms.Form):

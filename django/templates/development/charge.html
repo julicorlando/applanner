@@ -1,6 +1,6 @@
 {% extends 'development/customer_base.html' %}
 {% block content %}
-{% if request.user.is_superuser %}<a href="{% url 'development-client' charge.client_id %}">← Cadastro do cliente</a>{% else %}<a href="{% url 'development-payments' %}">← Meus pagamentos</a>{% endif %}<h1>{{ charge.description }}</h1>
+{% if request.development_public_payment %}<p>Acesso exclusivo a esta cobrança.</p>{% elif request.user.is_superuser %}<a href="{% url 'development-client' charge.client_id %}">← Cadastro do cliente</a>{% else %}<a href="{% url 'development-payments' %}">← Meus pagamentos</a>{% endif %}<h1>{{ charge.description }}</h1>
 <article class="dev-panel"><p class="dev-amount">R$ {{ charge.amount }}</p><p>Vencimento: {{ charge.due_date|date:'d/m/Y' }}</p><p>Situação: {% if charge.overdue %}Em atraso{% else %}{{ charge.get_status_display }}{% endif %}</p>
 {% if charge.status == 'open' %}
 {% if online_available and not request.user.is_superuser and not busy %}<h2>Pagar online</h2><p>Pix ou cartão pelo provedor cadastrado no Master, com confirmação automática. O recebedor é a conta vinculada ao provedor; os dados bancários abaixo não alteram essa conta.</p><form method="post" action="{% url 'development-pix' charge.pk %}">{% csrf_token %}<button type="submit">Gerar Pix com confirmação automática</button></form>{% if card_available %}<p><a class="dev-button" href="{% url 'development-card' charge.pk %}">Pagar com cartão</a></p>{% endif %}{% endif %}

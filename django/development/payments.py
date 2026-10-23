@@ -32,12 +32,18 @@ def payment_note(row):
 
 
 @transaction.atomic
-def _allocate(charge_id, method, attempt_id):
+def _allocate(charge_id, method, attempt_id, access_link_id=None):
     customer_id = Charge.objects.values_list("client_id", flat=True).get(pk=charge_id)
     customer = (
         Client.objects.select_for_update().select_related("user").get(pk=customer_id)
     )
     charge = Charge.objects.select_for_update().get(pk=charge_id)
+    from .payment_links import link_allows_payment
+
+    if not link_allows_payment(access_link_id, charge_id):
+        raise ValidationError(
+            "Reabra o link da cobrança e confira o documento antes de pagar."
+        )
     if (
         method not in {"pix", "card"}
         or charge.status != "open"
@@ -79,8 +85,8 @@ def _allocate(charge_id, method, attempt_id):
     ), True
 
 
-def start_payment(charge_id, method, attempt_id, card=None):
-    row, created = _allocate(charge_id, method, attempt_id)
+def start_payment(charge_id, method, attempt_id, card=None, *, access_link_id=None):
+    row, created = _allocate(charge_id, method, attempt_id, access_link_id)
     if not created:
         return row
     provider_called = False
@@ -100,6 +106,8 @@ def start_payment(charge_id, method, attempt_id, card=None):
                 .get(pk=charge_id)
             )
             row = OnlinePayment.objects.select_for_update().get(pk=row.pk)
+            from .payment_links import link_allows_payment
+
             if (
                 charge.status != "open"
                 or not charge.online_payments_enabled
@@ -107,6 +115,7 @@ def start_payment(charge_id, method, attempt_id, card=None):
                 or not charge.client.user.is_active
                 or charge.client.user.deleted_at
                 or not row.gateway.active
+                or not link_allows_payment(access_link_id, charge_id)
             ):
                 row.status = "cancelled"
                 row.save(update_fields=["status", "updated_at"])
