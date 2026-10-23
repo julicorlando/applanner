@@ -75,7 +75,17 @@ def granted_charge(request, pk):
     if not isinstance(data, dict) or data.get("charge") != pk:
         return None
     link = valid_links().filter(pk=data.get("link"), charge_id=pk).first()
-    return link.charge if link else None
+    if link:
+        link.charge._payment_link_id = link.pk
+        return link.charge
+    return None
+
+
+def link_allows_payment(link_id, charge_id):
+    return (
+        link_id is None
+        or valid_links().filter(pk=link_id, charge_id=charge_id).exists()
+    )
 
 
 def payment_required(view):

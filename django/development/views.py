@@ -449,7 +449,12 @@ def pix(request, pk):
     if wait:
         return limited_response(wait)
     try:
-        start_payment(row.pk, "pix", uuid.uuid4())
+        start_payment(
+            row.pk,
+            "pix",
+            uuid.uuid4(),
+            access_link_id=getattr(row, "_payment_link_id", None),
+        )
     except (ValidationError, ValueError) as exc:
         messages.error(
             request,
@@ -511,7 +516,11 @@ def card(request, pk):
         if not form.is_valid():
             raise ValueError
         payment = start_payment(
-            row.pk, "card", form.cleaned_data["attempt_id"], form.cleaned_data
+            row.pk,
+            "card",
+            form.cleaned_data["attempt_id"],
+            form.cleaned_data,
+            access_link_id=getattr(row, "_payment_link_id", None),
         )
     except (ValidationError, ValueError, TypeError):
         return JsonResponse(

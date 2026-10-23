@@ -1,11 +1,13 @@
 import base64
 import hashlib
 import json
+import uuid
 from datetime import datetime, time, timedelta
 from unittest.mock import patch
 from urllib.parse import urlsplit
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.test import Client as Browser, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -244,3 +246,36 @@ class PaymentLinkTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(start.call_args.args[:2], (self.charge.pk, "card"))
+        self.assertEqual(start.call_args.kwargs["access_link_id"], self.link.pk)
+
+    @patch("development.payments.platform_provider")
+    def test_payment_rechecks_link_under_locks_before_requesting_money(self, provider):
+        from .payments import start_payment
+
+        PaymentGateway.objects.create(
+            provider="mercadopago",
+            environment="production",
+            active=True,
+            last_test_status="validated",
+            public_key="APP_USR-public",
+        )
+        PaymentLink.objects.filter(pk=self.link.pk).update(charge_revision=99)
+        with self.assertRaises(ValidationError):
+            start_payment(
+                self.charge.pk, "pix", uuid.uuid4(), access_link_id=self.link.pk
+            )
+        provider.assert_not_called()
+        PaymentLink.objects.filter(pk=self.link.pk).update(charge_revision=1)
+
+        def identity():
+            PaymentLink.objects.filter(pk=self.link.pk).update(
+                expires_at=timezone.now() - timedelta(seconds=1)
+            )
+            return {"id": 321}
+
+        provider.return_value.test_connection.side_effect = identity
+        payment = start_payment(
+            self.charge.pk, "pix", uuid.uuid4(), access_link_id=self.link.pk
+        )
+        self.assertEqual(payment.status, "cancelled")
+        provider.return_value._request.assert_not_called()
