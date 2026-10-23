@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("financeiro/", views.revenue, name="development-revenue"),
     path(
         "envio/<int:pk>/tentar/",
         views.retry_delivery,

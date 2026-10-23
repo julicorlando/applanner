@@ -25,7 +25,13 @@ class ClientAccessMiddleware:
             if request.path in {"/", "/app/", "/account/login/"}:
                 return redirect("development-payments")
             allowed = request.path.startswith(
-                ("/desenvolvimento/pagamentos/", "/static/", "/imagens/", "/legal/")
+                (
+                    "/desenvolvimento/pagamentos/",
+                    "/desenvolvimento/cobranca/",
+                    "/static/",
+                    "/imagens/",
+                    "/legal/",
+                )
             ) or request.path in {
                 "/account/logout/",
                 "/account/password/change/",

@@ -10,15 +10,78 @@ from django.db import IntegrityError, transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.crypto import constant_time_compare
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.debug import sensitive_post_parameters
 from accounts.login_limits import attempt_budget, limited_response
 from core.crypto import decrypt_text
 from core.customer_import_views import require_master
 from .forms import ClientForm, ChargeForm, PasswordForm, SettlementForm
 from .models import Client, Charge, Delivery, Invitation, OnlinePayment
 from .services import audit, invite, save_charge, save_client, settle
+from .payment_links import payment_required
+
+
+@sensitive_post_parameters("document")
+@never_cache
+@require_http_methods(["GET", "POST"])
+def payment_link(request, token):
+    from .payment_links import find_link, grant_access
+    from .forms import PaymentDocumentForm
+
+    link = find_link(token)
+    if not link:
+        return render(request, "development/unlock.html", {"invalid": True}, status=404)
+    form = PaymentDocumentForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST":
+        for kind, identity in [
+            ("development-link-ip", "all"),
+            ("development-link", link.pk),
+        ]:
+            _, wait = attempt_budget(request, kind, identity)
+            if wait:
+                return limited_response(wait)
+        if form.is_valid():
+            digest = hashlib.sha256(form.cleaned_data["document"].encode()).hexdigest()
+            if constant_time_compare(digest, link.document_hash):
+                grant_access(request, link)
+                return redirect("development-charge", pk=link.charge_id)
+            form.add_error(
+                "document", "Informe o CPF ou CNPJ cadastrado para esta cobrança."
+            )
+    return render(request, "development/unlock.html", {"form": form})
+
+
+@login_required
+@never_cache
+@require_http_methods(["GET"])
+def revenue(request):
+    from django.core.paginator import Paginator
+    from .forms import RevenueFilterForm
+    from .revenue import financial_report
+
+    require_master(request)
+    initial = {
+        "month": timezone.localdate().replace(day=1),
+        "client": request.GET.get("client", ""),
+    }
+    data = request.GET.copy() if request.GET else None
+    if data is not None and not data.get("month"):
+        data["month"] = initial["month"].strftime("%Y-%m")
+    form = RevenueFilterForm(data, initial=initial)
+    report, page = None, None
+    if data is None or form.is_valid():
+        month = form.cleaned_data["month"] if data is not None else initial["month"]
+        customer = form.cleaned_data["client"] if data is not None else None
+        report = financial_report(month, customer)
+        page = Paginator(report["customers"], 30).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "development/revenue.html",
+        {"form": form, "report": report, "page": page},
+    )
 
 
 @login_required
@@ -298,6 +361,9 @@ def portal(request):
 
 
 def authorized_charge(request, pk):
+    public = getattr(request, "development_payment_charge", None)
+    if public and public.pk == pk:
+        return public
     if request.user.is_superuser:
         require_master(request)
         return get_object_or_404(Charge.objects.select_related("bank", "client"), pk=pk)
@@ -308,7 +374,7 @@ def authorized_charge(request, pk):
     )
 
 
-@login_required
+@payment_required
 @never_cache
 @require_http_methods(["GET"])
 def charge_detail(request, pk):
@@ -357,17 +423,26 @@ def charge_detail(request, pk):
 
 
 def payable_charge(request, pk):
+    public = getattr(request, "development_payment_charge", None)
+    if public and public.pk == pk:
+        return public
     return get_object_or_404(Charge, pk=pk, client=customer_for(request))
 
 
-@login_required
+@payment_required
 @never_cache
 @require_POST
 def pix(request, pk):
     from .payments import start_payment
 
     row = payable_charge(request, pk)
-    _, wait = attempt_budget(request, "development-payment", request.user.pk)
+    _, wait = attempt_budget(
+        request,
+        "development-payment",
+        f"charge-{row.pk}"
+        if getattr(request, "development_public_payment", False)
+        else request.user.pk,
+    )
     if wait:
         return limited_response(wait)
     try:
@@ -382,7 +457,7 @@ def pix(request, pk):
     return redirect("development-charge", pk=pk)
 
 
-@login_required
+@payment_required
 @never_cache
 @require_http_methods(["GET", "POST"])
 def card(request, pk):
@@ -408,13 +483,19 @@ def card(request, pk):
                 "card_config": {
                     "publicKey": gateway.public_key,
                     "amount": str(row.amount),
-                    "email": request.user.email,
+                    "email": row.client.user.email,
                     "attemptId": uuid.uuid4().hex,
                     "submitUrl": reverse("development-card", args=[pk]),
                 },
             },
         )
-    _, wait = attempt_budget(request, "development-payment", request.user.pk)
+    _, wait = attempt_budget(
+        request,
+        "development-payment",
+        f"charge-{row.pk}"
+        if getattr(request, "development_public_payment", False)
+        else request.user.pk,
+    )
     if wait:
         return limited_response(wait)
     if len(request.body) > 8000:
@@ -445,14 +526,20 @@ def card(request, pk):
     )
 
 
-@login_required
+@payment_required
 @never_cache
 @require_POST
 def refresh_payment(request, pk):
     from .payments import reconcile
 
     row = authorized_charge(request, pk)
-    _, wait = attempt_budget(request, "development-payment-refresh", request.user.pk)
+    _, wait = attempt_budget(
+        request,
+        "development-payment-refresh",
+        f"charge-{row.pk}"
+        if getattr(request, "development_public_payment", False)
+        else request.user.pk,
+    )
     if wait:
         return limited_response(wait)
     payment = row.online_payments.order_by("-pk").first()
@@ -503,7 +590,7 @@ def payment_webhook(request, public_id):
     return JsonResponse({"ok": True})
 
 
-@login_required
+@payment_required
 @never_cache
 @require_http_methods(["GET"])
 def boleto(request, pk):

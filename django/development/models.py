@@ -79,6 +79,17 @@ class Charge(TimeStampedModel):
         return self.status == "open" and self.due_date < timezone.localdate()
 
 
+class PaymentLink(models.Model):
+    charge = models.ForeignKey(
+        Charge, on_delete=models.CASCADE, related_name="payment_links"
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    charge_revision = models.PositiveIntegerField()
+    document_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class Invitation(models.Model):
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="invitations"

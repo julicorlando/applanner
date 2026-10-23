@@ -200,7 +200,13 @@ def queue_reminder(charge_id, today):
     from .forms import validate_template
 
     validate_template(client.message_template)
-    url = public_url("development-charge", charge.pk)
+    key = f"dev-charge-{charge.pk}-r{charge.revision}-{stage}"
+    previous = Delivery.objects.filter(key=key).first()
+    if previous:
+        return previous
+    from .payment_links import create_payment_link
+
+    payment_link, url = create_payment_link(charge, client)
     text = client.message_template.format(
         nome=client.name,
         descricao=charge.description,
@@ -209,14 +215,16 @@ def queue_reminder(charge_id, today):
         link=url,
     )
     row, _ = Delivery.objects.get_or_create(
-        key=f"dev-charge-{charge.pk}-r{charge.revision}-{stage}",
+        key=key,
         defaults={
             "client": client,
             "charge": charge,
             "charge_revision": charge.revision,
             "scheduled_date": today,
             "channel": "whatsapp",
-            "payload_encrypted": encrypt_json({"text": text}),
+            "payload_encrypted": encrypt_json(
+                {"text": text, "payment_link_id": payment_link.pk}
+            ),
         },
     )
     return row
