@@ -73,3 +73,10 @@ body.landing-home .home-real-preview img{display:block;width:100%;height:auto;as
 body.landing-home .home-booking-capture{flex-direction:column;align-items:center;gap:16px;margin:0}
 body.landing-home .home-booking-capture .home-phone img{display:block;width:100%;height:auto;aspect-ratio:390/844}
 body.landing-home .home-booking-capture figcaption{font-size:.75rem;line-height:1.5;color:var(--muted);text-align:center;max-width:300px}
+
+/* Fixed entry point to the Master WhatsApp assistant on the public homepage. */
+body.landing-home .home-chat-fab{position:fixed;right:22px;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);z-index:1000;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:54px;padding:0 20px;border:0;border-radius:999px;background:#0866E8;color:#fff;box-shadow:0 8px 24px rgba(8,102,232,.32);font-weight:750;font-size:.95rem;text-decoration:none;transition:transform .18s ease,box-shadow .18s ease}
+body.landing-home .home-chat-fab svg{width:22px;height:22px;fill:currentColor;flex:none}
+body.landing-home .home-chat-fab:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(8,102,232,.38)}
+body.landing-home .home-chat-fab:focus-visible{outline:3px solid #102D40;outline-offset:3px}
+@media(max-width:560px){body.landing-home .home-chat-fab{right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);min-height:52px;padding-inline:17px}}
