@@ -141,7 +141,7 @@ class PaymentLinkTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
-    def test_global_ip_budget_blocks_bruteforce_across_links(self):
+    def test_budget_blocks_bruteforce_across_links_without_blocking_other_clients(self):
         for _ in range(5):
             self.client.post(self.path, {"document": "00000000000"})
         _, url = create_payment_link(self.charge, self.customer)
@@ -152,6 +152,28 @@ class PaymentLinkTests(TestCase):
             429,
         )
         self.assertNotIn(SESSION_KEY, self.client.session)
+        other_user = get_user_model().objects.create_user(
+            "second-link@example.test", None
+        )
+        other = Client.objects.create(
+            user=other_user,
+            name="Outro cliente",
+            kind="cpf",
+            document_hash=hashlib.sha256(b"11144477735").hexdigest(),
+        )
+        other_charge = Charge.objects.create(
+            client=other,
+            amount="1.00",
+            description="Outro projeto",
+            due_date=self.charge.due_date,
+        )
+        _, other_url = create_payment_link(other_charge, other)
+        self.assertEqual(
+            self.client.post(
+                urlsplit(other_url).path, {"document": "11144477735"}
+            ).status_code,
+            302,
+        )
 
     @patch("development.tasks._gateway")
     def test_reminder_sends_private_link_and_pdf_once(self, gateway):

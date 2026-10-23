@@ -36,8 +36,11 @@ def payment_link(request, token):
         return render(request, "development/unlock.html", {"invalid": True}, status=404)
     form = PaymentDocumentForm(request.POST if request.method == "POST" else None)
     if request.method == "POST":
+        # Scope the budget to the customer as well as the link. The proxy may
+        # give all visitors the same REMOTE_ADDR; unrelated clients must not
+        # consume one shared five-attempt allowance.
         for kind, identity in [
-            ("development-link-ip", "all"),
+            ("development-link-client", link.charge.client_id),
             ("development-link", link.pk),
         ]:
             _, wait = attempt_budget(request, kind, identity)
