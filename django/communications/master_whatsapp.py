@@ -313,7 +313,7 @@ def master_whatsapp_conversation(request,pk):
                 try:
                     sent=_gateway("POST","/send",{"to":row.wa_id,"text":body})
                     record_outbound_message(conversation=row,sent=sent,body=body,sent_by=request.user)
-                    from .models import MasterFlowDelivery,MasterWhatsAppFlow
+                    from .models import MasterFlowDelivery
                     from core.crypto import encrypt_json
                     MasterFlowDelivery.objects.filter(conversation=row,status="queued").update(status="cancelled")
                     flow=MasterWhatsAppFlow.objects.filter(pk=1,enabled=True).first()
