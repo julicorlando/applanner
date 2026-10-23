@@ -133,6 +133,7 @@ http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && req.url === '/status') return reply(res, 200, {
       state, qr, pending: pending.length,
+      phone: /^\d{10,20}$/.test((socket?.user?.id || '').split(':')[0].split('@')[0]) ? socket.user.id.split(':')[0].split('@')[0] : '',
       callbackError: callbackHost ? callbackError : 'O callback interno precisa apontar para web:8000 no Compose.',
     });
     if (req.method === 'POST' && req.url === '/connect') {
