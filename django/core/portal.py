@@ -860,7 +860,13 @@ class PhysiotherapyRecordForm(forms.Form):
     precautions=forms.CharField(label="Precauções / sinais de alerta observados",required=False,widget=forms.Textarea(attrs={"rows":2}))
     functional_limits=forms.CharField(label="Limitações funcionais relatadas",required=False,widget=forms.Textarea(attrs={"rows":3}))
     goals=forms.CharField(label="Objetivos definidos com o paciente",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    physical_assessment=forms.CharField(label="Avaliação física e testes realizados",required=False,widget=forms.Textarea(attrs={"rows":4}))
+    vital_signs=forms.CharField(label="Sinais vitais e medidas relevantes",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    observation=forms.CharField(label="Inspeção, postura e marcha",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    range_of_motion=forms.CharField(label="Amplitude de movimento",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    strength=forms.CharField(label="Força muscular",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    special_tests=forms.CharField(label="Testes específicos e resultados",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    functional_scale=forms.CharField(label="Escalas e testes funcionais",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    physical_assessment=forms.CharField(label="Outros achados da avaliação",required=False,widget=forms.Textarea(attrs={"rows":3}))
     clinical_impression=forms.CharField(label="Impressão clínica do profissional",required=False,widget=forms.Textarea(attrs={"rows":3}))
     initial_plan=forms.CharField(label="Plano terapêutico inicial",required=False,widget=forms.Textarea(attrs={"rows":3}))
     subjective=forms.CharField(label="Relato do paciente desde a última sessão",required=False,widget=forms.Textarea(attrs={"rows":2}))
@@ -1432,7 +1438,10 @@ def resource_create(request,module_slug,resource_slug):
                         "pain_level":data.get("pain_level"),"medical_history":data.get("medical_history",""),
                         "medications_allergies":data.get("medications_allergies",""),
                         "precautions":data.get("precautions",""),"functional_limits":data.get("functional_limits",""),
-                        "goals":data.get("goals",""),"physical_assessment":data.get("physical_assessment",""),
+                        "goals":data.get("goals",""),"vital_signs":data.get("vital_signs",""),
+                        "observation":data.get("observation",""),"range_of_motion":data.get("range_of_motion",""),
+                        "strength":data.get("strength",""),"special_tests":data.get("special_tests",""),
+                        "functional_scale":data.get("functional_scale",""),"physical_assessment":data.get("physical_assessment",""),
                         "clinical_impression":data.get("clinical_impression",""),"initial_plan":data.get("initial_plan",""),
                         "subjective":data.get("subjective",""),"treatment":data.get("treatment",""),
                         "response":data.get("response",""),"pain_session":data.get("pain_session",""),
@@ -1494,6 +1503,7 @@ def resource_create(request,module_slug,resource_slug):
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
         "unit_billing_notice":_unit_billing_notice(tenant,module_slug,resource_slug),
         "body_areas":PHYSIO_BODY_AREAS if is_physio else [],
+        "body_selected":(form["body_regions"].value() or []) if is_physio else [],
     })
 
 
@@ -1571,7 +1581,9 @@ def resource_detail(request,module_slug,resource_slug,pk):
                 "chief_complaint":"Queixa principal","onset":"Início e contexto","pain_level":"Dor (0 a 10)",
                 "medical_history":"Histórico relevante","medications_allergies":"Medicamentos, alergias e cirurgias",
                 "precautions":"Precauções e sinais de alerta","functional_limits":"Limitações funcionais",
-                "goals":"Objetivos","physical_assessment":"Avaliação física e testes",
+                "goals":"Objetivos","vital_signs":"Sinais vitais e medidas","observation":"Inspeção, postura e marcha",
+                "range_of_motion":"Amplitude de movimento","strength":"Força muscular","special_tests":"Testes específicos",
+                "functional_scale":"Escalas e testes funcionais","physical_assessment":"Outros achados",
                 "clinical_impression":"Impressão clínica","initial_plan":"Plano terapêutico inicial",
                 "subjective":"Relato do paciente","treatment":"Procedimentos aplicados",
                 "response":"Resposta e evolução observada","pain_session":"Dor antes/depois",

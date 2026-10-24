@@ -33,6 +33,12 @@
         <div class="physio-field full">{{ form.medical_history.label_tag }}{{ form.medical_history }}{{ form.medical_history.errors }}</div>
         <div class="physio-field full">{{ form.precautions.label_tag }}{{ form.precautions }}{{ form.precautions.errors }}</div>
         <div class="physio-field full">{{ form.functional_limits.label_tag }}{{ form.functional_limits }}{{ form.functional_limits.errors }}</div>
+        <div class="physio-field full">{{ form.vital_signs.label_tag }}{{ form.vital_signs }}{{ form.vital_signs.errors }}</div>
+        <div class="physio-field full">{{ form.observation.label_tag }}{{ form.observation }}{{ form.observation.errors }}</div>
+        <div class="physio-field">{{ form.range_of_motion.label_tag }}{{ form.range_of_motion }}{{ form.range_of_motion.errors }}</div>
+        <div class="physio-field">{{ form.strength.label_tag }}{{ form.strength }}{{ form.strength.errors }}</div>
+        <div class="physio-field">{{ form.special_tests.label_tag }}{{ form.special_tests }}{{ form.special_tests.errors }}</div>
+        <div class="physio-field">{{ form.functional_scale.label_tag }}{{ form.functional_scale }}{{ form.functional_scale.errors }}</div>
         <div class="physio-field full">{{ form.physical_assessment.label_tag }}{{ form.physical_assessment }}{{ form.physical_assessment.errors }}</div>
         <div class="physio-field full">{{ form.clinical_impression.label_tag }}{{ form.clinical_impression }}{{ form.clinical_impression.errors }}</div>
         <div class="physio-field">{{ form.goals.label_tag }}{{ form.goals }}{{ form.goals.errors }}</div>
@@ -79,6 +85,7 @@
   </form>
 </section>
 {{ body_areas|json_script:"physio-body-areas" }}
+{{ body_selected|json_script:"physio-body-selected" }}
 <script>
 (() => {
   const choices = JSON.parse(document.getElementById("physio-body-areas").textContent);
@@ -88,7 +95,7 @@
   const summary = document.getElementById("selected-area-summary");
   const typeInputs = document.querySelectorAll('input[name="record_type"]');
   let view = "anterior";
-  const selected = new Set(Array.from(document.querySelectorAll('input[name="body_regions"]')).map(i => i.value).filter(Boolean));
+  const selected = new Set(JSON.parse(document.getElementById("physio-body-selected").textContent));
   const positions = (id) => {
     const back = id.includes("back") || ["upper_back","lower_back","calf_left","calf_right"].includes(id);
     const side = id.includes("_left") || id.endsWith("_left") ? -1 : (id.includes("_right") || id.endsWith("_right") ? 1 : 0);
