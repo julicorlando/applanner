@@ -5,7 +5,7 @@ from billing.entitlements import require_module
 from .models import MedicalRecordAccessLog,MedicalRecordEntry
 
 
-CLINICAL_ROLES={"owner","manager","tenant-admin","professional"}
+CLINICAL_ROLES={"owner","manager","tenant-admin","professional","healthcare"}
 
 
 def assert_clinical_access(user):
