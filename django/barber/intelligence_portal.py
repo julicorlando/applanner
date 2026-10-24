@@ -51,60 +51,35 @@ class ResourceForm(forms.ModelForm):
 
 class StageForm(forms.Form):
     service = forms.ModelChoiceField(Service.objects.none(), label="Serviço")
-    definition = forms.CharField(
-        required=False,
-        label="Etapas: nome | minutos | profissional sim/não | ID do recurso (opcional)",
-        widget=forms.Textarea(
-            attrs={
-                "rows": 6,
-                "placeholder": "Aplicação | 20 | sim | 1\nPausa | 30 | não | 1\nFinalização | 20 | sim | 2",
-            }
-        ),
-    )
 
     def __init__(self, *args, tenant, **kwargs):
         super().__init__(*args, **kwargs)
-        self.tenant = tenant
         self.fields["service"].queryset = Service.objects.filter(
             tenant=tenant, active=True
         )
 
-    def clean_definition(self):
-        rows = []
-        for line in self.cleaned_data["definition"].splitlines():
-            if not line.strip():
-                continue
-            parts = [v.strip() for v in line.split("|")]
-            try:
-                if (
-                    len(parts) not in (3, 4)
-                    or parts[2].lower() not in ["sim", "não", "nao"]
-                    or not 1 <= len(parts[0]) <= 120
-                ):
-                    raise ValueError
-                resource = (
-                    SalonResource.objects.get(
-                        pk=int(parts[3]), tenant=self.tenant, active=True
-                    )
-                    if len(parts) == 4 and parts[3]
-                    else None
-                )
-                minutes = int(parts[1])
-                if not 1 <= minutes <= 600:
-                    raise ValueError
-                rows.append(
-                    {
-                        "name": parts[0],
-                        "minutes": minutes,
-                        "professional_required": parts[2].lower() == "sim",
-                        "resource": resource,
-                    }
-                )
-            except (ValueError, SalonResource.DoesNotExist):
-                raise forms.ValidationError(
-                    "Confira as etapas e os IDs dos recursos da sua empresa."
-                ) from None
-        return rows
+
+class StageRowForm(forms.Form):
+    name = forms.CharField(max_length=120, label="Etapa")
+    minutes = forms.IntegerField(min_value=1, max_value=600, label="Duração em minutos")
+    professional_required = forms.BooleanField(
+        required=False, initial=True, label="Ocupa o profissional"
+    )
+    resource = forms.ModelChoiceField(
+        SalonResource.objects.none(),
+        required=False,
+        label="Cadeira ou lavatório",
+        empty_label="Sem recurso",
+    )
+
+    def __init__(self, *args, tenant, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["resource"].queryset = SalonResource.objects.filter(
+            tenant=tenant, active=True
+        ).select_related("unit")
+
+
+StageRows = forms.formset_factory(StageRowForm, extra=5, max_num=12, validate_max=True)
 
 
 @login_required
@@ -120,6 +95,11 @@ def dashboard(request):
         request.POST if action == "resource" else None, tenant=tenant
     )
     stage_form = StageForm(request.POST if action == "stages" else None, tenant=tenant)
+    stage_rows = StageRows(
+        request.POST if action == "stages" else None,
+        prefix="steps",
+        form_kwargs={"tenant": tenant},
+    )
     if action == "settings" and settings_form.is_valid():
         from communications.models import ChatbotFlow
 
@@ -141,12 +121,12 @@ def dashboard(request):
         row.save()
         messages.success(request, "Recurso cadastrado.")
         return redirect("beauty-intelligence")
-    if action == "stages" and stage_form.is_valid():
+    if action == "stages" and stage_form.is_valid() and stage_rows.is_valid():
         try:
             configure_stages(
                 tenant,
                 stage_form.cleaned_data["service"],
-                stage_form.cleaned_data["definition"],
+                [row for row in stage_rows.cleaned_data if row],
             )
             messages.success(
                 request,
@@ -176,6 +156,7 @@ def dashboard(request):
             "settings_form": settings_form,
             "resource_form": resource_form,
             "stage_form": stage_form,
+            "stage_rows": stage_rows,
             "resources": SalonResource.objects.filter(tenant=tenant),
             "services": Service.objects.filter(tenant=tenant, stages__isnull=False)
             .distinct()
