@@ -54,7 +54,13 @@ def advance(conversation_id,message_id=None,resume=False):
     phone=conversation.wa_id if not jid.endswith('@lid') and conversation.wa_id.startswith('55') and len(conversation.wa_id) in {12,13} else ''
     variables['contact_phone']=phone
     from .beauty_booking import answer as beauty_answer
-    beauty_result=None if normalized(body).strip(' .!?') in HUMAN else beauty_answer(conversation,flow,context,body,event)
+    try:
+        with transaction.atomic():
+            beauty_result=None if normalized(body).strip(' .!?') in HUMAN else beauty_answer(conversation,flow,context,body,event)
+    except Exception as exc:
+        beauty_result={'state':'__finished__','context':context,'waiting':'',
+            'messages':['Não consegui concluir essa consulta com segurança. Vou encaminhar o contexto à equipe.'],
+            'handoff':True,'wake_seconds':None,'error':'Falha do agendamento ('+type(exc).__name__+').'}
     if normalized(body).strip(' .!?') in {'sair','pare','nao quero receber mensagens'} and conversation.customer_id:
         conversation.customer.consent_marketing=False
         conversation.customer.save(update_fields=['consent_marketing','updated_at'])
