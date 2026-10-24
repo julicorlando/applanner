@@ -153,6 +153,23 @@ def answer(conversation, flow, context, body, event):
             )
         from scheduling.public_api import PublicBookingAPIView
 
+        selected_ids = state.get("service_ids") or [state["service_id"]]
+        current = list(
+            Service.objects.filter(tenant=tenant, active=True, pk__in=selected_ids)
+        )
+        by_id = {item.pk: item for item in current}
+        if any(pk not in by_id for pk in selected_ids):
+            return reply(
+                "Um dos serviços não está mais disponível. Nossa equipe vai ajudar a escolher outra opção.",
+                True,
+            )
+        total = sum(by_id[pk].price for pk in selected_ids)
+        if str(total) != state.get("quoted_price"):
+            state["quoted_price"] = str(total)
+            return reply(
+                f"O valor foi atualizado para R$ {total:.2f}. Você confirma o agendamento com esse valor? Responda SIM apenas se concordar."
+            )
+
         data = {
             "service_id": state["service_id"],
             "professional_id": state["professional_id"],
@@ -371,6 +388,7 @@ def answer(conversation, flow, context, body, event):
     state["key"] = "beauty-" + secrets.token_hex(16)
     service_names = " + ".join(s.name for s in services)
     total = sum(s.price for s in services)
+    state["quoted_price"] = str(total)
     return reply(
         f"Confirma {service_names}, dia {day:%d/%m}, às {datetime.fromisoformat(state['starts_at']):%H:%M}, com "
         + Professional.objects.get(pk=state["professional_id"], tenant=tenant).name
