@@ -197,9 +197,15 @@ class MasterWhatsAppTests(TestCase):
         row.refresh_from_db()
         self.assertTrue(row.human_handoff)
         self.assertEqual(row.messages.filter(direction="out").count(),3)
-        self.assertEqual(self.client.post(reverse("master-whatsapp-conversation",args=[row.pk]),{"action":"handoff","enabled":"0"}).status_code,302)
+        with patch("communications.master_whatsapp._gateway",return_value={"id":"rating-1","to":row.wa_id}) as gateway:
+            response=self.client.post(reverse("master-whatsapp-conversation",args=[row.pk]),{"action":"handoff","enabled":"0"})
+        self.assertEqual(response.status_code,302)
+        gateway.assert_called_once_with("POST","/send",{
+            "to":row.wa_id,"text":"Como você avalia o atendimento que recebeu? Responda com uma nota de 1 a 5."
+        })
         row.refresh_from_db()
         self.assertFalse(row.human_handoff)
+        self.assertEqual(row.flow_state,"__finished__")
 
     def test_master_sends_valid_image_and_media_stays_private(self):
         row=MasterWhatsAppConversation.objects.create(wa_id="5581999999999@s.whatsapp.net",last_message_at=timezone.now())
