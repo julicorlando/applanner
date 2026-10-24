@@ -157,3 +157,5 @@ class BarberQueueEntry(TimeStampedModel):
 
     class Meta:
         indexes=[models.Index(fields=["tenant","status","priority","joined_at"],name="barber_queue_status_idx")]
+
+from .intelligence_models import BeautySettings, SalonResource, ServiceStage, StageReservation, RecoveryOffer  # noqa: F401,E402

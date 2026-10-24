@@ -66,7 +66,7 @@ def plan_sequence(tenant, unit, items, start):
                 row
                 for row in candidates
                 if engine.professional_offers(tenant, row.pk, service.pk)
-                and engine.is_available(tenant, row, cursor, end, public_rules=True)
+                and engine.is_available(tenant, row, cursor, end, public_rules=True, service=service)
             ),
             None,
         )

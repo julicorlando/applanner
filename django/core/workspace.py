@@ -167,6 +167,8 @@ def navigation(request):
                     )
                     for resource in module["resources"]
                 ]
+                if module['slug']=='barbearia' and user.role not in ['reception','professional']:
+                    items.insert(0,link('Agenda inteligente e retorno',reverse('beauty-intelligence'),'scissors'))
                 groups.append({"title": module["title"], "items": items})
             routes = {(m['slug'], r['slug']) for m in available_modules(user, tenant) for r in m['resources']}
             if ('agenda', 'agendamentos') in routes or ('arena', 'reservas') in routes:

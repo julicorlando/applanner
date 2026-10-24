@@ -53,7 +53,15 @@ def advance(conversation_id,message_id=None,resume=False):
     jid=conversation.context.get('_chatbot_jid','')
     phone=conversation.wa_id if not jid.endswith('@lid') and conversation.wa_id.startswith('55') and len(conversation.wa_id) in {12,13} else ''
     variables['contact_phone']=phone
-    if normalized(body).strip(' .!?') in HUMAN:
+    from .beauty_booking import answer as beauty_answer
+    beauty_result=None if normalized(body).strip(' .!?') in HUMAN else beauty_answer(conversation,flow,context,body,event)
+    if normalized(body).strip(' .!?') in {'sair','pare','nao quero receber mensagens'} and conversation.customer_id:
+        conversation.customer.consent_marketing=False
+        conversation.customer.save(update_fields=['consent_marketing','updated_at'])
+        beauty_result={'state':'__finished__','context':context,'waiting':'','messages':['Certo. Você não receberá novos convites de relacionamento. Nossa equipe pode ajudar se precisar.'],'handoff':True,'wake_seconds':None,'error':''}
+    if beauty_result is not None:
+        result=beauty_result
+    elif normalized(body).strip(' .!?') in HUMAN:
         result={'state':'__finished__','context':context,'waiting':'','messages':[flow.handoff],'handoff':True,'wake_seconds':None,'error':''}
     elif flow.graph:
         try:

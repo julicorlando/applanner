@@ -374,7 +374,7 @@ class PublicBookingAPIView(APIView):
                 return Response({"detail":"Profissional não oferece esse serviço."},status=status.HTTP_400_BAD_REQUEST)
             source=Appointment.Source.PROFESSIONAL_LINK if data.get("professional_link") else Appointment.Source.PUBLIC
             if not availability.is_available(
-                tenant,professional,starts_at,ends_at,public_rules=True
+                tenant,professional,starts_at,ends_at,public_rules=True,service=service
             ):
                 return Response(
                     {"detail":"Este horário não está mais disponível."},
@@ -389,7 +389,7 @@ class PublicBookingAPIView(APIView):
                 if not availability.professional_offers(tenant,candidate.pk,service.pk):
                     continue
                 if availability.is_available(
-                    tenant,candidate,starts_at,ends_at,public_rules=True
+                    tenant,candidate,starts_at,ends_at,public_rules=True,service=service
                 ):
                     professional=candidate
                     break
@@ -602,7 +602,7 @@ class CustomerAppointmentAPIView(APIView):
                 return Response({"detail":"Profissional não oferece esse serviço."},status=status.HTTP_400_BAD_REQUEST)
             if not availability.is_available(
                 appointment.tenant,professional,starts_at,ends_at,
-                exclude_appointment_id=appointment.pk,public_rules=True,
+                exclude_appointment_id=appointment.pk,public_rules=True,service=appointment.service,
             ):
                 return Response({"detail":"Horário indisponível."},status=status.HTTP_409_CONFLICT)
         else:
@@ -615,7 +615,7 @@ class CustomerAppointmentAPIView(APIView):
                     continue
                 if availability.is_available(
                     appointment.tenant,candidate,starts_at,ends_at,
-                    exclude_appointment_id=appointment.pk,public_rules=True,
+                    exclude_appointment_id=appointment.pk,public_rules=True,service=appointment.service,
                 ):
                     professional=candidate
                     break

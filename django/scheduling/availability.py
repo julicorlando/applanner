@@ -40,7 +40,7 @@ class AvailabilityService:
             return True
         return professional.services.filter(pk=service_id,tenant=tenant,active=True).exists()
 
-    def is_available(self,tenant,professional,start,end,exclude_appointment_id=None,public_rules=True):
+    def is_available(self,tenant,professional,start,end,exclude_appointment_id=None,public_rules=True,service=None):
         tz=ZoneInfo(tenant.timezone or "America/Recife")
         start=start.astimezone(tz)
         end=end.astimezone(tz)
@@ -93,17 +93,31 @@ class AvailabilityService:
         ).exists():
             return False
 
-        busy_start=start-timedelta(minutes=schedule.buffer_minutes)
-        busy_end=end+timedelta(minutes=schedule.buffer_minutes)
-        conflicts=Appointment.objects.filter(
-            tenant=tenant,
-            professional=professional,
-            starts_at__lt=busy_end,
-            ends_at__gt=busy_start,
-        ).exclude(status__in=[Appointment.Status.CANCELLED,Appointment.Status.NO_SHOW])
-        if exclude_appointment_id:
-            conflicts=conflicts.exclude(pk=exclude_appointment_id)
-        return not conflicts.exists()
+        from barber.models import StageReservation
+        from barber.stages import intervals, resources_free
+        spans=[(start,end)]
+        if service is not None:
+            if service.tenant_id!=tenant.pk:
+                return False
+            stages=intervals(service,start)
+            if stages:
+                if stages[-1][2]!=end or not resources_free(tenant,service,professional,start,exclude=exclude_appointment_id):
+                    return False
+                spans=[(begin,stop) for stage,begin,stop in stages if stage.professional_required]
+        for begin,stop in spans:
+            busy_start=begin-timedelta(minutes=schedule.buffer_minutes)
+            busy_end=stop+timedelta(minutes=schedule.buffer_minutes)
+            conflicts=Appointment.objects.filter(tenant=tenant,professional=professional,
+                starts_at__lt=busy_end,ends_at__gt=busy_start,
+                stage_reservations__isnull=True).exclude(status__in=['cancelled','no_show'])
+            staged=StageReservation.objects.filter(tenant=tenant,professional=professional,
+                starts_at__lt=busy_end,ends_at__gt=busy_start).exclude(appointment__status__in=['cancelled','no_show'])
+            if exclude_appointment_id:
+                conflicts=conflicts.exclude(pk=exclude_appointment_id)
+                staged=staged.exclude(appointment_id=exclude_appointment_id)
+            if conflicts.exists() or staged.exists():
+                return False
+        return True
 
     def slots(self,tenant,service_id,professional_id,day,public_rules=True,limit=96):
         service=self.service(tenant,service_id)
@@ -133,7 +147,7 @@ class AvailabilityService:
 
         while cursor+duration<=finish:
             end=cursor+duration
-            if self.is_available(tenant,professional,cursor,end,public_rules=public_rules):
+            if self.is_available(tenant,professional,cursor,end,public_rules=public_rules,service=service):
                 slots.append({
                     "value":cursor.isoformat(),
                     "label":cursor.strftime("%H:%M"),

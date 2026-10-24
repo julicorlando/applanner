@@ -39,6 +39,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
         service=validated_data.get("service",getattr(instance,"service",None))
 
         with transaction.atomic():
+            unit_id=validated_data.get('unit_id') or getattr(instance,'unit_id',None) or getattr(professional,'unit_id',None)
+            if unit_id:
+                from tenants.models import Unit
+                Unit.objects.select_for_update().get(pk=unit_id,tenant=tenant)
             if professional is not None:
                 professional=Professional.objects.select_for_update().get(
                     pk=professional.pk,
@@ -56,7 +60,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
                     starts_at,
                     ends_at,
                     exclude_appointment_id=getattr(instance,"pk",None),
-                    public_rules=False,
+                    public_rules=False,service=service,
                 ):
                     raise serializers.ValidationError({
                         "starts_at":"O profissional não está disponível nesse intervalo."

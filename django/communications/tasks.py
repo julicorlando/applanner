@@ -251,3 +251,9 @@ def process_tenant_chatbot(message_id):
 def deliver_tenant_flow_message(delivery_id):
     from .tenant_graph_services import deliver
     return deliver(delivery_id)
+
+@shared_task(autoretry_for=(ValueError,),retry_backoff=True,max_retries=3)
+def recover_beauty_vacancy(appointment_id):
+    from barber.recovery import offer_vacancy, deliver_offer
+    offer=offer_vacancy(appointment_id)
+    if offer:deliver_offer(offer.pk)

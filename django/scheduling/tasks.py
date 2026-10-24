@@ -58,6 +58,8 @@ def _queue_reminder(appointment,key,channel,destination):
 
 @shared_task
 def queue_appointment_reminders():
+    from barber.recovery import expire_offers
+    expire_offers()
     now=timezone.now()
     window_start=now+timedelta(hours=2)
     window_end=now+timedelta(hours=24,minutes=10)

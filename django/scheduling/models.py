@@ -253,7 +253,30 @@ class Appointment(TimeStampedModel):
     def save(self,*args,**kwargs):
         if self._state.adding and not self.customer_name_snapshot and self.customer_id:
             self.customer_name_snapshot=self.customer.name
-        super().save(*args,**kwargs)
+        from django.db import transaction
+        staged = self.service_id and self.service.stages.exists()
+        if staged:
+            if not self.unit_id and self.professional_id:
+                self.unit_id=self.professional.unit_id
+                if kwargs.get('update_fields') is not None:
+                    kwargs['update_fields']=set(kwargs['update_fields'])|{'unit'}
+            with transaction.atomic():
+                if self.unit_id:
+                    from tenants.models import Unit
+                    Unit.objects.select_for_update().get(pk=self.unit_id,tenant_id=self.tenant_id)
+                if self.professional_id:
+                    Professional.objects.select_for_update().get(pk=self.professional_id,tenant_id=self.tenant_id)
+                previous=type(self).objects.filter(pk=self.pk).values('starts_at','ends_at','professional_id','service_id').first() if self.pk else None
+                changed=previous is None or any(previous[k]!=getattr(self,k) for k in previous)
+                if changed and self.status not in ['cancelled','no_show']:
+                    from .availability import AvailabilityService
+                    from django.core.exceptions import ValidationError
+                    if not self.professional_id or not AvailabilityService().is_available(self.tenant,self.professional,
+                        self.starts_at,self.ends_at,exclude_appointment_id=self.pk,public_rules=False,service=self.service):
+                        raise ValidationError('Etapas, profissional ou recurso indisponível neste horário.')
+                super().save(*args,**kwargs)
+        else:
+            super().save(*args,**kwargs)
 
     def __str__(self):
         if not self.customer_id or not self.starts_at:
@@ -376,6 +399,20 @@ class CustomerAccessChallenge(models.Model):
 
 
 class AppointmentWorkNote(models.Model):
+    technical_encrypted = models.TextField(blank=True)
+
+    @property
+    def technical(self):
+        from core.crypto import decrypt_json
+        return decrypt_json(self.technical_encrypted) if self.technical_encrypted else {}
+
+    @property
+    def technical_display(self):
+        labels={'cut_style':'Corte / máquina / degradê','beard':'Barba e acabamento',
+            'color_formula':'Fórmula de coloração','products':'Produtos utilizados',
+            'processing_minutes':'Pausa (minutos)','preferences':'Preferências e cuidados','result':'Resultado'}
+        return [(labels[k],v) for k,v in self.technical.items() if k in labels and v not in (None,'')]
+
     tenant = models.ForeignKey('tenants.Tenant',on_delete=models.PROTECT)
     appointment = models.ForeignKey(Appointment,on_delete=models.PROTECT,related_name='work_notes')
     user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)

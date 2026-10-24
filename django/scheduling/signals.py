@@ -9,6 +9,8 @@ from .models import Appointment
 
 @receiver(pre_save,sender=Appointment)
 def remember_confirmation_state(sender,instance,**kwargs):
+    instance._previous_service=sender.objects.filter(pk=instance.pk).values_list('service_id',flat=True).first() if instance.pk else None
+    instance._previous_end=sender.objects.filter(pk=instance.pk).values_list('ends_at',flat=True).first() if instance.pk else None
     instance._previous_start=(sender.objects.filter(pk=instance.pk).values_list("starts_at",flat=True).first() if instance.pk else None)
     instance._previous_professional=(sender.objects.filter(pk=instance.pk).values_list("professional_id",flat=True).first() if instance.pk else None)
     instance._previous_status=(sender.objects.filter(pk=instance.pk).values_list("status",flat=True).first()
@@ -59,3 +61,23 @@ def notify_mobile_change(sender,instance,created,**kwargs):
     if created or getattr(instance,"_previous_status",None)!=instance.status or getattr(instance,"_previous_start",None)!=instance.starts_at or getattr(instance,"_previous_professional",None)!=instance.professional_id:
         from communications.mobile_delivery import appointment_event
         appointment_event(instance,created=created)
+
+@receiver(post_save, sender=Appointment)
+def maintain_beauty_stages(sender, instance, created, **kwargs):
+    if created or getattr(instance,'_previous_start',None)!=instance.starts_at or getattr(instance,'_previous_professional',None)!=instance.professional_id or getattr(instance,'_previous_end',None)!=instance.ends_at or getattr(instance,'_previous_service',None)!=instance.service_id:
+        from barber.stages import snapshot
+        instance.stage_reservations.all().delete()
+        snapshot(instance)
+
+@receiver(post_save, sender=Appointment)
+def recover_cancelled_beauty_vacancy(sender, instance, created, **kwargs):
+    if not created and instance.status=='cancelled' and getattr(instance,'_previous_status',None)!='cancelled':
+        from barber.models import BeautySettings, RecoveryOffer
+        if BeautySettings.objects.filter(tenant=instance.tenant,recovery_enabled=True).exists() and not RecoveryOffer.objects.filter(appointment=instance).exists():
+            from django.db import transaction
+            from communications.tasks import recover_beauty_vacancy
+            def dispatch_recovery():
+                import logging
+                try:recover_beauty_vacancy.delay(instance.pk)
+                except Exception:logging.getLogger(__name__).exception('Falha ao enfileirar recuperação da vaga %s',instance.pk)
+            transaction.on_commit(dispatch_recovery)
