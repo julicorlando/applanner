@@ -410,3 +410,17 @@ class IntelligenceTests(TestCase):
         self.client.force_login(self.owner)
         response = self.client.get(reverse("beauty-intelligence"))
         self.assertEqual(response.context["received"], Decimal("50"))
+
+    def test_optout_works_even_while_human_is_assigned(self):
+        from communications.tenant_whatsapp import mark_inbound_appointment
+
+        conv = WhatsAppConversation.objects.create(
+            tenant=self.tenant,
+            wa_id=self.customer.phone,
+            customer=self.customer,
+            status="human",
+            last_message_at=timezone.now(),
+        )
+        mark_inbound_appointment(conv, "SAIR")
+        self.customer.refresh_from_db()
+        self.assertFalse(self.customer.consent_marketing)
