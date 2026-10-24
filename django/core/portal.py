@@ -1,4 +1,5 @@
 from datetime import timedelta,datetime,date,time
+import json
 from decimal import Decimal
 import secrets
 from zoneinfo import ZoneInfo
@@ -819,6 +820,72 @@ class MedicalRecordForm(forms.Form):
         self.fields["professional"].queryset=apps.get_model("scheduling","Professional").objects.filter(tenant=tenant,active=True)
         self.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant).order_by("-starts_at")[:500]
 
+PHYSIO_BODY_AREAS=[
+    ("head_central","Cabeça e face · anterior"),("neck_central","Pescoço · anterior"),
+    ("shoulder_left","Ombro esquerdo · anterior"),("shoulder_right","Ombro direito · anterior"),
+    ("chest_central","Tórax · anterior"),("elbow_left","Cotovelo esquerdo · anterior"),
+    ("elbow_right","Cotovelo direito · anterior"),("forearm_left","Antebraço esquerdo · anterior"),
+    ("forearm_right","Antebraço direito · anterior"),("wrist_left","Punho/mão esquerdo · anterior"),
+    ("wrist_right","Punho/mão direito · anterior"),("hip_left","Quadril esquerdo · anterior"),
+    ("hip_right","Quadril direito · anterior"),("thigh_left","Coxa esquerda · anterior"),
+    ("thigh_right","Coxa direita · anterior"),("knee_left","Joelho esquerdo · anterior"),
+    ("knee_right","Joelho direito · anterior"),("shin_left","Perna esquerda · anterior"),
+    ("shin_right","Perna direita · anterior"),("ankle_left","Tornozelo/pé esquerdo · anterior"),
+    ("ankle_right","Tornozelo/pé direito · anterior"),
+    ("head_back","Cabeça · posterior"),("neck_back","Pescoço · posterior"),
+    ("shoulder_back_left","Ombro esquerdo · posterior"),("shoulder_back_right","Ombro direito · posterior"),
+    ("upper_back","Dorso/torácica · posterior"),("lower_back","Lombar · posterior"),
+    ("elbow_back_left","Cotovelo esquerdo · posterior"),("elbow_back_right","Cotovelo direito · posterior"),
+    ("wrist_back_left","Punho/mão esquerdo · posterior"),("wrist_back_right","Punho/mão direito · posterior"),
+    ("hip_back_left","Quadril esquerdo · posterior"),("hip_back_right","Quadril direito · posterior"),
+    ("thigh_back_left","Coxa esquerda · posterior"),("thigh_back_right","Coxa direita · posterior"),
+    ("knee_back_left","Joelho esquerdo · posterior"),("knee_back_right","Joelho direito · posterior"),
+    ("calf_left","Panturrilha esquerda · posterior"),("calf_right","Panturrilha direita · posterior"),
+    ("ankle_back_left","Tornozelo/pé esquerdo · posterior"),("ankle_back_right","Tornozelo/pé direito · posterior"),
+]
+
+
+class PhysiotherapyRecordForm(forms.Form):
+    record_type=forms.ChoiceField(choices=[
+        ("physio_evaluation","Avaliação inicial"),("physio_evolution","Evolução da sessão")
+    ],widget=forms.RadioSelect,label="Tipo de registro")
+    customer=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Customer").objects.none(),label="Paciente")
+    professional=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Professional").objects.none(),label="Profissional responsável pelo registro")
+    appointment=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Appointment").objects.none(),required=False,label="Agendamento relacionado")
+    chief_complaint=forms.CharField(label="Queixa principal",widget=forms.Textarea(attrs={"rows":2}))
+    onset=forms.CharField(label="Início e contexto da queixa",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    pain_level=forms.IntegerField(label="Dor referida (0 a 10)",required=False,min_value=0,max_value=10)
+    medical_history=forms.CharField(label="Histórico de saúde relevante",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    medications_allergies=forms.CharField(label="Medicamentos, alergias e cirurgias relevantes",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    precautions=forms.CharField(label="Precauções / sinais de alerta observados",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    functional_limits=forms.CharField(label="Limitações funcionais relatadas",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    goals=forms.CharField(label="Objetivos definidos com o paciente",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    physical_assessment=forms.CharField(label="Avaliação física e testes realizados",required=False,widget=forms.Textarea(attrs={"rows":4}))
+    clinical_impression=forms.CharField(label="Impressão clínica do profissional",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    initial_plan=forms.CharField(label="Plano terapêutico inicial",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    subjective=forms.CharField(label="Relato do paciente desde a última sessão",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    treatment=forms.CharField(label="Procedimentos e recursos aplicados",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    response=forms.CharField(label="Resposta, tolerância e evolução observada",required=False,widget=forms.Textarea(attrs={"rows":3}))
+    pain_session=forms.CharField(label="Dor antes/depois (0–10)",required=False,max_length=80)
+    next_plan=forms.CharField(label="Conduta / foco da próxima sessão",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    body_regions=forms.MultipleChoiceField(choices=PHYSIO_BODY_AREAS,required=False,
+        widget=forms.CheckboxSelectMultiple, label="Locais tratados no mapa corporal")
+
+    def __init__(self,*args,tenant=None,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fields["customer"].queryset=apps.get_model("scheduling","Customer").objects.filter(tenant=tenant,active=True).order_by("name")
+        self.fields["professional"].queryset=apps.get_model("scheduling","Professional").objects.filter(tenant=tenant,active=True).order_by("name")
+        self.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant).select_related("customer","professional").order_by("-starts_at")[:500]
+
+    def clean(self):
+        data=super().clean()
+        appointment=data.get("appointment")
+        if appointment and data.get("customer") and appointment.customer_id!=data["customer"].pk:
+            self.add_error("appointment","Este agendamento pertence a outro paciente.")
+        if data.get("record_type")=="physio_evaluation" and not data.get("chief_complaint"):
+            self.add_error("chief_complaint","Descreva a queixa principal para iniciar a avaliação.")
+        return data
+
 
 def _save_special(obj, *, resource, request, tenant, is_new):
     special=resource.get("special")
@@ -1352,17 +1419,37 @@ def resource_create(request,module_slug,resource_slug):
             except ValidationError as exc:
                 form.add_error(None,exc)
     elif custom=="medical_record":
-        form=MedicalRecordForm(request.POST or None,tenant=tenant)
+        is_physio=(tenant.category or "").strip().lower()=="fisioterapia"
+        form=(PhysiotherapyRecordForm(request.POST or None,tenant=tenant) if is_physio
+              else MedicalRecordForm(request.POST or None,tenant=tenant))
         if request.method=="POST" and form.is_valid():
             data=form.cleaned_data
             try:
+                if is_physio:
+                    kind=data["record_type"]
+                    sections={
+                        "chief_complaint":data.get("chief_complaint",""),"onset":data.get("onset",""),
+                        "pain_level":data.get("pain_level"),"medical_history":data.get("medical_history",""),
+                        "medications_allergies":data.get("medications_allergies",""),
+                        "precautions":data.get("precautions",""),"functional_limits":data.get("functional_limits",""),
+                        "goals":data.get("goals",""),"physical_assessment":data.get("physical_assessment",""),
+                        "clinical_impression":data.get("clinical_impression",""),"initial_plan":data.get("initial_plan",""),
+                        "subjective":data.get("subjective",""),"treatment":data.get("treatment",""),
+                        "response":data.get("response",""),"pain_session":data.get("pain_session",""),
+                        "next_plan":data.get("next_plan",""),
+                        "body_regions":[{"id":key,"label":dict(PHYSIO_BODY_AREAS)[key]} for key in data.get("body_regions",[])],
+                    }
+                    title="Avaliação fisioterápica" if kind=="physio_evaluation" else "Evolução fisioterápica"
+                    content=json.dumps({"schema":"applanner.physiotherapy.v1","sections":sections},ensure_ascii=False)
+                else:
+                    kind=data["record_type"]; title=data["title"]; content=data["content"]
                 create_record(
                     tenant=tenant,customer=data["customer"],professional=data["professional"],
-                    appointment=data["appointment"],record_type=data["record_type"],
-                    title=data["title"],content=data["content"],user=request.user,
+                    appointment=data["appointment"],record_type=kind,
+                    title=title,content=content,user=request.user,
                     ip=request.META.get("REMOTE_ADDR",""),
                 )
-                messages.success(request,"Prontuário criado e criptografado.")
+                messages.success(request,"Registro salvo com conteúdo criptografado.")
                 return redirect("portal-resource-list",module_slug=module_slug,resource_slug=resource_slug)
             except (ValidationError,PermissionDenied) as exc:
                 form.add_error(None,exc)
@@ -1399,12 +1486,14 @@ def resource_create(request,module_slug,resource_slug):
             except ValidationError as exc:
                 form.add_error(None,exc)
 
-    return render(request,"portal/form.html",{
+    is_physio=(custom=="medical_record" and (tenant.category or "").strip().lower()=="fisioterapia")
+    return render(request,"portal/physiotherapy_record_form.html" if is_physio else "portal/form.html",{
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,"form":form,
         "title":f"Novo — {resource['title']}",
         "professional_capacity":professional_capacity(tenant) if model._meta.label_lower=="scheduling.professional" else None,
         "unit_billing_notice":_unit_billing_notice(tenant,module_slug,resource_slug),
+        "body_areas":PHYSIO_BODY_AREAS if is_physio else [],
     })
 
 
@@ -1476,6 +1565,26 @@ def resource_detail(request,module_slug,resource_slug,pk):
         return redirect("arena-class-detail",pk=obj.pk)
     if resource.get("detail")=="medical_record":
         content=read_record(entry=obj,user=request.user,ip=request.META.get("REMOTE_ADDR",""))
+        if (tenant.category or "").strip().lower()=="fisioterapia" and content.startswith('{"schema":"applanner.physiotherapy.v1"'):
+            payload=json.loads(content)
+            labels={
+                "chief_complaint":"Queixa principal","onset":"Início e contexto","pain_level":"Dor (0 a 10)",
+                "medical_history":"Histórico relevante","medications_allergies":"Medicamentos, alergias e cirurgias",
+                "precautions":"Precauções e sinais de alerta","functional_limits":"Limitações funcionais",
+                "goals":"Objetivos","physical_assessment":"Avaliação física e testes",
+                "clinical_impression":"Impressão clínica","initial_plan":"Plano terapêutico inicial",
+                "subjective":"Relato do paciente","treatment":"Procedimentos aplicados",
+                "response":"Resposta e evolução observada","pain_session":"Dor antes/depois",
+                "next_plan":"Próxima conduta",
+            }
+            sections=[{"label":labels[k],"value":v} for k,v in payload.get("sections",{}).items()
+                if k in labels and v not in (None,"")]
+            return render(request,"portal/medical_record.html",{
+                "tenant":tenant,"module_slug":module_slug,"module":module,
+                "resource_slug":resource_slug,"resource":resource,"entry":obj,
+                "physiotherapy":True,"sections":sections,
+                "body_regions":payload.get("sections",{}).get("body_regions",[]),
+            })
         return render(request,"portal/medical_record.html",{
             "tenant":tenant,"module_slug":module_slug,"module":module,
             "resource_slug":resource_slug,"resource":resource,"entry":obj,"content":content,

@@ -12,7 +12,7 @@ def segment_enabled(tenant, segment):
         "barbearia": ("barber", "barbear", "salao", "cabel"),
         "arena": ("arena", "esport", "quadra"),
         "auto": ("auto", "lava", "detailing", "veicul"),
-        "saude": ("saude", "clinic", "odonto", "dent"),
+        "saude": ("saude", "clinic", "odonto", "dent", "fisioterap"),
     }
     if not any(word in category for word in aliases[segment]):
         return False
