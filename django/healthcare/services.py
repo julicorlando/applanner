@@ -5,10 +5,10 @@ from billing.entitlements import require_module
 from .models import MedicalRecordAccessLog,MedicalRecordEntry
 
 
-CLINICAL_ROLES={"owner","manager","tenant-admin","professional","barber-manager","arena-manager","auto-manager"}
+CLINICAL_ROLES={"owner","manager","tenant-admin","professional"}
 
 
-def _assert_clinical_access(user):
+def assert_clinical_access(user):
     if not user.is_superuser and getattr(user,"role",None) not in CLINICAL_ROLES:
         raise PermissionDenied("Acesso restrito à equipe clínica autorizada.")
 
@@ -18,10 +18,12 @@ def _ip_hash(ip):
 
 
 def create_record(*,tenant,customer,professional,title,content,user,appointment=None,record_type="evolution",ip=""):
-    _assert_clinical_access(user)
+    assert_clinical_access(user)
     require_module(tenant,"medical_records")
     if customer.tenant_id!=tenant.id or professional.tenant_id!=tenant.id:
         raise PermissionDenied("Paciente/profissional pertence a outro tenant.")
+    if appointment and (appointment.tenant_id!=tenant.id or appointment.customer_id!=customer.id):
+        raise PermissionDenied("O agendamento não corresponde ao paciente desta empresa.")
     entry=MedicalRecordEntry.objects.create(
         tenant=tenant,customer=customer,professional=professional,appointment=appointment,
         record_type=record_type,title=title[:190],content_encrypted=encrypt_text(content),created_by=user,

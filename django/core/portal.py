@@ -22,7 +22,7 @@ from accounts.permissions import has_capability,require_any_capability
 from arena.services import ArenaReservationService
 from billing.segment_access import require_segment,segment_enabled
 from billing.entitlements import active_subscription,module_enabled,professional_capacity
-from healthcare.services import create_record, read_record
+from healthcare.services import create_record, read_record, assert_clinical_access
 
 
 MODULE_CAPABILITIES = {
@@ -673,6 +673,8 @@ def _require_module_access(user,module,tenant=None,module_slug=None,resource_slu
     capability=module.get("capability")
     if capability:
         require_any_capability(user,capability)
+    if module_slug=="saude":
+        assert_clinical_access(user)
     if tenant and not user.is_superuser and module_slug in {"barbearia","arena","auto","saude"}:
         require_segment(tenant,{"barbearia":"barbearia","arena":"arena","auto":"auto","saude":"saude"}[module_slug])
     if resource_slug and not _feature_allowed(user,tenant,module_slug,resource_slug):
@@ -852,7 +854,7 @@ class PhysiotherapyRecordForm(forms.Form):
     customer=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Customer").objects.none(),label="Paciente")
     professional=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Professional").objects.none(),label="Profissional responsável pelo registro")
     appointment=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Appointment").objects.none(),required=False,label="Agendamento relacionado")
-    chief_complaint=forms.CharField(label="Queixa principal",widget=forms.Textarea(attrs={"rows":2}))
+    chief_complaint=forms.CharField(label="Queixa principal",required=False,widget=forms.Textarea(attrs={"rows":2}))
     onset=forms.CharField(label="Início e contexto da queixa",required=False,widget=forms.Textarea(attrs={"rows":2}))
     pain_level=forms.IntegerField(label="Dor referida (0 a 10)",required=False,min_value=0,max_value=10)
     medical_history=forms.CharField(label="Histórico de saúde relevante",required=False,widget=forms.Textarea(attrs={"rows":3}))
