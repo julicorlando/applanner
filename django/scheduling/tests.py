@@ -54,6 +54,9 @@ class AvailabilityServiceTests(TestCase):
 
 class PublicBookingFlowTests(TestCase):
     def setUp(self):
+        # Public endpoint throttles are external to database transaction rollback.
+        from django.core.cache import cache
+        cache.clear()
         from django.utils import timezone
         self.tenant=Tenant.objects.create(
             name="Public Demo",slug="public-demo",public_slug="public-demo",

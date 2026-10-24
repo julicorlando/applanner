@@ -15,6 +15,13 @@ from .audit import append_audit
 
 
 class WorkNoteForm(forms.Form):
+    cut_style = forms.CharField(max_length=200, required=False, label="Corte, máquina e altura do degradê")
+    beard = forms.CharField(max_length=200, required=False, label="Barba e acabamento")
+    color_formula = forms.CharField(max_length=1000, required=False, label="Fórmula de coloração e proporções", widget=forms.Textarea(attrs={"rows":2}))
+    products = forms.CharField(max_length=500, required=False, label="Produtos e quantidades utilizadas")
+    processing_minutes = forms.IntegerField(min_value=0, max_value=600, required=False, label="Tempo de aplicação / pausa (minutos)")
+    preferences = forms.CharField(max_length=500, required=False, label="Preferências e cuidados informados pelo cliente")
+    result = forms.CharField(max_length=1000, required=False, label="Resultado e recomendações", widget=forms.Textarea(attrs={"rows":2}))
     text = forms.CharField(
         max_length=4000,
         label="Anotação técnica",
@@ -61,7 +68,14 @@ def authorized_appointment(request, pk):
 @never_cache
 def notes(request, pk):
     appointment = authorized_appointment(request, pk)
-    form = WorkNoteForm(request.POST or None, request.FILES or None)
+    initial={}
+    if request.method=="GET" and request.GET.get('repeat'):
+        previous=get_object_or_404(AppointmentWorkNote, pk=request.GET['repeat'], tenant=appointment.tenant,
+            appointment__customer=appointment.customer)
+        authorized_appointment(request, previous.appointment_id)
+        initial=previous.technical
+        initial['text']='Referência da ficha #'+str(previous.pk)+'. Confira os dados antes de salvar.'
+    form = WorkNoteForm(request.POST or None, request.FILES or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         row = AppointmentWorkNote(
@@ -71,6 +85,9 @@ def notes(request, pk):
             text=data["text"],
             photo_consent=data["photo_consent"],
         )
+        from core.crypto import encrypt_json
+        row.technical_encrypted=encrypt_json({key:data.get(key) for key in [
+            'cut_style','beard','color_formula','products','processing_minutes','preferences','result']})
         if data["photo"]:
             with Image.open(data["photo"]) as image:
                 image = ImageOps.exif_transpose(image).convert("RGB")

@@ -236,6 +236,8 @@ def send_appointment_notification(notification):
 
 
 def mark_inbound_appointment(conversation,body):
+    if body.strip().upper() in {'SAIR','PARE','NÃO QUERO RECEBER MENSAGENS','NAO QUERO RECEBER MENSAGENS'} and conversation.customer_id:
+        Customer.objects.filter(pk=conversation.customer_id,tenant=conversation.tenant).update(consent_marketing=False)
     appointment=conversation.appointment
     if not appointment:
         return False

@@ -1,6 +1,7 @@
 from django.contrib import admin
 from accounts.api_access import api_resource
 from django.urls import include, path
+from barber.intelligence_portal import recovery_accept
 
 from billing.webhooks import mercadopago_platform_webhook, mercadopago_tenant_webhook
 from development.views import payment_webhook as development_payment_webhook
@@ -33,6 +34,7 @@ from scheduling import card_payments
 from communications import mobile_portal
 
 urlpatterns = [
+    path("vaga-beleza/<str:token>/",recovery_accept,name="beauty-recovery-accept"),
     path("desenvolvimento/", include("development.urls")),
     path("webhooks/desenvolvimento/pagamentos/<uuid:public_id>/", development_payment_webhook, name="development-payment-webhook"),
     path("master/clientes-desenvolvimento/", include("development.master_urls")),

@@ -205,7 +205,7 @@ def move(request, pk):
                 start,
                 end,
                 exclude_appointment_id=row.pk,
-                public_rules=False,
+                public_rules=False,service=row.service,
             ):
                 raise ValidationError(
                     "Horário indisponível: verifique agenda e bloqueios."
