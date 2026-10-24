@@ -35,7 +35,7 @@ def create_record(*,tenant,customer,professional,title,content,user,appointment=
 
 
 def read_record(*,entry,user,ip=""):
-    _assert_clinical_access(user)
+    assert_clinical_access(user)
     if user.tenant_id!=entry.tenant_id and not user.is_superuser:
         raise PermissionDenied("Acesso negado.")
     MedicalRecordAccessLog.objects.create(
