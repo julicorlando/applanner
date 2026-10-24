@@ -1,6 +1,7 @@
 from datetime import time, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
@@ -46,16 +47,19 @@ class ProfessionalWaitlistTests(TestCase):
 
     def test_walk_in_occupies_time_and_cannot_double_book(self):
         url=reverse("professional-waitlist",args=[self.entry.pk])
-        self.assertEqual(self.client.post(url,{"action":"instant"}).status_code,302)
-        self.entry.refresh_from_db()
-        appointment=self.entry.appointment
-        self.assertEqual(appointment.status,Appointment.Status.IN_PROGRESS)
-        self.assertEqual(appointment.source,Appointment.Source.WALK_IN)
-        self.assertIsNotNone(appointment.checked_in_at)
-        self.assertLess(abs((appointment.starts_at-timezone.now()).total_seconds()),30)
-        second=WaitlistEntry.objects.create(tenant=self.tenant,customer=self.customer,service=self.service,
-            status=WaitlistEntry.Status.WAITING)
-        response=self.client.post(reverse("professional-waitlist",args=[second.pk]),{"action":"instant"})
+        tz=ZoneInfo(self.tenant.timezone or "America/Recife")
+        now=timezone.now().astimezone(tz).replace(hour=10,minute=30,second=0,microsecond=0)
+        with patch("django.utils.timezone.now",return_value=now):
+            self.assertEqual(self.client.post(url,{"action":"instant"}).status_code,302)
+            self.entry.refresh_from_db()
+            appointment=self.entry.appointment
+            self.assertEqual(appointment.status,Appointment.Status.IN_PROGRESS)
+            self.assertEqual(appointment.source,Appointment.Source.WALK_IN)
+            self.assertIsNotNone(appointment.checked_in_at)
+            self.assertEqual(appointment.starts_at,now)
+            second=WaitlistEntry.objects.create(tenant=self.tenant,customer=self.customer,service=self.service,
+                status=WaitlistEntry.Status.WAITING)
+            response=self.client.post(reverse("professional-waitlist",args=[second.pk]),{"action":"instant"})
         self.assertContains(response,"Profissional ocupado")
         second.refresh_from_db()
         self.assertEqual(second.status,WaitlistEntry.Status.WAITING)

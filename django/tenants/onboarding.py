@@ -57,7 +57,7 @@ class CompanyForm(forms.ModelForm):
                 "email":"E-mail comercial","phone":"Telefone com DDD","description":"Apresentação (opcional)"}
         widgets={"category":forms.Select(choices=[("","Selecione"),("barbearia","Barbearia"),
             ("salao","Salão"),("estetica","Estética"),("auto","Automotivo"),
-            ("arena","Arena / quadras"),("saude","Saúde"),("outro","Outro")])}
+            ("arena","Arena / quadras"),("saude","Saúde"),("fisioterapia","Fisioterapia"),("outro","Outro")])}
 
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
@@ -124,6 +124,15 @@ class ServiceForm(forms.ModelForm):
 
 
 class ProfessionalForm(forms.ModelForm):
+    def __init__(self,*args,tenant=None,**kwargs):
+        super().__init__(*args,**kwargs)
+        if tenant and (tenant.category or "").strip().lower()=="fisioterapia":
+            self.fields["name"].label="Nome exibido no agendamento"
+            self.fields["name"].help_text="Pode ser o nome da clínica. O registro clínico continua atribuído ao profissional responsável que o lançar."
+            if not self.is_bound and not self.instance.pk:
+                self.initial.setdefault("name",tenant.name)
+                self.initial.setdefault("specialty","Fisioterapia")
+
     class Meta:
         model=Professional
         fields=["name","specialty","phone","email","photo"]
@@ -220,7 +229,7 @@ def onboarding(request):
     elif step=="service_done":
         form=ServiceForm(request.POST or None,instance=service)
     elif step=="professional_done":
-        form=ProfessionalForm(request.POST or None,request.FILES or None,instance=professional)
+        form=ProfessionalForm(request.POST or None,request.FILES or None,instance=professional,tenant=tenant)
     elif step=="schedule_done":
         form=HoursForm(request.POST or None,initial={"days":["1","2","3","4","5"],"start_time":"09:00","end_time":"18:00"})
     elif step=="branding_done":

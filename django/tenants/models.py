@@ -65,7 +65,8 @@ class Tenant(TimeStampedModel):
     def category_label(self):
         labels={"barbearia":"Barbearia","salao":"Salão de beleza","salão":"Salão de beleza",
                 "arena":"Arena esportiva","auto":"Automotivo","automotivo":"Automotivo",
-                "medico":"Médico","médico":"Médico","saude":"Saúde","saúde":"Saúde"}
+                "medico":"Médico","médico":"Médico","saude":"Saúde","saúde":"Saúde",
+                "fisioterapia":"Fisioterapia"}
         return labels.get((self.category or "").strip().lower(),self.category or "Estabelecimento")
 
 

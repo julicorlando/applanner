@@ -5,6 +5,8 @@ from django.db import models
 class MedicalRecordEntry(models.Model):
     class Type(models.TextChoices):
         EVOLUTION="evolution","Evolução"
+        PHYSIO_EVALUATION="physio_evaluation","Avaliação fisioterápica"
+        PHYSIO_EVOLUTION="physio_evolution","Evolução fisioterápica"
         ANAMNESIS="anamnesis","Anamnese"
         PROCEDURE="procedure","Procedimento"
         OBSERVATION="observation","Observação"

@@ -17,7 +17,7 @@ class MedicalRecordTests(TestCase):
         module.save(update_fields=["slug"])
         TenantModule.objects.create(tenant=tenant,module=module,enabled=True)
         user=User.objects.create_user(
-            email="doctor@example.com",password="StrongPassword!123",tenant=tenant
+            email="doctor@example.com",password="StrongPassword!123",tenant=tenant,role="owner"
         )
         customer=Customer.objects.create(tenant=tenant,name="Paciente")
         professional=Professional.objects.create(tenant=tenant,user=user,name="Dra. Teste")
@@ -29,3 +29,18 @@ class MedicalRecordTests(TestCase):
         self.assertNotIn(content,entry.content_encrypted)
         self.assertEqual(read_record(entry=entry,user=user),content)
         self.assertEqual(entry.access_log.count(),2)
+
+    def test_reception_cannot_read_clinical_record(self):
+        from django.core.exceptions import PermissionDenied
+
+        tenant=Tenant.objects.create(name="Clínica",slug="health-reception-test",status=Tenant.Status.ACTIVE)
+        module=Module.objects.create(slug="medical_records",name="Prontuários")
+        TenantModule.objects.create(tenant=tenant,module=module,enabled=True)
+        owner=User.objects.create_user(email="owner2@example.com",password="StrongPassword!123",tenant=tenant,role="owner")
+        customer=Customer.objects.create(tenant=tenant,name="Paciente")
+        professional=Professional.objects.create(tenant=tenant,user=owner,name="Responsável")
+        entry=create_record(tenant=tenant,customer=customer,professional=professional,title="Avaliação",
+            content="Conteúdo protegido",user=owner)
+        reception=User.objects.create_user(email="reception@example.com",password="StrongPassword!123",tenant=tenant,role="reception")
+        with self.assertRaises(PermissionDenied):
+            read_record(entry=entry,user=reception)
