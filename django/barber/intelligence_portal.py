@@ -17,6 +17,9 @@ from .stages import configure_stages
 
 def manager(request):
     tenant = _tenant(request)
+    from billing.segment_access import require_segment
+
+    require_segment(tenant, "barbearia")
     if not has_capability(request.user, "barber.manage") or request.user.role in [
         "professional",
         "reception",

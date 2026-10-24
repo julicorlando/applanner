@@ -62,12 +62,12 @@ def offer_vacancy(cancelled_id):
         return None
     from tenants.models import Unit
 
+    expire_offers(tenant)
     if original.unit_id:
         Unit.objects.select_for_update().get(pk=original.unit_id, tenant=tenant)
     pro = Professional.objects.select_for_update().get(
         pk=original.professional_id, tenant=tenant, active=True
     )
-    expire_offers(tenant)
     existing = (
         RecoveryOffer.objects.filter(cancelled_appointment=original)
         .exclude(status__in=["expired", "cancelled"])
@@ -167,7 +167,7 @@ def deliver_offer(offer_id):
 
     with transaction.atomic():
         offer = (
-            RecoveryOffer.objects.select_for_update()
+            RecoveryOffer.objects.select_for_update(of=("self",))
             .select_related(
                 "tenant",
                 "appointment__customer",
@@ -251,7 +251,7 @@ def deliver_offer(offer_id):
 @transaction.atomic
 def accept_offer(token):
     offer = (
-        RecoveryOffer.objects.select_for_update()
+        RecoveryOffer.objects.select_for_update(of=("self",))
         .select_related("appointment", "entry")
         .get(token_hash=hashlib.sha256(token.encode()).hexdigest())
     )
