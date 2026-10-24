@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Editar página inicial · Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">IDENTIDADE DA PLATAFORMA</span><h1>Página inicial</h1><p>Edite os textos, as logos dos temas claro e escuro e o ícone da aba do navegador. As notícias são publicadas no blog.</p></div></div>
+  <form method="post" enctype="multipart/form-data" class="portal-form panel">{% csrf_token %}
+    <div><span class="eyebrow">LOGO PADRÃO</span><p><img class="brand-preview" src="{% if branding.logo %}{% url 'public-platform-logo' %}{% else %}{% static 'images/applanner-logo.png' %}{% endif %}" alt="Logo padrão do ApPlanner"></p><small>{% if branding.logo %}Logo padrão personalizada. As logos específicas de cada tema têm preferência.{% else %}Logo oficial do ApPlanner ativa como padrão. As logos específicas de cada tema têm preferência.{% endif %}</small></div>
+    <div class="branding-previews">{% if branding.logo_light %}<figure class="branding-preview-light"><img class="brand-preview" src="{% url 'public-platform-logo' %}?theme=light&amp;v={{ branding.updated_at|date:'U' }}" alt="Logo do tema claro"><figcaption>Tema claro</figcaption></figure>{% endif %}{% if branding.logo_dark %}<figure class="branding-preview-dark"><img class="brand-preview" src="{% url 'public-platform-logo' %}?theme=dark&amp;v={{ branding.updated_at|date:'U' }}" alt="Logo do tema escuro"><figcaption>Tema escuro</figcaption></figure>{% endif %}{% if branding.favicon %}<figure><img width="32" height="32" src="{% url 'public-platform-favicon' %}?v={{ branding.updated_at|date:'U' }}" alt="Ícone da aba"><figcaption>Ícone da aba</figcaption></figure>{% endif %}</div>
+    {% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% if field.errors %}<span class="field-error">{{ field.errors }}</span>{% endif %}</div>{% endfor %}
+    <div class="form-actions"><button class="button primary">Salvar página inicial</button><a class="button ghost" href="{% url 'master-resource-list' 'blog' %}">Gerenciar notícias</a><a class="button ghost" href="/" target="_blank" rel="noopener">Ver index ↗</a></div>
+  </form>
+</section>
+{% endblock %}

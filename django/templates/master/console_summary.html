@@ -1,0 +1,13 @@
+{% load display_pt %}
+<section aria-labelledby="master-overview-title">
+  <div class="section-heading"><div><span class="eyebrow">ACOMPANHAMENTO · {{ overview.month|date:'m/Y' }}</span><h2 id="master-overview-title">Sua operação agora</h2></div></div>
+  <div class="metric-grid">
+    <article><span>Empresas ativas</span><strong>{{ overview.active_companies }}</strong><a href="{% url 'master-resource-list' 'empresas' %}">Abrir empresas</a></article>
+    <article><span>Em teste grátis</span><strong>{{ overview.trial_companies }}</strong><small>{{ overview.ending_trials }} testes vencem nas próximas 48 horas</small></article>
+    <article><span>Cobranças vencidas</span><strong>{{ overview.overdue_count }}</strong><a href="{% url 'master-charges' %}?status=overdue">Conferir cobranças</a></article>
+    <article><span>Receita recebida no mês</span><strong>R$ {{ overview.totals.gross|money_pt }}</strong><small>Recebimentos aprovados e outras receitas pagas</small></article>
+    <article><span>Lucro líquido no mês</span><strong>R$ {{ overview.totals.net|money_pt }}</strong><small>Bruto menos estornos, taxas e despesas{% if overview.totals.unreconciled_count %} · {{ overview.totals.unreconciled_count }} cobrança(s) ainda sem taxa confirmada{% endif %}</small></article>
+    <article><span>Pontos de atenção</span><strong>{{ overview.alert_count }}</strong><a href="{% url 'master-alerts' %}">Abrir central de alertas</a></article>
+  </div>
+  <div class="form-actions"><a class="button" href="{% url 'master-retention' %}">Retenção e conversão</a><a class="button" href="{% url 'master-alerts' %}">Alertas</a><a class="button" href="{% url 'master-charges' %}">Cobranças</a><a class="button" href="{% url 'master-reports' %}">Relatórios e CSV</a></div>
+</section>

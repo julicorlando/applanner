@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Clientes de desenvolvimento · Master{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <header class="portal-heading"><div><span class="eyebrow">MASTER · DESENVOLVIMENTO DE SOFTWARE</span><h1>Clientes de desenvolvimento</h1><p>Cadastros e cobranças dos seus projetos, separados das empresas de agendamento.</p></div><a class="button primary" href="{% url 'development-client-create' %}">Cadastrar cliente</a></header>
+  <p><a class="button" href="{% url 'development-revenue' %}">Recebimentos e projeção financeira</a></p>
+  <form method="get" class="panel portal-form"><label for="client-search">Buscar por nome ou e-mail</label><input id="client-search" name="q" value="{{ q }}" maxlength="100"><button class="button">Buscar</button></form>
+  <div class="table-card"><table class="portal-table"><thead><tr><th>Cliente</th><th>E-mail</th><th>WhatsApp</th><th>Situação</th><th></th></tr></thead><tbody>{% for row in page %}<tr><td>{{ row.name }}<br><small>{{ row.company_name }}</small></td><td>{{ row.user.email }}</td><td>{{ row.phone }}</td><td>{{ row.active|yesno:'Ativo,Inativo' }}</td><td><a href="{% url 'development-client' row.pk %}">Abrir cadastro</a></td></tr>{% empty %}<tr><td colspan="5">Nenhum cliente cadastrado.</td></tr>{% endfor %}</tbody></table></div>
+  {% include 'development/pagination.html' %}
+</section>
+{% endblock %}

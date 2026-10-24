@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp da empresa · {{ tenant.name }}{% endblock %}
+{% block content %}<section class="shell portal-page narrow"><div class="portal-heading"><div><span class="eyebrow">COMUNICAÇÃO DA EMPRESA</span><h1>Conectar WhatsApp</h1><p>Use o WhatsApp da empresa para confirmar agendamentos e enviar lembretes prontos aos clientes.</p></div></div>
+<article class="panel"><h2>Conexão: {{ connection_label }}</h2>
+{% if not available %}<p role="status">O módulo WhatsApp não está liberado no plano desta empresa. A conexão por QR fica disponível após o Master incluí-lo no plano ou liberar esta empresa.</p>
+{% if request.user.is_superuser %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="grant"><button class="button primary">Liberar WhatsApp para {{ tenant.name }}</button></form>{% endif %}{% endif %}
+{% if state.callbackError %}<p role="alert">{{ state.callbackError }}</p>{% endif %}
+{% if state.qr %}<p>Abra WhatsApp → Aparelhos conectados → Conectar aparelho e escaneie:</p><img alt="QR para conectar o WhatsApp da empresa" src="{{ state.qr }}" width="320" height="320">{% endif %}
+{% if available %}<p><a class="button" href="{% url 'tenant-whatsapp-chatbot' %}">Configurar chatbot</a></p><p>Monte o fluxo visual de atendimento, com serviços, unidades, triagem e IA da plataforma. Cada empresa usa sua própria conexão e configuração de chatbot.</p><div class="form-actions"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="connect"><button class="button primary">Conectar / atualizar QR</button></form>
+{% if connection.enabled %}<form method="post" onsubmit="return confirm('Desconectar o WhatsApp da empresa?')">{% csrf_token %}<input type="hidden" name="action" value="disconnect"><button class="button ghost">Desconectar</button></form>{% endif %}</div>
+{% endif %}
+<p>O QR e as sessões de cada empresa ficam separados da conta WhatsApp do Master. O gateway só recebe mensagens se o serviço estiver conectado.</p></article></section>
+{% if connection.enabled and state.state != 'connected' %}<script>setTimeout(()=>location.reload(),5000)</script>{% endif %}
+{% endblock %}

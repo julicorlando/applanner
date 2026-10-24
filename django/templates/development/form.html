@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} · Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <a href="{% url 'development-clients' %}">← Clientes de desenvolvimento</a>
+  <header class="portal-heading"><div><h1>{{ title }}</h1></div></header>
+  {% if warning %}<p class="panel">{{ warning }}</p>{% endif %}
+  {% if multipart %}<p>Anexe o PDF do boleto emitido pelo banco para enviá-lo junto aos lembretes automáticos do WhatsApp. Um link HTTPS do banco também pode ser informado, mas sozinho não gera um arquivo anexo. O cadastro bancário não emite boletos. Pix direto à chave bancária exige conferência do Master; Pix e cartão pelo provedor têm confirmação automática.</p>{% endif %}
+  <form method="post" {% if multipart %}enctype="multipart/form-data"{% endif %} class="panel portal-form">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}{% if field.is_hidden %}{{ field }}{{ field.errors }}{% else %}<div class="form-field">{{ field.label_tag }}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endif %}{% endfor %}<button class="button primary" type="submit">Salvar</button></form>
+</section>
+{% endblock %}

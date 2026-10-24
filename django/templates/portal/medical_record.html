@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.title }} — Prontuário{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'portal-resource-list' module_slug resource_slug %}">← Prontuários</a><span class="eyebrow">{% if physiotherapy %}PRONTUÁRIO FISIOTERÁPICO{% else %}PRONTUÁRIO CRIPTOGRAFADO{% endif %}</span><h1>{{ entry.title }}</h1><p>{{ entry.customer }} · {{ entry.professional }} · {{ entry.get_record_type_display }}</p><p>Registrado em {{ entry.created_at|date:"d/m/Y H:i" }} · {{ entry.created_by }}</p></div></div>
+  {% if physiotherapy %}
+    {% for section in sections %}<article class="panel medical-record-content"><strong>{{ section.label }}</strong><div>{{ section.value|linebreaksbr }}</div></article>{% endfor %}
+    {% if body_regions %}<article class="panel medical-record-content"><strong>Locais tratados no mapa corporal</strong><ul>{% for area in body_regions %}<li>{{ area.label }}</li>{% endfor %}</ul></article>{% endif %}
+  {% else %}<article class="panel medical-record-content">{{ content|linebreaks }}</article>{% endif %}
+</section>
+{% endblock %}

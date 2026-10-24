@@ -1,0 +1,83 @@
+from django.db.models.signals import post_save,pre_save
+from django.dispatch import receiver
+from django.utils import timezone
+
+from applanner.transactional_email import queue_email
+
+from .models import Appointment
+
+
+@receiver(pre_save,sender=Appointment)
+def remember_confirmation_state(sender,instance,**kwargs):
+    instance._previous_service=sender.objects.filter(pk=instance.pk).values_list('service_id',flat=True).first() if instance.pk else None
+    instance._previous_end=sender.objects.filter(pk=instance.pk).values_list('ends_at',flat=True).first() if instance.pk else None
+    instance._previous_start=(sender.objects.filter(pk=instance.pk).values_list("starts_at",flat=True).first() if instance.pk else None)
+    instance._previous_professional=(sender.objects.filter(pk=instance.pk).values_list("professional_id",flat=True).first() if instance.pk else None)
+    instance._previous_status=(sender.objects.filter(pk=instance.pk).values_list("status",flat=True).first()
+        if instance.pk else None)
+
+
+@receiver(post_save,sender=Appointment)
+def notify_confirmed_appointment(sender,instance,created,**kwargs):
+    if instance.status!=Appointment.Status.CONFIRMED or (
+        not created and getattr(instance,"_previous_status",None)==Appointment.Status.CONFIRMED
+    ):
+        return
+    from communications.tenant_whatsapp import queue_appointment_whatsapp
+    queue_appointment_whatsapp(instance,"confirmation")
+    if instance.customer.email:
+        queue_email(instance.tenant,instance.customer.email,"booking_confirmation",{
+        "nome":instance.customer.name,
+        "empresa":instance.tenant.name,
+        "servico":instance.service.name,
+        "profissional":instance.professional.name if instance.professional_id else "A definir",
+        "data_hora":timezone.localtime(instance.starts_at).strftime("%d/%m/%Y às %H:%M"),
+        },customer=instance.customer)
+
+
+@receiver(post_save,sender=Appointment)
+def close_finished_appointment_conversation(sender,instance,**kwargs):
+    if instance.status in {Appointment.Status.COMPLETED,Appointment.Status.CANCELLED,Appointment.Status.NO_SHOW}:
+        from communications.models import WhatsAppConversation
+        WhatsAppConversation.objects.filter(appointment=instance).update(status=WhatsAppConversation.Status.CLOSED)
+
+
+@receiver(post_save, sender=Appointment)
+def start_return_intelligence(sender, instance, created, **kwargs):
+    if not created or instance.status == Appointment.Status.CANCELLED:
+        return
+    from engagement.models import BehaviorEvent, BehaviorProfile, BehaviorServiceProfile
+
+    _, first = BehaviorProfile.objects.get_or_create(tenant_id=instance.tenant_id, customer_id=instance.customer_id)
+    BehaviorServiceProfile.objects.get_or_create(tenant_id=instance.tenant_id,
+        customer_id=instance.customer_id, service_id=instance.service_id)
+    if first:
+        BehaviorEvent.objects.create(tenant_id=instance.tenant_id, customer_id=instance.customer_id,
+            event_type="first_appointment", payload={"appointment_id": instance.pk})
+
+
+@receiver(post_save,sender=Appointment)
+def notify_mobile_change(sender,instance,created,**kwargs):
+    if created or getattr(instance,"_previous_status",None)!=instance.status or getattr(instance,"_previous_start",None)!=instance.starts_at or getattr(instance,"_previous_professional",None)!=instance.professional_id:
+        from communications.mobile_delivery import appointment_event
+        appointment_event(instance,created=created)
+
+@receiver(post_save, sender=Appointment)
+def maintain_beauty_stages(sender, instance, created, **kwargs):
+    if created or getattr(instance,'_previous_start',None)!=instance.starts_at or getattr(instance,'_previous_professional',None)!=instance.professional_id or getattr(instance,'_previous_end',None)!=instance.ends_at or getattr(instance,'_previous_service',None)!=instance.service_id:
+        from barber.stages import snapshot
+        instance.stage_reservations.all().delete()
+        snapshot(instance)
+
+@receiver(post_save, sender=Appointment)
+def recover_cancelled_beauty_vacancy(sender, instance, created, **kwargs):
+    if not created and instance.status=='cancelled' and getattr(instance,'_previous_status',None)!='cancelled':
+        from barber.models import BeautySettings, RecoveryOffer
+        if BeautySettings.objects.filter(tenant=instance.tenant,recovery_enabled=True).exists() and not RecoveryOffer.objects.filter(appointment=instance).exists():
+            from django.db import transaction
+            from communications.tasks import recover_beauty_vacancy
+            def dispatch_recovery():
+                import logging
+                try:recover_beauty_vacancy.delay(instance.pk)
+                except Exception:logging.getLogger(__name__).exception('Falha ao enfileirar recuperação da vaga %s',instance.pk)
+            transaction.on_commit(dispatch_recovery)

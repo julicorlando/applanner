@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}Cadastrar recepção — {{ tenant.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow"><header class="portal-heading"><div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">EQUIPE</span><h1>Cadastrar recepção</h1><p>A recepção pode cuidar de agenda, clientes, comunicação e suporte. O financeiro permanece restrito à gestão.</p></div></header><form method="post" class="portal-form panel">{% csrf_token %}{% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}<button class="button primary">Criar acesso de recepção</button></form></section>
+{% endblock %}

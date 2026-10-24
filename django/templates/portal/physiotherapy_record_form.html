@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<style>
+.physio-wrap{max-width:1000px;margin:auto}.physio-hero{background:linear-gradient(130deg,#e8f6f2,#eef2ff);border-radius:22px;padding:28px;margin-bottom:20px}.physio-hero h1{margin:.25rem 0}.physio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.physio-field label{font-weight:650;display:block;margin-bottom:6px}.physio-field input,.physio-field select,.physio-field textarea{width:100%;border:1px solid #ccd5df;border-radius:10px;padding:10px;background:#fff}.physio-field textarea{min-height:76px}.physio-section{padding:20px;margin-bottom:16px}.physio-section h2{font-size:1.12rem;margin:0 0 14px}.physio-type{display:flex;gap:12px;flex-wrap:wrap}.physio-type label{padding:10px 15px;background:#f5f7fa;border-radius:12px;cursor:pointer}.body-map{display:grid;grid-template-columns:240px 1fr;gap:20px;align-items:center}.body-canvas{height:390px;position:relative;margin:auto;width:190px}.body-canvas svg{width:100%;height:100%}.body-silhouette{fill:#dce5ec;stroke:#9aaab7;stroke-width:2}.hotspot{position:absolute;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;border:2px solid #fff;background:#7290a8;box-shadow:0 1px 5px #273a4b66;cursor:pointer}.hotspot:hover,.hotspot:focus{background:#0f766e;outline:3px solid #99e5d8}.hotspot.selected{background:#14a38b}.body-views{display:flex;gap:8px;margin-bottom:10px}.body-views button,.area-chip{border:1px solid #cbd5df;border-radius:999px;background:#fff;padding:8px 12px;cursor:pointer}.body-views .active,.area-chip.selected{background:#0f766e;color:#fff;border-color:#0f766e}.area-list{display:flex;flex-wrap:wrap;gap:7px}.map-caption{font-size:.9rem;color:#596579}.selected-areas{padding:10px 0}.physio-actions{display:flex;justify-content:space-between;align-items:center;margin:20px 0}.field-error{color:#b42318;font-size:.9rem}.full{grid-column:1/-1}.subtle{color:#5f6b7a}@media(max-width:700px){.physio-grid,.body-map{grid-template-columns:1fr}.body-canvas{height:340px}.physio-hero{padding:20px}}
+</style>
+<section class="shell portal-page physio-wrap">
+  <div class="physio-hero">
+    <a class="back-link" href="{% url 'portal-resource-list' module_slug resource_slug %}">← Prontuários</a>
+    <span class="eyebrow">CUIDADO COM CONTEXTO</span>
+    <h1>{{ title }}</h1>
+    <p class="subtle">Registre a avaliação ou a sessão. O conteúdo clínico é criptografado e vinculado ao paciente, à empresa e ao profissional que salvou.</p>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="field-error">{{ form.non_field_errors }}</div>{% endif %}
+    <section class="panel physio-section">
+      <h2>Vínculo do atendimento</h2>
+      <div class="physio-grid">
+        <div class="physio-field full"><label>{{ form.record_type.label }}</label><div class="physio-type">{{ form.record_type }}</div>{{ form.record_type.errors }}</div>
+        <div class="physio-field">{{ form.customer.label_tag }}{{ form.customer }}{{ form.customer.errors }}</div>
+        <div class="physio-field">{{ form.professional.label_tag }}{{ form.professional }}{{ form.professional.errors }}</div>
+        <div class="physio-field full">{{ form.appointment.label_tag }}{{ form.appointment }}{{ form.appointment.errors }}</div>
+      </div>
+    </section>
+    <section class="panel physio-section" data-kind="physio_evaluation">
+      <h2>Avaliação fisioterápica inicial</h2>
+      <div class="physio-grid">
+        <div class="physio-field full">{{ form.chief_complaint.label_tag }}{{ form.chief_complaint }}{{ form.chief_complaint.errors }}</div>
+        <div class="physio-field full">{{ form.onset.label_tag }}{{ form.onset }}{{ form.onset.errors }}</div>
+        <div class="physio-field">{{ form.pain_level.label_tag }}{{ form.pain_level }}{{ form.pain_level.errors }}</div>
+        <div class="physio-field">{{ form.medications_allergies.label_tag }}{{ form.medications_allergies }}{{ form.medications_allergies.errors }}</div>
+        <div class="physio-field full">{{ form.medical_history.label_tag }}{{ form.medical_history }}{{ form.medical_history.errors }}</div>
+        <div class="physio-field full">{{ form.precautions.label_tag }}{{ form.precautions }}{{ form.precautions.errors }}</div>
+        <div class="physio-field full">{{ form.functional_limits.label_tag }}{{ form.functional_limits }}{{ form.functional_limits.errors }}</div>
+        <div class="physio-field full">{{ form.vital_signs.label_tag }}{{ form.vital_signs }}{{ form.vital_signs.errors }}</div>
+        <div class="physio-field full">{{ form.observation.label_tag }}{{ form.observation }}{{ form.observation.errors }}</div>
+        <div class="physio-field">{{ form.range_of_motion.label_tag }}{{ form.range_of_motion }}{{ form.range_of_motion.errors }}</div>
+        <div class="physio-field">{{ form.strength.label_tag }}{{ form.strength }}{{ form.strength.errors }}</div>
+        <div class="physio-field">{{ form.special_tests.label_tag }}{{ form.special_tests }}{{ form.special_tests.errors }}</div>
+        <div class="physio-field">{{ form.functional_scale.label_tag }}{{ form.functional_scale }}{{ form.functional_scale.errors }}</div>
+        <div class="physio-field full">{{ form.physical_assessment.label_tag }}{{ form.physical_assessment }}{{ form.physical_assessment.errors }}</div>
+        <div class="physio-field full">{{ form.clinical_impression.label_tag }}{{ form.clinical_impression }}{{ form.clinical_impression.errors }}</div>
+        <div class="physio-field">{{ form.goals.label_tag }}{{ form.goals }}{{ form.goals.errors }}</div>
+        <div class="physio-field">{{ form.initial_plan.label_tag }}{{ form.initial_plan }}{{ form.initial_plan.errors }}</div>
+      </div>
+    </section>
+    <section class="panel physio-section" data-kind="physio_evolution">
+      <h2>Evolução da sessão</h2>
+      <div class="physio-grid">
+        <div class="physio-field full">{{ form.subjective.label_tag }}{{ form.subjective }}{{ form.subjective.errors }}</div>
+        <div class="physio-field">{{ form.pain_session.label_tag }}{{ form.pain_session }}{{ form.pain_session.errors }}</div>
+        <div class="physio-field">{{ form.treatment.label_tag }}{{ form.treatment }}{{ form.treatment.errors }}</div>
+        <div class="physio-field full">{{ form.response.label_tag }}{{ form.response }}{{ form.response.errors }}</div>
+        <div class="physio-field full">{{ form.next_plan.label_tag }}{{ form.next_plan }}{{ form.next_plan.errors }}</div>
+      </div>
+      <hr>
+      <h2>Mapa corporal dos locais tratados</h2>
+      <p class="map-caption">Selecione a vista anterior ou posterior e toque/click nas áreas. Os lados se referem ao paciente.</p>
+      <div class="body-views" role="group" aria-label="Vista do corpo">
+        <button type="button" class="active" data-view="anterior">Vista anterior</button>
+        <button type="button" data-view="posterior">Vista posterior</button>
+      </div>
+      <div class="body-map">
+        <div class="body-canvas" id="body-canvas" aria-label="Mapa corporal interativo">
+          <svg viewBox="0 0 200 420" role="img" aria-label="Silhueta corporal">
+            <circle class="body-silhouette" cx="100" cy="29" r="21"/>
+            <path class="body-silhouette" d="M84 52 L116 52 L117 75 Q145 78 155 98 L174 168 Q178 183 165 187 Q155 190 150 176 L135 126 L137 197 L130 240 L141 312 L138 398 Q136 410 125 410 L116 410 L112 323 L102 270 L94 323 L90 410 L75 410 Q64 409 63 398 L60 312 L70 240 L63 197 L65 126 L50 176 Q45 190 35 187 Q22 183 26 168 L45 98 Q55 78 83 75 Z"/>
+            <path d="M75 90 Q100 103 125 90 M70 198 Q100 215 130 198 M71 238 Q100 250 129 238" fill="none" stroke="#9aaab7" stroke-width="2"/>
+          </svg>
+        </div>
+        <div>
+          <p class="subtle" id="map-help">Escolha as áreas atendidas. Os pontos ficam marcados no corpo e listados abaixo.</p>
+          <div id="area-list" class="area-list"></div>
+          <div class="selected-areas"><strong>Selecionados:</strong> <span id="selected-area-summary" class="subtle">nenhum local</span></div>
+          <div id="body-inputs"></div>
+          {{ form.body_regions.errors }}
+        </div>
+      </div>
+    </section>
+    <div class="physio-actions">
+      <a class="button secondary" href="{% url 'portal-resource-list' module_slug resource_slug %}">Cancelar</a>
+      <button class="button primary" type="submit">Salvar no prontuário</button>
+    </div>
+  </form>
+</section>
+{{ body_areas|json_script:"physio-body-areas" }}
+{{ body_selected|json_script:"physio-body-selected" }}
+<script>
+(() => {
+  const choices = JSON.parse(document.getElementById("physio-body-areas").textContent);
+  const list = document.getElementById("area-list");
+  const canvas = document.getElementById("body-canvas");
+  const inputs = document.getElementById("body-inputs");
+  const summary = document.getElementById("selected-area-summary");
+  const typeInputs = document.querySelectorAll('input[name="record_type"]');
+  let view = "anterior";
+  const selected = new Set(JSON.parse(document.getElementById("physio-body-selected").textContent));
+  const positions = (id) => {
+    const back = id.includes("back") || ["upper_back","lower_back","calf_left","calf_right"].includes(id);
+    const side = id.includes("_left") || id.endsWith("_left") ? -1 : (id.includes("_right") || id.endsWith("_right") ? 1 : 0);
+    let y = 100, x = side ? (side < 0 ? 69 : 131) : 100;
+    if(id.startsWith("head")) y=29;
+    else if(id.startsWith("neck")) y=66;
+    else if(id.includes("shoulder")) y=91;
+    else if(id.includes("chest") || id==="upper_back") {y=116;x=side?x:100}
+    else if(id==="lower_back") y=190;
+    else if(id.includes("elbow")) y=143;
+    else if(id.includes("forearm")) {y=171;x=side?(side<0?43:157):100}
+    else if(id.includes("wrist")) {y=199;x=side?(side<0?35:165):100}
+    else if(id.includes("hip")) y=215;
+    else if(id.includes("thigh")) y=258;
+    else if(id.includes("knee")) y=294;
+    else if(id.includes("shin")||id.includes("calf")) y=342;
+    else if(id.includes("ankle")) y=389;
+    return {x,y,back};
+  };
+  const sync = () => {
+    list.replaceChildren(); inputs.replaceChildren(); canvas.querySelectorAll(".hotspot").forEach(x=>x.remove());
+    const visible=choices.filter(([id,label]) => label.endsWith(view==="anterior"?"anterior":"posterior"));
+    visible.forEach(([id,label])=>{
+      const b=document.createElement("button"); b.type="button"; b.className="area-chip"+(selected.has(id)?" selected":""); b.textContent=label; b.setAttribute("aria-pressed",selected.has(id));
+      b.addEventListener("click",()=>{selected.has(id)?selected.delete(id):selected.add(id);sync()}); list.appendChild(b);
+      const p=positions(id); if(p.back===(view==="posterior")){
+        const dot=document.createElement("button"); dot.type="button"; dot.className="hotspot"+(selected.has(id)?" selected":""); dot.style.left=(p.x/2)+"%"; dot.style.top=(p.y/4.2)+"%"; dot.title=label; dot.setAttribute("aria-label",label); dot.setAttribute("aria-pressed",selected.has(id));
+        dot.addEventListener("click",()=>{selected.has(id)?selected.delete(id):selected.add(id);sync()});canvas.appendChild(dot);
+      }
+    });
+    selected.forEach(id=>{const input=document.createElement("input");input.type="hidden";input.name="body_regions";input.value=id;inputs.appendChild(input)});
+    const names=choices.filter(([id])=>selected.has(id)).map(([,label])=>label);
+    summary.textContent=names.length?names.join(", "):"nenhum local";
+  };
+  document.querySelectorAll("[data-view]").forEach(btn=>btn.addEventListener("click",()=>{view=btn.dataset.view;document.querySelectorAll("[data-view]").forEach(x=>x.classList.toggle("active",x===btn));sync()}));
+  const togglePanels=()=>{const val=Array.from(typeInputs).find(x=>x.checked)?.value||"physio_evaluation";document.querySelectorAll("[data-kind]").forEach(x=>x.hidden=x.dataset.kind!==val)};
+  typeInputs.forEach(x=>x.addEventListener("change",togglePanels));togglePanels();sync();
+})();
+</script>
+{% endblock %}
