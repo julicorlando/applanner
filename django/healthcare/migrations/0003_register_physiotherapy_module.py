@@ -20,5 +20,5 @@ def add_physiotherapy_module(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("healthcare", "0002_physiotherapy_record_types"), ("billing", "0001_initial")]
+    dependencies = [("healthcare", "0002_physiotherapy_record_types"), ("billing", "0021_verified_business_module")]
     operations = [migrations.RunPython(add_physiotherapy_module, migrations.RunPython.noop)]
