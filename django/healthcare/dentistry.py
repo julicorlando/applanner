@@ -5,7 +5,7 @@ service; no unencrypted patient findings are written to JSON database columns.
 """
 import json
 from django.core.exceptions import PermissionDenied, ValidationError
-from billing.entitlements import module_enabled, professional_capacity
+from billing.entitlements import module_enabled
 from billing.models import TenantModuleAddon, ModuleRequest
 from .models import MedicalRecordEntry
 from .services import create_record, read_record, assert_clinical_access
@@ -95,7 +95,7 @@ def dental_professional_allowance(tenant):
     return 1 + extras
 
 
-def request_extra_dentist(*, tenant, user, module, monthly_price, public_id, note=""):
+def request_extra_dentist(*, tenant, user, module, public_id, note=""):
     """Creates a request only. Master approval/payment uses the existing billing workflow."""
     from decimal import Decimal
     assert_clinical_access(user)
@@ -104,7 +104,8 @@ def request_extra_dentist(*, tenant, user, module, monthly_price, public_id, not
         raise PermissionDenied("Somente o responsável da clínica pode solicitar vagas.")
     if module.slug != "dental-professional-extra" or not module.active or not module.addon_sellable:
         raise ValidationError("Adicional odontológico indisponível.")
-    if Decimal(str(monthly_price)) < 0:
-        raise ValidationError("Preço inválido.")
+    monthly_price = module.addon_monthly_price
+    if monthly_price is None or monthly_price < Decimal("0"):
+        raise ValidationError("Master precisa definir o preço do adicional.")
     return ModuleRequest.objects.create(tenant=tenant, module=module, requested_by=user,
         public_id=public_id, quoted_monthly_price=monthly_price, tenant_note=note[:500])
