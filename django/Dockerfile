@@ -1,4 +1,6 @@
-FROM python:3.13-slim AS runtime
+FROM postgres:16-bookworm AS postgres_tools
+
+FROM python:3.13-slim-bookworm AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -7,9 +9,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl libpq5 postgresql-client \
+    && apt-get install -y --no-install-recommends curl libpq5 liblz4-1 libzstd1 postgresql-client \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 appuser
+
+COPY --from=postgres_tools /usr/lib/postgresql/16/bin/pg_dump /usr/local/bin/pg_dump
+COPY --from=postgres_tools /usr/lib/postgresql/16/bin/pg_restore /usr/local/bin/pg_restore
+COPY --from=postgres_tools /usr/lib/postgresql/16/bin/psql /usr/local/bin/psql
+RUN pg_dump --version && pg_restore --version && psql --version
 
 COPY requirements.txt /app/requirements.txt
 RUN pip install --upgrade pip && pip install -r /app/requirements.txt

@@ -122,3 +122,26 @@ def process_fiscal_document(document_id):
 def reconcile_fiscal_documents():
     from .fiscal_automation import reconcile
     return reconcile()
+
+
+@shared_task
+def reconcile_paid_dental_seats():
+    from .dental_seats import finalize_seats
+    from .models import ModuleRequest
+    ids=ModuleRequest.objects.filter(module__slug="dental-professional-extra",
+        status__in=["approved","awaiting_payment","payment_failed"]).values_list("pk",flat=True)
+    payments=Payment.objects.filter(purpose="dental-seat",status="paid",reference_id__in=ids).values_list("pk",flat=True)
+    successful=0
+    for pk in payments:
+        try:successful+=bool(finalize_seats(pk))
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Falha na conciliação de vaga odontológica; payment_id=%s",pk)
+    from .dental_seats import reconcile_dental_refund
+    refunds=Payment.objects.filter(purpose="dental-seat",status__in=["refunded","partially_refunded"],reference_id__in=ModuleRequest.objects.filter(module__slug="dental-professional-extra",status="active").values_list("pk",flat=True))
+    for payment in refunds:
+        try:successful+=bool(reconcile_dental_refund(payment.pk))
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Falha ao conciliar estorno de vaga; payment_id=%s",payment.pk)
+    return successful

@@ -33,6 +33,8 @@
 <link rel="stylesheet" href="{% static 'css/workspace-calendar.css' %}">
 </head>
 <body class="adaptive-ui {% if workspace_groups %}has-workspace{% endif %} {% if simple_mode %}simple-mode{% endif %} {% block body_class %}{% endblock %}">
+{% if clinical_homologation %}<div role="status" style="padding:12px;background:#fef3c7;color:#78350f;text-align:center;font-weight:650">HOMOLOGAÇÃO · somente dados fictícios · pagamentos apenas em sandbox</div>{% endif %}
+
   <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
   {% block header %}{% if not workspace_groups %}<header class="topbar">
     <a class="brand" href="/" aria-label="ApPlanner início">

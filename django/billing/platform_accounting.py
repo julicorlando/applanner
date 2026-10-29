@@ -66,6 +66,9 @@ def reconcile_financial_payment(pk):
             if status in {'refunded','charged_back'}: row.status='refunded'
             elif status=='partially_refunded' or money(row.metadata['accounting']['refunded'])>0: row.status='partially_refunded'
             row.save(update_fields=['metadata','status'])
+            if row.purpose=="dental-seat" and row.status in {"refunded","partially_refunded"}:
+                from .dental_seats import reconcile_dental_refund
+                transaction.on_commit(lambda:reconcile_dental_refund(row.pk),robust=True)
         return changed
 
 

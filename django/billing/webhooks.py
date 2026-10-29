@@ -184,7 +184,19 @@ def _reconcile_platform(event,gateway,data,resource_id):
                         },
                     )
         if payment:
-            if payment.metadata.get("method")=="pix":
+            if payment.purpose=="dental-seat" and remote.get("status") in {"refunded","charged_back","partially_refunded"}:
+                from .platform_accounting import capture_accounting
+                from .dental_seats import reconcile_dental_refund
+                if payment.environment!=gateway.environment:raise ValueError("Ambiente do pagamento diverge da cobrança.")
+                capture_accounting(payment,remote)
+                payment.provider_status=remote["status"]
+                payment.status="partially_refunded" if remote["status"]=="partially_refunded" else "refunded"
+                payment.save(update_fields=["provider_status","status","metadata","updated_at"])
+                transaction.on_commit(lambda:reconcile_dental_refund(payment.pk),robust=True)
+                event.status=WebhookEvent.Status.PROCESSED;event.processed_at=timezone.now();event.error_message=""
+                event.save(update_fields=["status","processed_at","error_message"])
+                return
+            elif payment.metadata.get("method")=="pix":
                 if external!=payment.provider_reference or payment.environment!=gateway.environment:
                     raise ValueError("Pagamento Pix não corresponde à cobrança registrada.")
                 charge=PixCharge.objects.filter(payment=payment).first()

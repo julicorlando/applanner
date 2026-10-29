@@ -201,6 +201,22 @@ def navigation(request):
                     link('Avaliações da equipe', reverse('tenant-ratings'), 'users'),
                     link('WhatsApp da empresa', reverse('tenant-whatsapp-settings'), 'chat'),
                 ])
+    if tenant and not getattr(request, "billing_locked", False):
+        from django.core.exceptions import PermissionDenied
+        from billing.entitlements import module_enabled
+        from healthcare.services import assert_clinical_access
+        try:
+            assert_clinical_access(user)
+        except PermissionDenied:
+            pass
+        else:
+            clinical=[link("Painel clínico",reverse("clinical-dashboard"),"users"),link("Identificação profissional",reverse("clinical-registration"),"users")]
+            if module_enabled(tenant,"dentistry"):
+                clinical.append(link("Odontologia",reverse("dental-home"),"users"))
+            if module_enabled(tenant,"physiotherapy"):
+                clinical.append(link("Fisioterapia",reverse("portal-resource-list",args=["saude","prontuarios"]),"users"))
+            if clinical:
+                groups.append({"title":"Atendimento clínico","items":clinical})
     if not groups:
         groups = [{'title': 'Minha conta', 'items': [link('Início', '/'), link('Explorar estabelecimentos', reverse('public-directory'), 'calendar')]}]
     account = [link('Segurança da conta', '/account/2fa/setup/'),

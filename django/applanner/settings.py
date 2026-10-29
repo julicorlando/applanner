@@ -12,6 +12,7 @@ MASTER_WHATSAPP_GATEWAY_URL = env("MASTER_WHATSAPP_GATEWAY_URL",default="")
 TENANT_WHATSAPP_GATEWAY_URL = env("TENANT_WHATSAPP_GATEWAY_URL",default="")
 FIELD_ENCRYPTION_KEY = env("DJANGO_FIELD_ENCRYPTION_KEY")
 TRUSTED_DEVICE_DAYS = env.int("TRUSTED_DEVICE_DAYS", default=30)
+DEPLOYMENT_ENVIRONMENT = env("DEPLOYMENT_ENVIRONMENT",default="production")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost","127.0.0.1"])
 PUBLIC_BASE_URL = normalize_public_base_url(env("PUBLIC_BASE_URL",default=""))
@@ -63,6 +64,7 @@ TEMPLATES=[{
     "DIRS":[BASE_DIR/"templates"],"APP_DIRS":True,
     "OPTIONS":{"context_processors":[
         "django.template.context_processors.request",
+        "core.clinical_context.environment",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
         "core.mobile_workspace.navigation","core.workspace.navigation","core.branding.platform_branding","core.simple_mode.company_context","core.unit_scope.operation_unit_context","billing.access.trial_prompt","billing.reminders.payment_reminder",

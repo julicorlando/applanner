@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand,CommandError
 from django.db import models,transaction
 from django.utils import timezone
 
-from core.crypto import encrypt_json, encrypt_text
+from core.crypto import encrypt_json, encrypt_text, decrypt_text
 from core.legacy_crypto import decrypt_php_aes_gcm
 
 
@@ -686,7 +686,7 @@ class Command(BaseCommand):
                 raise CommandError(
                     f"Prontuário legado #{row['id']} não pôde ser descriptografado: {exc}"
                 ) from exc
-            Entry.objects.update_or_create(
+            entry,created=Entry.objects.get_or_create(
                 id=row["id"],
                 defaults={
                     "tenant_id":row["tenant_id"],
@@ -697,8 +697,13 @@ class Command(BaseCommand):
                     "title":row.get("title") or "Registro migrado",
                     "content_encrypted":encrypt_text(str(plaintext)),
                     "created_by_id":row["created_by"],
+                    "created_at":aware(row["created_at"]) or timezone.now(),
                 },
             )
-            Entry.objects.filter(pk=row["id"]).update(created_at=aware(row["created_at"]))
+            if not created and (entry.tenant_id!=row["tenant_id"] or
+                    entry.customer_id!=row["customer_id"] or
+                    entry.professional_id!=row["professional_id"] or
+                    decrypt_text(entry.content_encrypted)!=str(plaintext)):
+                raise CommandError(f"Prontuário legado #{row['id']} diverge do registro preservado. Use retificação clínica.")
             count+=1
         return count

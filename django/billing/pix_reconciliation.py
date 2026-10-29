@@ -23,6 +23,9 @@ def reconcile_pix_charge(charge_id, *, gateway=None, provider=None, order=None):
         payment = Payment.objects.select_for_update().get(pk=charge.payment_id)
         charge = PixCharge.objects.select_for_update().get(pk=charge_id)
         if payment.status == Payment.Status.PAID and charge.status == 'paid':
+            if payment.purpose=="dental-seat":
+                from .dental_seats import finalize_seats
+                transaction.on_commit(lambda:finalize_seats(payment.pk),robust=True)
             return True
         if payment.status in {Payment.Status.CANCELLED, Payment.Status.REFUNDED, Payment.Status.PARTIALLY_REFUNDED}:
             return False
@@ -74,7 +77,10 @@ def reconcile_pix_charge(charge_id, *, gateway=None, provider=None, order=None):
         charge.paid_at = charge.paid_at or paid_at
         charge.save(update_fields=['status', 'paid_at', 'updated_at'])
         CheckoutSession.objects.filter(pk=charge.checkout_session_id).update(status=CheckoutSession.Status.PAID, updated_at=paid_at)
-        if subscription.status in {Subscription.Status.TRIAL, Subscription.Status.PAST_DUE, Subscription.Status.ACTIVE}:
+        if payment.purpose=="dental-seat":
+            from .dental_seats import finalize_seats
+            transaction.on_commit(lambda:finalize_seats(payment.pk),robust=True)
+        elif subscription.status in {Subscription.Status.TRIAL, Subscription.Status.PAST_DUE, Subscription.Status.ACTIVE}:
             subscription.status = Subscription.Status.ACTIVE
             subscription.next_billing_at = prior_coverage if already_paid else cycle_start + relativedelta(months=months)
             subscription.save(update_fields=['status', 'next_billing_at', 'updated_at'])

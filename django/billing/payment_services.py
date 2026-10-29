@@ -80,6 +80,9 @@ def configure_mercadopago_gateway(*,environment,public_key,access_token,webhook_
 
 
 def platform_provider(gateway):
+    from django.conf import settings
+    if settings.DEPLOYMENT_ENVIRONMENT=="homologacao" and gateway.environment!="sandbox":
+        raise ValueError("Homologação permite apenas Mercado Pago sandbox.")
     return MercadoPagoProvider(decrypt_text(gateway.access_token_encrypted))
 
 
@@ -94,7 +97,7 @@ def create_platform_subscription(*,subscription,payer_email,back_url,idempotency
         raise ValueError("Selecione cartão em Alterar forma de pagamento antes de continuar.")
     if subscription.provider_subscription_id:
         return {"reference":subscription.provider_subscription_id,"init_point":subscription.provider_checkout_url}
-    if PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING,expires_at__gt=timezone.now()).exists():
+    if PixCharge.objects.filter(subscription=subscription,payment__purpose="subscription",payment__status=Payment.Status.PENDING,expires_at__gt=timezone.now()).exists():
         raise ValueError("Existe um Pix pendente. Conclua o pagamento ou aguarde sua expiração antes de configurar o cartão.")
     gateway=PaymentGateway.objects.filter(
         provider="mercadopago",active=True,last_test_status=PaymentGateway.TestStatus.VALIDATED
@@ -157,7 +160,7 @@ def create_platform_pix_charge(*,subscription,payer_email):
     if subscription.payment_method=="card":
         raise ValueError("Selecione Pix em Alterar forma de pagamento antes de continuar.")
     previous=PixCharge.objects.select_related("payment").filter(
-        subscription=subscription,payment__status=Payment.Status.PENDING,
+        subscription=subscription,payment__purpose="subscription",payment__status=Payment.Status.PENDING,
         expires_at__gt=timezone.now(),
     ).order_by("-created_at").first()
     if previous:
@@ -260,6 +263,9 @@ def configure_tenant_mercadopago(*,tenant,environment,access_token,webhook_secre
 
 
 def tenant_provider(connection):
+    from django.conf import settings
+    if settings.DEPLOYMENT_ENVIRONMENT=="homologacao" and connection.environment!="sandbox":
+        raise ValueError("Homologação permite apenas pagamentos sandbox.")
     credentials=decrypt_json(connection.credentials_encrypted)
     return MercadoPagoProvider(credentials["access_token"])
 

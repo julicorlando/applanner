@@ -1,8 +1,24 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
+
+
+class ClinicalRecordQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Registros clínicos são imutáveis. Crie uma retificação.")
+
+    def delete(self):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Registros clínicos devem ser preservados; exclusão exige processo de retenção próprio.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Registros clínicos são imutáveis. Crie uma retificação.")
 
 
 class MedicalRecordEntry(models.Model):
+    objects=ClinicalRecordQuerySet.as_manager()
     class Type(models.TextChoices):
         EVOLUTION="evolution","Evolução"
         PHYSIO_EVALUATION="physio_evaluation","Avaliação fisioterápica"
@@ -12,15 +28,28 @@ class MedicalRecordEntry(models.Model):
         OBSERVATION="observation","Observação"
         FOLLOW_UP="follow_up","Acompanhamento"
 
-    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="medical_records")
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.PROTECT,related_name="medical_records")
     customer=models.ForeignKey("scheduling.Customer",on_delete=models.PROTECT,related_name="medical_records")
     professional=models.ForeignKey("scheduling.Professional",on_delete=models.PROTECT,related_name="medical_records")
-    appointment=models.ForeignKey("scheduling.Appointment",null=True,blank=True,on_delete=models.SET_NULL,related_name="medical_records")
+    appointment=models.ForeignKey("scheduling.Appointment",null=True,blank=True,on_delete=models.PROTECT,related_name="medical_records")
     record_type=models.CharField(max_length=20,choices=Type.choices,default=Type.EVOLUTION)
     title=models.CharField(max_length=190)
     content_encrypted=models.TextField()
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="medical_records_created")
-    created_at=models.DateTimeField(auto_now_add=True)
+    created_at=models.DateTimeField(default=timezone.now,editable=False)
+    professional_snapshot=models.JSONField(default=dict,db_default={},blank=True)
+    supersedes=models.ForeignKey("self",null=True,blank=True,on_delete=models.PROTECT,related_name="rectifications")
+    correction_reason_encrypted=models.TextField(blank=True,db_default="")
+
+    def delete(self,*args,**kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Registro clínico preservado; exclusão não permitida.")
+
+    def save(self,*args,**kwargs):
+        if not self._state.adding:
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Registros clínicos são imutáveis. Crie uma retificação.")
+        super().save(*args,**kwargs)
 
     class Meta:
         indexes=[
@@ -40,4 +69,95 @@ class MedicalRecordAccessLog(models.Model):
     user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="medical_record_access")
     action=models.CharField(max_length=12,choices=Action.choices)
     ip_hash=models.CharField(max_length=64,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+
+class ClinicalRegistration(models.Model):
+    professional=models.OneToOneField("scheduling.Professional",on_delete=models.PROTECT,related_name="clinical_registration")
+    council=models.CharField(max_length=10,choices=[("CRO","CRO"),("CREFITO","CREFITO")])
+    number=models.CharField(max_length=40)
+    jurisdiction=models.CharField(max_length=4)
+    specialties=models.CharField(max_length=300,blank=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        import re
+        from django.core.exceptions import ValidationError
+        if not re.fullmatch(r"[0-9A-Za-z./-]{1,40}",self.number or ""):
+            raise ValidationError({"number":"Registro profissional inválido."})
+        self.jurisdiction=(self.jurisdiction or "").upper().strip()
+        if self.council=="CRO" and self.jurisdiction not in "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split():
+            raise ValidationError({"jurisdiction":"Informe a UF do CRO."})
+        if self.council=="CREFITO" and not re.fullmatch(r"[1-9][0-9]?",self.jurisdiction):
+            raise ValidationError({"jurisdiction":"Informe a região numérica do CREFITO."})
+
+    def snapshot(self):
+        return {"name":self.professional.name,"council":self.council,"number":self.number,
+                "jurisdiction":self.jurisdiction,"specialties":self.specialties}
+
+
+class ClinicalCareGrant(models.Model):
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.PROTECT)
+    customer=models.ForeignKey("scheduling.Customer",on_delete=models.PROTECT)
+    source_professional=models.ForeignKey("scheduling.Professional",on_delete=models.PROTECT,related_name="grants_given")
+    grantee=models.ForeignKey("scheduling.Professional",on_delete=models.PROTECT,related_name="care_grants")
+    granted_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="care_grants_given")
+    justification_encrypted=models.TextField()
+    created_at=models.DateTimeField(auto_now_add=True)
+    revoked_at=models.DateTimeField(null=True,blank=True)
+    revoked_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,null=True,blank=True,related_name="care_grants_revoked")
+
+
+class ClinicalAttachment(models.Model):
+    class Kind(models.TextChoices):
+        EXAM="exam","Exame / radiografia"
+        CONSENT="consent","Consentimento / documento assinado"
+        IMAGE="image","Imagem clínica"
+        DOCUMENT="document","Documento"
+    entry=models.ForeignKey(MedicalRecordEntry,on_delete=models.PROTECT,related_name="attachments")
+    kind=models.CharField(max_length=12,choices=Kind.choices,default=Kind.DOCUMENT)
+    filename_encrypted=models.TextField()
+    content_encrypted=models.BinaryField()
+    mime_type=models.CharField(max_length=80)
+    sha256=models.CharField(max_length=64)
+    size=models.PositiveIntegerField()
+    attestation=models.BooleanField(default=False)
+    uploaded_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    def save(self,*args,**kwargs):
+        if not self._state.adding:
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Documento preservado; anexe uma nova versão.")
+        return super().save(*args,**kwargs)
+
+
+class ClinicalTreatmentPlan(models.Model):
+    class Status(models.TextChoices):
+        PROPOSED="proposed","Proposto"
+        ACCEPTED="accepted","Aprovado pelo paciente"
+        DECLINED="declined","Recusado"
+        IN_PROGRESS="in_progress","Em tratamento"
+        COMPLETED="completed","Concluído"
+    entry=models.OneToOneField(MedicalRecordEntry,on_delete=models.PROTECT,related_name="treatment_budget")
+    total=models.DecimalField(max_digits=12,decimal_places=2)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.PROPOSED)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Plano #{self.pk} — {self.entry.customer.name}"
+
+
+class ClinicalFollowUp(models.Model):
+    entry=models.ForeignKey(MedicalRecordEntry,on_delete=models.PROTECT,related_name="followups")
+    due_at=models.DateField()
+    note_encrypted=models.TextField()
+    completed_at=models.DateTimeField(null=True,blank=True)
+    completed_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.PROTECT)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+
+class ClinicalSessionUsage(models.Model):
+    entry=models.OneToOneField(MedicalRecordEntry,on_delete=models.PROTECT,related_name="session_usage")
+    usage=models.OneToOneField("engagement.CustomerPackageUsage",on_delete=models.PROTECT)
     created_at=models.DateTimeField(auto_now_add=True)

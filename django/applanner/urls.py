@@ -70,6 +70,8 @@ urlpatterns = [
     path("account/", include("accounts.urls")),
     path("", include("billing.urls")),
     path("legal/", include("legal.urls")),
+    path("app/odontologia/", include("healthcare.urls")),
+    path("app/clinica/", include("healthcare.clinic_urls")),
     path("app/barbearia/", include("barber.urls")),
     path("app/auto/", include("auto.urls")),
     path("auto/", include("auto.public_urls")),
