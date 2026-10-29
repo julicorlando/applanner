@@ -2,6 +2,7 @@ from datetime import timedelta
 from django.test import TestCase, RequestFactory
 from django.urls import reverse, resolve
 from django.utils import timezone
+from django.templatetags.static import static
 from billing.models import Module, TenantModule
 from scheduling.models import Appointment, Customer
 from . import test_clinical_security as fixtures
@@ -43,7 +44,7 @@ class GlobalPhysioWorkspaceTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, 'id="pa-sidebar"', count=1)
                 self.assertContains(response, 'class="pa-topbar"', count=1)
-                self.assertContains(response, "physio-workspace.css")
+                self.assertContains(response, static("healthcare/physio-workspace.css"))
                 self.assertNotContains(response, 'id="workspace-sidebar"')
                 self.assertEqual(
                     [
@@ -107,7 +108,7 @@ class GlobalPhysioWorkspaceTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'id="pa-sidebar"')
-        self.assertNotContains(response, "physio-workspace.css")
+        self.assertNotContains(response, static("healthcare/physio-workspace.css"))
         self.tenant.category = "fisioterapia"
         self.tenant.save()
         self.client.force_login(self.master)
