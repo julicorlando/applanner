@@ -76,6 +76,14 @@ jobs:
           DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost
           PUBLIC_BASE_URL: http://localhost
         run: docker compose config --quiet
+      - name: Validate isolated clinical homologation Compose
+        env:
+          SERVICE_PASSWORD_64_DJANGO: ci-only-not-deployed
+          SERVICE_REALBASE64_FIELDKEY: MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
+          SERVICE_PASSWORD_DATABASE: ci-only-not-deployed
+          SERVICE_FQDN_WEB: homolog.example.invalid
+          SERVICE_URL_WEB_8000: https://homolog.example.invalid:8000
+        run: docker compose -f docker-compose.homolog.yml config --quiet
       - name: Validate legacy clone Compose
         env:
           POSTGRES_DB: applanner
