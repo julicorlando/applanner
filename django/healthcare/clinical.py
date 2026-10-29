@@ -130,10 +130,7 @@ def _pdf_content(raw):
     return raw
 
 
-@transaction.atomic
-def attach_document(*,entry,user,upload,kind,attestation=False,ip=""):
-    read_record(entry=entry,user=user,ip=ip)
-    if entry.professional.user_id!=user.pk:raise PermissionDenied("Somente o responsável pode anexar documentos.")
+def validate_document_upload(*,upload,kind="document",attestation=False):
     if kind not in ClinicalAttachment.Kind.values or upload.size>10*1024*1024:
         raise ValidationError("Documento deve ter até 10 MB e tipo válido.")
     if kind==ClinicalAttachment.Kind.CONSENT and not attestation:
@@ -152,6 +149,14 @@ def attach_document(*,entry,user,upload,kind,attestation=False,ip=""):
         mime,suffix={"PNG":("image/png",".png"),"JPEG":("image/jpeg",".jpg"),"TIFF":("image/tiff",".tiff")}[image_format]
         # Preserve diagnostic/source evidence without lossy resizing or metadata rewriting.
     filename=Path(upload.name).stem[:100]+suffix
+    return raw,mime,filename
+
+
+@transaction.atomic
+def attach_document(*,entry,user,upload,kind,attestation=False,ip=""):
+    read_record(entry=entry,user=user,ip=ip)
+    if entry.professional.user_id!=user.pk:raise PermissionDenied("Somente o responsável pode anexar documentos.")
+    raw,mime,filename=validate_document_upload(upload=upload,kind=kind,attestation=attestation)
     cipher=Fernet(settings.FIELD_ENCRYPTION_KEY.encode()).encrypt(raw)
     document=ClinicalAttachment.objects.create(entry=entry,kind=kind,filename_encrypted=encrypt_text(filename),
         content_encrypted=cipher,mime_type=mime,sha256=hashlib.sha256(raw).hexdigest(),size=len(raw),

@@ -213,8 +213,8 @@ def navigation(request):
             clinical=[link("Painel clínico",reverse("clinical-dashboard"),"users"),link("Identificação profissional",reverse("clinical-registration"),"users")]
             if module_enabled(tenant,"dentistry"):
                 clinical.append(link("Odontologia",reverse("dental-home"),"users"))
-            if module_enabled(tenant,"physiotherapy"):
-                clinical.append(link("Fisioterapia",reverse("portal-resource-list",args=["saude","prontuarios"]),"users"))
+            if (tenant.category or "").strip().lower()=="fisioterapia" or module_enabled(tenant,"physiotherapy"):
+                clinical.append(link("Fisioterapia",reverse("physio-assessments"),"users"))
             if clinical:
                 groups.append({"title":"Atendimento clínico","items":clinical})
     if not groups:

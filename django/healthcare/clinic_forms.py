@@ -7,8 +7,8 @@ from .clinical import periodontal_chart,treatment_lines
 class RegistrationForm(forms.ModelForm):
     class Meta:
         model=ClinicalRegistration
-        fields=["professional","council","number","jurisdiction","specialties"]
-        labels={"professional":"Profissional","council":"Conselho","number":"Número do registro",
+        fields=["professional","professional_name","council","number","jurisdiction","specialties"]
+        labels={"professional":"Profissional","professional_name":"Nome da pessoa responsável pelo atendimento","council":"Conselho","number":"Número do registro",
                 "jurisdiction":"UF (CRO) ou região (CREFITO)","specialties":"Especialidades"}
     def __init__(self,*args,user,**kwargs):
         super().__init__(*args,**kwargs)
