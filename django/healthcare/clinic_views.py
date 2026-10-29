@@ -44,11 +44,30 @@ def unpack(entry,user):
 @login_required
 @never_cache
 def dashboard(request):
-    tenant=clinic(request)
+    user=request.user
+    if not user.tenant_id or user.role not in {"owner","manager","tenant-admin","professional","healthcare"}:
+        raise PermissionDenied
+    tenant=user.tenant
+    if not module_enabled(tenant,"medical_records"):
+        # Keep the subscription gate: do not silently grant clinical modules.
+        return render(request,"healthcare/clinical_setup.html",{
+            "reason":"module","tenant":tenant,"clinical_access":False,
+        })
+    try:
+        assert_clinical_access(user)
+    except PermissionDenied:
+        # The owner may configure the clinic but cannot read clinical records
+        # until linked to an active, authorized clinical professional.
+        if user.role not in {"owner","tenant-admin","manager"}:
+            raise
+        return render(request,"healthcare/clinical_setup.html",{
+            "reason":"professional","tenant":tenant,"clinical_access":False,
+        })
+    records=clinical_records_for(user=user,tenant=tenant)
     return render(request,"healthcare/clinic_dashboard.html",{
         "patients":Customer.objects.filter(tenant=tenant,active=True).order_by("name"),
-        "entries":clinical_records_for(user=request.user,tenant=tenant).select_related("customer","professional").order_by("-created_at")[:100],
-        "followups":ClinicalFollowUp.objects.filter(entry__in=clinical_records_for(user=request.user,tenant=tenant),completed_at__isnull=True).select_related("entry__customer").order_by("due_at")[:100],
+        "entries":records.select_related("customer","professional").order_by("-created_at")[:100],
+        "followups":ClinicalFollowUp.objects.filter(entry__in=records,completed_at__isnull=True).select_related("entry__customer").order_by("due_at")[:100],
         "dentistry":module_enabled(tenant,"dentistry"),"physiotherapy":module_enabled(tenant,"physiotherapy"),
     })
 
