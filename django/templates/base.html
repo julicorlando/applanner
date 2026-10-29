@@ -89,7 +89,7 @@
     </div></details>
     {% include "theme_toggle.html" %}
   </header>{% endif %}{% endblock %}
-  {% include "workspace_sidebar.html" %}
+  {% block workspace_sidebar %}{% include "workspace_sidebar.html" %}{% endblock %}
   {% if request.support_actor %}
     <div class="panel" role="status" style="margin:12px auto;max-width:1100px;padding:14px">
       Acesso assistido ativo por {{ request.support_actor.email }}. Suas ações são registradas.

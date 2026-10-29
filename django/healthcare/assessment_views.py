@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from django.http import FileResponse, JsonResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from core.crypto import decrypt_text
 from scheduling.models import Customer, Professional, Appointment
@@ -18,6 +19,58 @@ from .assessment_services import (
     AssessmentConflict,
 )
 from .models import PhysiotherapyAssessmentDocument
+
+
+def shell_context(user):
+    from accounts.permissions import has_capability
+    from .finance_views import allowed
+
+    profile = (
+        Professional.objects.filter(tenant_id=user.tenant_id, user=user, active=True)
+        .select_related("clinical_registration")
+        .first()
+    )
+    registration = getattr(profile, "clinical_registration", None) if profile else None
+    identity = (
+        (registration.professional_name if registration else "")
+        or user.get_full_name()
+        or (profile.name if profile else user.email)
+    )
+    manager = user.role in {"owner", "tenant-admin", "manager"}
+    rows = [
+        ("Dashboard", "portal-home", "dashboard", True),
+        (
+            "Agenda",
+            "professional-area"
+            if user.role in {"professional", "healthcare"}
+            else "operation-calendar",
+            "calendar",
+            True,
+        ),
+        ("Pacientes", "clinical-dashboard", "users", True),
+        (
+            "Atendimentos",
+            "operation-today",
+            "record",
+            manager or has_capability(user, "scheduling.manage"),
+        ),
+        ("Fisioterapia", "physio-assessments", "physio", True),
+        ("Financeiro", "clinical-finance", "money", allowed(user)),
+        ("Relatórios", "operation-performance", "report", manager),
+        ("Configurações", "clinical-registration", "settings", True),
+    ]
+    return {
+        "physio_identity": identity,
+        "physio_menu": [
+            {
+                "title": title,
+                "url": reverse(route) if enabled else None,
+                "icon": icon,
+                "active": title == "Fisioterapia",
+            }
+            for title, route, icon, enabled in rows
+        ],
+    }
 
 
 def _integer(value):
@@ -57,7 +110,7 @@ def assessment_list(request):
     return render(
         request,
         "healthcare/physio_assessment_list.html",
-        {"assessments": rows[:200], "patient": patient},
+        {"assessments": rows[:200], "patient": patient, **shell_context(request.user)},
     )
 
 
@@ -196,6 +249,7 @@ def assessment_editor(request, pk=None):
         request,
         "healthcare/physio_assessment.html",
         {
+            **shell_context(request.user),
             "form": form,
             "assessment": row,
             "readonly": readonly,

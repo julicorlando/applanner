@@ -221,6 +221,21 @@ class AssessmentTests(TestCase):
         response = assessment_views.assessment_editor(self.req(self.doctor))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Mapa corporal")
+        for label in (
+            "Dashboard",
+            "Agenda",
+            "Pacientes",
+            "Atendimentos",
+            "Fisioterapia",
+            "Financeiro",
+            "Relatórios",
+            "Configurações",
+        ):
+            self.assertContains(response, label)
+        self.assertContains(response, 'id="pa-sidebar"')
+        self.assertContains(response, "pa-top-grid")
+        self.assertContains(response, "pa-middle-grid")
+        self.assertContains(response, "pa-bottom-grid")
         row = self.save()
         response = assessment_views.assessment_editor(self.req(self.doctor), pk=row.pk)
         self.assertContains(response, "Salvar rascunho")
@@ -348,9 +363,9 @@ class AssessmentTests(TestCase):
             slug="physiotherapy", defaults={"name": "Fisioterapia"}
         )
         TenantModule.objects.create(tenant=self.tenant, module=module, enabled=True)
-        self.assertEqual(
-            assessment_views.assessment_list(self.req(self.doctor)).status_code, 200
-        )
+        response = assessment_views.assessment_list(self.req(self.doctor))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="pa-sidebar"')
         self.tenant.refresh_from_db()
         self.assertEqual(self.tenant.category, "saude")
 
@@ -373,3 +388,22 @@ class AssessmentTests(TestCase):
             save_assessment(form=form, user=self.doctor)
         self.assertEqual(PhysiotherapyAssessment.objects.count(), 0)
         self.assertEqual(PhysiotherapyAssessmentVersion.objects.count(), 0)
+
+    def test_existing_registration_gets_reference_menu_without_recreation(self):
+        from scheduling.models import Professional, Customer
+
+        before = (Professional.objects.count(), Customer.objects.count())
+        self.client.force_login(self.doctor)
+        response = self.client.get(reverse("physio-assessment-create"))
+        self.assertContains(response, 'id="pa-sidebar"')
+        self.assertContains(response, "pa-profile")
+        self.assertEqual(
+            (Professional.objects.count(), Customer.objects.count()), before
+        )
+        self.entry.refresh_from_db()
+        from .services import read_record
+
+        self.assertEqual(
+            read_record(entry=self.entry, user=self.doctor),
+            "Informação clínica de teste",
+        )
