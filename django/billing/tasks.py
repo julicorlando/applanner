@@ -2,6 +2,9 @@ from celery import shared_task
 from django.utils import timezone
 
 from .models import CheckoutSession,Payment,Subscription
+from .tenant_card_reconciliation import (
+    reconcile_pending_tenant_cards as reconcile_pending_tenant_cards,
+)
 
 
 @shared_task
