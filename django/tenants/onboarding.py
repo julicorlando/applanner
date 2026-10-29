@@ -126,12 +126,20 @@ class ServiceForm(forms.ModelForm):
 class ProfessionalForm(forms.ModelForm):
     def __init__(self,*args,tenant=None,**kwargs):
         super().__init__(*args,**kwargs)
-        if tenant and (tenant.category or "").strip().lower()=="fisioterapia":
-            self.fields["name"].label="Nome exibido no agendamento"
-            self.fields["name"].help_text="Pode ser o nome da clínica. O registro clínico continua atribuído ao profissional responsável que o lançar."
-            if not self.is_bound and not self.instance.pk:
-                self.initial.setdefault("name",tenant.name)
-                self.initial.setdefault("specialty","Fisioterapia")
+        if tenant:
+            from billing.entitlements import is_healthcare_tenant
+            if is_healthcare_tenant(tenant):
+                self.fields["name"].label="Nome exibido no agendamento"
+                self.fields["name"].help_text=(
+                    "O primeiro perfil está incluído no plano e representa a própria empresa. "
+                    "O prontuário deve identificar o profissional habilitado responsável pelo atendimento."
+                )
+                if not self.is_bound and not self.instance.pk:
+                    self.initial.setdefault("name",tenant.name)
+                    category=(tenant.category or "").strip().lower()
+                    specialty=("Fisioterapia" if category=="fisioterapia" else
+                               "Odontologia" if category.startswith("odont") else "Clínica médica")
+                    self.initial.setdefault("specialty",specialty)
 
     class Meta:
         model=Professional
