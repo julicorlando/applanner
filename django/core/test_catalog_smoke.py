@@ -39,4 +39,8 @@ class PortalCatalogSmokeTests(TestCase):
                     response=self.client.get(
                         reverse("portal-resource-list",args=[module_slug,resource_slug])
                     )
-                    self.assertIn(response.status_code,{200,302})
+                    if module_slug=="saude":
+                        # A platform superuser has no automatic clinical care link.
+                        self.assertEqual(response.status_code,403)
+                    else:
+                        self.assertIn(response.status_code,{200,302})

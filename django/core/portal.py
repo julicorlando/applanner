@@ -848,6 +848,18 @@ PHYSIO_BODY_AREAS=[
 
 
 class PhysiotherapyRecordForm(forms.Form):
+    registration=forms.CharField(label="CREFITO do profissional responsável",max_length=60)
+    medical_diagnosis=forms.CharField(label="Diagnóstico médico informado",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    physiotherapy_diagnosis=forms.CharField(label="Diagnóstico fisioterapêutico",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    palpation=forms.CharField(label="Palpação",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    neurological_assessment=forms.CharField(label="Avaliação neurológica, quando aplicável",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    prognosis=forms.CharField(label="Prognóstico e reavaliação prevista",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    exercises=forms.CharField(label="Exercícios realizados",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    parameters=forms.CharField(label="Parâmetros dos recursos terapêuticos",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    adverse_events=forms.CharField(label="Intercorrências",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    guidance=forms.CharField(label="Orientações ao paciente",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    discharge=forms.CharField(label="Reavaliação, metas funcionais e alta",required=False,widget=forms.Textarea(attrs={"rows":2}))
+    body_findings=forms.JSONField(required=False,initial=dict,widget=forms.HiddenInput)
     record_type=forms.ChoiceField(choices=[
         ("physio_evaluation","Avaliação inicial"),("physio_evolution","Evolução da sessão")
     ],widget=forms.RadioSelect,label="Tipo de registro")
@@ -885,11 +897,34 @@ class PhysiotherapyRecordForm(forms.Form):
         self.fields["professional"].queryset=apps.get_model("scheduling","Professional").objects.filter(tenant=tenant,active=True).order_by("name")
         self.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant).select_related("customer","professional").order_by("-starts_at")[:500]
 
+    def clean_body_findings(self):
+        findings=self.cleaned_data.get("body_findings")
+        if findings is None:
+            findings={}
+        if not isinstance(findings,dict) or len(findings)>len(PHYSIO_BODY_AREAS):
+            raise forms.ValidationError("Mapa corporal inválido.")
+        allowed=dict(PHYSIO_BODY_AREAS)
+        cleaned={}
+        for region,item in findings.items():
+            if region not in allowed or not isinstance(item,dict):
+                raise forms.ValidationError("Região corporal inválida.")
+            pain=item.get("pain")
+            if isinstance(pain,bool) or not isinstance(pain,int) or not 0<=pain<=10:
+                raise forms.ValidationError("Dor por região deve estar entre 0 e 10.")
+            condition=item.get("condition")
+            note=item.get("note","")
+            if condition not in {"pain","injury","edema","treated"} or not isinstance(note,str) or len(note)>2000:
+                raise forms.ValidationError("Marcação corporal inválida.")
+            cleaned[region]={"pain":pain,"condition":condition,"note":note}
+        return cleaned
+
     def clean(self):
         data=super().clean()
         appointment=data.get("appointment")
         if appointment and data.get("customer") and appointment.customer_id!=data["customer"].pk:
             self.add_error("appointment","Este agendamento pertence a outro paciente.")
+        if set(data.get("body_findings",{})) - set(data.get("body_regions",[])):
+            self.add_error("body_findings","Marcação sem região selecionada.")
         if data.get("record_type")=="physio_evaluation" and not data.get("chief_complaint"):
             self.add_error("chief_complaint","Descreva a queixa principal para iniciar a avaliação.")
         return data
@@ -1324,6 +1359,9 @@ def resource_list(request,module_slug,resource_slug):
     if tenant is None:
         return redirect("portal-home")
     qs=_tenant_queryset(model,tenant)
+    if model._meta.label_lower=="healthcare.medicalrecordentry":
+        from healthcare.services import clinical_records_for
+        qs=clinical_records_for(user=request.user,tenant=tenant)
     if model._meta.label_lower=="scheduling.appointment":
         qs=qs.select_related("customer","service","professional","vehicle").prefetch_related("product_reservations__product")
     from core.unit_scope import selected_unit as resolve_unit,scope_queryset
@@ -1427,9 +1465,11 @@ def resource_create(request,module_slug,resource_slug):
             except ValidationError as exc:
                 form.add_error(None,exc)
     elif custom=="medical_record":
-        is_physio=(tenant.category or "").strip().lower()=="fisioterapia"
+        is_physio=((tenant.category or "").strip().lower()=="fisioterapia" or module_enabled(tenant,"physiotherapy"))
         form=(PhysiotherapyRecordForm(request.POST or None,tenant=tenant) if is_physio
               else MedicalRecordForm(request.POST or None,tenant=tenant))
+        form.fields["professional"].queryset=form.fields["professional"].queryset.filter(user=request.user)
+        form.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant,professional__user=request.user)
         if request.method=="POST" and form.is_valid():
             data=form.cleaned_data
             try:
@@ -1448,6 +1488,7 @@ def resource_create(request,module_slug,resource_slug):
                         "subjective":data.get("subjective",""),"treatment":data.get("treatment",""),
                         "response":data.get("response",""),"pain_session":data.get("pain_session",""),
                         "next_plan":data.get("next_plan",""),
+                        **{key:data.get(key,"") for key in ("registration","medical_diagnosis","physiotherapy_diagnosis","palpation","neurological_assessment","prognosis","exercises","parameters","adverse_events","guidance","discharge","body_findings")},
                         "body_regions":[{"id":key,"label":dict(PHYSIO_BODY_AREAS)[key]} for key in data.get("body_regions",[])],
                     }
                     title="Avaliação fisioterápica" if kind=="physio_evaluation" else "Evolução fisioterápica"
@@ -1497,7 +1538,7 @@ def resource_create(request,module_slug,resource_slug):
             except ValidationError as exc:
                 form.add_error(None,exc)
 
-    is_physio=(custom=="medical_record" and (tenant.category or "").strip().lower()=="fisioterapia")
+    is_physio=(custom=="medical_record" and ((tenant.category or "").strip().lower()=="fisioterapia" or module_enabled(tenant,"physiotherapy")))
     return render(request,"portal/physiotherapy_record_form.html" if is_physio else "portal/form.html",{
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,"form":form,
@@ -1590,6 +1631,11 @@ def resource_detail(request,module_slug,resource_slug,pk):
                 "subjective":"Relato do paciente","treatment":"Procedimentos aplicados",
                 "response":"Resposta e evolução observada","pain_session":"Dor antes/depois",
                 "next_plan":"Próxima conduta",
+                "registration":"CREFITO responsável","medical_diagnosis":"Diagnóstico médico informado",
+                "physiotherapy_diagnosis":"Diagnóstico fisioterapêutico","palpation":"Palpação",
+                "neurological_assessment":"Avaliação neurológica","prognosis":"Prognóstico e reavaliação",
+                "exercises":"Exercícios","parameters":"Parâmetros terapêuticos","adverse_events":"Intercorrências",
+                "guidance":"Orientações","discharge":"Reavaliação e alta",
             }
             sections=[{"label":labels[k],"value":v} for k,v in payload.get("sections",{}).items()
                 if k in labels and v not in (None,"")]
@@ -1598,6 +1644,7 @@ def resource_detail(request,module_slug,resource_slug,pk):
                 "resource_slug":resource_slug,"resource":resource,"entry":obj,
                 "physiotherapy":True,"sections":sections,
                 "body_regions":payload.get("sections",{}).get("body_regions",[]),
+                "body_findings":[{"label":dict(PHYSIO_BODY_AREAS).get(key,key),**value} for key,value in payload.get("sections",{}).get("body_findings",{}).items()],
             })
         return render(request,"portal/medical_record.html",{
             "tenant":tenant,"module_slug":module_slug,"module":module,

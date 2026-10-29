@@ -111,6 +111,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install UI test dependencies
+        run: npm ci --ignore-scripts --no-fund
       - name: Validate Portuguese browser constraints
         run: node --test tests-js/*.test.cjs
       - name: Run tests

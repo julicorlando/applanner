@@ -6,9 +6,9 @@ service; no unencrypted patient findings are written to JSON database columns.
 import json
 from django.core.exceptions import PermissionDenied, ValidationError
 from billing.entitlements import module_enabled
-from billing.models import TenantModuleAddon, ModuleRequest
+from billing.models import TenantModuleAddon
 from .models import MedicalRecordEntry
-from .services import create_record, read_record, assert_clinical_access
+from .services import create_record, read_record, assert_clinical_access, clinical_records_for
 
 PERMANENT_TEETH = frozenset(
     f"{quadrant}{tooth}" for quadrant in (1, 2, 3, 4) for tooth in range(1, 9)
@@ -77,7 +77,7 @@ def dental_history(*, tenant, customer, user, ip=""):
         raise PermissionDenied("Acesso a outra clínica negado.")
     if customer.tenant_id != tenant.pk:
         raise PermissionDenied("Paciente de outra clínica.")
-    entries = MedicalRecordEntry.objects.filter(tenant=tenant, customer=customer,
+    entries = clinical_records_for(user=user, tenant=tenant).filter(customer=customer,
         record_type=MedicalRecordEntry.Type.PROCEDURE).order_by("created_at")
     result = []
     for entry in entries:
@@ -87,7 +87,7 @@ def dental_history(*, tenant, customer, user, ip=""):
         except (ValueError, TypeError):
             continue
         if isinstance(payload, dict) and payload.get("kind") == "dental_encounter":
-            result.append({"entry_id": entry.pk, "created_at": entry.created_at, "data": payload})
+            result.append({"entry_id": entry.pk, "created_at": entry.created_at, "professional": entry.professional, "data": payload, "chart_json": json.dumps(payload["odontogram"])})
     return result
 
 
@@ -102,7 +102,6 @@ def dental_professional_allowance(tenant):
 def request_extra_dentist(*, tenant, user, module, public_id, note=""):
     """Creates a request only. Master approval/payment uses the existing billing workflow."""
     from decimal import Decimal
-    assert_clinical_access(user)
     _require_dentistry(tenant)
     if user.tenant_id != tenant.pk or user.role not in {"owner", "tenant-admin"}:
         raise PermissionDenied("Somente o responsável da clínica pode solicitar vagas.")
@@ -111,5 +110,5 @@ def request_extra_dentist(*, tenant, user, module, public_id, note=""):
     monthly_price = module.addon_monthly_price
     if monthly_price is None or monthly_price < Decimal("0"):
         raise ValidationError("Master precisa definir o preço do adicional.")
-    return ModuleRequest.objects.create(tenant=tenant, module=module, requested_by=user,
-        public_id=public_id, quoted_monthly_price=monthly_price, tenant_note=note[:500])
+    from billing.module_services import request_module
+    return request_module(tenant=tenant,module=module,user=user,note=note)

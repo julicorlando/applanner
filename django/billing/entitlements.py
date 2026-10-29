@@ -96,6 +96,11 @@ def professional_capacity(tenant, subscription=None):
     }
 
 
+def is_dental_tenant(tenant):
+    category=(tenant.category or "").strip().lower()
+    return category in {"odontologia", "odontologica", "odontológico", "odontologico"} or module_enabled(tenant,"dentistry")
+
+
 def validate_professional_capacity(professional):
     from django.core.exceptions import ValidationError
     if not professional.tenant_id or not professional.active:
@@ -106,8 +111,7 @@ def validate_professional_capacity(professional):
         return
     # Dental clinics include one active dentist; extra seats require a paid addon.
     # Do not retroactively invalidate an existing active professional.
-    category=(professional.tenant.category or "").strip().lower()
-    if category in {"odontologia", "odontologica", "odontológico", "odontologico"}:
+    if is_dental_tenant(professional.tenant):
         from .models import TenantModuleAddon
         paid=TenantModuleAddon.objects.filter(
             tenant=professional.tenant,

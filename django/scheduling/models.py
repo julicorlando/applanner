@@ -53,7 +53,43 @@ class Service(TimeStampedModel):
         return self.name
 
 
+class ProfessionalQuerySet(models.QuerySet):
+    def _guard_capacity_writes(self, fields, objs=None):
+        if not {"active", "tenant", "tenant_id", "user", "user_id"}.intersection(fields):
+            return
+        from billing.entitlements import is_dental_tenant
+        from tenants.models import Tenant
+        tenants = ({obj.tenant_id for obj in objs} if objs is not None
+                   else set(self.values_list("tenant_id", flat=True)))
+        if any(is_dental_tenant(tenant) for tenant in Tenant.objects.filter(pk__in=tenants)):
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Altere profissionais odontológicos individualmente para validar as vagas contratadas.")
+
+    def update(self, **kwargs):
+        self._guard_capacity_writes(kwargs)
+        destination=kwargs.get("tenant_id", getattr(kwargs.get("tenant"),"pk",None))
+        if destination:
+            from billing.entitlements import is_dental_tenant
+            from tenants.models import Tenant
+            from django.core.exceptions import ValidationError
+            if is_dental_tenant(Tenant.objects.get(pk=destination)):
+                raise ValidationError("Transfira profissionais individualmente para validar as vagas.")
+        return super().update(**kwargs)
+
+    def bulk_create(self, objs, **kwargs):
+        objs=list(objs)
+        self._guard_capacity_writes({"tenant"}, objs)
+        return super().bulk_create(objs, **kwargs)
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        objs=list(objs)
+        self._guard_capacity_writes(fields, objs)
+        self.filter(pk__in=[obj.pk for obj in objs])._guard_capacity_writes(fields)
+        return super().bulk_update(objs, fields, batch_size=batch_size)
+
+
 class Professional(TimeStampedModel):
+    objects=ProfessionalQuerySet.as_manager()
     tenant=models.ForeignKey("tenants.Tenant",on_delete=models.CASCADE,related_name="professionals")
     unit=models.ForeignKey("tenants.Unit",null=True,blank=True,on_delete=models.SET_NULL,related_name="professionals")
     user=models.OneToOneField(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
@@ -78,13 +114,19 @@ class Professional(TimeStampedModel):
             raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa."})
 
     def save(self, *args, **kwargs):
-        # Enforce dental seat limits on direct ORM writes, not only ModelForms.
-        if self.tenant_id and (self.tenant.category or "").strip().lower() in {"odontologia", "odontologica", "odontológico", "odontologico"}:
-            from billing.entitlements import validate_professional_capacity
-            validate_professional_capacity(self)
         from core.public_identity import assign_short_code
+        from billing.entitlements import is_dental_tenant, validate_professional_capacity
+        from django.db import transaction
+        from tenants.models import Tenant
         assign_short_code(self, kwargs)
-        super().save(*args, **kwargs)
+        # Serialize dentist creation/reactivation per clinic, including direct ORM
+        # writes. Existing active records remain editable even above the allowance.
+        if self.tenant_id and is_dental_tenant(self.tenant):
+            with transaction.atomic(using=kwargs.get("using")):
+                Tenant.objects.select_for_update().get(pk=self.tenant_id)
+                validate_professional_capacity(self)
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     class Meta:
         constraints=[

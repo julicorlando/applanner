@@ -1,8 +1,20 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
+
+
+class ClinicalRecordQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Registros clínicos são imutáveis. Crie uma retificação.")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Registros clínicos são imutáveis. Crie uma retificação.")
 
 
 class MedicalRecordEntry(models.Model):
+    objects=ClinicalRecordQuerySet.as_manager()
     class Type(models.TextChoices):
         EVOLUTION="evolution","Evolução"
         PHYSIO_EVALUATION="physio_evaluation","Avaliação fisioterápica"
@@ -20,7 +32,15 @@ class MedicalRecordEntry(models.Model):
     title=models.CharField(max_length=190)
     content_encrypted=models.TextField()
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="medical_records_created")
-    created_at=models.DateTimeField(auto_now_add=True)
+    created_at=models.DateTimeField(default=timezone.now,editable=False)
+    supersedes=models.ForeignKey("self",null=True,blank=True,on_delete=models.PROTECT,related_name="rectifications")
+    correction_reason_encrypted=models.TextField(blank=True)
+
+    def save(self,*args,**kwargs):
+        if not self._state.adding:
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Registros clínicos são imutáveis. Crie uma retificação.")
+        super().save(*args,**kwargs)
 
     class Meta:
         indexes=[

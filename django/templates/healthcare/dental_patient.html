@@ -1,9 +1,9 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
 {% block title %}Prontuário odontológico{% endblock %}
 {% block content %}
-<main style="max-width:1100px;margin:auto;padding:24px">
+<link rel="stylesheet" href="{% static 'healthcare/clinical.css' %}"><main style="max-width:1100px;margin:auto;padding:24px">
 <h1>Prontuário odontológico — {{ patient.name }}</h1>
-<a href="{% url 'dental-encounter' %}">Registrar evolução</a>
+<a href="{% url 'dental-encounter' %}">Registrar evolução</a><button type="button" onclick="window.print()">Imprimir / salvar PDF</button>
 {% for item in history %}
 <article style="border:1px solid #ddd;border-radius:12px;padding:18px;margin:18px 0">
 <h2>{{ item.created_at|date:"d/m/Y H:i" }}</h2>
@@ -11,10 +11,10 @@
 <p><strong>Achados:</strong> {{ item.data.findings|linebreaksbr }}</p>
 <p><strong>Procedimentos:</strong> {{ item.data.procedures|linebreaksbr }}</p>
 <p><strong>Plano:</strong> {{ item.data.treatment_plan|linebreaksbr }}</p>
-<h3>Odontograma registrado</h3><ul>{% for tooth, observations in item.data.odontogram.items %}
+{% include 'healthcare/odontogram.html' with readonly=True chart_json=item.chart_json %}<p>Profissional: {{ item.professional.name }}</p><h3>Condições registradas</h3><ul>{% for tooth, observations in item.data.odontogram.items %}
 <li>Dente {{ tooth }}: {% for observation in observations %}{{ observation.condition }} ({{ observation.surfaces|join:", " }}) {{ observation.note }}; {% endfor %}</li>
 {% endfor %}</ul>
 </article>
 {% empty %}<p>Não há evoluções odontológicas registradas.</p>{% endfor %}
-</main>
+</main><script src="{% static 'healthcare/odontogram.js' %}" defer></script>
 {% endblock %}

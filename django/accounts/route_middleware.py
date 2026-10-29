@@ -31,6 +31,7 @@ PREFIX_CAPABILITIES={
     "/app/auto/":"auto.manage",
     "/app/relacionamento/":"engagement.manage",
     "/app/saude/":"healthcare.manage",
+    "/app/odontologia/":"healthcare.manage",
     "/app/suporte/":"support.manage",
 }
 
@@ -47,7 +48,7 @@ class CapabilityRouteMiddleware:
         user=getattr(request,"user",None)
         if user and user.is_authenticated and user.role=="professional" and not user.is_superuser:
             own_calendar_read = request.method in {'GET', 'HEAD'} and request.path in {'/app/calendario/', '/app/identidade/logo/'}
-            if request.path.startswith("/app/") and not request.path.startswith("/app/profissional/") and not own_calendar_read:
+            if request.path.startswith("/app/") and not request.path.startswith("/app/profissional/") and not own_calendar_read and not request.path.startswith(("/app/saude/", "/app/odontologia/")):
                 raise PermissionDenied("A conta profissional acessa apenas sua própria área.")
         if (
             user and user.is_authenticated and not user.is_superuser

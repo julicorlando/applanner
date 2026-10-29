@@ -6,6 +6,7 @@
   {% if physiotherapy %}
     {% for section in sections %}<article class="panel medical-record-content"><strong>{{ section.label }}</strong><div>{{ section.value|linebreaksbr }}</div></article>{% endfor %}
     {% if body_regions %}<article class="panel medical-record-content"><strong>Locais tratados no mapa corporal</strong><ul>{% for area in body_regions %}<li>{{ area.label }}</li>{% endfor %}</ul></article>{% endif %}
+    {% if body_findings %}<article class="panel medical-record-content"><strong>Marcações corporais da sessão</strong>{% for item in body_findings %}<p>{{ item.label }} · Dor {{ item.pain }}/10 · {{ item.condition }}<br>{{ item.note }}</p>{% endfor %}</article>{% endif %}
   {% else %}<article class="panel medical-record-content">{{ content|linebreaks }}</article>{% endif %}
 </section>
 {% endblock %}

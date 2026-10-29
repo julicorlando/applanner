@@ -1,6 +1,6 @@
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
-from .dentistry import validate_odontogram, dental_professional_allowance
+from .dentistry import validate_odontogram
 
 
 class DentalChartValidationTests(SimpleTestCase):
