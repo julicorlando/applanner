@@ -39,8 +39,10 @@ class PortalCatalogSmokeTests(TestCase):
                     response=self.client.get(
                         reverse("portal-resource-list",args=[module_slug,resource_slug])
                     )
-                    if module_slug=="saude":
-                        # A platform superuser has no automatic clinical care link.
-                        self.assertEqual(response.status_code,403)
+                    if module_slug=="saude" and resource_slug=="prontuarios":
+                        # Legacy route redirects to clinical dashboard, which
+                        # continues enforcing clinical membership and permissions.
+                        self.assertEqual(response.status_code,302)
+                        self.assertEqual(response.url,reverse("clinical-dashboard"))
                     else:
                         self.assertIn(response.status_code,{200,302})
