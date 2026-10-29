@@ -1324,6 +1324,10 @@ def select_tenant(request, tenant_id):
 
 @login_required
 def resource_list(request,module_slug,resource_slug):
+    # Legacy navigation points to the generic portal resource. Clinical records
+    # now have their own secured dashboard and activation instructions.
+    if (module_slug,resource_slug)==("saude","prontuarios"):
+        return redirect("clinical-dashboard")
     require_any_capability(request.user,MODULE_CAPABILITIES.get(module_slug,"__denied__"))
     module_for_access=PORTAL_MODULES.get(module_slug)
     if not module_for_access: raise Http404
