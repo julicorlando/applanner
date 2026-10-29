@@ -34,6 +34,9 @@ class DentalCapacityConcurrencyTests(TransactionTestCase):
         barrier=Barrier(2)
         def add(index):
             try:
+                with connections["default"].cursor() as cursor:
+                    cursor.execute("SET lock_timeout = '10s'")
+                    cursor.execute("SET statement_timeout = '30s'")
                 clinic=Tenant.objects.get(pk=tenant.pk)
                 barrier.wait(timeout=10)
                 Professional.objects.create(tenant=clinic,name=f"Dentista {index}")

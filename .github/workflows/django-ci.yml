@@ -52,6 +52,7 @@ jobs:
       DJANGO_DEBUG: "false"
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
       DATABASE_URL: postgresql://applanner:applanner-ci@127.0.0.1:5432/applanner
+      PGOPTIONS: "-c lock_timeout=15000 -c statement_timeout=120000"
       REDIS_URL: redis://127.0.0.1:6379/0
       CELERY_BROKER_URL: redis://127.0.0.1:6379/1
       CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/2
@@ -116,7 +117,7 @@ jobs:
       - name: Validate Portuguese browser constraints
         run: node --test tests-js/*.test.cjs
       - name: Run tests
-        run: python manage.py test --settings=applanner.test_settings
+        run: python manage.py test --settings=applanner.test_settings --verbosity=2
       - name: Install PostgreSQL client for isolated restore drill
         run: sudo apt-get update && sudo apt-get install -y postgresql-client-16
       - name: Verify backup restoration in disposable PostgreSQL database
