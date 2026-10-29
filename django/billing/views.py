@@ -85,9 +85,16 @@ class SignupForm(forms.Form):
         medical_available=bool(platform and platform.medical_segment_visible and Plan.objects.filter(
             slug="segment-medico",active=True,public_visible=True
         ).exists())
-        if medical_available:
+        # Fisioterapia e outros planos de saude independem da vitrine do plano medico.
+        other_health_available=any(
+            "saude" in (candidate.features or {}).get("segments", [])
+            for candidate in Plan.objects.filter(
+                active=True,public_visible=True,is_custom=False
+            ).exclude(slug="segment-medico")
+        )
+        if medical_available or other_health_available:
             self.fields["category"].widget.choices=[
-                *self.fields["category"].widget.choices,("clinica","Clínica e saúde")
+                *self.fields["category"].widget.choices,("clinica","Médico / Clínica")
             ]
         self.fields["plan"].queryset=Plan.objects.filter(
             active=True,public_visible=True,is_custom=False
@@ -143,9 +150,18 @@ class SignupForm(forms.Form):
             from contenthub.models import PlatformHomepage
             platform=PlatformHomepage.objects.filter(pk=1).first()
             medical_visible=bool(platform and platform.medical_segment_visible)
-            if not medical_visible or not Plan.objects.filter(
-                slug="segment-medico",active=True,public_visible=True
-            ).exists():
+            # A restricao de lancamento vale somente para o plano medico, nao
+            # para Fisioterapia ou outro plano ativo com segmento saude.
+            is_other_health_plan=bool(
+                plan and plan.slug!="segment-medico"
+                and "saude" in (plan.features or {}).get("segments", [])
+                and plan.active and plan.public_visible and not plan.is_custom
+            )
+            if not is_other_health_plan and (
+                not medical_visible or not Plan.objects.filter(
+                    slug="segment-medico",active=True,public_visible=True
+                ).exists()
+            ):
                 self.add_error("category","O segmento Médico / Clínica ainda não está disponível.")
         if plan and category:
             segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
