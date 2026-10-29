@@ -67,6 +67,9 @@ def professional_capacity(tenant, subscription=None):
         return int(value) if not isinstance(value,bool) and str(value).isdigit() and int(value)>0 else None
 
     plan_limit=positive_limit(raw)
+    # A empresa usa o primeiro perfil clínico sem contratar vagas adicionais.
+    if is_healthcare_tenant(tenant):
+        plan_limit=max(1,plan_limit or 0)
     active_units=max(tenant.units.filter(active=True).count(),1)
     multiunit_active=active_units>1 and module_enabled(tenant,"multiunit")
     additional_units=max(active_units-1,0) if multiunit_active else 0
@@ -108,6 +111,23 @@ def professional_capacity(tenant, subscription=None):
 def is_dental_tenant(tenant):
     category=(tenant.category or "").strip().lower()
     return category in {"odontologia", "odontologica", "odontológico", "odontologico"} or module_enabled(tenant,"dentistry")
+
+
+def is_healthcare_tenant(tenant):
+    """Clinical plans include the first company-facing booking profile."""
+    category=(tenant.category or "").strip().lower()
+    if is_dental_tenant(tenant):
+        return True
+    if category in {"clinica","clínica","saude","saúde","medico","médico","fisioterapia"}:
+        return True
+    subscription=active_subscription(tenant)
+    if not subscription:
+        return False
+    plan=subscription.plan
+    segments=set((plan.features or {}).get("segments", []))
+    return bool(segments & {"saude","fisioterapia","physiotherapy","odontologia","medical","dentistry"}) or any(
+        word in (plan.slug or "").lower() for word in ("fisio","medico","medical","odont","dental")
+    )
 
 
 def validate_professional_capacity(professional):
