@@ -78,6 +78,10 @@ class Professional(TimeStampedModel):
             raise ValidationError({"unit":"A unidade deve pertencer à mesma empresa."})
 
     def save(self, *args, **kwargs):
+        # Enforce dental seat limits on direct ORM writes, not only ModelForms.
+        if self.tenant_id and (self.tenant.category or "").strip().lower() in {"odontologia", "odontologica", "odontológico", "odontologico"}:
+            from billing.entitlements import validate_professional_capacity
+            validate_professional_capacity(self)
         from core.public_identity import assign_short_code
         assign_short_code(self, kwargs)
         super().save(*args, **kwargs)
