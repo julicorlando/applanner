@@ -118,7 +118,7 @@ FIELD_LABELS = {
     "public_id": "Identificador público", "public_notes": "Observações públicas",
     "public_rules": "Regras públicas", "public_slug": "Link público",
     "published_at": "Publicado em", "purchase_amount": "Valor da compra",
-    "purpose": "Finalidade", "quantity": "Quantidade", "quoted_monthly_price": "Valor mensal proposto",
+    "purpose": "Finalidade", "quantity": "Quantidade", "quoted_monthly_price": "Valor mensal proposto", "initial_charge_amount": "Cobrança inicial",
     "rating": "Nota", "read_at": "Lido em", "reason": "Motivo",
     "reason_code": "Código do motivo", "reason_text": "Descrição do motivo",
     "received_at": "Recebido em", "record_type": "Tipo de registro",
