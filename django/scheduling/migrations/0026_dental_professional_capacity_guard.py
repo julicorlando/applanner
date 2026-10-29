@@ -13,9 +13,8 @@ BEGIN
     IF TG_OP = 'UPDATE' THEN
         IF OLD.active AND OLD.tenant_id = NEW.tenant_id THEN RETURN NEW; END IF;
     END IF;
-    -- All write paths, including SQL/bulk inserts, share the same clinic lock.
     SELECT lower(trim(category)) INTO category_name
-      FROM tenants_tenant WHERE id = NEW.tenant_id FOR UPDATE;
+      FROM tenants_tenant WHERE id = NEW.tenant_id;
     dental := category_name IN ('odontologia','odontologica','odontológico','odontologico');
     IF NOT coalesce(dental,false) THEN
         SELECT coalesce(
@@ -31,6 +30,9 @@ BEGIN
              AND m.slug='dentistry' AND m.active LIMIT 1),false) INTO dental;
     END IF;
     IF NOT dental THEN RETURN NEW; END IF;
+    -- Only dental writes acquire the capacity lock. Other segments retain their
+    -- existing transaction behavior and must not inherit this extra row lock.
+    PERFORM 1 FROM tenants_tenant WHERE id=NEW.tenant_id FOR UPDATE;
     SELECT coalesce(sum(a.quantity),0) INTO extra_seats
       FROM billing_tenantmoduleaddon a JOIN billing_module m ON m.id=a.module_id
       WHERE a.tenant_id=NEW.tenant_id AND m.slug='dental-professional-extra' AND a.status='active';
