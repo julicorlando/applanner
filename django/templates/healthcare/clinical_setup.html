@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Ativar prontuários — ApPlanner{% endblock %}
+{% block content %}
+<section class="container" style="max-width:880px;margin:3rem auto;padding:1.5rem">
+  <h1>Prontuários clínicos</h1>
+  {% if reason == "module" %}
+    <p>O módulo Prontuários clínicos ainda não está habilitado para este estabelecimento.</p>
+    <p>Peça ao administrador Master para verificar o módulo <strong>medical_records</strong> e a inclusão de Fisioterapia ou Odontologia no plano contratado. Nenhuma cobrança adicional deve ser criada apenas para o primeiro profissional incluído.</p>
+  {% else %}
+    <p>O cadastro da empresa está ativo, mas esta conta ainda não está vinculada a um profissional clínico autorizado.</p>
+    <p>O primeiro perfil de agendamento pertence à empresa e está incluído no plano. Para acessar os prontuários, vincule o usuário do profissional responsável ao perfil ativo e informe sua habilitação profissional. O nome comercial da empresa não substitui a identificação clínica.</p>
+  {% endif %}
+  <p>O acesso aos dados dos pacientes será liberado apenas após a configuração das permissões correspondentes.</p>
+  <a href="/app/">Voltar ao painel</a>
+</section>
+{% endblock %}
