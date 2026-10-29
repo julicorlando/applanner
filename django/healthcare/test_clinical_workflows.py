@@ -215,3 +215,5 @@ class ClinicalRollbackSchemaTests(TestCase):
         row=MedicalRecordEntry.objects.get(pk=pk)
         self.assertEqual(row.professional_snapshot,{})
         self.assertEqual(row.correction_reason_encrypted,'')
+        self.assertEqual(read_record(entry=row,user=self.doctor),read_record(entry=self.entry,user=self.doctor))
+        with self.assertRaises(PermissionDenied):read_record(entry=row,user=self.colleague)

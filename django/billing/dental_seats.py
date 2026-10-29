@@ -1,5 +1,6 @@
 """Dental seats reuse the existing Payment/PixCharge and subscription ledger."""
 from datetime import timedelta
+from hashlib import sha256
 from decimal import Decimal,ROUND_HALF_UP
 from secrets import token_hex
 from dateutil.relativedelta import relativedelta
@@ -49,7 +50,11 @@ def checkout_seats(*,row,user):
     if subscription.provider_environment:gateways=PaymentGateway.objects.filter(provider="mercadopago",environment=subscription.provider_environment,last_test_status="validated")
     gateway=gateways.first()
     if not gateway:raise ValidationError("Configure o Mercado Pago do ambiente da assinatura.")
-    public=token_hex(16);reference="dental-seat-"+row.public_id
+    public=token_hex(16)
+    # Retries of one approved quote reuse its key. A renewed, expired quote
+    # gets a distinct provider order while retaining the same request ledger.
+    quote_key=f"{row.public_id}|{row.seat_quote_expires_at.isoformat()}|{row.initial_charge_amount}"
+    reference="dental-seat-"+sha256(quote_key.encode()).hexdigest()[:48]
     expiry=min(timezone.now()+timedelta(hours=24),row.seat_quote_expires_at)
     session=CheckoutSession.objects.create(public_id=public,tenant=row.tenant,plan=subscription.plan,
         billing_cycle=subscription.billing_cycle,subtotal=row.initial_charge_amount,total=row.initial_charge_amount,
@@ -88,7 +93,6 @@ def finalize_seats(payment_id):
 
 @transaction.atomic
 def reconcile_dental_refund(payment_id):
-    from hashlib import sha256
     from .models import TenantModuleAddon,SubscriptionModuleAdjustment
     from .module_services import _gateway_for,_cycle_months,invalidate_pending_subscription_charges
     from core.audit import append_audit

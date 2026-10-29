@@ -140,3 +140,15 @@ class DentalCheckoutTests(TestCase):
         with connection.cursor() as cursor:
             cursor.execute('INSERT INTO billing_modulerequest ('+','.join(fields)+') SELECT '+','.join(selected)+' FROM billing_modulerequest WHERE id=%s RETURNING quantity',[self.row.pk])
             self.assertEqual(cursor.fetchone()[0],1)
+
+    def test_expired_charge_can_be_requoted_without_reusing_old_provider_order(self):
+        first=self.checkout()
+        first.expires_at=timezone.now()-timedelta(minutes=1);first.save(update_fields=["expires_at"])
+        self.row.refresh_from_db();self.row.seat_quote_expires_at=first.expires_at;self.row.save(update_fields=["seat_quote_expires_at"])
+        self.assertEqual(self.master_action().status_code,302)
+        self.provider.create_pix_order.return_value={"order_id":"renewed-dental-order","payment_id":"renewed-dental-payment","qr_code":"renewed-qr","status":"pending"}
+        second=self.checkout()
+        self.assertNotEqual(first.payment_id,second.payment_id)
+        self.assertNotEqual(first.payment.idempotency_key,second.payment.idempotency_key)
+        self.assertEqual(second.pk,self.checkout().pk)
+        self.assertEqual(self.provider.create_pix_order.call_count,2)

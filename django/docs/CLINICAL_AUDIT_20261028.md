@@ -1,6 +1,6 @@
 # Auditoria clínica — Odontologia e Fisioterapia
 
-Estado: implementação incremental; não homologada e não liberada para produção.
+Registro histórico da auditoria inicial. A lista abaixo foi parcialmente superada pela implementação e pelas evidências em [CLINICAL_RELEASE_20261029.md](CLINICAL_RELEASE_20261029.md). Não interpretar as pendências históricas como o estado atual.
 
 ## Repositório auditado
 

@@ -33,8 +33,11 @@ def clinical_records_for(*, user, tenant):
     grants=ClinicalCareGrant.objects.filter(tenant=tenant,grantee__user=user,
         grantee__active=True,revoked_at__isnull=True).values_list("customer_id","source_professional_id","granted_by_id")
     scope=Q(professional__user=user,professional_snapshot__user_id=user.pk)
+    # A previous release may insert without the newly added snapshot column.
+    # Its immutable author must still match the current professional login.
+    scope |= Q(professional__user=user,created_by=user,professional_snapshot={})
     for patient_id,professional_id,author_id in grants:
-        scope |= Q(customer_id=patient_id,professional_id=professional_id,professional_snapshot__user_id=author_id)
+        scope |= Q(customer_id=patient_id,professional_id=professional_id) & (Q(professional_snapshot__user_id=author_id) | Q(created_by_id=author_id,professional_snapshot={}))
     return MedicalRecordEntry.objects.filter(scope,tenant=tenant)
 
 
