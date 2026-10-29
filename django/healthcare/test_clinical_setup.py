@@ -3,7 +3,6 @@ from django.urls import reverse
 
 from accounts.models import User
 from billing.models import Module, TenantModule
-from scheduling.models import Professional
 from tenants.models import Tenant
 
 
