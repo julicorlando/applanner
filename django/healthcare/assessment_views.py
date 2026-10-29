@@ -61,6 +61,7 @@ def shell_context(user):
     ]
     return {
         "physio_identity": identity,
+        "physio_photo": profile.photo.url if profile and profile.photo else "",
         "physio_menu": [
             {
                 "title": title,
@@ -257,6 +258,20 @@ def assessment_editor(request, pk=None):
             "historical": historical,
             "documents": _documents(row) if row else [],
             "payload": payload,
+            "patient_initials": "".join(
+                word[0]
+                for word in payload.get("patient", {}).get("name", "").split()[:2]
+            ).upper(),
+            "patient_age": (
+                timezone.localdate().year
+                - row.customer.birth_date.year
+                - (
+                    (timezone.localdate().month, timezone.localdate().day)
+                    < (row.customer.birth_date.month, row.customer.birth_date.day)
+                )
+            )
+            if row and row.customer.birth_date
+            else None,
             "sections": display_data,
             "text_fields": [form[name] for name in TEXT_FIELDS],
             "body_areas": dict(PHYSIO_BODY_AREAS),
