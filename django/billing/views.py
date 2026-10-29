@@ -43,7 +43,7 @@ def _unique_slug(name):
     return slug
 
 
-SEGMENT_CATEGORIES={"barbearia":{"barbearia","salao"},"arena":{"arena"},"auto":{"auto"},"saude":{"clinica"}}
+SEGMENT_CATEGORIES={"barbearia":{"barbearia","salao"},"arena":{"arena"},"auto":{"auto"},"saude":{"clinica"},"fisioterapia":{"clinica"},"physiotherapy":{"clinica"}}
 
 
 def plan_categories(plan,choices):
@@ -87,7 +87,7 @@ class SignupForm(forms.Form):
         ).exists())
         # Fisioterapia e outros planos de saude independem da vitrine do plano medico.
         other_health_available=any(
-            "saude" in (candidate.features or {}).get("segments", [])
+            bool(set((candidate.features or {}).get("segments", [])) & {"saude","fisioterapia","physiotherapy"})
             for candidate in Plan.objects.filter(
                 active=True,public_visible=True,is_custom=False
             ).exclude(slug="segment-medico")
@@ -154,7 +154,7 @@ class SignupForm(forms.Form):
             # para Fisioterapia ou outro plano ativo com segmento saude.
             is_other_health_plan=bool(
                 plan and plan.slug!="segment-medico"
-                and "saude" in (plan.features or {}).get("segments", [])
+                and bool(set((plan.features or {}).get("segments", [])) & {"saude","fisioterapia","physiotherapy"})
                 and plan.active and plan.public_visible and not plan.is_custom
             )
             if not is_other_health_plan and (
@@ -166,7 +166,9 @@ class SignupForm(forms.Form):
         if plan and category:
             segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
                      "arena":"arena","clinica":"saude"}.get(category)
-            if "segments" in (plan.features or {}) and segment not in plan.features["segments"]:
+            if "segments" in (plan.features or {}) and segment not in plan.features["segments"] and not (
+                segment=="saude" and bool(set(plan.features["segments"]) & {"fisioterapia","physiotherapy"})
+            ):
                 self.add_error("plan","Este plano não inclui o segmento selecionado. Escolha outro plano ou solicite uma proposta personalizada.")
         password=data.get("password") or ""
         if password and password!=data.get("password_confirm"):
