@@ -1,3 +1,4 @@
+from healthcare import workspace_views as physio_workspace
 from django.urls import path
 from . import portal, operation_insights
 from .branding import tenant_branding, workspace_logo
@@ -19,6 +20,8 @@ from .work_notes import notes,photo
 from .professional_materials import materials
 
 urlpatterns = [
+    path("fisioterapia/dashboard/",physio_workspace.dashboard,name="physio-dashboard"),
+    path("fisioterapia/configuracoes/",physio_workspace.settings,name="physio-settings"),
     path("agenda/expedientes/em-massa/", bulk_work_schedule, name="bulk-work-schedule"),
     path('identidade/logo/', workspace_logo, name='workspace-company-logo'),
     path("profissional/notificacoes/",mobile_portal.user_preferences,name="professional-notification-preferences"),

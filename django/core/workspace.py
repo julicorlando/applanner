@@ -235,7 +235,13 @@ def navigation(request):
     seen = set()
     for group in groups:
         group['items'] = [item for item in group['items'] if not (item['url'] in seen or seen.add(item['url']))]
+    from healthcare.navigation import workspace_enabled,shell_context
+    physio={}
+    if workspace_enabled(request):
+        physio={"physio_workspace":True,**shell_context(user,request)}
+        groups=[{"title":"Fisioterapia","items":[item for item in physio["physio_menu"] if item["url"]]}]
     return {
+        **physio,
         "workspace_groups": groups,
         "workspace_tenant": tenant,
         "workspace_master": user.is_superuser and not request.path.startswith('/app/'),

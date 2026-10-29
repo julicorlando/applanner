@@ -32,6 +32,10 @@ def healthz(request):
 
 
 def _tenant_dashboard(request):
+    from healthcare.navigation import workspace_enabled
+    if workspace_enabled(request):
+        from django.shortcuts import redirect
+        return redirect("physio-dashboard")
     if request.user.role=="professional" and not request.user.is_superuser:
         from django.shortcuts import redirect
         return redirect("professional-area")
