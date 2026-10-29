@@ -33,6 +33,8 @@ class Command(BaseCommand):
             plan,_=Plan.objects.get_or_create(slug="homolog-"+category,defaults={"name":"Homologação "+category,"monthly_price":0,"public_visible":False,"features":{"professionals":1}})
             for slug in ("medical_records","dentistry" if council=="CRO" else "physiotherapy","packages"):
                 module,_=Module.objects.get_or_create(slug=slug,defaults={"name":slug})
+                if not module.active:
+                    module.active=True;module.save(update_fields=["active"])
                 TenantModule.objects.update_or_create(tenant=tenant,module=module,defaults={"enabled":True})
                 PlanModule.objects.update_or_create(plan=plan,module=module,defaults={"enabled":True})
             Subscription.objects.get_or_create(tenant=tenant,plan=plan,defaults={"status":"active","started_at":timezone.now(),"payment_method":"pix","contracted_price":0,"base_contracted_price":0,"provider_environment":"sandbox"})

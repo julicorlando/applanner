@@ -37,7 +37,7 @@ MODULES={
         "active":True,"sort_order":0,"addon_monthly_price":"39.99","addon_sellable":True,
         "per_unit_billing":True,
     },
-    "medical_records":{"name":"Prontuários","description":"Prontuário clínico.","active":False,"sort_order":60},
+    "medical_records":{"name":"Prontuários","description":"Prontuário clínico.","active":True,"sort_order":60},
     "odontology":{"name":"Odontologia","description":"Recursos de odontologia.","active":False,"sort_order":61},
     "api":{"name":"API","description":"Acesso à API.","active":False,"sort_order":62},
     "packages":{

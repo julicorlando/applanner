@@ -174,7 +174,11 @@ class HomologationSmokeTests(TestCase):
             call_command("clinical_homologation_smoke",stdout=BytesIO())
         from io import StringIO
         with override_settings(DEPLOYMENT_ENVIRONMENT="homologacao"):
+            from billing.models import Module
+            call_command("seed_modules",preserve_existing=True,stdout=StringIO())
+            Module.objects.filter(slug="medical_records").update(active=False)
             output=StringIO();call_command("clinical_homologation_smoke",stdout=output)
+            self.assertTrue(Module.objects.get(slug="medical_records").active)
             self.assertEqual(json.loads(output.getvalue())["status"],"passed")
             count=MedicalRecordEntry.objects.count()
             call_command("clinical_homologation_smoke",stdout=StringIO())
