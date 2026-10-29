@@ -107,3 +107,27 @@ class DentalCheckoutTests(TestCase):
         addon=TenantModuleAddon.objects.get(module=self.module)
         self.assertEqual(addon.quantity,2);self.assertEqual(addon.status,"past_due")
         self.subscription.refresh_from_db();self.assertEqual(self.subscription.contracted_price,Decimal("49.90"))
+
+    def master_action(self):
+        from django.test import RequestFactory
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from core.master import operational_action
+        request=RequestFactory().post('/master/',{})
+        request.user=self.master;request.session={};request._messages=FallbackStorage(request)
+        return operational_action(request,'module-request-approve',self.row.pk)
+
+    def test_master_can_renew_expired_quote_before_payment(self):
+        self.row.seat_quote_expires_at=timezone.now()-timedelta(minutes=1);self.row.save()
+        self.assertEqual(self.master_action().status_code,302)
+        self.row.refresh_from_db();self.assertGreater(self.row.seat_quote_expires_at,timezone.now())
+        self.assertEqual(self.row.quoted_monthly_price,Decimal('10.00'))
+        self.assertFalse(Payment.objects.filter(purpose='dental-seat').exists())
+
+    def test_master_reuses_paid_proof_after_activation_failure(self):
+        charge=self.checkout();payment=charge.payment
+        payment.status='paid';payment.paid_at=timezone.now();payment.provider_status='approved';payment.provider_payment_id='dental-payment';payment.save()
+        self.row.status='payment_failed';self.row.save()
+        self.assertEqual(self.master_action().status_code,302)
+        self.row.refresh_from_db();self.assertEqual(self.row.status,'active')
+        self.assertEqual(Payment.objects.filter(purpose='dental-seat').count(),1)
+        self.assertEqual(TenantModuleAddon.objects.get(module=self.module).quantity,2)

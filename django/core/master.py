@@ -210,7 +210,7 @@ MASTER_RESOURCES={
     "empresas":{"model":"tenants.Tenant","title":"Empresas","fields":["name","slug","public_slug","category","email","phone","logo","cover","status","public_enabled","public_booking_enabled","locale","timezone"],"columns":["name","slug","category","status","public_enabled","created_at"],"order":"-created_at"},
     "planos":{"model":"billing.Plan","title":"Planos","fields":["name","slug","description","monthly_price","quarterly_price","semiannual_price","annual_price","trial_days","trial_without_card","active","public_visible","is_custom","featured","sort_order"],"columns":["name","monthly_price","trial_days","active","public_visible","is_custom","featured"],"order":"sort_order,name","special":"plan"},
     "modulos":{"model":"billing.Module","title":"Módulos","fields":["name","slug","description","addon_monthly_price","addon_sellable","per_unit_billing","sort_order","active"],"columns":["name","slug","addon_monthly_price","addon_sellable","active"],"order":"sort_order,name"},
-    "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":[],"columns":["tenant","module","quoted_monthly_price","status","created_at"],"order":"-created_at","create":False,"edit":False},
+    "solicitacoes-modulos":{"model":"billing.ModuleRequest","title":"Solicitações de módulos","fields":[],"columns":["tenant","module","quantity","quoted_monthly_price","initial_charge_amount","status","created_at"],"order":"-created_at","create":False,"edit":False},
     "equipe-comercial":{"model":"commercial.CommercialProfile","title":"Equipe comercial","fields":["user","commission_percent","max_discount_percent","support_enabled","active"],"columns":["user","commission_percent","max_discount_percent","support_enabled","active"],"order":"user__email"},
     "comissoes-comerciais":{"model":"commercial.CommercialCommission","title":"Comissões comerciais","fields":["commercial_user","tenant","base_amount","commission_percent","commission_amount","status","hold_until"],"columns":["commercial_user","tenant","commission_amount","status","created_at"],"order":"-created_at"},
     "assinaturas":{"model":"billing.Subscription","title":"Assinaturas","fields":["tenant","plan","billing_cycle","contracted_price","status","started_at","trial_ends_at","next_billing_at","provider_customer_id","provider_subscription_id","provider_environment"],"columns":["tenant","plan","billing_cycle","status","next_billing_at"],"order":"-started_at"},
@@ -998,7 +998,7 @@ def operational_action(request,action,pk=None):
                     note=request.POST.get("note",""),
                 )
             elif not approved or row.status not in {
-                ModuleRequest.Status.APPROVED,ModuleRequest.Status.PAYMENT_FAILED,
+                ModuleRequest.Status.APPROVED,ModuleRequest.Status.PAYMENT_FAILED,ModuleRequest.Status.AWAITING_PAYMENT,
             }:
                 raise ValidationError("Esta solicitação não está disponível para aprovação.")
             if approved and row.module.slug=="dental-professional-extra":
@@ -1008,7 +1008,20 @@ def operational_action(request,action,pk=None):
                     if adjustment.status!="applied":raise ValidationError("A isenção foi registrada, mas a assinatura requer conciliação: "+adjustment.error_code)
                     messages.success(request,"Vagas liberadas por isenção inicial expressa; adicional recorrente incorporado à assinatura.")
                 else:
-                    messages.success(request,"Solicitação aprovada. O responsável deve aceitar e pagar a cobrança proporcional antes da liberação.")
+                    from billing.models import Payment,PixCharge
+                    paid=Payment.objects.filter(tenant=row.tenant,purpose="dental-seat",reference_id=row.pk,status="paid").order_by("-paid_at").first()
+                    if paid:
+                        adjustment=activate_module_request(module_request=row,user=request.user,financial_payment=paid)
+                        if adjustment.status!="applied":raise ValidationError("Pagamento preservado; atualização da assinatura ainda exige conciliação: "+adjustment.error_code)
+                        row.reviewed_by=request.user;row.save(update_fields=["reviewed_by","updated_at"])
+                        messages.success(request,"Pagamento já conciliado reutilizado; vagas liberadas sem nova cobrança.")
+                    else:
+                        pending=PixCharge.objects.filter(payment__purpose="dental-seat",payment__reference_id=row.pk,payment__tenant=row.tenant,payment__status="pending",expires_at__gt=timezone.now()).exists()
+                        row.refresh_from_db()
+                        if not pending and (row.status=="payment_failed" or (row.seat_quote_expires_at and row.seat_quote_expires_at<=timezone.now())):
+                            row.status="payment_failed";row.save(update_fields=["status","updated_at"])
+                            review_module_request(module_request=row,user=request.user,approved=True,note=request.POST.get("note","") or row.master_note)
+                        messages.success(request,"Solicitação aprovada. O responsável deve aceitar e pagar a cobrança proporcional antes da liberação.")
             elif approved:
                 adjustment=activate_module_request(module_request=row,user=request.user)
                 if adjustment.status==adjustment.Status.APPLIED:
