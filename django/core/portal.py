@@ -1155,6 +1155,8 @@ def setup_checklist(request):
 
 @login_required
 def home(request):
+    from healthcare.navigation import workspace_enabled
+    if workspace_enabled(request):return redirect("physio-dashboard")
     if request.user.role=="professional" and not request.user.is_superuser:
         return redirect("professional-area")
     if request.user.is_superuser and request.GET.get("trocar")=="1":
