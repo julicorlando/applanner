@@ -131,3 +131,12 @@ class DentalCheckoutTests(TestCase):
         self.row.refresh_from_db();self.assertEqual(self.row.status,'active')
         self.assertEqual(Payment.objects.filter(purpose='dental-seat').count(),1)
         self.assertEqual(TenantModuleAddon.objects.get(module=self.module).quantity,2)
+
+    def test_previous_release_insert_gets_one_requested_seat_by_database_default(self):
+        from django.db import connection
+        excluded={'id','quantity','initial_charge_amount','seat_quote_expires_at','proration_until'}
+        fields=[f.column for f in ModuleRequest._meta.concrete_fields if f.name not in excluded]
+        selected=["'rollback-dental-request'" if name=='public_id' else name for name in fields]
+        with connection.cursor() as cursor:
+            cursor.execute('INSERT INTO billing_modulerequest ('+','.join(fields)+') SELECT '+','.join(selected)+' FROM billing_modulerequest WHERE id=%s RETURNING quantity',[self.row.pk])
+            self.assertEqual(cursor.fetchone()[0],1)

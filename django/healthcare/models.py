@@ -37,9 +37,9 @@ class MedicalRecordEntry(models.Model):
     content_encrypted=models.TextField()
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="medical_records_created")
     created_at=models.DateTimeField(default=timezone.now,editable=False)
-    professional_snapshot=models.JSONField(default=dict,blank=True)
+    professional_snapshot=models.JSONField(default=dict,db_default={},blank=True)
     supersedes=models.ForeignKey("self",null=True,blank=True,on_delete=models.PROTECT,related_name="rectifications")
-    correction_reason_encrypted=models.TextField(blank=True)
+    correction_reason_encrypted=models.TextField(blank=True,db_default="")
 
     def delete(self,*args,**kwargs):
         from django.core.exceptions import ValidationError

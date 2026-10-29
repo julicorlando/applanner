@@ -180,3 +180,16 @@ class HomologationSmokeTests(TestCase):
             call_command("clinical_homologation_smoke",stdout=StringIO())
             self.assertEqual(MedicalRecordEntry.objects.count(),count)
             self.assertTrue(all(not user.has_usable_password() for user in User.objects.filter(email__endswith="@homolog.invalid")))
+
+
+class ClinicalRollbackSchemaTests(TestCase):
+    setUp=ClinicalWorkflowTests.setUp
+    create=ClinicalWorkflowTests.create
+    def test_previous_release_can_insert_without_new_columns(self):
+        columns='tenant_id,customer_id,professional_id,record_type,title,content_encrypted,created_by_id,created_at'
+        with connection.cursor() as cursor:
+            cursor.execute(f'INSERT INTO healthcare_medicalrecordentry ({columns}) SELECT {columns} FROM healthcare_medicalrecordentry WHERE id=%s RETURNING id',[self.entry.pk])
+            pk=cursor.fetchone()[0]
+        row=MedicalRecordEntry.objects.get(pk=pk)
+        self.assertEqual(row.professional_snapshot,{})
+        self.assertEqual(row.correction_reason_encrypted,'')

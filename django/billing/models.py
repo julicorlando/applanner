@@ -364,7 +364,7 @@ class ModuleRequest(TimeStampedModel):
     module=models.ForeignKey(Module,on_delete=models.PROTECT,related_name="requests")
     requested_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name="module_requests")
     quoted_monthly_price=models.DecimalField(max_digits=10,decimal_places=2)
-    quantity=models.PositiveSmallIntegerField(default=1)
+    quantity=models.PositiveSmallIntegerField(default=1,db_default=1)
     initial_charge_amount=models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
     seat_quote_expires_at=models.DateTimeField(null=True,blank=True)
     proration_until=models.DateTimeField(null=True,blank=True)
