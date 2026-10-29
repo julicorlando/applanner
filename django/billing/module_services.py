@@ -180,7 +180,10 @@ def activate_module_request(*,module_request,user,financial_payment=None,waiver_
                 purpose="dental-seat",reference_id=row.pk,status=Payment.Status.PAID,
                 paid_at__isnull=False,provider="mercadopago",
             ).exclude(provider_payment_id="").first())
-            if not payment or payment.amount != quoted*months:
+            if (not payment or payment.amount != quoted*months
+                    or payment.provider_status not in {"processed","approved"}
+                    or payment.environment not in {"sandbox","production"}
+                    or (subscription.provider_environment and payment.environment!=subscription.provider_environment)):
                 raise ValidationError("A vaga exige pagamento conciliado e vinculado a esta solicitação, ou isenção expressa do Master.")
     monthly_before=_merged_monthly(row.tenant)
     previous=Decimal(subscription.contracted_price or Decimal("0.00")).quantize(Decimal("0.01"))

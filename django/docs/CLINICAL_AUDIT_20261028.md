@@ -32,9 +32,10 @@ Estado: implementação incremental; não homologada e não liberada para produ�
 - Ruff F401/F821/F822/F823: passou.
 - Política de artefatos: passou.
 - JavaScript: 29 testes passaram, incluindo cinco testes DOM dos mapas com jsdom.
-- Suíte clínica/comercial/catálogos atual: 48 testes executados, 45 passaram e 3 testes específicos de PostgreSQL ignorados localmente.
+- Suíte clínica/comercial/catálogos atual: 50 testes executados, 47 passaram e 3 testes específicos de PostgreSQL ignorados localmente.
 - Regressão completa em SQLite: 919 testes, 4 falhas, 3 erros, 13 ignorados. Três falhas de concorrência dependem de PostgreSQL; três erros dependem de Redis. Uma expectativa antiga de acesso Master irrestrito foi corrigida para exigir 403. Não contabilizar a regressão completa como aprovada; exigir CI em PostgreSQL/Redis.
-- As novas migrations foram exercitadas somente em banco local descartável. Nenhuma migration aplicada no Coolify nesta execução. Healthcare.0001–0005 estão registradas no banco descartável dos testes; scheduling.0026 é no-op em SQLite.
+- CI do commit bd7e7728249c87621c359476ba409eda0cd9096a: Django e segurança aprovados; 919 testes PostgreSQL/Redis passaram (3 ignorados), 29 testes JavaScript passaram e 3 testes de restauração em PostgreSQL descartável passaram. As alterações posteriores de proteção de vagas e auditoria financeira exigem o CI do HEAD do PR.
+- As migrations healthcare.0004/.0005 foram exercitadas em bancos descartáveis local e do CI. Nenhuma migration aplicada no Coolify nesta execução. Healthcare.0001–0005 estão registradas no banco descartável dos testes; scheduling.0026 é no-op em SQLite.
 
 ## Coolify observado, sem alterações
 

@@ -21,7 +21,7 @@ class DentalSeatActivationTests(TestCase):
 
     def payment(self,**overrides):
         data=dict(tenant=self.tenant,subscription=self.subscription,purpose="dental-seat",reference_id=self.request.pk,
-                  provider="mercadopago",provider_payment_id="dental-test-payment",environment="sandbox",
+                  provider="mercadopago",provider_payment_id="dental-test-payment",environment="sandbox",provider_status="processed",
                   amount=self.request.quoted_monthly_price,status=Payment.Status.PAID,paid_at=timezone.now())
         data.update(overrides)
         return Payment.objects.create(**data)
@@ -74,3 +74,15 @@ class DentalSeatActivationTests(TestCase):
         with self.assertRaises(ValidationError):
             activate_module_request(module_request=self.request,user=self.master,financial_payment=payment)
         self.assertEqual(TenantModuleAddon.objects.get(module=self.extra).quantity,1)
+
+    def test_sandbox_payment_cannot_unlock_production_subscription(self):
+        self.subscription.provider_environment="production"
+        self.subscription.save()
+        with self.assertRaises(ValidationError):
+            activate_module_request(module_request=self.request,user=self.master,financial_payment=self.payment())
+        self.assertFalse(TenantModuleAddon.objects.filter(module=self.extra).exists())
+
+    def test_unconfirmed_provider_status_cannot_unlock_seat(self):
+        with self.assertRaises(ValidationError):
+            activate_module_request(module_request=self.request,user=self.master,
+                                    financial_payment=self.payment(provider_status="pending"))
