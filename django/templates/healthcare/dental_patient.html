@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Prontuário odontológico{% endblock %}
+{% block content %}
+<main style="max-width:1100px;margin:auto;padding:24px">
+<h1>Prontuário odontológico — {{ patient.name }}</h1>
+<a href="{% url 'dental-encounter' %}">Registrar evolução</a>
+{% for item in history %}
+<article style="border:1px solid #ddd;border-radius:12px;padding:18px;margin:18px 0">
+<h2>{{ item.created_at|date:"d/m/Y H:i" }}</h2>
+<p><strong>Anamnese:</strong> {{ item.data.anamnesis|linebreaksbr }}</p>
+<p><strong>Achados:</strong> {{ item.data.findings|linebreaksbr }}</p>
+<p><strong>Procedimentos:</strong> {{ item.data.procedures|linebreaksbr }}</p>
+<p><strong>Plano:</strong> {{ item.data.treatment_plan|linebreaksbr }}</p>
+<h3>Odontograma registrado</h3><ul>{% for tooth, observations in item.data.odontogram.items %}
+<li>Dente {{ tooth }}: {% for observation in observations %}{{ observation.condition }} ({{ observation.surfaces|join:", " }}) {{ observation.note }}; {% endfor %}</li>
+{% endfor %}</ul>
+</article>
+{% empty %}<p>Não há evoluções odontológicas registradas.</p>{% endfor %}
+</main>
+{% endblock %}
