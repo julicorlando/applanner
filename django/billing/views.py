@@ -46,9 +46,27 @@ def _unique_slug(name):
 SEGMENT_CATEGORIES={"barbearia":{"barbearia","salao"},"arena":{"arena"},"auto":{"auto"},"saude":{"clinica"},"fisioterapia":{"clinica"},"physiotherapy":{"clinica"}}
 
 
+def is_physiotherapy_plan(plan):
+    return bool(plan and (
+        "fisio" in (plan.slug or "").lower()
+        or "fisio" in (plan.name or "").lower()
+        or "physiotherap" in (plan.slug or "").lower()
+        or "physiotherap" in (plan.name or "").lower()
+    ))
+
+
+def healthcare_plan_allowed(plan):
+    if not plan or plan.slug=="segment-medico":
+        return False
+    segments=set((plan.features or {}).get("segments", []))
+    return bool(segments & {"saude","fisioterapia","physiotherapy"}) or is_physiotherapy_plan(plan)
+
+
 def plan_categories(plan,choices):
     segments=(plan.features or {}).get("segments")
     allowed=None if segments is None else set().union(*(SEGMENT_CATEGORIES.get(segment,set()) for segment in segments))
+    if allowed is not None and is_physiotherapy_plan(plan):
+        allowed.add("clinica")
     return [(key,label) for key,label in choices if not key or allowed is None or key in allowed]
 
 
@@ -87,7 +105,7 @@ class SignupForm(forms.Form):
         ).exists())
         # Fisioterapia e outros planos de saude independem da vitrine do plano medico.
         other_health_available=any(
-            bool(set((candidate.features or {}).get("segments", [])) & {"saude","fisioterapia","physiotherapy"})
+            healthcare_plan_allowed(candidate)
             for candidate in Plan.objects.filter(
                 active=True,public_visible=True,is_custom=False
             ).exclude(slug="segment-medico")
@@ -154,7 +172,7 @@ class SignupForm(forms.Form):
             # para Fisioterapia ou outro plano ativo com segmento saude.
             is_other_health_plan=bool(
                 plan and plan.slug!="segment-medico"
-                and bool(set((plan.features or {}).get("segments", [])) & {"saude","fisioterapia","physiotherapy"})
+                and healthcare_plan_allowed(plan)
                 and plan.active and plan.public_visible and not plan.is_custom
             )
             if not is_other_health_plan and (
@@ -167,7 +185,7 @@ class SignupForm(forms.Form):
             segment={"barbearia":"barbearia","salao":"barbearia","auto":"auto",
                      "arena":"arena","clinica":"saude"}.get(category)
             if "segments" in (plan.features or {}) and segment not in plan.features["segments"] and not (
-                segment=="saude" and bool(set(plan.features["segments"]) & {"fisioterapia","physiotherapy"})
+                segment=="saude" and (is_physiotherapy_plan(plan) or bool(set(plan.features["segments"]) & {"fisioterapia","physiotherapy"}))
             ):
                 self.add_error("plan","Este plano não inclui o segmento selecionado. Escolha outro plano ou solicite uma proposta personalizada.")
         password=data.get("password") or ""
