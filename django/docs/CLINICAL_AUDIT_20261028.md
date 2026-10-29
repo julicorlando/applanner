@@ -19,7 +19,7 @@ Estado: implementação incremental; não homologada e não liberada para produ�
 - Arcadas SVG superior/inferior, dentes esquemáticos e raízes, dentições permanente/decídua, FDI, seleção múltipla, faces, cores e legenda. Histórico apresenta os odontogramas registrados. Impressão permite salvar PDF pelo navegador; não é um PDF assinado.
 - Limite odontológico verificado também no save ORM, com bloqueio por tenant; bulk_create/update/bulk_update não podem ativar vagas odontológicas. Clínica com módulo Odontologia ativo não contorna a regra alterando apenas a categoria. Foi acrescentada a migration scheduling.0026 com trigger PostgreSQL para bloquear bypass por SQL/_base_manager; testes de bypass e concorrência exigem execução no CI PostgreSQL.
 - Recepcionista é uma conta administrativa e não consome um objeto Professional. Não foi criada uma segunda modalidade de cadastro de recepção.
-- Vaga adicional: repetição permitida, preço cotado preservado e ativação recusada sem pagamento associado, pago e com valor correspondente, ou isenção expressa atribuída ao Master. Fluxo de cobrança e webhook dedicado à solicitação ainda NÃO conectado à interface. A guarda de ativação não equivale a um checkout completo.
+- Vaga adicional: repetição permitida, preço cotado preservado e ativação recusada sem pagamento associado, pago e com valor correspondente, ou isenção expressa atribuída ao Master, com trilha administrativa de ativação e motivo integral preservado. Fluxo de cobrança e webhook dedicado à solicitação ainda NÃO conectado à interface. A guarda de ativação não equivale a um checkout completo.
 - Fisioterapia: CREFITO no registro, diagnósticos médico/fisioterapêutico, palpação, avaliação neurológica, prognóstico, exercícios, parâmetros, intercorrências, orientações e alta.
 - Mapa corporal existente preservado e ampliado com dor 0–10, condição e notas por região, validação no servidor e correção de lateralidade anterior/posterior. Mapa também disponível na avaliação inicial.
 - Links clínicos no menu para profissionais vinculados e módulos habilitados.
@@ -32,7 +32,7 @@ Estado: implementação incremental; não homologada e não liberada para produ�
 - Ruff F401/F821/F822/F823: passou.
 - Política de artefatos: passou.
 - JavaScript: 29 testes passaram, incluindo cinco testes DOM dos mapas com jsdom.
-- Suíte clínica/comercial/catálogos atual: 47 testes executados, 44 passaram e 3 testes específicos de PostgreSQL ignorados localmente.
+- Suíte clínica/comercial/catálogos atual: 48 testes executados, 45 passaram e 3 testes específicos de PostgreSQL ignorados localmente.
 - Regressão completa em SQLite: 919 testes, 4 falhas, 3 erros, 13 ignorados. Três falhas de concorrência dependem de PostgreSQL; três erros dependem de Redis. Uma expectativa antiga de acesso Master irrestrito foi corrigida para exigir 403. Não contabilizar a regressão completa como aprovada; exigir CI em PostgreSQL/Redis.
 - As novas migrations foram exercitadas somente em banco local descartável. Nenhuma migration aplicada no Coolify nesta execução. Healthcare.0001–0005 estão registradas no banco descartável dos testes; scheduling.0026 é no-op em SQLite.
 

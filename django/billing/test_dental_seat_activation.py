@@ -17,6 +17,7 @@ class DentalSeatActivationTests(TestCase):
         self.extra.save()
         self.request=request_module(tenant=self.tenant,module=self.extra,user=self.owner,note="Vaga adicional")
         review_module_request(module_request=self.request,user=self.master,approved=True,note="Aprovado")
+        self.request.refresh_from_db()
 
     def payment(self,**overrides):
         data=dict(tenant=self.tenant,subscription=self.subscription,purpose="dental-seat",reference_id=self.request.pk,
@@ -55,6 +56,17 @@ class DentalSeatActivationTests(TestCase):
         self.assertIn("Homologação autorizada",self.request.master_note)
         self.assertEqual(self.request.reviewed_by_id,self.master.pk)
         self.assertEqual(TenantModuleAddon.objects.get(module=self.extra).quantity,1)
+        from core.models import AuditLog
+        audit=AuditLog.objects.get(action="dental.seat.activated",entity_id=self.request.pk)
+        self.assertEqual(audit.after["waiver_reason"],"Homologação autorizada")
+        self.assertEqual(audit.user_id,self.master.pk)
+
+    def test_long_prior_note_cannot_hide_waiver_reason(self):
+        self.request.master_note="x"*500
+        self.request.save()
+        activate_module_request(module_request=self.request,user=self.master,waiver_reason="Motivo integral")
+        self.request.refresh_from_db()
+        self.assertIn("Motivo integral",self.request.master_note)
 
     def test_repeated_activation_does_not_add_another_seat(self):
         payment=self.payment()

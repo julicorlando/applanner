@@ -168,8 +168,10 @@ def activate_module_request(*,module_request,user,financial_payment=None,waiver_
         from django.core.exceptions import PermissionDenied
         if not user.is_active or not user.is_superuser:
             raise PermissionDenied("Somente o Master pode ativar vagas odontológicas.")
+        if not isinstance(waiver_reason,str) or len(waiver_reason)>300:
+            raise ValidationError("O motivo da isenção deve conter até 300 caracteres.")
         if waiver_reason.strip():
-            row.master_note=(row.master_note+" | Isenção financeira: "+waiver_reason.strip())[:500]
+            row.master_note=row.master_note[:150]+" | Isenção financeira: "+waiver_reason.strip()
             row.reviewed_by=user
             row.save(update_fields=["master_note","reviewed_by","updated_at"])
         else:
@@ -265,6 +267,12 @@ def activate_module_request(*,module_request,user,financial_payment=None,waiver_
             adjustment.applied_at=timezone.now()
             adjustment.error_code=""
             adjustment.save()
+            if row.module.slug=="dental-professional-extra":
+                from core.models import AuditLog
+                AuditLog.objects.create(tenant=row.tenant,user=user,
+                    action="dental.seat.activated",entity_type="billing.ModuleRequest",entity_id=row.pk,
+                    after={"waiver_reason":waiver_reason.strip(),"payment_id":getattr(financial_payment,"pk",None),
+                           "monthly_price":str(quoted),"quantity":addon.quantity})
         return adjustment
     except Exception as exc:
         logger.exception("Falha ao ativar módulo adicional para assinatura %s",subscription.pk)
