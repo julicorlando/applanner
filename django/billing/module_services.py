@@ -108,6 +108,9 @@ def request_module(*,tenant,module,user,note=""):
 @transaction.atomic
 def review_module_request(*,module_request,user,approved=True,note=""):
     row=ModuleRequest.objects.select_for_update().select_related("tenant","module").get(pk=module_request.pk)
+    if row.module.slug=="dental-professional-extra" and (not user.is_active or not user.is_superuser):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Somente o Master pode analisar vagas odontológicas.")
     if row.status not in {ModuleRequest.Status.PENDING,ModuleRequest.Status.PAYMENT_FAILED}:
         raise ValidationError("Esta solicitação não está pendente de análise.")
     row.status=ModuleRequest.Status.APPROVED if approved else ModuleRequest.Status.REJECTED

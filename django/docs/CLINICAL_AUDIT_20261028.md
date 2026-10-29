@@ -17,7 +17,7 @@ Estado: implementação incremental; não homologada e não liberada para produ�
 - Imutabilidade por save/update/bulk_update no ORM público dos registros; retificação cria outro registro com referência ao original e motivo cifrado. A interface de retificação e proteção por trigger do banco ainda estão pendentes.
 - Importação legada preserva registros existentes, recusa divergências e mantém a data histórica na criação.
 - Arcadas SVG superior/inferior, dentes esquemáticos e raízes, dentições permanente/decídua, FDI, seleção múltipla, faces, cores e legenda. Histórico apresenta os odontogramas registrados. Impressão permite salvar PDF pelo navegador; não é um PDF assinado.
-- Limite odontológico verificado também no save ORM, com bloqueio por tenant; bulk_create/update/bulk_update não podem ativar vagas odontológicas. Clínica com módulo Odontologia ativo não contorna a regra alterando apenas a categoria. Garantia contra SQL direto/_base_manager e teste concorrente PostgreSQL ainda precisam de validação/proteção no banco.
+- Limite odontológico verificado também no save ORM, com bloqueio por tenant; bulk_create/update/bulk_update não podem ativar vagas odontológicas. Clínica com módulo Odontologia ativo não contorna a regra alterando apenas a categoria. Foi acrescentada a migration scheduling.0026 com trigger PostgreSQL para bloquear bypass por SQL/_base_manager; testes de bypass e concorrência exigem execução no CI PostgreSQL.
 - Recepcionista é uma conta administrativa e não consome um objeto Professional. Não foi criada uma segunda modalidade de cadastro de recepção.
 - Vaga adicional: repetição permitida, preço cotado preservado e ativação recusada sem pagamento associado, pago e com valor correspondente, ou isenção expressa atribuída ao Master. Fluxo de cobrança e webhook dedicado à solicitação ainda NÃO conectado à interface. A guarda de ativação não equivale a um checkout completo.
 - Fisioterapia: CREFITO no registro, diagnósticos médico/fisioterapêutico, palpação, avaliação neurológica, prognóstico, exercícios, parâmetros, intercorrências, orientações e alta.
@@ -27,14 +27,14 @@ Estado: implementação incremental; não homologada e não liberada para produ�
 ## Validação local
 
 - manage.py check: passou.
-- makemigrations --check --dry-run: sem alterações pendentes antes do ajuste da data histórica; repetir após a migration 0005.
+- makemigrations --check --dry-run: sem alterações pendentes, incluindo healthcare.0004 e .0005.
 - collectstatic: passou.
 - Ruff F401/F821/F822/F823: passou.
 - Política de artefatos: passou.
 - JavaScript: 29 testes passaram, incluindo cinco testes DOM dos mapas com jsdom.
-- Suíte clínica/comercial inicial: 41 testes passaram, em SQLite e cache local.
+- Suíte clínica/comercial/catálogos atual: 47 testes executados, 44 passaram e 3 testes específicos de PostgreSQL ignorados localmente.
 - Regressão completa em SQLite: 919 testes, 4 falhas, 3 erros, 13 ignorados. Três falhas de concorrência dependem de PostgreSQL; três erros dependem de Redis. Uma expectativa antiga de acesso Master irrestrito foi corrigida para exigir 403. Não contabilizar a regressão completa como aprovada; exigir CI em PostgreSQL/Redis.
-- As novas migrations foram exercitadas somente em banco local descartável. Nenhuma migration aplicada no Coolify nesta execução.
+- As novas migrations foram exercitadas somente em banco local descartável. Nenhuma migration aplicada no Coolify nesta execução. Healthcare.0001–0005 estão registradas no banco descartável dos testes; scheduling.0026 é no-op em SQLite.
 
 ## Coolify observado, sem alterações
 
@@ -43,6 +43,7 @@ Estado: implementação incremental; não homologada e não liberada para produ�
 - Estado apresentado: Running (no healthcheck). Não equivale a confirmação individual de web/worker/beat/db/redis.
 - Backups de storage na tela: 0 agendamentos, 0 execuções. Isso não exclui backups externos; recuperação não demonstrada.
 - Nenhum redeploy, alteração de variáveis/volumes, migration ou mudança de produção realizado.
+- Consulta pública de produção /healthz/: HTTP 200, database=true e cache=true. Isso não valida o código desta branch nem os processos Celery.
 - Homologação isolada ainda não identificada/criada; nenhuma URL de homologação validada.
 
 ## Pendências impeditivas para aceite integral
@@ -52,7 +53,7 @@ Estado: implementação incremental; não homologada e não liberada para produ�
 3. Identificação profissional CRO/UF e CREFITO em cadastro validado e snapshot por atendimento; vínculo clínico compartilhado com concessão/revogação explícita.
 4. Periodontograma, orçamento/aprovação e planejamento estruturado por dente; materiais, anestesia e demais campos odontológicos separados (a base ainda usa quatro textos clínicos amplos).
 5. Anexos clínicos privados, radiografias, consentimentos/assinaturas e exportações auditadas; retenção e restauração validadas.
-6. UI de retificação, trilha administrativa completa, proteção de integridade no PostgreSQL e testes concorrentes.
+6. UI de retificação, trilha administrativa completa, proteção de integridade dos prontuários no PostgreSQL e validação dos testes concorrentes.
 7. Comparação visual retrospectiva do mapa corporal, indicadores por paciente, relatórios e integração validada de pacotes/sessões/financeiro.
 8. Testes E2E no navegador real em homologação, responsividade, agendamento, recepção, prontuário, extras e pagamento sandbox.
 9. Não declarar certificação, assinatura ICP-Brasil ou conformidade LGPD/CFO/COFFITO por esta entrega.

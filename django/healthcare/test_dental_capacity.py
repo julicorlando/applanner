@@ -62,3 +62,10 @@ class DentalCapacityTests(TestCase):
         self.tenant.save()
         with self.assertRaises(ValidationError):
             Professional.objects.create(tenant=self.tenant,name="Tentativa")
+
+    def test_commercial_capacity_matches_dental_limit(self):
+        from billing.entitlements import professional_capacity
+        capacity=professional_capacity(self.tenant)
+        self.assertEqual(capacity["limit"],1)
+        self.assertEqual(capacity["used"],1)
+        self.assertEqual(capacity["available"],0)

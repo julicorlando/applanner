@@ -51,6 +51,15 @@ def professional_capacity(tenant, subscription=None):
     """Plano + 3 vagas por unidade adicional contratada + vagas extras avulsas."""
     from .models import TenantModuleAddon
 
+    if is_dental_tenant(tenant):
+        extras=(TenantModuleAddon.objects.filter(tenant=tenant,module__slug="dental-professional-extra",
+            status=TenantModuleAddon.Status.ACTIVE).values_list("quantity",flat=True).first() or 0)
+        used=tenant.professionals.filter(active=True).count()
+        limit=1+extras
+        return {"plan_limit":1,"limit":limit,"used":used,"overridden":False,"unlimited":False,
+                "available":max(0,limit-used),"exceeded":used>limit,
+                "active_units":max(1,tenant.units.filter(active=True).count()),"additional_units":0,
+                "unit_bonus":0,"extra_professionals":extras}
     subscription=subscription or active_subscription(tenant)
     raw=(subscription.plan.features or {}).get("professionals") if subscription else None
 
