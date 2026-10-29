@@ -891,8 +891,13 @@ class PhysiotherapyRecordForm(forms.Form):
     body_regions=forms.MultipleChoiceField(choices=PHYSIO_BODY_AREAS,required=False,
         widget=forms.CheckboxSelectMultiple, label="Locais tratados no mapa corporal")
 
-    def __init__(self,*args,tenant=None,**kwargs):
+    assessment=forms.ModelChoiceField(queryset=apps.get_model("healthcare","PhysiotherapyAssessment").objects.none(),required=False,label="Avaliação inicial vinculada")
+
+    def __init__(self,*args,tenant=None,user=None,**kwargs):
         super().__init__(*args,**kwargs)
+        if user:
+            from healthcare.assessment_services import assessments_for
+            self.fields["assessment"].queryset=assessments_for(user).filter(status="finalized")
         self.fields["customer"].queryset=apps.get_model("scheduling","Customer").objects.filter(tenant=tenant,active=True).order_by("name")
         self.fields["professional"].queryset=apps.get_model("scheduling","Professional").objects.filter(tenant=tenant,active=True).order_by("name")
         self.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant).select_related("customer","professional").order_by("-starts_at")[:500]
@@ -920,6 +925,9 @@ class PhysiotherapyRecordForm(forms.Form):
 
     def clean(self):
         data=super().clean()
+        assessment=data.get("assessment")
+        if assessment and (data.get("record_type")!="physio_evolution" or not data.get("customer") or assessment.customer_id!=data["customer"].pk):
+            self.add_error("assessment","Vincule uma avaliação finalizada do mesmo paciente a uma evolução.")
         appointment=data.get("appointment")
         if appointment and data.get("customer") and appointment.customer_id!=data["customer"].pk:
             self.add_error("appointment","Este agendamento pertence a outro paciente.")
@@ -1470,7 +1478,11 @@ def resource_create(request,module_slug,resource_slug):
                 form.add_error(None,exc)
     elif custom=="medical_record":
         is_physio=((tenant.category or "").strip().lower()=="fisioterapia" or module_enabled(tenant,"physiotherapy"))
-        form=(PhysiotherapyRecordForm(request.POST or None,tenant=tenant) if is_physio
+        if is_physio and request.method=="GET" and request.GET.get("record_type")!="physio_evolution":
+            from urllib.parse import urlencode
+            params={key:request.GET[key] for key in ("customer","appointment") if request.GET.get(key,"").isdigit()}
+            return redirect(reverse("physio-assessment-create")+("?"+urlencode(params) if params else ""))
+        form=(PhysiotherapyRecordForm(request.POST or None,tenant=tenant,user=request.user,initial={key:request.GET[key] for key in ("customer","assessment","record_type") if request.GET.get(key)}) if is_physio
               else MedicalRecordForm(request.POST or None,tenant=tenant))
         form.fields["professional"].queryset=form.fields["professional"].queryset.filter(user=request.user)
         form.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant,professional__user=request.user)
@@ -1508,6 +1520,7 @@ def resource_create(request,module_slug,resource_slug):
                     tenant=tenant,customer=data["customer"],professional=data["professional"],
                     appointment=data["appointment"],record_type=kind,
                     title=title,content=content,user=request.user,
+                    physiotherapy_assessment=data.get("assessment") if is_physio else None,
                     ip=request.META.get("REMOTE_ADDR",""),
                 )
                 messages.success(request,"Registro salvo com conteúdo criptografado.")

@@ -31,6 +31,7 @@
 <script src="{% static 'js/workspace.js' %}" defer></script>
 {% if simple_mode %}<link rel="stylesheet" href="{% static 'css/simple-mode.css' %}">{% endif %}
 <link rel="stylesheet" href="{% static 'css/workspace-calendar.css' %}">
+{% block extra_head %}{% endblock %}
 </head>
 <body class="adaptive-ui {% if workspace_groups %}has-workspace{% endif %} {% if simple_mode %}simple-mode{% endif %} {% block body_class %}{% endblock %}">
 {% if clinical_homologation %}<div role="status" style="padding:12px;background:#fef3c7;color:#78350f;text-align:center;font-weight:650">HOMOLOGAÇÃO · somente dados fictícios · pagamentos apenas em sandbox</div>{% endif %}
@@ -89,7 +90,7 @@
     </div></details>
     {% include "theme_toggle.html" %}
   </header>{% endif %}{% endblock %}
-  {% include "workspace_sidebar.html" %}
+  {% block workspace_sidebar %}{% include "workspace_sidebar.html" %}{% endblock %}
   {% if request.support_actor %}
     <div class="panel" role="status" style="margin:12px auto;max-width:1100px;padding:14px">
       Acesso assistido ativo por {{ request.support_actor.email }}. Suas ações são registradas.

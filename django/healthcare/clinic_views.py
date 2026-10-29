@@ -68,7 +68,7 @@ def dashboard(request):
         "patients":Customer.objects.filter(tenant=tenant,active=True).order_by("name"),
         "entries":records.select_related("customer","professional").order_by("-created_at")[:100],
         "followups":ClinicalFollowUp.objects.filter(entry__in=records,completed_at__isnull=True).select_related("entry__customer").order_by("due_at")[:100],
-        "dentistry":module_enabled(tenant,"dentistry"),"physiotherapy":module_enabled(tenant,"physiotherapy"),
+        "dentistry":module_enabled(tenant,"dentistry"),"physiotherapy":((tenant.category or "").strip().lower()=="fisioterapia" or module_enabled(tenant,"physiotherapy")),
     })
 
 
@@ -117,6 +117,8 @@ def record_detail(request,pk):
     tenant=clinic(request)
     entry=get_object_or_404(clinical_records_for(user=request.user,tenant=tenant),pk=pk)
     payload=unpack(entry,request.user)
+    if getattr(entry,"physio_assessment",None) and not request.GET.get("retificar"):
+        return redirect("physio-assessment-detail",pk=entry.physio_assessment.pk)
     owner=entry.professional.user_id==request.user.pk
     forms={"correct":RectificationForm(),"attach":AttachmentForm(),"grant":CareGrantForm(user=request.user),
            "followup":FollowUpForm(),"status":TreatmentStatusForm()}
@@ -197,7 +199,7 @@ def patient(request,pk):
     for entry in entries:
         data=unpack(entry,request.user)
         history.append({"entry":entry,"kind":data.get("kind",""),"pain":data.get("sections",{}).get("pain_level")})
-        if data.get("schema")=="applanner.physiotherapy.v1":physio.append({"id":entry.pk,"date":entry.created_at.isoformat(),"regions":data.get("sections",{}).get("body_findings",{}),"pain":data.get("sections",{}).get("pain_level")})
+        if data.get("schema") in {"applanner.physiotherapy.v1","applanner.physiotherapy.v2"}:physio.append({"id":entry.pk,"date":entry.created_at.isoformat(),"regions":data.get("sections",{}).get("body_findings",{}),"pain":data.get("sections",{}).get("pain_level")})
     from engagement.models import CustomerPackage
     packages=[]
     for pack in CustomerPackage.objects.filter(tenant=tenant,customer=customer).select_related("package"):
@@ -205,7 +207,7 @@ def patient(request,pk):
         used=pack.usages.aggregate(n=Sum("credits_used"))["n"] or 0
         packages.append({"name":pack.package.name,"purchased":purchased,"used":used,"remaining":max(0,purchased-used),"status":pack.get_status_display()})
     from core.portal import PHYSIO_BODY_AREAS
-    return render(request,"healthcare/clinical_patient.html",{"patient":customer,"history":history,"physio":physio,"packages":packages,"body_labels":dict(PHYSIO_BODY_AREAS)})
+    return render(request,"healthcare/clinical_patient.html",{"patient":customer,"history":history,"physio":physio,"packages":packages,"body_labels":dict(PHYSIO_BODY_AREAS),"is_physio":((tenant.category or "").strip().lower()=="fisioterapia" or module_enabled(tenant,"physiotherapy"))})
 
 
 @login_required

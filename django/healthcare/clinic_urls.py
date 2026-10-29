@@ -1,6 +1,12 @@
 from django.urls import path
 from . import clinic_views as views
+from . import assessment_views as assessments
 urlpatterns=[
+    path("fisioterapia/",assessments.assessment_list,name="physio-assessments"),
+    path("fisioterapia/avaliacao/nova/",assessments.assessment_editor,name="physio-assessment-create"),
+    path("fisioterapia/avaliacao/<int:pk>/",assessments.assessment_editor,name="physio-assessment-detail"),
+    path("fisioterapia/paciente/<int:pk>/opcoes/",assessments.patient_options,name="physio-patient-options"),
+    path("fisioterapia/documento/<int:pk>/",assessments.assessment_document,name="physio-assessment-document"),
     path("",views.dashboard,name="clinical-dashboard"),
     path("registro-profissional/",views.registration,name="clinical-registration"),
     path("novo/<str:kind>/",views.structured_record,name="clinical-structured"),

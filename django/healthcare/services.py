@@ -44,7 +44,7 @@ def clinical_records_for(*, user, tenant):
 @transaction.atomic
 def create_record(*, tenant, customer, professional, title, content, user,
                   appointment=None, record_type="evolution", ip="", supersedes=None,
-                  correction_reason=""):
+                  correction_reason="",physiotherapy_assessment=None):
     assert_clinical_access(user)
     require_module(tenant, "medical_records")
     if (user.tenant_id != tenant.pk or customer.tenant_id != tenant.pk
@@ -66,10 +66,19 @@ def create_record(*, tenant, customer, professional, title, content, user,
             raise PermissionDenied("Retificação não corresponde ao registro original.")
         if not correction_reason.strip():
             raise ValidationError("Informe o motivo da retificação.")
+    if physiotherapy_assessment is not None:
+        assessment=physiotherapy_assessment
+        if (assessment.tenant_id!=tenant.pk or assessment.customer_id!=customer.pk
+                or record_type not in {"physio_evaluation","physio_evolution"}
+                or (record_type=="physio_evaluation" and assessment.professional_id!=professional.pk)):
+            raise PermissionDenied("A avaliação não corresponde ao paciente/profissional deste atendimento.")
+        if record_type=="physio_evolution":
+            if assessment.status!="finalized":raise ValidationError("Finalize a avaliação antes de registrar evoluções vinculadas.")
+            read_record(entry=assessment.final_entry,user=user,ip=ip)
     entry = MedicalRecordEntry.objects.create(
         tenant=tenant, customer=customer, professional=professional, appointment=appointment,
         record_type=record_type, title=title[:190], content_encrypted=encrypt_text(content),
-        created_by=user, supersedes=supersedes,
+        created_by=user, supersedes=supersedes,physiotherapy_assessment=physiotherapy_assessment,
         professional_snapshot={**(professional.clinical_registration.snapshot() if hasattr(professional,"clinical_registration") else {"name":professional.name}),"user_id":user.pk},
         correction_reason_encrypted=encrypt_text(correction_reason) if supersedes else "",
     )
