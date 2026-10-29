@@ -262,6 +262,23 @@ class AssessmentTests(TestCase):
         response = self.client.get(reverse("physio-assessment-create"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("no-store", response["Cache-Control"])
+        data = self.data(action="draft")
+        response = self.client.post(reverse("physio-assessment-create"), data)
+        self.assertEqual(response.status_code, 302)
+        row = PhysiotherapyAssessment.objects.get()
+        data.update(
+            version=row.version,
+            action="finalize",
+            appointment=self.appointment.pk,
+            attestation="on",
+        )
+        response = self.client.post(
+            reverse("physio-assessment-detail", args=[row.pk]), data
+        )
+        self.assertEqual(response.status_code, 302)
+        row.refresh_from_db()
+        self.assertEqual(row.status, "finalized")
+        self.assertEqual(row.final_entry.customer_id, self.patient.pk)
         self.client.force_login(self.reception)
         self.assertEqual(
             self.client.get(reverse("physio-assessments")).status_code, 403
