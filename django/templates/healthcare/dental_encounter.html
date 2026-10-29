@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Evolução odontológica{% endblock %}
+{% block content %}
+<main style="max-width:1100px;margin:auto;padding:24px">
+<h1>Nova evolução odontológica</h1>
+<p>Selecione um dente na arcada e registre suas condições. Numeração internacional FDI; dentição permanente e decídua.</p>
+<form method="post">{% csrf_token %}
+{{ form.non_field_errors }}
+{% for field in form %}{% if field.name != "odontogram_json" %}<div style="margin:12px 0"><label for="{{ field.id_for_label }}"><strong>{{ field.label }}</strong></label><div>{{ field }}{{ field.errors }}</div></div>{% endif %}{% endfor %}
+{{ form.odontogram_json }}
+<section aria-label="Odontograma" style="padding:20px;border:1px solid #cbd5e1;border-radius:14px">
+<h2>Odontograma interativo</h2>
+<p>Arcada superior</p><div id="upper" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+<hr><p>Arcada inferior</p><div id="lower" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+<label for="condition">Condição</label>
+<select id="condition"><option value="higido">Hígido</option><option value="carie">Cárie</option><option value="restauracao">Restauração</option><option value="ausente">Ausente</option><option value="extracao_indicada">Extração indicada</option><option value="endodontia">Endodontia</option><option value="coroa">Coroa</option><option value="implante">Implante</option><option value="fratura">Fratura</option><option value="selante">Selante</option><option value="protese">Prótese</option><option value="outro">Outro</option></select>
+<label for="surface">Superfície</label><select id="surface"><option value="">Dente inteiro</option><option value="mesial">Mesial</option><option value="distal">Distal</option><option value="vestibular">Vestibular</option><option value="lingual">Lingual</option><option value="palatina">Palatina</option><option value="oclusal">Oclusal</option><option value="incisal">Incisal</option><option value="cervical">Cervical</option><option value="raiz">Raiz</option></select>
+<label for="tooth-note">Observação</label><input id="tooth-note" maxlength="2000">
+<p id="selection" aria-live="polite">Selecione um dente</p>
+<button type="button" id="add-tooth">Registrar condição no dente</button>
+<button type="button" id="clear-tooth">Limpar dente selecionado</button>
+<div id="recorded" aria-live="polite"></div>
+</section>
+<button type="submit" style="margin-top:20px">Salvar evolução e odontograma</button>
+</form></main>
+<script>
+(function(){
+const upper=document.getElementById('upper'),lower=document.getElementById('lower');
+const field=document.getElementById('id_odontogram_json');
+let chart={};try{chart=JSON.parse(field.value||'{}')}catch(e){chart={}}
+let selected=null;
+function teeth(quadrants,max){let arr=[];for(let q of quadrants){for(let n=1;n<=max;n++)arr.push(''+q+n)}return arr}
+function makeRow(node,ids){ids.forEach(id=>{const b=document.createElement('button');b.type='button';b.dataset.tooth=id;b.title='Dente '+id;b.setAttribute('aria-label','Dente '+id);
+b.style.cssText='width:43px;height:58px;border:2px solid #64748b;border-radius:14px 14px 22px 22px;background:white;cursor:pointer';
+b.textContent=id;b.onclick=()=>{selected=id;document.getElementById('selection').textContent='Dente '+id;refresh()};node.appendChild(b)})}
+makeRow(upper,[...teeth([1],8).reverse(),...teeth([2],8),...teeth([5],5).reverse(),...teeth([6],5)]);
+makeRow(lower,[...teeth([4],8).reverse(),...teeth([3],8),...teeth([8],5).reverse(),...teeth([7],5)]);
+function refresh(){document.querySelectorAll('[data-tooth]').forEach(b=>{const id=b.dataset.tooth;b.style.background=chart[id]?.length?'#fde68a':'white';b.style.borderColor=id===selected?'#0f766e':'#64748b'});field.value=JSON.stringify(chart);
+document.getElementById('recorded').textContent=Object.entries(chart).map(([k,v])=>k+': '+v.map(o=>o.condition).join(', ')).join(' | ')}
+document.getElementById('add-tooth').onclick=()=>{if(!selected)return;const surface=document.getElementById('surface').value;const item={condition:document.getElementById('condition').value,surfaces:surface?[surface]:[],note:document.getElementById('tooth-note').value};(chart[selected]??=[]).push(item);refresh()};
+document.getElementById('clear-tooth').onclick=()=>{if(selected){delete chart[selected];refresh()}};
+refresh();
+})();
+</script>
+{% endblock %}
