@@ -53,6 +53,10 @@ def validate_odontogram(teeth):
 def save_dental_encounter(*, tenant, customer, professional, user, anamnesis, findings,
                           procedures, plan, odontogram, appointment=None, ip=""):
     _require_dentistry(tenant)
+    if user.tenant_id != tenant.pk and not user.is_superuser:
+        raise PermissionDenied("Profissional de outra clínica.")
+    if not professional.active:
+        raise ValidationError("Profissional inativo.")
     for value in (anamnesis, findings, procedures, plan):
         if not isinstance(value, str) or len(value) > 20000:
             raise ValidationError("Campo clínico inválido ou muito extenso.")
