@@ -407,3 +407,13 @@ class AssessmentTests(TestCase):
             read_record(entry=self.entry, user=self.doctor),
             "Informação clínica de teste",
         )
+
+    def test_preexisting_physio_entries_remain_listed_and_scoped(self):
+        legacy = self.create(
+            record_type="physio_evaluation", content="Avaliação anterior preservada"
+        )
+        response = assessment_views.assessment_list(self.req(self.doctor))
+        self.assertContains(response, "Avaliações e evoluções anteriores")
+        self.assertContains(response, reverse("clinical-record", args=[legacy.pk]))
+        response = assessment_views.assessment_list(self.req(self.colleague))
+        self.assertNotContains(response, reverse("clinical-record", args=[legacy.pk]))

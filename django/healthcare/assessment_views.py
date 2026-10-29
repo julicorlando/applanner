@@ -19,6 +19,7 @@ from .assessment_services import (
     AssessmentConflict,
 )
 from .models import PhysiotherapyAssessmentDocument
+from .services import clinical_records_for
 
 
 def shell_context(user):
@@ -100,6 +101,15 @@ def assessment_list(request):
         .select_related("customer", "professional")
         .order_by("-updated_at", "-pk")
     )
+    legacy_entries = (
+        clinical_records_for(user=request.user, tenant=request.user.tenant)
+        .filter(
+            record_type__in=["physio_evaluation", "physio_evolution"],
+            physiotherapy_assessment__isnull=True,
+        )
+        .select_related("customer", "professional")
+        .order_by("-created_at", "-pk")
+    )
     patient = None
     if request.GET.get("customer"):
         patient = get_object_or_404(
@@ -108,10 +118,16 @@ def assessment_list(request):
             tenant_id=request.user.tenant_id,
         )
         rows = rows.filter(customer=patient)
+        legacy_entries = legacy_entries.filter(customer=patient)
     return render(
         request,
         "healthcare/physio_assessment_list.html",
-        {"assessments": rows[:200], "patient": patient, **shell_context(request.user)},
+        {
+            "assessments": rows[:200],
+            "legacy_entries": legacy_entries[:200],
+            "patient": patient,
+            **shell_context(request.user),
+        },
     )
 
 
