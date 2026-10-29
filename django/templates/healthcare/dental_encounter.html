@@ -2,8 +2,8 @@
 {% block title %}Evolução odontológica{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="{% static 'healthcare/clinical.css' %}">
-<main class="clinical-wrap"><h1>Nova evolução odontológica</h1>
-<form method="post">{% csrf_token %}{{ form.non_field_errors }}
+<main class="clinical-wrap"><h1>Nova evolução odontológica</h1><p><a href="{% url 'clinical-registration' %}">Identificação profissional (CRO/UF)</a> · <a href="{% url 'clinical-dashboard' %}">Painel clínico</a></p>
+<form method="post" data-chart-url="{% url 'dental-chart' 0 %}">{% csrf_token %}{{ form.non_field_errors }}
 {% for field in form %}{% if field.name != "odontogram_json" %}<div class="clinical-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endif %}{% endfor %}
 {% include 'healthcare/odontogram.html' %}
 <button type="submit">Salvar evolução e odontograma</button>

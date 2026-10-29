@@ -1,0 +1,79 @@
+x-clinical-env: &clinical-env
+  DJANGO_SECRET_KEY: ${SERVICE_PASSWORD_64_DJANGO}
+  DJANGO_FIELD_ENCRYPTION_KEY: ${SERVICE_REALBASE64_FIELDKEY}
+  DJANGO_DEBUG: "false"
+  DJANGO_ALLOWED_HOSTS: ${SERVICE_FQDN_WEB_8000},web,localhost,127.0.0.1
+  DJANGO_CSRF_TRUSTED_ORIGINS: ${SERVICE_URL_WEB_8000}
+  DATABASE_URL: postgresql://applanner:${SERVICE_PASSWORD_DATABASE}@db:5432/applanner_homolog
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  DEPLOYMENT_ENVIRONMENT: homologacao
+  PUBLIC_BASE_URL: ${SERVICE_URL_WEB_8000}
+  SECURE_SSL_REDIRECT: "true"
+  EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+  DEFAULT_FROM_EMAIL: homologacao@example.invalid
+  TIME_ZONE: America/Recife
+  GUNICORN_WORKERS: "1"
+  GUNICORN_THREADS: "2"
+  BACKUP_DIR: /app/media/backups
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      <<: *clinical-env
+      SERVICE_URL_WEB_8000: ${SERVICE_URL_WEB_8000}
+    expose: ["8000"]
+    volumes: ["homolog_media:/app/media"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD","curl","--fail","--silent","-H","X-Forwarded-Proto: https","http://localhost:8000/healthz/"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 180s
+  worker:
+    build: .
+    restart: unless-stopped
+    environment: *clinical-env
+    command: ["celery","-A","applanner","worker","-l","INFO","--concurrency=1"]
+    volumes: ["homolog_media:/app/media"]
+    depends_on:
+      web: {condition: service_healthy}
+  beat:
+    build: .
+    restart: unless-stopped
+    environment: *clinical-env
+    command: ["celery","-A","applanner","beat","-l","INFO","--scheduler","django_celery_beat.schedulers:DatabaseScheduler"]
+    depends_on:
+      web: {condition: service_healthy}
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: applanner_homolog
+      POSTGRES_USER: applanner
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_DATABASE}
+    volumes: ["homolog_postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U applanner -d applanner_homolog"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server","--appendonly","yes"]
+    volumes: ["homolog_redis:/data"]
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+volumes:
+  homolog_media:
+  homolog_postgres:
+  homolog_redis:

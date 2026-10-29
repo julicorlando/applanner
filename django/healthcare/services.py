@@ -1,6 +1,7 @@
 import hashlib
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from core.crypto import encrypt_text, decrypt_text
 from billing.entitlements import require_module
 from .models import MedicalRecordAccessLog, MedicalRecordEntry
@@ -28,7 +29,13 @@ def clinical_records_for(*, user, tenant):
         raise PermissionDenied("Acesso a outra clínica negado.")
     # Only the responsible clinician may access the record. Shared-care grants
     # require an explicit authorization workflow, never an administrative bypass.
-    return MedicalRecordEntry.objects.filter(tenant=tenant, professional__user=user)
+    from .models import ClinicalCareGrant
+    grants=ClinicalCareGrant.objects.filter(tenant=tenant,grantee__user=user,
+        grantee__active=True,revoked_at__isnull=True).values_list("customer_id","source_professional_id","granted_by_id")
+    scope=Q(professional__user=user,professional_snapshot__user_id=user.pk)
+    for patient_id,professional_id,author_id in grants:
+        scope |= Q(customer_id=patient_id,professional_id=professional_id,professional_snapshot__user_id=author_id)
+    return MedicalRecordEntry.objects.filter(scope,tenant=tenant)
 
 
 @transaction.atomic
@@ -60,6 +67,7 @@ def create_record(*, tenant, customer, professional, title, content, user,
         tenant=tenant, customer=customer, professional=professional, appointment=appointment,
         record_type=record_type, title=title[:190], content_encrypted=encrypt_text(content),
         created_by=user, supersedes=supersedes,
+        professional_snapshot={**(professional.clinical_registration.snapshot() if hasattr(professional,"clinical_registration") else {"name":professional.name}),"user_id":user.pk},
         correction_reason_encrypted=encrypt_text(correction_reason) if supersedes else "",
     )
     MedicalRecordAccessLog.objects.create(

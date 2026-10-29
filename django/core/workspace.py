@@ -210,7 +210,7 @@ def navigation(request):
         except PermissionDenied:
             pass
         else:
-            clinical=[]
+            clinical=[link("Painel clínico",reverse("clinical-dashboard"),"users"),link("Identificação profissional",reverse("clinical-registration"),"users")]
             if module_enabled(tenant,"dentistry"):
                 clinical.append(link("Odontologia",reverse("dental-home"),"users"))
             if module_enabled(tenant,"physiotherapy"):

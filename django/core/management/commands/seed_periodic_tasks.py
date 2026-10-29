@@ -25,6 +25,7 @@ TASKS=[
     ("Processar CRM automotivo","auto.tasks.process_auto_crm",1,"hours"),
     ("Aplicar retenção LGPD de leads","commercial.tasks.enforce_lead_retention",24,"hours"),
     ("Expirar checkouts","billing.tasks.expire_checkouts",10,"minutes"),
+    ("Conciliar vagas odontológicas pagas","billing.tasks.reconcile_paid_dental_seats",5,"minutes"),
     ("Confirmar Pix pendentes","billing.tasks.reconcile_pending_pix",5,"minutes"),
     ("Conciliar taxas e estornos","billing.tasks.reconcile_platform_finances",1,"hours"),
     ("Aplicar reajustes de assinatura","billing.tasks.apply_subscription_price_changes",1,"hours"),

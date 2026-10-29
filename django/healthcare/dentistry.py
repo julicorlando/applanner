@@ -51,7 +51,7 @@ def validate_odontogram(teeth):
 
 
 def save_dental_encounter(*, tenant, customer, professional, user, anamnesis, findings,
-                          procedures, plan, odontogram, appointment=None, ip=""):
+                          procedures, plan, odontogram, appointment=None, ip="", clinical_details=None, treatment_plan_reference=None):
     _require_dentistry(tenant)
     if user.tenant_id != tenant.pk and not user.is_superuser:
         raise PermissionDenied("Profissional de outra clínica.")
@@ -60,7 +60,15 @@ def save_dental_encounter(*, tenant, customer, professional, user, anamnesis, fi
     for value in (anamnesis, findings, procedures, plan):
         if not isinstance(value, str) or len(value) > 20000:
             raise ValidationError("Campo clínico inválido ou muito extenso.")
-    payload = {"schema": 1, "kind": "dental_encounter",
+    details=clinical_details or {}
+    from .forms import DENTAL_DETAILS
+    if not isinstance(details,dict) or any(key not in DENTAL_DETAILS or not isinstance(value,str) or len(value)>20000 for key,value in details.items()):
+        raise ValidationError("Detalhes clínicos odontológicos inválidos.")
+    if treatment_plan_reference:
+        read_record(entry=treatment_plan_reference.entry,user=user,ip=ip)
+        if treatment_plan_reference.entry.tenant_id!=tenant.pk or treatment_plan_reference.entry.customer_id!=customer.pk:
+            raise PermissionDenied("Plano de outro paciente ou clínica.")
+    payload = {"treatment_plan_id":treatment_plan_reference.pk if treatment_plan_reference else None,"clinical_details":details,"schema": 1, "kind": "dental_encounter",
                "anamnesis": anamnesis, "findings": findings,
                "procedures": procedures, "treatment_plan": plan,
                "odontogram": validate_odontogram(odontogram)}

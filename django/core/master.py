@@ -1001,7 +1001,15 @@ def operational_action(request,action,pk=None):
                 ModuleRequest.Status.APPROVED,ModuleRequest.Status.PAYMENT_FAILED,
             }:
                 raise ValidationError("Esta solicitação não está disponível para aprovação.")
-            if approved:
+            if approved and row.module.slug=="dental-professional-extra":
+                waiver=request.POST.get("waiver_reason","").strip()
+                if waiver:
+                    adjustment=activate_module_request(module_request=row,user=request.user,waiver_reason=waiver)
+                    if adjustment.status!="applied":raise ValidationError("A isenção foi registrada, mas a assinatura requer conciliação: "+adjustment.error_code)
+                    messages.success(request,"Vagas liberadas por isenção inicial expressa; adicional recorrente incorporado à assinatura.")
+                else:
+                    messages.success(request,"Solicitação aprovada. O responsável deve aceitar e pagar a cobrança proporcional antes da liberação.")
+            elif approved:
                 adjustment=activate_module_request(module_request=row,user=request.user)
                 if adjustment.status==adjustment.Status.APPLIED:
                     messages.success(request,

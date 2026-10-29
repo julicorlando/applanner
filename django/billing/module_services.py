@@ -75,9 +75,16 @@ def invalidate_pending_subscription_charges(subscription):
         )
 
 
-def request_module(*,tenant,module,user,note=""):
+def request_module(*,tenant,module,user,note="",quantity=1):
     if not module.active or not module.addon_sellable or module.addon_monthly_price is None:
         raise ValidationError("Este módulo não está disponível para contratação avulsa.")
+    if module.slug=="dental-professional-extra":
+        from django.core.exceptions import PermissionDenied
+        if user.tenant_id!=tenant.pk or user.role not in {"owner","tenant-admin"}:
+            raise PermissionDenied("Somente o responsável da clínica pode contratar vagas.")
+        if isinstance(quantity,bool) or not isinstance(quantity,int) or not 1<=quantity<=100:
+            raise ValidationError("Solicite entre 1 e 100 vagas.")
+    else:quantity=1
     from .entitlements import module_enabled
     if module.slug == "verified-business":
         from core.public_identity import verification_status
@@ -99,7 +106,7 @@ def request_module(*,tenant,module,user,note=""):
     if existing:
         return existing
     return ModuleRequest.objects.create(
-        public_id=secrets.token_hex(16),tenant=tenant,module=module,requested_by=user,
+        public_id=secrets.token_hex(16),tenant=tenant,module=module,requested_by=user,quantity=quantity,
         quoted_monthly_price=module_monthly_price(module,tenant),
         tenant_note=(note or "")[:500],status=ModuleRequest.Status.PENDING,
     )
@@ -113,11 +120,20 @@ def review_module_request(*,module_request,user,approved=True,note=""):
         raise PermissionDenied("Somente o Master pode analisar vagas odontológicas.")
     if row.status not in {ModuleRequest.Status.PENDING,ModuleRequest.Status.PAYMENT_FAILED}:
         raise ValidationError("Esta solicitação não está pendente de análise.")
+    if row.module.slug=="dental-professional-extra":
+        if not approved and not note.strip():raise ValidationError("Informe o motivo da rejeição.")
+        if approved:
+            from .dental_seats import quote_initial_charge
+            amount,until=quote_initial_charge(row)
+            from datetime import timedelta
+            row.initial_charge_amount=amount
+            row.proration_until=until
+            row.seat_quote_expires_at=min(timezone.now()+timedelta(hours=24),until) if until else timezone.now()+timedelta(hours=24)
     row.status=ModuleRequest.Status.APPROVED if approved else ModuleRequest.Status.REJECTED
     row.master_note=(note or "")[:500]
     row.reviewed_by=user
     row.reviewed_at=timezone.now()
-    row.save(update_fields=["status","master_note","reviewed_by","reviewed_at","updated_at"])
+    row.save(update_fields=["status","master_note","reviewed_by","reviewed_at","updated_at","initial_charge_amount","proration_until","seat_quote_expires_at"])
     return row
 
 
@@ -139,12 +155,16 @@ def _gateway_for(subscription):
 @transaction.atomic
 def activate_module_request(*,module_request,user,financial_payment=None,waiver_reason=""):
     row=ModuleRequest.objects.select_for_update().select_related("tenant","module").get(pk=module_request.pk)
-    if row.status not in {ModuleRequest.Status.APPROVED,ModuleRequest.Status.PAYMENT_FAILED}:
+    allowed={ModuleRequest.Status.APPROVED,ModuleRequest.Status.PAYMENT_FAILED}
+    if row.module.slug=="dental-professional-extra":allowed.add(ModuleRequest.Status.AWAITING_PAYMENT)
+    if row.status not in allowed:
         raise ValidationError("A solicitação precisa estar aprovada.")
     subscription=_subscription(row.tenant)
     if not subscription:
         raise ValidationError("A empresa não possui assinatura válida.")
 
+    if row.module.slug=="dental-professional-extra" and TenantModuleAddon.objects.filter(tenant=row.tenant,module=row.module,status="past_due").exists():
+        raise ValidationError("Adicional odontológico exige regularização financeira antes de novas vagas.")
     repeatable=row.module.slug in {"professional-extra", "dental-professional-extra"}
     existing_addon=TenantModuleAddon.objects.select_for_update().filter(
         tenant=row.tenant,module=row.module,status=TenantModuleAddon.Status.ACTIVE
@@ -164,6 +184,9 @@ def activate_module_request(*,module_request,user,financial_payment=None,waiver_
             row.save(update_fields=["quoted_monthly_price","updated_at"])
 
     months=_cycle_months(subscription.billing_cycle)
+    quantity=row.quantity if row.module.slug=="dental-professional-extra" else 1
+    unit_quote=quoted
+    quoted=quoted*quantity
     if row.module.slug == "dental-professional-extra":
         from django.core.exceptions import PermissionDenied
         if not user.is_active or not user.is_superuser:
@@ -180,7 +203,7 @@ def activate_module_request(*,module_request,user,financial_payment=None,waiver_
                 purpose="dental-seat",reference_id=row.pk,status=Payment.Status.PAID,
                 paid_at__isnull=False,provider="mercadopago",
             ).exclude(provider_payment_id="").first())
-            if (not payment or payment.amount != quoted*months
+            if (not payment or payment.amount != (row.initial_charge_amount if row.initial_charge_amount is not None else quoted*months)
                     or payment.provider_status not in {"processed","approved"}
                     or payment.environment not in {"sandbox","production"}
                     or (subscription.provider_environment and payment.environment!=subscription.provider_environment)):
@@ -222,8 +245,8 @@ def activate_module_request(*,module_request,user,financial_payment=None,waiver_
         with transaction.atomic():
             if repeatable and existing_addon:
                 components=list(existing_addon.pricing_components or [])
-                components.append(str(quoted))
-                existing_addon.quantity=max(int(existing_addon.quantity or 1),1)+1
+                components.extend([str(unit_quote)]*quantity)
+                existing_addon.quantity=max(int(existing_addon.quantity or 1),1)+quantity
                 existing_addon.pricing_components=components
                 existing_addon.monthly_price=(
                     Decimal(existing_addon.monthly_price or 0)+quoted
@@ -242,8 +265,8 @@ def activate_module_request(*,module_request,user,financial_payment=None,waiver_
                     tenant=row.tenant,module=row.module,
                     defaults={
                         "module_request":row,"monthly_price":quoted,
-                        "quantity":1,
-                        "pricing_components":[str(quoted)] if repeatable else [str(row.module.addon_monthly_price)] if row.module.per_unit_billing else [],
+                        "quantity":quantity,
+                        "pricing_components":[str(unit_quote)]*quantity if repeatable else [str(row.module.addon_monthly_price)] if row.module.per_unit_billing else [],
                         "status":TenantModuleAddon.Status.ACTIVE,
                         "billing_mode":TenantModuleAddon.BillingMode.MERGED,
                         "provider":"mercadopago" if gateway else "",
@@ -300,6 +323,9 @@ def activate_module_request(*,module_request,user,financial_payment=None,waiver_
 @transaction.atomic
 def cancel_module_addon(*,addon,user):
     addon=TenantModuleAddon.objects.select_for_update().select_related("tenant","module").get(pk=addon.pk)
+    if addon.module.slug=="dental-professional-extra" and not user.is_superuser:
+        from .dental_seats import owner_access
+        owner_access(addon,user)
     if addon.status!=TenantModuleAddon.Status.ACTIVE:
         raise ValidationError("Módulo adicional não está ativo.")
     subscription=_subscription(addon.tenant)

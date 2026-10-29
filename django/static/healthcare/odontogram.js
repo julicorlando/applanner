@@ -58,6 +58,19 @@
     root.querySelector('[data-add]')?.addEventListener('click',()=>{if(!selected.size){status.textContent='Selecione pelo menos um dente.';return;}selected.forEach(id=>{(chart[id]??=[]).push({condition:root.querySelector('[data-condition]').value,surfaces:[...surfaces],note:root.querySelector('[data-note]').value});});refresh();});
     root.querySelector('[data-clear]')?.addEventListener('click',()=>{selected.forEach(id=>delete chart[id]);refresh();});
     const legend=root.querySelector('[data-legend]');Object.entries(colors).forEach(([name,color])=>{const item=document.createElement('span');item.style.borderLeft=`12px solid ${color}`;item.style.padding='0 10px 0 5px';item.textContent=name.replaceAll('_',' ');legend.append(item);});
+    root.addEventListener('odontogram:load',event=>{chart=event.detail||{};selected.clear();refresh();});
+    const patient=document.getElementById('id_customer'),form=root.closest('form');
+    if(!readonly&&patient&&form?.dataset.chartUrl){
+      let pending,epoch=0;
+      patient.addEventListener('change',async()=>{
+        const current=++epoch;pending?.abort();pending=new AbortController();chart={};selected.clear();refresh();
+        if(!/^\d+$/.test(patient.value))return;
+        try{const response=await fetch(form.dataset.chartUrl.replace('/0/','/'+patient.value+'/'),{credentials:'same-origin',signal:pending.signal,headers:{Accept:'application/json'}});
+          if(!response.ok)throw new Error('unavailable');
+          const result=await response.json();if(current!==epoch)return;chart=result.odontogram||{};refresh();
+        }catch(error){if(current===epoch&&error.name!=='AbortError')status.textContent='Não foi possível carregar o odontograma anterior. Confira o histórico antes de salvar.';}
+      });
+    }
     refresh();
   }
   document.querySelectorAll('[data-odontogram]').forEach(setup);

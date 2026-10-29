@@ -1474,6 +1474,11 @@ def resource_create(request,module_slug,resource_slug):
             data=form.cleaned_data
             try:
                 if is_physio:
+                    profile=getattr(data["professional"],"clinical_registration",None)
+                    if not profile or profile.council!="CREFITO":
+                        raise ValidationError("Cadastre o CREFITO em Identificação profissional antes do atendimento.")
+                    if data["registration"].strip()!=profile.number:
+                        raise ValidationError("CREFITO informado difere do cadastro profissional.")
                     kind=data["record_type"]
                     sections={
                         "chief_complaint":data.get("chief_complaint",""),"onset":data.get("onset",""),

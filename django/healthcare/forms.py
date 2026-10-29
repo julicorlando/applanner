@@ -16,9 +16,14 @@ class DentalEncounterForm(forms.Form):
 
     def __init__(self, *args, tenant, user, **kwargs):
         super().__init__(*args, **kwargs)
+        for name,label in DENTAL_DETAILS.items():
+            self.fields[name]=forms.CharField(label=label,required=False,max_length=20000,widget=forms.Textarea(attrs={"rows":2}))
         self.fields["customer"].queryset = Customer.objects.filter(tenant=tenant)
         self.fields["professional"].queryset = Professional.objects.filter(tenant=tenant, user=user, active=True)
         self.fields["appointment"].queryset = Appointment.objects.filter(tenant=tenant, professional__user=user)
+        from .models import ClinicalTreatmentPlan
+        from .services import clinical_records_for
+        self.fields["plan_reference"]=forms.ModelChoiceField(label="Plano de tratamento relacionado",required=False,queryset=ClinicalTreatmentPlan.objects.filter(entry__in=clinical_records_for(user=user,tenant=tenant)).select_related("entry__customer"))
 
     def clean_odontogram_json(self):
         try:
@@ -34,4 +39,19 @@ class DentalEncounterForm(forms.Form):
         if appointment and ((customer and appointment.customer_id != customer.pk)
                 or (professional and appointment.professional_id != professional.pk)):
             self.add_error("appointment", "Agendamento incompatível com paciente ou profissional.")
+        reference=data.get("plan_reference")
+        if reference and customer and reference.entry.customer_id!=customer.pk:
+            self.add_error("plan_reference","O plano de tratamento pertence a outro paciente.")
         return data
+
+
+DENTAL_DETAILS={
+    "chief_complaint":"Queixa principal","medical_history":"Histórico médico e odontológico",
+    "previous_treatments":"Tratamentos anteriores","allergies":"Alergias e alertas",
+    "medications":"Medicamentos","systemic_conditions":"Condições sistêmicas",
+    "extraoral_exam":"Exame extraoral","intraoral_exam":"Exame intraoral",
+    "signs_symptoms":"Sinais e sintomas","diagnosis":"Diagnóstico",
+    "diagnostic_hypotheses":"Hipóteses diagnósticas","materials":"Materiais utilizados",
+    "anesthesia":"Anestesia","complications":"Intercorrências",
+    "postoperative_guidance":"Orientações pós-operatórias","return_followup":"Retornos e acompanhamento",
+}

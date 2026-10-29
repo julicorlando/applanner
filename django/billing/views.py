@@ -440,7 +440,7 @@ def subscription_status(request):
         "price_changes":subscription.price_changes.exclude(status="cancelled").order_by("effective_at") if subscription else [],
         "unit_usage":{"used":request.user.tenant.units.filter(active=True).count(),"included":(subscription.plan.features or {}).get("units",1),"multiunit":__import__("billing.entitlements",fromlist=["module_enabled"]).module_enabled(request.user.tenant,"multiunit")} if subscription and request.user.tenant_id else None,
         "subscription":subscription,"pix_charge":pix_charge,
-        "has_pending_pix":bool(subscription and PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING).exists()),
+        "has_pending_pix":bool(subscription and PixCharge.objects.filter(subscription=subscription,payment__purpose="subscription",payment__status=Payment.Status.PENDING).exists()),
         "professional_capacity":professional_capacity(request.user.tenant,subscription) if request.user.tenant_id and not segment_enabled(request.user.tenant,"arena") else None,
         "pending_deletion":pending_deletion,
         "can_manage":request.user.tenant_id and request.user.role=="owner",
@@ -586,7 +586,7 @@ def subscription_pix_refresh(request):
         raise PermissionDenied("Somente o responsável pode verificar o pagamento da assinatura.")
     subscription=Subscription.objects.filter(tenant_id=request.user.tenant_id).order_by("-started_at","-pk").first()
     charge=PixCharge.objects.filter(tenant_id=request.user.tenant_id,subscription=subscription,
-        payment__status=Payment.Status.PENDING).order_by("-created_at").first()
+        payment__status=Payment.Status.PENDING,payment__purpose="subscription").order_by("-created_at").first()
     if not charge:
         messages.info(request,"Não há Pix pendente para verificar.")
     else:
@@ -613,7 +613,7 @@ def subscription_checkout(request):
     if not eligible_for_payment(subscription) and not (subscription and subscription.payment_method=="card" and subscription.status=="active" and not subscription.provider_subscription_id):
         messages.error(request,"Não há cobrança pendente para esta assinatura.")
         return redirect("billing-subscription-status")
-    if PixCharge.objects.filter(subscription=subscription,payment__status=Payment.Status.PENDING,expires_at__gt=timezone.now()).exists():
+    if PixCharge.objects.filter(subscription=subscription,payment__purpose="subscription",payment__status=Payment.Status.PENDING,expires_at__gt=timezone.now()).exists():
         messages.info(request,"Já existe um Pix pendente. Confira o código antes de iniciar outra cobrança.")
         return redirect("billing-subscription-pix")
     if subscription.provider_subscription_id:
@@ -653,7 +653,7 @@ def subscription_modules(request):
         try:
             if action=="request":
                 module=get_object_or_404(Module,pk=request.POST.get("module"),active=True)
-                row=request_module(tenant=tenant,module=module,user=request.user,note=request.POST.get("note",""))
+                row=request_module(tenant=tenant,module=module,user=request.user,note=request.POST.get("note",""),quantity=int(request.POST.get("quantity","1")))
                 messages.success(request,f"Solicitação de {row.module.name} enviada ao Master.")
             elif action=="cancel":
                 addon=get_object_or_404(TenantModuleAddon,pk=request.POST.get("addon"),tenant=tenant)
@@ -681,8 +681,7 @@ def subscription_modules(request):
             ]
         ).values_list("module_id",flat=True)
     )
-    professional_extra_id=Module.objects.filter(slug="professional-extra").values_list("pk",flat=True).first()
-    repeatable_ids={professional_extra_id} if professional_extra_id else set()
+    repeatable_ids=set(Module.objects.filter(slug__in=["professional-extra","dental-professional-extra"]).values_list("pk",flat=True))
     blocked_ids=(plan_module_ids|active_ids)-repeatable_ids
     available=list(Module.objects.filter(
         active=True,addon_sellable=True
