@@ -104,6 +104,24 @@ def validate_professional_capacity(professional):
     if professional.pk and type(professional).objects.filter(pk=professional.pk,
             tenant_id=professional.tenant_id,active=True).exists():
         return
+    # Dental clinics include one active dentist; extra seats require a paid addon.
+    # Do not retroactively invalidate an existing active professional.
+    category=(professional.tenant.category or "").strip().lower()
+    if category in {"odontologia", "odontologica", "odontológico", "odontologico"}:
+        from .models import TenantModuleAddon
+        paid=TenantModuleAddon.objects.filter(
+            tenant=professional.tenant,
+            module__slug="dental-professional-extra",
+            status=TenantModuleAddon.Status.ACTIVE,
+        ).values_list("quantity", flat=True).first() or 0
+        allowed=1+paid
+        active=professional.tenant.professionals.filter(active=True).count()
+        if active>=allowed:
+            raise ValidationError(
+                f"O plano odontológico inclui 1 profissional. Limite atual: {allowed}. "
+                "Solicite profissionais adicionais e aguarde aprovação e ativação pelo Master."
+            )
+        return
     capacity=professional_capacity(professional.tenant)
     if capacity["limit"] is not None and capacity["used"]>=capacity["limit"]:
         raise ValidationError(
