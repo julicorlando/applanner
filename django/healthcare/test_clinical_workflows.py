@@ -173,13 +173,31 @@ class HomologationSmokeTests(TestCase):
         with override_settings(DEPLOYMENT_ENVIRONMENT="production"),self.assertRaises(CommandError):
             call_command("clinical_homologation_smoke",stdout=BytesIO())
         from io import StringIO
-        with override_settings(DEPLOYMENT_ENVIRONMENT="homologacao"):
+        with override_settings(DEPLOYMENT_ENVIRONMENT="homologacao",SUBSCRIPTION_ACCESS_ENFORCED=True):
             from billing.models import Module
             call_command("seed_modules",preserve_existing=True,stdout=StringIO())
             Module.objects.filter(slug="medical_records").update(active=False)
             output=StringIO();call_command("clinical_homologation_smoke",stdout=output)
             self.assertTrue(Module.objects.get(slug="medical_records").active)
             self.assertEqual(json.loads(output.getvalue())["status"],"passed")
+            for slug in ("homolog-odontologia","homolog-fisioterapia"):
+                response=self.client.get("/p/"+slug+"/")
+                self.assertEqual(response.status_code,200)
+                self.assertContains(response,"Atendimento fictício")
+                self.assertContains(response,"Profissional fictício")
+                from tenants.models import Tenant
+                from scheduling.models import Service,Appointment
+                from django.utils import timezone
+                from datetime import timedelta
+                tenant=Tenant.objects.get(public_slug=slug)
+                service=Service.objects.get(tenant=tenant)
+                self.client.defaults["REMOTE_ADDR"]="192.0.2.234"
+                availability=self.client.get("/api/public/"+slug+"/availability/",{"service_id":service.pk,"date":(timezone.localdate()+timedelta(days=1)).isoformat()})
+                self.assertEqual(availability.status_code,200)
+                self.assertTrue(availability.json()["slots"])
+                result=self.client.post("/api/public/"+slug+"/book/",{"service_id":service.pk,"starts_at":availability.json()["slots"][0]["value"],"name":"Paciente fictício de agendamento","phone":"81900000000"},content_type="application/json")
+                self.assertEqual(result.status_code,201)
+                self.assertEqual(Appointment.objects.get(pk=result.json()["id"]).professional.user.tenant_id,tenant.pk)
             count=MedicalRecordEntry.objects.count()
             call_command("clinical_homologation_smoke",stdout=StringIO())
             self.assertEqual(MedicalRecordEntry.objects.count(),count)

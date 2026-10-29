@@ -1,6 +1,6 @@
 """Create fictitious, non-login demo data and exercise deployed clinical views."""
 import json
-from datetime import time
+from datetime import time,timedelta
 from io import BytesIO
 from django.conf import settings
 from django.core.management.base import BaseCommand,CommandError
@@ -14,7 +14,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from accounts.models import User
 from billing.models import Module,TenantModule,Plan,Subscription,PlanModule
 from scheduling.models import Professional,Customer,Service,ProfessionalAvailability
-from tenants.models import Tenant,Unit
+from tenants.models import Tenant,Unit,UnitBusinessHours
 from healthcare.models import ClinicalRegistration,MedicalRecordEntry
 from healthcare.services import create_record,read_record
 from healthcare.dentistry import save_dental_encounter
@@ -37,7 +37,10 @@ class Command(BaseCommand):
                     module.active=True;module.save(update_fields=["active"])
                 TenantModule.objects.update_or_create(tenant=tenant,module=module,defaults={"enabled":True})
                 PlanModule.objects.update_or_create(plan=plan,module=module,defaults={"enabled":True})
-            Subscription.objects.get_or_create(tenant=tenant,plan=plan,defaults={"status":"active","started_at":timezone.now(),"payment_method":"pix","contracted_price":0,"base_contracted_price":0,"provider_environment":"sandbox"})
+            subscription,_=Subscription.objects.get_or_create(tenant=tenant,plan=plan,defaults={"status":"trial","started_at":timezone.now(),"trial_ends_at":timezone.now()+timedelta(days=7),"payment_method":"pix","contracted_price":0,"base_contracted_price":0,"provider_environment":"sandbox"})
+            if not subscription.trial_ends_at and not subscription.payments.exists():
+                subscription.status="trial";subscription.trial_ends_at=subscription.started_at+timedelta(days=7)
+                subscription.save(update_fields=["status","trial_ends_at","updated_at"])
             doctor,_=User.objects.get_or_create(email=category+"@homolog.invalid",defaults={"tenant":tenant,"role":"professional","is_active":True,"email_verified_at":timezone.now()})
             if not doctor.password:
                 doctor.set_unusable_password();doctor.save(update_fields=["password"])
@@ -45,6 +48,10 @@ class Command(BaseCommand):
             professional,_=Professional.objects.get_or_create(tenant=tenant,user=doctor,defaults={"name":"Profissional fictício — "+category,"public_slug":"profissional-ficticio"})
             ClinicalRegistration.objects.get_or_create(professional=professional,defaults={"council":council,"number":"999999","jurisdiction":jurisdiction,"specialties":"Dados fictícios"})
             unit,_=Unit.objects.get_or_create(tenant=tenant,name="Unidade fictícia",defaults={"is_primary":True,"active":True})
+            if not professional.unit_id:
+                professional.unit=unit;professional.save(update_fields=["unit","updated_at"])
+            for day in range(1,8):
+                UnitBusinessHours.objects.get_or_create(tenant=tenant,unit=unit,weekday=day,defaults={"opens_at":time(9),"closes_at":time(17),"active":True})
             service,_=Service.objects.get_or_create(tenant=tenant,name="Atendimento fictício",defaults={"unit":unit,"duration_minutes":30,"price":0})
             for day in range(1,8):ProfessionalAvailability.objects.get_or_create(tenant=tenant,professional=professional,weekday=day,defaults={"start_time":time(9),"end_time":time(17)})
             customer,_=Customer.objects.get_or_create(tenant=tenant,name="Paciente fictício de homologação")
