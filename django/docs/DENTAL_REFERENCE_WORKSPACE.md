@@ -1,0 +1,15 @@
+# Odontologia — prontuário e área interna
+
+Referência: imagem fornecida pelo usuário em 29/10/2026. Layout escuro com navegação lateral de oito entradas, cabeçalho e cards. A área interna é selecionada pela categoria Odontologia ou pelo módulo `dentistry`; uma categoria explícita tem precedência quando ambos os módulos clínicos estão habilitados. Fisioterapia conserva sua navegação e seus prontuários.
+
+O editor odontológico inclui rascunhos cifrados, versões, prevenção de atualização concorrente, idempotência, finalização com atendimento vinculado e autoria CRO/UF, odontograma FDI permanente/decíduo por faces, anamnese, diagnóstico, planejamento, evolução, orientações, assinatura opcional desenhada e anexos cifrados. Registros finalizados e versões são preservados por modelo e triggers PostgreSQL. A finalização usa o prontuário e o orçamento clínico existentes; aprovação do paciente e cobranças seguem o fluxo já existente, sem criação automática de cobrança pelo editor.
+
+Radiografias, fotos e documentos têm categorias próprias. PDF, PNG, JPEG, TIFF e DICOM Part 10 são aceitos com validação e limite de 10 MB. Para DICOM, os cabeçalhos são analisados com `pydicom.dcmread(force=False, stop_before_pixels=True)`; o arquivo original permanece cifrado, privado e disponível para download em visualizador externo. Não existe interpretação diagnóstica automática ou visualizador DICOM no navegador. Referência técnica: https://pydicom.github.io/pydicom/3.0/reference/generated/pydicom.filereader.dcmread.html
+
+Os desenhos do odontograma são SVG esquemáticos com anatomia diferenciada de incisivos, caninos e molares, esmalte sombreado, raízes e faces selecionáveis. Nenhuma radiografia, foto, assinatura, diagnóstico, convênio ou identificação pessoal de exemplo foi inserida no prontuário real. Os cards refletem os dados e arquivos efetivamente cadastrados. Endereço, sexo e convênio não são inventados quando não existem no cadastro atual.
+
+Migrations aditivas: 0012 (modelos), 0013 (preservação PostgreSQL), 0014 (ligação ao orçamento e categoria dos anexos). Não removem nem sobrescrevem prontuários existentes. Rollback de aplicação deve preservar as tabelas e seus dados, sem reverter as migrations clínicas.
+
+Validações locais: regressão Django incluindo saúde, navegação, permissões e cobrança; testes JavaScript de edição, troca de paciente, odontograma e modos de leitura; check, consistência de migrations e Ruff. O CI executa o conjunto completo em PostgreSQL, inclusive os testes de triggers.
+
+Fidelidade visual exata e responsividade precisam ser verificadas em uma sessão de navegador autenticada como profissional autorizado. Testes de DOM, CSS e persistência não substituem essa verificação. O desenho de assinatura não equivale a certificado ICP-Brasil, e esta alteração não constitui certificação de conformidade legal.

@@ -262,3 +262,89 @@ class PhysiotherapyAssessmentDocument(models.Model):
     def delete(self,*args,**kwargs):
         from django.core.exceptions import ValidationError
         raise ValidationError("Desvincule o documento no rascunho; o histórico é preservado.")
+
+
+class DentalAssessment(models.Model):
+    submission_key=models.UUIDField(default=uuid.uuid4,unique=True,editable=False)
+    class Status(models.TextChoices):
+        DRAFT="draft","Rascunho"
+        FINALIZED="finalized","Finalizada"
+
+    objects=AssessmentQuerySet.as_manager()
+    tenant=models.ForeignKey("tenants.Tenant",on_delete=models.PROTECT)
+    customer=models.ForeignKey("scheduling.Customer",on_delete=models.PROTECT,related_name="dental_assessments")
+    professional=models.ForeignKey("scheduling.Professional",on_delete=models.PROTECT)
+    appointment=models.ForeignKey("scheduling.Appointment",on_delete=models.PROTECT,null=True,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    status=models.CharField(max_length=16,choices=Status.choices,default=Status.DRAFT)
+    version=models.PositiveIntegerField(default=0)
+    payload_encrypted=models.TextField()
+    final_entry=models.OneToOneField(MedicalRecordEntry,on_delete=models.PROTECT,null=True,blank=True,related_name="dental_assessment")
+    treatment_plan=models.OneToOneField(ClinicalTreatmentPlan,on_delete=models.PROTECT,null=True,blank=True,related_name="dental_assessment")
+    signed_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    def save(self,*args,**kwargs):
+        from django.core.exceptions import ValidationError
+        if self.pk and type(self)._base_manager.filter(pk=self.pk,status=self.Status.FINALIZED).exists():
+            raise ValidationError("Avaliação finalizada é imutável. Registre evolução ou retificação.")
+        super().save(*args,**kwargs)
+
+    def delete(self,*args,**kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Avaliações clínicas devem ser preservadas.")
+
+    class Meta:
+        constraints=[models.CheckConstraint(condition=(models.Q(status="draft",final_entry__isnull=True,signed_at__isnull=True) | models.Q(status="finalized",final_entry__isnull=False,signed_at__isnull=False)),name="dental_assessment_final_state")]
+        indexes=[models.Index(fields=["tenant","customer","created_at"],name="dental_assessment_patient_idx"),
+                 models.Index(fields=["tenant","professional","status"],name="dental_assessment_status_idx")]
+
+
+class DentalAssessmentVersion(models.Model):
+    objects=ClinicalRecordQuerySet.as_manager()
+    assessment=models.ForeignKey(DentalAssessment,on_delete=models.PROTECT,related_name="versions")
+    number=models.PositiveIntegerField()
+    status=models.CharField(max_length=16,choices=DentalAssessment.Status.choices)
+    payload_encrypted=models.TextField()
+    sha256=models.CharField(max_length=64)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    def save(self,*args,**kwargs):
+        from django.core.exceptions import ValidationError
+        if not self._state.adding:raise ValidationError("Histórico de avaliação é imutável.")
+        super().save(*args,**kwargs)
+
+    def delete(self,*args,**kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Histórico de avaliação é imutável.")
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["assessment","number"],name="uq_dental_assessment_version")]
+        ordering=["number"]
+
+
+class DentalAssessmentDocument(models.Model):
+    objects=AssessmentQuerySet.as_manager()
+    assessment=models.ForeignKey(DentalAssessment,on_delete=models.PROTECT,related_name="documents")
+    kind=models.CharField(max_length=12,choices=[("radiograph","Radiografia"),("photo","Foto clínica"),("document","Documento")],default="document")
+    filename_encrypted=models.TextField()
+    content_encrypted=models.BinaryField()
+    mime_type=models.CharField(max_length=80)
+    sha256=models.CharField(max_length=64)
+    size=models.PositiveIntegerField()
+    uploaded_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    created_at=models.DateTimeField(auto_now_add=True)
+    removed_at=models.DateTimeField(null=True,blank=True)
+    final_document=models.OneToOneField(ClinicalAttachment,on_delete=models.PROTECT,null=True,blank=True)
+
+    def save(self,*args,**kwargs):
+        from django.core.exceptions import ValidationError
+        if DentalAssessment.objects.filter(pk=self.assessment_id,status="finalized").exists():
+            raise ValidationError("Documento de avaliação finalizada é imutável.")
+        super().save(*args,**kwargs)
+
+    def delete(self,*args,**kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Desvincule o documento no rascunho; o histórico é preservado.")

@@ -20,6 +20,7 @@ def _clinic(request):
 
 
 @login_required
+@never_cache
 def dental_home(request):
     tenant = _clinic(request)
     assert_clinical_access(request.user)
@@ -30,9 +31,15 @@ def dental_home(request):
 
 
 @login_required
+@never_cache
 def dental_encounter(request):
     tenant = _clinic(request)
     assert_clinical_access(request.user)
+    if request.method == "GET":
+        from django.urls import reverse
+        from urllib.parse import urlencode
+        params = {key: request.GET[key] for key in ("customer", "appointment") if request.GET.get(key)}
+        return redirect(reverse("dental-assessment-create") + ("?" + urlencode(params) if params else ""))
     form = DentalEncounterForm(request.POST or None, tenant=tenant, user=request.user)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
@@ -57,6 +64,7 @@ def dental_encounter(request):
 
 
 @login_required
+@never_cache
 def dental_patient(request, customer_id):
     tenant = _clinic(request)
     assert_clinical_access(request.user)

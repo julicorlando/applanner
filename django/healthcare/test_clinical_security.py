@@ -111,9 +111,9 @@ class ClinicalSecurityTests(TestCase):
         request.user=self.doctor
         request.session={}
         response=dental_encounter(request)
-        self.assertContains(response,'data-odontogram')
-        self.assertContains(response,'healthcare/odontogram.')
-        self.assertContains(response,'data-surface')
+        self.assertEqual(response.status_code,302)
+        from django.urls import reverse
+        self.assertEqual(response.url,reverse('dental-assessment-create'))
 
     def test_dental_history_is_scoped_to_clinician(self):
         save_dental_encounter(tenant=self.tenant,customer=self.patient,professional=self.professional,

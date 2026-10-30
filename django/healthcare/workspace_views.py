@@ -8,7 +8,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_safe
 from accounts.permissions import has_capability
 from scheduling.models import Appointment, Customer
-from .navigation import workspace_enabled, resource_routes
+from .navigation import workspace_enabled, resource_routes, dental_workspace
 
 
 def tenant_for(request):
@@ -120,7 +120,7 @@ def settings(request):
     else:
         account.append(
             {
-                "title": "Identificação profissional e CREFITO",
+                "title": "Identificação profissional e CRO/UF" if dental_workspace(tenant) else "Identificação profissional e CREFITO",
                 "url": reverse("clinical-registration"),
             }
         )
