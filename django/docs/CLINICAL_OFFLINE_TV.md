@@ -31,7 +31,7 @@ Responsável/gestor configura título, ativação, voz, nomes completos (abrevia
 
 Recepção pode chamar pacientes, mas não configurar o painel nem ler prontuários. Profissional só chama atendimentos próprios; o Master não recebe acesso clínico. Cada chamada registra usuário/atendimento/sala, expira na visualização e usa chave idempotente. Não são enviados diagnóstico, telefone, e-mail ou prontuário à TV.
 
-O endereço personalizado `/tv/<clinica>/<token>/` é uma credencial de exibição: mantenha-o reservado. Revogação do link ou do módulo invalida tela, feed e mídia antigos. O painel atualiza a cada cinco segundos, limpa nomes após um minuto sem atualização e alterna imagens/vídeos. Áudio/tela cheia exigem clique em “Iniciar TV e habilitar áudio”, conforme o navegador. A lista de chamadas mostra a atual e até cinco anteriores não expiradas.
+O link curto `/tv/<token>/` redireciona ao endereço personalizado `/tv/<clinica>/<token>/`. Esse endereço é uma credencial de exibição: mantenha-o reservado. Revogação do link ou do módulo invalida tela, feed e mídia antigos. O rodapé mostra apenas o link público de agendamento da clínica, quando disponível; não divulga o token de acesso à TV. O painel atualiza a cada cinco segundos, limpa nomes após um minuto sem atualização e alterna imagens/vídeos. Áudio/tela cheia exigem clique em “Iniciar TV e habilitar áudio”, conforme o navegador. A lista de chamadas mostra a atual e até cinco anteriores não expiradas.
 
 ## Implantação e rollback
 

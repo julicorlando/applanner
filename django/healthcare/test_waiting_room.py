@@ -140,3 +140,13 @@ class WaitingRoomTests(TestCase):
         self.assertEqual(self.call().status_code,302)
         self.assertEqual(self.client.get(reverse('clinical-dashboard')).status_code,403)
         self.assertEqual(self.client.get(reverse('clinical-offline-snapshot')).json()['entries'],[])
+
+    def test_short_link_is_revocable_and_screen_footer_never_discloses_tv_token(self):
+        response=self.client.get(reverse('waiting-room-short',args=[self.display.token]))
+        self.assertRedirects(response,self.url(),fetch_redirect_response=False)
+        response=self.client.get(self.url())
+        footer=response.content.decode().split('<footer>')[1].split('</footer>')[0]
+        self.assertNotIn(self.display.token,footer)
+        old=reverse('waiting-room-short',args=[self.display.token])
+        self.client.post(reverse('waiting-room-console'),{'action':'rotate'})
+        self.assertEqual(self.client.get(old).status_code,404)

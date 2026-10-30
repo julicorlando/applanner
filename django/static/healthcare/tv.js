@@ -3,7 +3,6 @@
   const $=id=>document.getElementById(id), panel=$('tv-panel');
   let voice=false, started=false, lastCall=null, primed=false, media=[], index=0, timer, lastOk=0;
   const node=(tag,value)=>{const el=document.createElement(tag);el.textContent=value;return el;};
-  $('tv-link').textContent=location.host+location.pathname;
   $('tv-start').onclick=()=>{started=true;document.documentElement.requestFullscreen?.().catch(()=>{});$('tv-start').hidden=true;showMedia();};
   function showMedia(){
     clearTimeout(timer);const host=$('tv-media');host.replaceChildren();

@@ -151,7 +151,7 @@ def console(request):
         status__in=['pending', 'confirmed', 'waiting', 'in_progress']).select_related('customer', 'professional').order_by('starts_at')[:100]
     return render(request, 'healthcare/waiting_room_console.html', {'display': display, 'form': form, 'media_form': media_form,
         'admin': admin, 'appointments': rows, 'request_id': uuid.uuid4(),
-        'tv_url': request.build_absolute_uri(reverse('waiting-room-screen', args=[tenant.slug, display.token]))})
+        'tv_url': request.build_absolute_uri(reverse('waiting-room-short', args=[display.token]))})
 
 
 @login_required
@@ -195,7 +195,10 @@ def call_patient(request):
 @never_cache
 def screen(request, slug, token):
     display = active_display(slug, token)
-    response = render(request, 'healthcare/waiting_room_screen.html', {'display': display})
+    public_link = ''
+    if display.tenant.public_enabled and display.tenant.public_short_code:
+        public_link = request.build_absolute_uri(reverse('tenant-short-link', args=[display.tenant.public_short_code]))
+    response = render(request, 'healthcare/waiting_room_screen.html', {'display': display, 'public_link': public_link})
     response['Referrer-Policy'] = 'no-referrer'
     response['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
     return response
@@ -240,4 +243,15 @@ def media(request, slug, token, pk):
     response['Accept-Ranges'] = 'bytes'
     response['Referrer-Policy'] = 'no-referrer'
     response['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+@require_GET
+@never_cache
+def short_link(request, token):
+    display = get_object_or_404(WaitingRoomDisplay.objects.select_related('tenant'), token=token)
+    active_display(display.tenant.slug, token)
+    response = redirect('waiting-room-screen', slug=display.tenant.slug, token=token)
+    response['Referrer-Policy'] = 'no-referrer'
+    response['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
     return response
