@@ -24,6 +24,9 @@ class AssessmentForm(BaseAssessmentForm):
             self.fields[key] = forms.CharField(label=label, required=self.finalizing and key in {"chief_complaint", "findings"}, max_length=20000, widget=forms.Textarea(attrs={"rows": 3, "class": "pa-input"}))
         self.fields["documents"].widget.attrs["accept"] = ".pdf,.png,.jpg,.jpeg,.tif,.tiff,.dcm"
         self.fields["upload_kind"] = forms.ChoiceField(label="Tipo do exame / anexo", choices=[("radiograph","Radiografia"),("photo","Foto clínica"),("document","Documento")], initial="document", required=False)
+        self.fields["patient_address"] = forms.CharField(label="Endereço do paciente", required=False, max_length=500, widget=forms.Textarea(attrs={"rows":2,"data-patient-demographics":""}))
+        self.fields["patient_gender"] = forms.ChoiceField(label="Sexo / gênero (informado)", required=False, choices=[("","Não informado"),("female","Feminino"),("male","Masculino"),("other","Outro")], widget=forms.Select(attrs={"data-patient-demographics":""}))
+        self.fields["patient_coverage"] = forms.CharField(label="Convênio / forma de atendimento", required=False, max_length=160, widget=forms.TextInput(attrs={"data-patient-demographics":"","placeholder":"Não informado"}))
         self.fields["professional"].label = "Cirurgião-dentista responsável"
         for name, label, choices in (("systemic_flags", "Condições sistêmicas", SYSTEMIC), ("dental_flags", "Histórico odontológico", DENTAL), ("guidance_flags", "Orientações", GUIDANCE)):
             self.fields[name] = forms.MultipleChoiceField(label=label, choices=choices, required=False, widget=forms.CheckboxSelectMultiple)

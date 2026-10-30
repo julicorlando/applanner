@@ -263,6 +263,8 @@ def patient_options(request, pk):
     ).exclude(status__in=["cancelled", "canceled"])
     if professional:
         qs = qs.filter(professional_id=_integer(professional))
+    previous = assessments_for(request.user).filter(customer=patient).order_by("-updated_at", "-pk").first()
+    demographics = read_assessment(assessment=previous, user=request.user, request=request).get("patient", {}) if previous else {}
     today = timezone.localdate()
     birth = patient.birth_date
     return JsonResponse(
@@ -270,6 +272,9 @@ def patient_options(request, pk):
             "patient": {
                 "name": patient.name,
                 "phone": patient.phone,
+                "address": demographics.get("address", ""),
+                "gender": demographics.get("gender", ""),
+                "coverage": demographics.get("coverage", ""),
                 "age": today.year
                 - birth.year
                 - ((today.month, today.day) < (birth.month, birth.day))

@@ -178,6 +178,17 @@ class DentalAssessmentTests(TestCase):
         with self.assertRaises(ValidationError):
             validate_document_upload(upload=SimpleUploadedFile('invalido.dcm',b'bad'))
 
+    def test_patient_demographics_are_encrypted_and_reused_only_with_clinical_access(self):
+        row=self.save(patient_address='Endereço fictício confidencial',patient_gender='male',patient_coverage='Convênio fictício')
+        self.assertNotIn('Endereço',row.payload_encrypted)
+        payload=read_assessment(assessment=row,user=self.doctor)
+        self.assertEqual(payload['patient']['gender_label'],'Masculino')
+        self.client.force_login(self.doctor)
+        response=self.client.get(reverse('dental-assessment-patient-options',args=[self.patient.pk]),{'professional':self.professional.pk})
+        self.assertEqual(response.json()['patient']['address'],'Endereço fictício confidencial')
+        self.client.force_login(self.reception)
+        self.assertEqual(self.client.get(reverse('dental-assessment-patient-options',args=[self.patient.pk])).status_code,403)
+
     @skipUnless(connection.vendor=='postgresql','PostgreSQL ledger triggers')
     def test_postgresql_preserves_finalized_content_and_versions(self):
         row=self.save(final=True)
