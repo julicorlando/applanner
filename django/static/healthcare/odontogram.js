@@ -52,6 +52,7 @@
           board.append(group);
         });
       }
+      if(rows){for(const [x,label,anchor] of [[8,'Direita do paciente','start'],[792,'Esquerda do paciente','end']]){const side=svg('text',{x,y:174,'text-anchor':anchor,'font-size':13});side.textContent=label;board.append(side);}}
       canvas.append(board);
     }
     function refresh(){field.value=JSON.stringify(chart);draw();status.textContent=selected.size?'Dentes selecionados: '+[...selected].join(', '):'Selecione um ou mais dentes';const summary=root.querySelector('[data-chart-summary]');summary.replaceChildren();Object.entries(chart).forEach(([id,items])=>{const line=document.createElement('p');line.textContent=`${id}: ${items.map(o=>`${o.condition} · ${o.surfaces.join(', ')} · ${o.note}`).join('; ')}`;summary.append(line);});}

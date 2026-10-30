@@ -189,6 +189,15 @@ class DentalAssessmentTests(TestCase):
         self.client.force_login(self.reception)
         self.assertEqual(self.client.get(reverse('dental-assessment-patient-options',args=[self.patient.pk])).status_code,403)
 
+    def test_new_visit_with_preselected_patient_starts_from_last_authorized_odontogram(self):
+        self.save(final=True)
+        self.client.force_login(self.doctor)
+        response=self.client.get(reverse('dental-assessment-create'),{'customer':self.patient.pk})
+        self.assertEqual(response.status_code,200)
+        chart=json.loads(response.context['form']['odontogram_json'].value())
+        self.assertEqual(chart['46'][0]['condition'],'carie')
+        self.assertEqual(chart['46'][0]['surfaces'],['oclusal'])
+
     @skipUnless(connection.vendor=='postgresql','PostgreSQL ledger triggers')
     def test_postgresql_preserves_finalized_content_and_versions(self):
         row=self.save(final=True)
