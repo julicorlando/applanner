@@ -1,7 +1,8 @@
 import json
 import uuid
 from datetime import timedelta, time
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
+from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User
@@ -99,6 +100,13 @@ class OfflineOperationsTests(TestCase):
         self.assertEqual(self.post({**self.op(),'scope':f'{self.other.pk}:{self.user.pk}'}).status_code,403)
         self.assertEqual(self.post(self.op(attestation=False)).status_code,409)
         self.assertEqual(MedicalRecordEntry.objects.count(),0)
+
+    def test_replay_remains_idempotent_after_secret_rotation_with_fallback(self):
+        operation=self.op();first=self.post(operation)
+        original=settings.SECRET_KEY
+        with override_settings(SECRET_KEY='new-test-only-key-for-rotation',SECRET_KEY_FALLBACKS=[original]):
+            self.assertEqual(self.post(operation).json(),first.json())
+        self.assertEqual(MedicalRecordEntry.objects.count(),1)
 
     def test_registration_must_match_the_clinical_segment(self):
         registration=self.profile.clinical_registration

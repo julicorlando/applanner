@@ -1,10 +1,11 @@
 """Explicit, encrypted device snapshots and idempotent, permission-checked replay."""
 from datetime import timedelta, date
 from decimal import Decimal, InvalidOperation
-import hashlib
 import json
 import uuid
 from django import forms
+from django.conf import settings
+from django.utils.crypto import salted_hmac
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -145,11 +146,13 @@ def replay(user, operation):
         raise PermissionDenied('Seu vínculo clínico não está ativo.')
     if kind == 'cash' and not can_receive(user):
         raise PermissionDenied('Recebimento não autorizado.')
-    fingerprint = hashlib.sha256(json.dumps(operation, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
+    canonical = json.dumps(operation, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
+    fingerprint = salted_hmac('clinical-offline-replay-v1', canonical, algorithm='sha256').hexdigest()
     existing = OfflineOperation.objects.filter(tenant=tenant, user=user, request_id=request_id).first()
     if existing:
-        if existing.fingerprint != fingerprint:
-            raise ValidationError('Identificador já usado com outro conteúdo. O original foi preservado.')
+        accepted = {fingerprint, *[salted_hmac('clinical-offline-replay-v1', canonical, secret=secret, algorithm='sha256').hexdigest() for secret in settings.SECRET_KEY_FALLBACKS]}
+        if existing.fingerprint not in accepted:
+            raise ValidationError('Identificador já usado com outro conteúdo. O original foi preservado.', code='idempotency_conflict')
         return existing.result
     if kind == 'customer':
         form = WalkInForm(data)
@@ -158,7 +161,7 @@ def replay(user, operation):
         fields = form.cleaned_data
         phones, emails = identity_matches(tenant, fields.get('phone') or '', fields.get('email') or '')
         if (fields.get('phone') and phones.exists()) or emails.exists():
-            raise ValidationError('Telefone ou e-mail já cadastrado. Revise a fila e selecione o paciente existente; não foi feita mesclagem automática.')
+            raise ValidationError('Telefone ou e-mail já cadastrado. Revise a fila e selecione o paciente existente; não foi feita mesclagem automática.', code='customer_exists')
         patient = Customer.objects.create(tenant=tenant, **fields)
         result = {'customer': patient.pk}
     elif kind == 'appointment':
@@ -177,7 +180,7 @@ def replay(user, operation):
             raise ValidationError('Horário indisponível. Revise o agendamento pendente; nenhum atendimento existente foi alterado.')
         row = Appointment.objects.create(tenant=tenant, unit=professional.unit, customer=patient, professional=professional,
             service=service, service_price_snapshot=service.price, starts_at=start, ends_at=end, source='walk_in', status='pending', created_by=user)
-        result = {'appointment': row.pk}
+        result = {'appointment': row.pk, 'version': row.updated_at.isoformat(), 'price': str(row.service_price_snapshot)}
     elif kind in {'checkin', 'cash'}:
         row = get_object_or_404(appointments_for(user).select_for_update(), pk=data.get('appointment'))
         if data.get('version') != row.updated_at.isoformat():
@@ -253,5 +256,5 @@ def synchronize(request):
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError, TypeError):
         return JsonResponse({'detail': 'Dados inválidos.'}, status=400)
     except ValidationError as exc:
-        return JsonResponse({'detail': ' '.join(exc.messages), 'conflict': True}, status=409)
+        return JsonResponse({'detail': ' '.join(exc.messages), 'conflict': True, 'code': getattr(exc, 'code', 'conflict')}, status=409)
     return JsonResponse({'ok': True, 'result': result})

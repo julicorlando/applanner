@@ -13,13 +13,13 @@ A cópia tem validade de sete dias, até 1.000 pacientes, 500 atendimentos de on
 Operações disponíveis:
 
 - Consultar agenda, pacientes e histórico clínico autorizado já preparado.
-- Cadastrar paciente avulso com nome completo; telefone/e-mail/nascimento opcionais e validados. Contatos existentes exigem revisão; não há fusão automática de pacientes.
+- Cadastrar paciente avulso com nome completo; telefone/e-mail/nascimento opcionais e validados. Contatos existentes exigem revisão; não há fusão automática de pacientes. Após conferir a identidade, é possível vincular explicitamente a fila ao cadastro existente sem perder as evoluções e agendamentos pendentes.
 - Agendar paciente existente ou recém-cadastrado; a disponibilidade real é revalidada ao sincronizar. A reserva local não bloqueia a agenda de outros dispositivos.
 - Registrar chegada com controle de versão do atendimento.
 - Registrar evolução com data clínica, confirmação de autoria e vinculação opcional ao atendimento. A sincronização cria novo registro criptografado com identificação profissional; não sobrescreve versões antigas. Avaliações estruturadas e suas assinaturas finais continuam no editor online.
 - Registrar recebimento integral em dinheiro, reutilizando o encerramento/financeiro existente e as proteções contra duplicidade. Pix, cartão, estornos e cobranças online exigem conexão e confirmação do provedor; não há aprovação financeira offline.
 
-A sincronização exige sessão online e CSRF. UUID, escopo de conta/clínica e hash do conteúdo tornam repetição idempotente. Recibos contêm somente IDs, sem conteúdo clínico. Conflitos ficam na fila criptografada, não são sobrescritos; o usuário pode revisar ou descartar conscientemente. Falha de rede após confirmação pode ser repetida com o mesmo UUID. Uma conta diferente não envia a fila de outra conta.
+A sincronização exige sessão online e CSRF. UUID, escopo de conta/clínica e HMAC do conteúdo tornam repetição idempotente. O HMAC evita expor um hash simples de textos clínicos a tentativas de adivinhação. Recibos contêm somente IDs, versões e valores operacionais, sem texto clínico nem contatos. Confirmações já recebidas permanecem na cópia local mesmo se a rede falhar antes da próxima atualização. Conflitos ficam na fila criptografada, não são sobrescritos; o usuário pode revisar ou descartar conscientemente. Falha de rede após confirmação pode ser repetida com o mesmo UUID. Uma conta diferente não envia a fila de outra conta.
 
 Não encerre o navegador sem confirmar que a fila foi salva. Navegadores podem remover armazenamento local; solicitação de armazenamento persistente não é garantia. O backup exportado é criptografado e depende da mesma senha. Perder a senha impede recuperar lançamentos locais não sincronizados; os dados confirmados permanecem no servidor. A aplicação não salva anexos ou arquivos clínicos completos offline nesta versão.
 

@@ -94,6 +94,20 @@
           try{await persist();}catch(error){state=before;throw error;}render();
         });details.append(edit);
       }
+      if(op.kind==='customer' && op.code==='customer_exists'){
+        const form=document.createElement('form'), label=text('label','Vincular a cadastro existente após conferir a identidade'), select=document.createElement('select');
+        select.required=true;select.name='existing_patient';option(select,'','Selecione o paciente correto');
+        state.snapshot.patients.forEach(patient=>option(select,patient.id,`${patient.name} · ${patient.phone||patient.email||'sem contato'}`));label.append(select);
+        const submit=text('button','Vincular e preservar lançamentos');submit.type='submit';submit.disabled=syncing;form.append(label,submit);
+        form.onsubmit=event=>{event.preventDefault();run(async()=>{
+          const patient=state.snapshot.patients.find(x=>String(x.id)===select.value);if(!patient)return;
+          if(!confirm(`Confirmou a identidade de ${patient.name}? Os lançamentos pendentes serão vinculados a este paciente. O cadastro existente não será alterado.`))return;
+          const before=structuredClone(state);
+          for(const next of state.queue)if(next.data.customer==='local:'+op.id)next.data.customer=patient.id;
+          state.queue=state.queue.filter(x=>x.id!==op.id);
+          try{await persist();}catch(error){state=before;throw error;}render();
+        });};details.append(form);
+      }
       row.append(details);
       const remove=text('button','Descartar da fila');remove.type='button';remove.disabled=syncing;
       remove.onclick=()=>run(async()=>{
@@ -152,12 +166,23 @@
         const response=await fetch('/app/clinica/operacao/sincronizar/',{method:'POST',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000),headers:{'Content-Type':'application/json','X-CSRFToken':token},body:JSON.stringify(body)});
         if(!response.headers.get('Content-Type')?.includes('application/json')){op.error='Sessão ou permissão indisponível. Faça login e tente novamente.';await persist();break;}
         const payload=await response.json();
-        if(!response.ok){op.error=payload.detail||'Acesso negado. Revise as permissões online.';op.revisable=response.status===409;await persist();break;}
+        if(!response.ok){op.error=payload.detail||'Acesso negado. Revise as permissões online.';op.code=payload.code;op.revisable=response.status===409&&payload.code!=='idempotency_conflict';await persist();break;}
         const before=structuredClone(state);
         state.queue=state.queue.filter(x=>x.id!==op.id);
         if(op.kind==='customer'){
           for(const next of state.queue)if(next.data.customer==='local:'+op.id)next.data.customer=payload.result.customer;
+          if(!state.snapshot.patients.some(x=>x.id===payload.result.customer))state.snapshot.patients.push({...op.data,id:payload.result.customer});
         }
+        if(op.kind==='appointment'){
+          const customer=state.snapshot.patients.find(x=>x.id===Number(op.data.customer));
+          const service=state.snapshot.services.find(x=>x.id===Number(op.data.service));
+          if(!state.snapshot.appointments.some(x=>x.id===payload.result.appointment))state.snapshot.appointments.push({id:payload.result.appointment,customer:Number(op.data.customer),customer_name:customer?.name||'Paciente',professional:Number(op.data.professional),service:Number(op.data.service),service_name:service?.name||'Atendimento',starts_at:op.data.starts_at,status:'pending',version:payload.result.version,price:payload.result.price});
+        }
+        if(['checkin','cash'].includes(op.kind)){
+          const appointment=state.snapshot.appointments.find(x=>x.id===payload.result.appointment);
+          if(appointment){appointment.status=op.kind==='cash'?'completed':'waiting';if(payload.result.version)appointment.version=payload.result.version;}
+        }
+        if(op.kind==='evolution'&&!state.snapshot.entries.some(x=>x.id===payload.result.entry))state.snapshot.entries.push({id:payload.result.entry,customer:Number(op.data.customer),title:'Evolução sincronizada',at:op.data.occurred_at,content:op.data.content});
         if(payload.result.version)for(const next of state.queue)if(next.data.appointment===payload.result.appointment && next.data.version===op.data.version)next.data.version=payload.result.version;
         try{await persist();}catch(error){state=before;throw error;}
       }

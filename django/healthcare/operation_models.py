@@ -47,7 +47,7 @@ class OfflineOperation(TimeStampedModel):
     request_id = models.UUIDField()
     kind = models.CharField(max_length=30)
     fingerprint = models.CharField(max_length=64)
-    result = models.JSONField(default=dict)  # Only object IDs, never clinical text or contact details.
+    result = models.JSONField(default=dict)  # Only object IDs and replay metadata, never clinical text or contacts.
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['tenant', 'user', 'request_id'], name='uq_clinical_offline_request')]
