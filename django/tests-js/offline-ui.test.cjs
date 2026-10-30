@@ -17,7 +17,7 @@ test('offline patient form saves into the vault before confirming; no request is
  const ui=setup();await ui.unlock();const {d,w}=ui;assert.equal(d.getElementById('co-work').hidden,false);
  const form=d.getElementById('co-patient');form.elements.name.value='Novo Paciente';form.dispatchEvent(new w.Event('submit',{cancelable:true,bubbles:true}));await settle();
  assert.equal(ui.saved.queue.length,1);assert.equal(ui.saved.queue[0].kind,'customer');assert.equal(ui.saved.queue[0].data.name,'Novo Paciente');assert.equal(ui.requests.length,0);assert.match(d.getElementById('co-status').textContent,/Salvo no cofre local/);
- d.getElementById('co-lock-button').click();assert.equal(d.getElementById('co-work').hidden,true);assert.ok(!d.body.textContent.includes('Dor confidencial'));assert.ok(!d.body.textContent.includes('Paciente Segredo'));assert.equal(w.localStorage.length,0);ui.dom.window.close();
+ d.getElementById('co-filter').value='Paciente Segredo';d.getElementById('co-lock-button').click();assert.equal(d.getElementById('co-filter').value,'');assert.equal(d.getElementById('co-work').hidden,true);assert.ok(!d.body.textContent.includes('Dor confidencial'));assert.ok(!d.body.textContent.includes('Paciente Segredo'));assert.equal(w.localStorage.length,0);ui.dom.window.close();
 });
 test('storage failure does not claim an offline save succeeded',async()=>{
  const ui=setup({failSave:true});await ui.unlock();const form=ui.d.getElementById('co-patient');form.elements.name.value='Falha de armazenamento';form.dispatchEvent(new ui.w.Event('submit',{cancelable:true,bubbles:true}));await settle();assert.equal(ui.saved,undefined);assert.match(ui.d.getElementById('co-status').textContent,/Sem espaço/);ui.dom.window.close();

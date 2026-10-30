@@ -25,7 +25,7 @@
     for (const id of ['co-queue','co-agenda','co-patients','co-identity','co-downloaded']) $(id).replaceChildren();
     document.querySelectorAll('#co-work form').forEach(form => form.reset());
     document.querySelectorAll('#co-work select').forEach(select => select.replaceChildren());
-    $('co-password').value='';status('Cofre bloqueado.');
+    $('co-password').value='';$('co-filter').value='';status('Cofre bloqueado.');
   }
   async function persist() { if (!state || !key) throw Error('Cofre bloqueado.');await vault.save(await vault.seal(state,key,salt)); }
   async function serverSnapshot() {

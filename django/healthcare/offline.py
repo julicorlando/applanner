@@ -127,7 +127,7 @@ def synced_at(value):
 def replay(user, operation):
     # Refresh actor inside the transaction; a stored device snapshot grants no server permissions.
     tenant = Tenant.objects.select_for_update().get(pk=user.tenant_id)
-    user = User.objects.select_for_update().select_related('tenant').get(pk=user.pk)
+    user = User.objects.select_for_update(of=('self',)).select_related('tenant').get(pk=user.pk)
     operator(user)
     if user.tenant_id != tenant.pk:
         raise PermissionDenied
@@ -219,6 +219,10 @@ def replay(user, operation):
         if not hasattr(professional, 'clinical_registration'):
             raise ValidationError('Configure sua habilitação profissional antes de sincronizar a evolução.')
         professional.clinical_registration.full_clean(validate_unique=False)
+        from .navigation import dental_workspace, is_physiotherapy
+        council = 'CRO' if dental_workspace(tenant) else 'CREFITO' if is_physiotherapy(tenant) else None
+        if council and professional.clinical_registration.council != council:
+            raise ValidationError('A habilitação profissional não corresponde ao segmento da clínica.')
         patient = referenced_customer(user, data)
         content = data.get('content')
         if not isinstance(content, str) or not 1 <= len(content.strip()) <= 20000 or data.get('attestation') is not True:

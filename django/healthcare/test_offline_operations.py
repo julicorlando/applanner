@@ -100,6 +100,12 @@ class OfflineOperationsTests(TestCase):
         self.assertEqual(self.post(self.op(attestation=False)).status_code,409)
         self.assertEqual(MedicalRecordEntry.objects.count(),0)
 
+    def test_registration_must_match_the_clinical_segment(self):
+        registration=self.profile.clinical_registration
+        registration.council='CRO';registration.jurisdiction='PE';registration.save()
+        self.assertEqual(self.post(self.op()).status_code,409)
+        self.assertFalse(MedicalRecordEntry.objects.exists())
+
     def test_revocation_is_rechecked_before_replay(self):
         operation=self.op();self.assertEqual(self.post(operation).status_code,200)
         TenantModule.objects.filter(tenant=self.tenant,module__slug='medical_records').update(enabled=False)
