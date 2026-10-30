@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Excluir plano — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-resource-list' 'planos' %}">← Planos</a><span class="eyebrow">MASTER · VENDAS</span><h1>Excluir plano</h1></div></div>
+  <article class="panel">
+    <h2>{{ plan.name }}</h2>
+    {% if references %}
+      <p>Este plano tem vínculos que precisam ser preservados:</p>
+      <ul>{% for reference in references %}<li>{{ reference }}</li>{% endfor %}</ul>
+      <p>Desative o plano e retire a visibilidade pública para impedir novas vendas. O histórico continua disponível para as empresas.</p>
+      <a class="button" href="{% url 'master-resource-edit' 'planos' plan.pk %}">Editar e desativar</a>
+    {% else %}
+      <p>O plano não possui assinaturas, checkouts ou propostas comerciais vinculadas e pode ser removido com segurança.</p>
+      <p><strong>Essa ação é permanente.</strong> Para confirmar, digite exatamente o nome do plano.</p>
+      <form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="confirm-name">Nome do plano</label><input id="confirm-name" name="confirm_name" required autocomplete="off"></div><div class="form-actions"><button class="button danger" type="submit">Excluir plano permanentemente</button><a class="button ghost" href="{% url 'master-resource-list' 'planos' %}">Cancelar</a></div></form>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

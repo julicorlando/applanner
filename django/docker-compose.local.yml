@@ -1,0 +1,25 @@
+services:
+  web:
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - media:/app/media
+    command:
+      - sh
+      - -c
+      - >
+        python manage.py migrate --noinput &&
+        python manage.py seed_modules &&
+        python manage.py seed_rbac &&
+        python manage.py seed_periodic_tasks &&
+        python manage.py runserver 0.0.0.0:8000
+
+  worker:
+    volumes:
+      - .:/app
+      - media:/app/media
+
+  beat:
+    volumes:
+      - .:/app

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load display_pt %}
+{% block title %}{{ title }} — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'portal-resource-list' module_slug resource_slug %}">← {{ resource.title }}</a><span class="eyebrow">{{ module.title }}</span><h1>{{ title }}</h1></div></div>
+  {% if simple_mode %}<p class="simple-help">Preencha os dados abaixo e toque em <strong>Salvar</strong>. Se precisar corrigir algo, a orientação aparecerá junto ao campo.</p>{% endif %}
+  {% if resource_slug == 'expedientes' %}<p>O expediente define quando cada profissional atende. As vagas respeitam também o funcionamento da unidade, intervalos, folgas e agendamentos existentes.</p>{% elif resource_slug == 'horarios-unidades' %}<p>Defina os dias e horários de funcionamento desta unidade para exibição na página pública. O atendimento depende também do expediente de cada profissional.</p>{% endif %}
+  {% if professional_capacity %}<aside class="panel" role="status" aria-label="Limite de profissionais" style="margin-bottom:16px">
+    <strong>{{ professional_capacity.used }} profissionais ativos{% if professional_capacity.limit != None %} de {{ professional_capacity.limit }} autorizados{% elif professional_capacity.unlimited %} · Sem limite autorizado pelo Master{% else %} · Limite não definido no catálogo{% endif %}</strong>.
+    {% if professional_capacity.limit != None %}<p>{{ professional_capacity.available }} {% if professional_capacity.available == 1 %}vaga disponível{% else %}vagas disponíveis{% endif %} para ativação.</p>{% endif %}
+    {% if professional_capacity.overridden %}<p>Liberação especial do Master aplicada.</p>{% endif %}
+    {% if professional_existing_active %}<p>Você pode editar este profissional ativo, mesmo que a equipe já ultrapasse o limite.</p>{% elif professional_capacity.available == 0 %}<p>Não há vagas para ativar outro profissional. Desmarque “Ativo” para salvar um perfil inativo, desative alguém da equipe ou solicite ampliação ao Master.</p>{% endif %}
+    <p>Profissionais inativos não ocupam vagas.</p><a href="{% url 'billing-subscription-status' %}">Ver meu plano e limites →</a>
+    {% include "portal/professional_extra_link.html" %}
+  </aside>{% endif %}
+  {% if appointment_identity.customer_name_differs %}<aside class="panel" aria-label="Identificação do cliente" style="margin-bottom:16px"><h2>Identificação do cliente</h2>{% include "portal/customer_name_difference.html" with appointment=appointment_identity only %}<p>O nome informado na reserva é preservado para consulta. O histórico continua vinculado ao cadastro do cliente, identificado pelo telefone; este aviso não altera seus dados.</p></aside>{% endif %}
+  {% if form.instance|homologation_record %}<aside class="panel" role="status"><strong>Registro de homologação</strong><p>Identificado pelo nome do cadastro. Revise antes de usar na operação real.</p></aside>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="portal-form panel">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}
+      {% if field.is_hidden %}{{ field }}{% else %}
+      <div class="form-field {% if field|single_checkbox %}checkbox-field{% elif field|checkbox_group %}checkbox-group-field{% endif %}">
+        {% if field|checkbox_group %}<fieldset class="checkbox-choice-group"><legend>{{ field.label }}</legend>{{ field }}</fieldset>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% endif %}
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    {% endfor %}
+    <div class="form-actions"><button class="button primary" type="submit">Salvar</button><a class="button ghost" href="{% url 'portal-resource-list' module_slug resource_slug %}">Cancelar</a></div>
+  </form>
+</section>
+{% endblock %}

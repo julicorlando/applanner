@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Segurança da conta — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">SUA CONTA</span><h1>Segurança</h1><p>Proteja seu acesso e acompanhe as opções de verificação da conta.</p></div></div>
+  <div class="metric-grid"><article><span>Verificação em duas etapas</span><strong>{% if enabled %}Ativa{% else %}Pendente{% endif %}</strong></article><article><span>E-mail da conta</span><strong style="font-size:1rem;overflow-wrap:anywhere">{{ request.user.email }}</strong></article></div>
+  <article class="panel" style="margin-top:18px"><h2>Senha e acesso</h2><p>Use uma senha exclusiva. Ao alterá-la, as sessões anteriores são encerradas.</p><a class="button" href="{% url 'accounts:change-password' %}">Alterar senha</a></article>
+  <article class="panel" style="margin-top:18px"><h2>Aplicativo autenticador</h2>
+    {% if enabled %}
+      <p>A verificação em duas etapas está ativa. Um código do aplicativo será solicitado ao entrar em um dispositivo não reconhecido.</p>
+      <form method="post" action="{% url 'accounts:two-factor-disable' %}" class="portal-form" onsubmit="return confirm('Desativar a verificação em duas etapas reduz a proteção da conta. Continuar?')">{% csrf_token %}<div class="form-field"><label for="disable-password">Senha atual</label><input id="disable-password" type="password" name="password" required autocomplete="current-password"></div><div class="form-actions"><button class="button" type="submit">Desativar verificação em duas etapas</button></div></form>
+    {% else %}
+      <p>1. Abra um aplicativo autenticador e adicione uma conta usando a chave abaixo.</p><p><code style="overflow-wrap:anywhere">{{ secret }}</code></p>
+      <p>2. Digite o código exibido no aplicativo para ativar a proteção.</p><form method="post" class="portal-form">{% csrf_token %}<div class="form-field"><label for="totp-code">Código de 6 dígitos</label><input id="totp-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></div><div class="form-actions"><button class="button primary" type="submit">Ativar verificação</button></div></form>
+      <details><summary>Configurar manualmente com a URI</summary><code style="overflow-wrap:anywhere">{{ provisioning_uri }}</code></details>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

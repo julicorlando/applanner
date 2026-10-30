@@ -1,0 +1,15 @@
+<section {% if reference_layout %}data-layout="rows"{% endif %} data-odontogram data-readonly="{{ readonly|yesno:'true,false' }}" class="odontogram">
+<h2>Odontograma FDI</h2>
+<p>Direita e esquerda referem-se ao paciente. Desenho esquemático das arcadas.</p>
+<div class="dentition"><button type="button" data-dentition="permanent">Permanente</button><button type="button" data-dentition="primary">Decídua</button></div>
+{% if readonly %}<input type="hidden" data-chart-input value="{{ chart_json }}">{% else %}{{ form.odontogram_json }}{{ form.odontogram_json.errors }}{% endif %}
+{% if reference_layout %}<div data-legend class="chart-legend"></div><div data-arches></div>{% else %}<div data-arches></div><div data-legend class="chart-legend"></div>{% endif %}
+{% if not readonly %}
+<p data-selection aria-live="polite">Selecione um ou mais dentes</p>
+{% if reference_layout %}<details class="da-chart-tools"><summary>✎ Editar condições, faces e observações</summary>{% endif %}<label>Condição <select data-condition><option value="higido">Hígido</option><option value="carie">Cárie</option><option value="restauracao">Restauração</option><option value="ausente">Ausente</option><option value="extracao_indicada">Extração indicada</option><option value="endodontia">Endodontia</option><option value="coroa">Coroa</option><option value="implante">Implante</option><option value="fratura">Fratura</option><option value="selante">Selante</option><option value="protese">Prótese</option><option value="outro">Outro</option></select></label>
+<fieldset><legend>Faces selecionáveis</legend>{% for surface in surfaces %}<label><input type="checkbox" data-surface value="{{ surface }}"> {{ surface|capfirst }}</label> {% endfor %}</fieldset>
+<label>Observações <textarea data-note maxlength="2000"></textarea></label>
+<div><button type="button" data-add>Registrar nos dentes selecionados</button> <button type="button" data-clear>Limpar seleção neste rascunho</button></div>{% if reference_layout %}</details>{% endif %}
+{% else %}<p data-selection hidden></p>{% endif %}
+<div data-chart-summary aria-live="polite"></div>
+</section>

@@ -1,0 +1,126 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="{% url 'web-app-manifest' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% url 'web-app-icon' 180 %}?v={{ platform_branding.updated_at|date:'U'|default:'1' }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ApPlanner">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f8fafc">
+  <link rel="preload" href="{% static 'fonts/inter-latin-variable.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <script src="{% static 'js/theme.js' %}"></script>
+  <title>{% block title %}ApPlanner{% endblock %}</title>
+  <meta name="description" content="{% block description %}Agenda, operação, pagamentos e relacionamento em uma plataforma preparada para o seu negócio.{% endblock %}">
+  {% if platform_branding.favicon %}<link rel="icon" href="{% url 'public-platform-favicon' %}?v={{ platform_branding.updated_at|date:'U' }}">{% else %}<link rel="icon" type="image/png" href="{% static 'images/applanner-logo.png' %}">{% endif %}
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/refresh.css' %}">
+  <link rel="stylesheet" href="{% static 'css/nightfall.css' %}">
+  <link rel="stylesheet" href="{% static 'css/usability.css' %}">
+  <link rel="stylesheet" href="{% static 'css/theme.css' %}?v=20261004-billing">
+  <script src="{% static 'js/form-validation-pt.js' %}?v=20261004" defer></script>
+  <script src="{% static 'js/postal-code.js' %}" data-postal-code-url="{% url 'accounts:postal-code-lookup' %}" defer></script>
+  {% block extra_css %}{% endblock %}
+  <link rel="stylesheet" href="{% static 'css/adaptive-layout.css' %}">
+  <script src="{% static 'js/adaptive-layout.js' %}" defer></script>
+<link rel="stylesheet" href="{% static 'css/mobile-brand.css' %}?v=20261008">
+<link rel="stylesheet" href="{% static 'css/premium.css' %}?v=20261019-social">
+<script src="{% static 'js/workspace.js' %}" defer></script>
+{% if simple_mode %}<link rel="stylesheet" href="{% static 'css/simple-mode.css' %}">{% endif %}
+<link rel="stylesheet" href="{% static 'css/workspace-calendar.css' %}">
+{% block extra_head %}{% endblock %}
+{% if physio_workspace %}<link rel="stylesheet" href="{% static 'healthcare/assessment.css' %}"><link rel="stylesheet" href="{% static 'healthcare/physio-workspace.css' %}">{% if dental_workspace %}<link rel="stylesheet" href="{% static 'healthcare/dental-workspace.css' %}">{% endif %}{% endif %}
+</head>
+<body class="adaptive-ui {% if workspace_groups %}has-workspace{% endif %} {% if simple_mode %}simple-mode{% endif %} {% if physio_workspace %}physio-page physio-reference physio-workspace{% if dental_workspace %} dental-workspace{% endif %}{% endif %} {% block body_class %}{% endblock %}">
+{% if clinical_homologation %}<div role="status" style="padding:12px;background:#fef3c7;color:#78350f;text-align:center;font-weight:650">HOMOLOGAÇÃO · somente dados fictícios · pagamentos apenas em sandbox</div>{% endif %}
+
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  {% block header %}{% if physio_workspace %}{% include 'healthcare/physio_topbar.html' %}{% elif not workspace_groups %}<header class="topbar">
+    <a class="brand" href="/" aria-label="ApPlanner início">
+      {% if platform_branding.logo_light or platform_branding.logo_dark %}
+        <img class="platform-logo platform-logo-custom brand-theme-light" src="{% url 'public-platform-logo' %}?theme=light&amp;v={{ platform_branding.updated_at|date:'U' }}" alt="ApPlanner">
+        <img class="platform-logo platform-logo-custom brand-theme-dark" src="{% url 'public-platform-logo' %}?theme=dark&amp;v={{ platform_branding.updated_at|date:'U' }}" alt="ApPlanner">
+      {% elif platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="ApPlanner">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="ApPlanner">{% endif %}
+    </a>
+    {% if simple_mode %}<nav class="simple-primary-nav" aria-label="Ações principais">{% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento</a>{% else %}{% for item in simple_nav %}<a href="{{ item.url }}">{{ item.title }}</a>{% endfor %}{% endif %}</nav><details class="simple-more"><summary>Mais opções</summary>{% endif %}
+    {% if not workspace_master or simple_mode %}
+    <nav class="nav">
+      {% if request.user.is_authenticated %}
+        {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
+        <a href="/">Painel</a>
+        <a href="{% if request.user.is_superuser %}{% url 'master-global-search' %}{% elif request.user.role == 'professional' %}{% url 'professional-search' %}{% else %}{% url 'operation-search' %}{% endif %}">Buscar</a>
+        {% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a>{% endif %}{% endif %}
+        {% if request.user.tenant_id and request.user.role != 'professional' %}<a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}
+        {% if workspace_master %}<a href="{% url 'master-global-search' %}">Buscar na plataforma</a>{% endif %}{% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
+        {% if request.user.is_superuser and request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
+        <a href="/account/2fa/setup/">Segurança</a>
+        <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
+        {% endif %}<form method="post" action="/account/logout/" class="nav-form">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form>
+      {% else %}
+        <a href="/#segmentos">Soluções</a>
+        <a href="/#beneficios">Recursos</a>
+        <a href="/planos/">Planos</a>
+        <a href="/directory/">Explorar</a>
+        <a href="/account/login/">Entrar</a>
+        <a class="nav-cta" href="/planos/">Teste grátis</a>
+      {% endif %}
+    </nav>
+    {% endif %}
+    {% if simple_mode %}</details>{% endif %}
+    <details class="mobile-nav"><summary>Menu</summary><div class="mobile-nav-links">
+      {% if request.user.is_authenticated %}
+      {% if request.billing_locked %}<a href="{% url 'billing-subscription-status' %}">Pagamento da assinatura</a>{% else %}
+      <a href="/">Painel</a>{% if request.user.role == 'professional' %}<a href="{% url 'professional-area' %}">Minha agenda e ganhos</a>{% else %}<a href="/app/">Operação</a>{% if request.user.tenant_id %}<a href="{% url 'tenant-branding' %}">Minha página</a><a href="{% url 'billing-subscription-status' %}">Meu plano e pagamento</a>{% endif %}{% endif %}
+      {% if workspace_master %}<a href="{% url 'master-global-search' %}">Buscar na plataforma</a>{% endif %}{% if request.user.is_superuser %}<a href="/master/">Master</a><a href="{% url 'master-whatsapp' %}">WhatsApp Master</a><a href="{% url 'master-platform-payment' %}">Cadastro bancário</a><a href="/commercial/">Comercial</a>{% endif %}
+      {% if request.user.is_superuser and request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
+      <a href="/account/2fa/setup/">Segurança</a>
+      <a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
+      {% endif %}
+      {% if workspace_groups and not simple_mode %}<div class="mobile-module-menu"><strong>Áreas de trabalho</strong>{% for group in workspace_groups %}<details><summary>{{ group.title }}</summary><nav aria-label="{{ group.title }}">{% for item in group.items %}<a href="{{ item.url }}"{% if item.active %} aria-current="page"{% endif %}>{{ item.title }}</a>{% endfor %}</nav></details>{% endfor %}</div>{% endif %}
+      <form method="post" action="/account/logout/">{% csrf_token %}<button type="submit">Sair</button></form>
+      {% else %}
+      <a href="/directory/">Explorar estabelecimentos</a>
+      <a href="/planos/">Ver planos</a>
+      <a href="/#segmentos">Segmentos</a>
+      <a href="/account/login/">Entrar</a>
+      <a href="{% url 'billing-custom-plan' %}">Monte o seu plano</a>
+      {% endif %}
+    </div></details>
+    {% include "theme_toggle.html" %}
+  </header>{% endif %}{% endblock %}
+  {% block workspace_sidebar %}{% if physio_workspace %}{% include 'healthcare/physio_sidebar.html' %}{% else %}{% include "workspace_sidebar.html" %}{% endif %}{% endblock %}
+  {% if request.support_actor %}
+    <div class="panel" role="status" style="margin:12px auto;max-width:1100px;padding:14px">
+      Acesso assistido ativo por {{ request.support_actor.email }}. Suas ações são registradas.
+      <form method="post" action="{% url 'support-end-access' %}" style="display:inline">
+        {% csrf_token %}<button class="button" type="submit">Encerrar acesso</button>
+      </form>
+    </div>
+  {% endif %}
+  {% if messages %}
+  <div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
+  {% endif %}
+  <main id="conteudo">{% include "app_install.html" %}{% if simple_mode and not request.billing_locked %}<div class="shell simple-breadcrumb"><a href="{% url 'portal-home' %}">← Voltar ao início</a><span>Modo simples</span></div>{% endif %}{% block account_notices %}{% include "billing/due_notice.html" %}{% if operation_units %}<div class="shell"><form method="get" class="portal-search" aria-label="Unidade da operação"><label>Unidade <select name="unit" onchange="this.form.submit()">{% for unit in operation_units %}<option value="{{ unit.pk }}"{% if operation_selected_unit.pk == unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select></label><span>Operação de {{ operation_selected_unit.name }}</span></form></div>{% endif %}
+{% endblock %}{% block content %}{% endblock %}</main>
+  {% block footer %}<footer class="footer">
+    <div><strong>ApPlanner</strong><span>Agenda e gestão que acompanham seu negócio.</span></div>
+    <nav class="footer-legal" aria-label="Documentos legais">
+      <a href="{% url 'legal-public-document' 'privacidade' %}">Privacidade</a>
+      <a href="{% url 'legal-public-document' 'termos-empresas' %}">Termos · Empresas</a>
+      <a href="{% url 'legal-public-document' 'termos-clientes' %}">Termos · Clientes</a>
+      <a href="{% url 'legal-public-document' 'cancelamento-empresas' %}">Cancelamento · Empresas</a>
+      <a href="{% url 'legal-public-document' 'cancelamento-clientes' %}">Cancelamento · Clientes</a>
+      <a href="{% url 'legal-public-privacy-request' %}">Solicitação de privacidade</a>
+      {% if request.user.is_authenticated %}<a href="{% url 'legal-privacy-center' %}">Meus dados e privacidade</a>{% endif %}
+    </nav>
+    <span>© {% now "Y" %} ApPlanner</span>
+  </footer>{% endblock %}
+  {% include "mobile_workspace_nav.html" %}
+  <script src="{% static 'js/app-install.js' %}" defer></script>
+  {% block trial_prompt %}{% include "billing/trial_prompt.html" %}{% endblock %}
+  <script src="{% static 'js/app-worker-registration.js' %}" data-app-worker-url="{% url 'web-app-worker' %}" defer></script>
+</body>
+</html>

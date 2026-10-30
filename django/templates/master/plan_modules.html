@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Módulos · {{ plan.name }} — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading">
+    <div>
+      <a class="back-link" href="{% url 'master-resource-list' 'planos' %}">← Planos</a>
+      <span class="eyebrow">MASTER · PLANO</span>
+      <h1>{{ plan.name }}</h1>
+      <p>Defina exatamente quais funções fazem parte deste plano.</p>
+    </div>
+    <a class="button ghost" href="{% url 'master-resource-edit' 'planos' plan.pk %}">Editar plano</a>
+  </div>
+  <form method="post">{% csrf_token %}
+    <div class="portal-module-grid">
+      {% for row in rows %}
+      <label class="portal-module-card">
+        <span class="portal-module-kicker">{{ forloop.counter|stringformat:"02d" }}</span>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:18px">
+          <input type="checkbox" name="modules" value="{{ row.module.pk }}" {% if row.enabled %}checked{% endif %}>
+          <strong>{{ row.module.name }}</strong>
+        </div>
+        <p>{{ row.module.description|default:"Sem descrição." }}</p>
+        <div class="portal-resource-links">
+          <span>{{ row.module.slug }}</span>
+          {% if row.module.addon_sellable %}<span>Avulso{% if row.module.addon_monthly_price %}: R$ {{ row.module.addon_monthly_price }}/mês{% endif %}</span>{% endif %}
+          {% if not row.module.active %}<span>Inativo</span>{% endif %}
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="form-actions" style="margin-top:20px"><button class="button primary">Salvar módulos do plano</button></div>
+  </form>
+</section>
+{% endblock %}
