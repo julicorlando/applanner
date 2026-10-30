@@ -15,13 +15,17 @@
   const close = () => { setOpen(false, true); toggle.focus(); };
   initial();
   window.addEventListener('resize', initial);
-  toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true', true));
+  toggle.addEventListener('click', () => {
+    const open = toggle.getAttribute('aria-expanded') !== 'true';
+    setOpen(open, true);
+    if (open && mobile()) sidebar.querySelector('a[href],button')?.focus();
+  });
   document.getElementById('pa-menu-close')?.addEventListener('click', close);
   document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
   document.addEventListener('click', event => { if (mobile() && !sidebar.contains(event.target) && !toggle.contains(event.target)) close(); });
   document.addEventListener('keydown', event => {
     if (event.key !== 'Tab' || !mobile() || !sidebar.classList.contains('pa-open')) return;
-    const items = [toggle, ...sidebar.querySelectorAll('a[href],button')];
+    const items = [...sidebar.querySelectorAll('a[href],button')];
     if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items.at(-1).focus(); }
     else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); toggle.focus(); }
   });

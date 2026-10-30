@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const $=id=>document.getElementById(id), panel=$('tv-panel');
-  let voice=false, started=false, lastCall=null, media=[], index=0, timer, lastOk=0;
+  let voice=false, started=false, lastCall=null, primed=false, media=[], index=0, timer, lastOk=0;
   const node=(tag,value)=>{const el=document.createElement(tag);el.textContent=value;return el;};
   $('tv-link').textContent=location.host+location.pathname;
   $('tv-start').onclick=()=>{started=true;document.documentElement.requestFullscreen?.().catch(()=>{});$('tv-start').hidden=true;showMedia();};
@@ -23,11 +23,12 @@
       const [current,...previous]=data.calls;
       if(current){
         $('tv-current').replaceChildren(node('span',current.name),node('small',current.room));
-        if(lastCall!==null&&current.id!==lastCall&&started&&voice&&'speechSynthesis'in window){speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(`${current.name}. Dirija-se à ${current.room}.`);utterance.lang='pt-BR';speechSynthesis.speak(utterance);}
+        if(primed&&current.id!==lastCall&&started&&voice&&'speechSynthesis'in window){speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(`${current.name}. Dirija-se à ${current.room}.`);utterance.lang='pt-BR';speechSynthesis.speak(utterance);}
         lastCall=current.id;
       }else{clearPrivate('');}
+      primed=true;
       $('tv-history').replaceChildren();for(const call of previous){const el=node('div','');el.className='tv-row';el.append(node('span',call.name),node('span',call.room));$('tv-history').append(el);}
-      if(JSON.stringify(media)!==JSON.stringify(data.media)){media=data.media;index=0;showMedia();}
+      if(JSON.stringify(media)!==JSON.stringify(data.media)||!$('tv-media').firstElementChild){media=data.media;index=0;showMedia();}
     }catch{
       $('tv-connection').textContent='Sem conexão · aguardando atualização';
       // Never leave patient aliases visible indefinitely on a disconnected TV.
