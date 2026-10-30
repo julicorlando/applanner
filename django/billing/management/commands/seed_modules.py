@@ -4,6 +4,7 @@ from billing.models import Module
 
 
 MODULES={
+    "waiting-room-tv":{"name":"Chamar na TV", "description":"Chamadas de pacientes, sala e mídias no painel da sala de espera.", "active":True, "sort_order":65},
     # Ordem deliberadamente igual aos IDs 1..17 do catálogo legado atual.
     "products":{
         "name":"Produtos, PDV e vendas",

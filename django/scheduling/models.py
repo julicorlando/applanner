@@ -17,11 +17,24 @@ class Customer(TimeStampedModel):
     def clean(self):
         super().clean()
         from .customer_identity import contact_values,identity_matches
-        self.name,self.phone,self.email=contact_values(self.name,self.phone,self.email)
+        from billing.entitlements import is_healthcare_tenant
+        from django.core.exceptions import ValidationError
+        if not (self.phone or "").strip() and self.tenant_id and is_healthcare_tenant(self.tenant):
+            # Walk-in clinical patients may have no contact yet. Public bookings
+            # still require a phone through contact_values/resolve_customer.
+            from django.core.validators import validate_email
+            self.name=(self.name or "").strip()
+            self.phone=""
+            self.email=(self.email or "").strip().lower()
+            if not 2<=len(self.name)<=150:
+                raise ValidationError({"name":"Informe o nome completo do paciente."})
+            if self.email:
+                validate_email(self.email)
+        else:
+            self.name,self.phone,self.email=contact_values(self.name,self.phone,self.email)
         if self.tenant_id:
-            from django.core.exceptions import ValidationError
             phones,emails=identity_matches(self.tenant,self.phone,self.email)
-            if phones.exclude(pk=self.pk).exists() or emails.exclude(pk=self.pk).exists():
+            if (self.phone and phones.exclude(pk=self.pk).exists()) or emails.exclude(pk=self.pk).exists():
                 raise ValidationError("Este telefone ou e-mail já pertence a um cliente da empresa. Use o cadastro existente para preservar o histórico.")
 
     class Meta:

@@ -1,5 +1,7 @@
 """Installable application metadata. No offline copy of account or payment data."""
 from io import BytesIO
+import json
+from django.templatetags.static import static
 from django.contrib.staticfiles import finders
 from django.http import Http404, HttpResponse, JsonResponse
 from django.urls import reverse
@@ -51,7 +53,8 @@ def worker(request):
     path=finders.find('js/app-worker.js')
     if not path: raise Http404
     with open(path,encoding='utf-8') as source:
-        response=HttpResponse(source.read(),content_type='application/javascript')
+        assets=[reverse('clinical-offline-shell'), *[static('healthcare/'+name) for name in ('operations.css','offline-vault.js','offline-ui.js')], static('js/app-worker-registration.js')]
+        response=HttpResponse('const CLINICAL_OFFLINE_ASSETS = '+json.dumps(assets)+';\n'+source.read(),content_type='application/javascript')
     response['Cache-Control']='no-cache'
     response['Service-Worker-Allowed']='/'
     response['X-Content-Type-Options']='nosniff'

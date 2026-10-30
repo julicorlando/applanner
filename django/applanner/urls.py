@@ -33,7 +33,14 @@ from scheduling.bundles import BundleAPIView,bundle_page
 from scheduling import card_payments
 from communications import mobile_portal
 
+from healthcare import waiting_room, offline
+
 urlpatterns = [
+    path("offline/clinica/", offline.shell, name="clinical-offline-shell"),
+    path("tv/<str:token>/", waiting_room.short_link, name="waiting-room-short"),
+    path("tv/<slug:slug>/<str:token>/", waiting_room.screen, name="waiting-room-screen"),
+    path("tv/<slug:slug>/<str:token>/dados/", waiting_room.feed, name="waiting-room-feed"),
+    path("tv/<slug:slug>/<str:token>/midia/<int:pk>/", waiting_room.media, name="waiting-room-media"),
     path("vaga-beleza/<str:token>/",recovery_accept,name="beauty-recovery-accept"),
     path("desenvolvimento/", include("development.urls")),
     path("webhooks/desenvolvimento/pagamentos/<uuid:public_id>/", development_payment_webhook, name="development-payment-webhook"),

@@ -1,7 +1,8 @@
 /* Only fingerprinted public static files can enter this cache. Account data stays online. */
 'use strict';
 const CACHE_PREFIX = 'applanner-static-';
-const CACHE_NAME = CACHE_PREFIX + '20261012-v2';
+const CACHE_NAME = CACHE_PREFIX + '20261030-clinical-v1';
+const CLINICAL_CACHE = 'applanner-clinical-shell-v1';
 const STATIC_FILE = /^\/static\/.+\.[a-f0-9]{12}\.(?:css|js|png|jpg|jpeg|webp|svg|woff2?)$/i;
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
@@ -11,11 +12,34 @@ self.addEventListener('activate', event => {
   })());
 });
 self.addEventListener('message', event => {
+  if (event.data?.type === 'CLINICAL_PREPARE') {
+    event.waitUntil((async () => {
+      try {
+        const cache = await caches.open(CLINICAL_CACHE);
+        // Fixed, server-built allowlist. No account HTML, cookies, JSON or PHI.
+        for (const path of CLINICAL_OFFLINE_ASSETS) {
+          const response = await fetch(new Request(new URL(path, self.location.origin), {credentials:'omit', cache:'reload'}));
+          if (!response.ok || response.redirected) throw Error('Offline shell unavailable');
+          await cache.put(path, response);
+        }
+        event.ports[0]?.postMessage({ok:true});
+      } catch { event.ports[0]?.postMessage({ok:false}); }
+    })());
+  }
   if (event.data?.type === 'APPLANNER_ACTIVATE_UPDATE') event.waitUntil(self.skipWaiting());
 });
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
+  if (request.method === 'GET' && url.origin === self.location.origin && !url.search &&
+      typeof CLINICAL_OFFLINE_ASSETS !== 'undefined' && CLINICAL_OFFLINE_ASSETS.includes(url.pathname)) {
+    event.respondWith((async () => {
+      // Only the opt-in shell has an offline navigation fallback. Private pages never do.
+      try { return await fetch(request); }
+      catch { return (await caches.open(CLINICAL_CACHE)).match(url.pathname); }
+    })());
+    return;
+  }
   if (request.method !== 'GET' || request.mode === 'navigate' || url.origin !== self.location.origin || !STATIC_FILE.test(url.pathname) || url.search) return;
   event.respondWith((async () => {
     let cache;
@@ -23,6 +47,7 @@ self.addEventListener('fetch', event => {
     const publicRequest = new Request(request.url, {credentials:'omit', mode:'same-origin'});
     let hit;
     try { hit = await cache?.match(publicRequest); } catch { /* Keep the network path working. */ }
+    if (!hit) { try { hit = await (await caches.open(CLINICAL_CACHE)).match(publicRequest); } catch {} }
     if (hit) return hit;
     const response = await fetch(publicRequest);
     const policy = response.headers.get('Cache-Control') || '';

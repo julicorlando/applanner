@@ -348,3 +348,6 @@ class DentalAssessmentDocument(models.Model):
     def delete(self,*args,**kwargs):
         from django.core.exceptions import ValidationError
         raise ValidationError("Desvincule o documento no rascunho; o histórico é preservado.")
+
+# Kept separate to make operational/offline records distinct from the clinical ledger.
+from .operation_models import WaitingRoomDisplay, WaitingRoomMedia, WaitingRoomCall, OfflineOperation  # noqa: F401,E402
