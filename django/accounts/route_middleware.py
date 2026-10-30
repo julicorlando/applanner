@@ -19,7 +19,15 @@ RECEPTION_MUTATION_PREFIXES=(
 )
 
 
+CLINIC_OPERATION_PATHS = {
+    "/app/clinica/operacao/snapshot/", "/app/clinica/operacao/sincronizar/",
+    "/app/clinica/tv/", "/app/clinica/tv/chamar/",
+}
+
+
 def _reception_mutation_allowed(path):
+    if path in {"/app/clinica/operacao/sincronizar/", "/app/clinica/tv/chamar/"}:
+        return True  # Views still enforce module, tenant and clinical/financial permissions per operation.
     return bool(re.fullmatch(r"/app/barbearia/comandas/[0-9]+/vale/",path)) or any(path.startswith(prefix) for prefix in RECEPTION_MUTATION_PREFIXES)
 
 
@@ -64,8 +72,8 @@ class CapabilityRouteMiddleware:
             )
         if user and user.is_authenticated and not user.is_superuser and user.role_links.exists():
             path=request.path
-            required=None
-            for prefix,capability in PREFIX_CAPABILITIES.items():
+            required="agenda.manage" if path in CLINIC_OPERATION_PATHS else None
+            for prefix,capability in (() if required else PREFIX_CAPABILITIES.items()):
                 if path.startswith(prefix):
                     required=capability
                     break

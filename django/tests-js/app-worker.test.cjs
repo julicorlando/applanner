@@ -50,3 +50,16 @@ test('worker update requires explicit activation message',async()=>{
 test('unavailable cache storage falls back to the network',async()=>{
   const ui=setup({cacheError:true});await ui.request('https://applanner.com.br/static/app.123456abcdef.css');assert.equal(ui.fetched.length,1);
 });
+
+test('clinical shell preparation caches only a fixed public allowlist and reports success',async()=>{
+ const events={},written=[],fetched=[],ports=[];
+ const assets=['/offline/clinica/','/static/healthcare/offline-ui.aabbccddeeff.js'];
+ const cache={async put(path){written.push(path);},async match(){return {cached:true};}};
+ const self={location:{origin:'https://applanner.test'},addEventListener:(name,fn)=>events[name]=fn};
+ vm.runInNewContext('const CLINICAL_OFFLINE_ASSETS='+JSON.stringify(assets)+';'+code,{self,caches:{async open(){return cache;}},URL,Request,fetch:async req=>{fetched.push(req);return {ok:true,redirected:false};}});
+ let pending;events.message({data:{type:'CLINICAL_PREPARE'},ports:[{postMessage:value=>ports.push(value)}],waitUntil:p=>pending=p});await pending;
+ assert.deepEqual(written,assets);assert.equal(ports[0].ok,true);assert.ok(fetched.every(req=>req.credentials==='omit'));
+ for(const path of ['/app/clinica/operacao/snapshot/','/app/clinica/registro/1/','/api/anything/','/tv/foo/token/dados/']){
+   let intercepted=false;events.fetch({request:{url:'https://applanner.test'+path,method:'GET',mode:'navigate'},respondWith:()=>intercepted=true});assert.equal(intercepted,false,path);
+ }
+});

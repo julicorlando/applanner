@@ -199,6 +199,7 @@ def shell_context(user, request=None):
         "physio_photo": profile.photo.url if profile and profile.photo else "",
         "physio_role_label": role_label,
         "physio_menu": menu,
+        "waiting_room_enabled": module_enabled(user.tenant, "waiting-room-tv"),
         "physio_search_url": reverse(
             "professional-search" if user.role == "professional" else "operation-search"
         ),

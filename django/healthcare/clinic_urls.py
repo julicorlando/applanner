@@ -1,7 +1,12 @@
 from django.urls import path
 from . import clinic_views as views
 from . import assessment_views as assessments
+from . import waiting_room, offline
 urlpatterns=[
+    path("operacao/snapshot/", offline.snapshot, name="clinical-offline-snapshot"),
+    path("operacao/sincronizar/", offline.synchronize, name="clinical-offline-sync"),
+    path("tv/", waiting_room.console, name="waiting-room-console"),
+    path("tv/chamar/", waiting_room.call_patient, name="waiting-room-call"),
     path("fisioterapia/",assessments.assessment_list,name="physio-assessments"),
     path("fisioterapia/avaliacao/nova/",assessments.assessment_editor,name="physio-assessment-create"),
     path("fisioterapia/avaliacao/<int:pk>/",assessments.assessment_editor,name="physio-assessment-detail"),
