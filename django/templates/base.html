@@ -32,9 +32,9 @@
 {% if simple_mode %}<link rel="stylesheet" href="{% static 'css/simple-mode.css' %}">{% endif %}
 <link rel="stylesheet" href="{% static 'css/workspace-calendar.css' %}">
 {% block extra_head %}{% endblock %}
-{% if physio_workspace %}<link rel="stylesheet" href="{% static 'healthcare/assessment.css' %}"><link rel="stylesheet" href="{% static 'healthcare/physio-workspace.css' %}">{% endif %}
+{% if physio_workspace %}<link rel="stylesheet" href="{% static 'healthcare/assessment.css' %}"><link rel="stylesheet" href="{% static 'healthcare/physio-workspace.css' %}">{% if dental_workspace %}<link rel="stylesheet" href="{% static 'healthcare/dental-workspace.css' %}">{% endif %}{% endif %}
 </head>
-<body class="adaptive-ui {% if workspace_groups %}has-workspace{% endif %} {% if simple_mode %}simple-mode{% endif %} {% if physio_workspace %}physio-page physio-reference physio-workspace{% endif %} {% block body_class %}{% endblock %}">
+<body class="adaptive-ui {% if workspace_groups %}has-workspace{% endif %} {% if simple_mode %}simple-mode{% endif %} {% if physio_workspace %}physio-page physio-reference physio-workspace{% if dental_workspace %} dental-workspace{% endif %}{% endif %} {% block body_class %}{% endblock %}">
 {% if clinical_homologation %}<div role="status" style="padding:12px;background:#fef3c7;color:#78350f;text-align:center;font-weight:650">HOMOLOGAÇÃO · somente dados fictícios · pagamentos apenas em sandbox</div>{% endif %}
 
   <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>

@@ -17,6 +17,14 @@ def is_physiotherapy(tenant):
     )
 
 
+def is_dentistry(tenant):
+    return bool(tenant and ((tenant.category or "").strip().lower() in {"odontologia", "dentistry"} or module_enabled(tenant, "dentistry")))
+
+
+def dental_workspace(tenant):
+    return is_dentistry(tenant) and ((tenant.category or "").strip().lower() in {"odontologia", "dentistry"} or not is_physiotherapy(tenant))
+
+
 def workspace_enabled(request):
     user = getattr(request, "user", None)
     if (
@@ -33,7 +41,7 @@ def workspace_enabled(request):
     private = path == "/" or path.startswith(
         ("/app/", "/billing/", "/account/", "/legal/privacidade/meus-dados/")
     )
-    return bool(private and is_physiotherapy(user.tenant))
+    return bool(private and (is_physiotherapy(user.tenant) or is_dentistry(user.tenant)))
 
 
 def resource_routes(user):
@@ -92,8 +100,11 @@ def shell_context(user, request=None):
         if user.role in {"owner", "tenant-admin"}
         else None
     )
+    dental = dental_workspace(user.tenant)
+    if dental and clinical and module_enabled(user.tenant, "dentistry"):
+        clinical_url = reverse("dental-assessments")
     rows = [
-        ("Dashboard", reverse("physio-dashboard"), "dashboard"),
+        ("Dashboard", reverse("dental-dashboard" if dental else "physio-dashboard"), "dashboard"),
         ("Agenda", reverse("operation-calendar") if agenda else None, "calendar"),
         ("Pacientes", patient_url, "users"),
         (
@@ -105,14 +116,14 @@ def shell_context(user, request=None):
             else None,
             "record",
         ),
-        ("Fisioterapia", clinical_url, "physio"),
+        ("Odontologia" if dental else "Fisioterapia", clinical_url, "tooth" if dental else "physio"),
         ("Financeiro", finance_url, "money"),
         (
             "Relatórios",
             reverse("operation-performance") if management and agenda else None,
             "report",
         ),
-        ("Configurações", reverse("physio-settings"), "settings"),
+        ("Configurações", reverse("dental-settings" if dental else "physio-settings"), "settings"),
     ]
     path = request.path if request else reverse("physio-assessments")
     name = (
@@ -120,7 +131,7 @@ def shell_context(user, request=None):
         if request
         else ""
     )
-    if name in {"physio-dashboard", "portal-home"} or path == "/":
+    if name in {"physio-dashboard", "dental-dashboard", "portal-home"} or path == "/":
         active = "Dashboard"
     elif name in {
         "operation-calendar",
@@ -153,6 +164,8 @@ def shell_context(user, request=None):
         active = "Fisioterapia"
     else:
         active = "Configurações"
+    if dental and (active == "Fisioterapia" or (path.startswith("/app/odontologia/") and name not in {"dental-dashboard", "dental-settings"})):
+        active = "Odontologia"
     locked = bool(request and getattr(request, "billing_locked", False))
     menu = []
     for title, url, icon in rows:
@@ -178,8 +191,10 @@ def shell_context(user, request=None):
         "manager": "Gestão da clínica",
         "tenant-admin": "Gestão da clínica",
         "finance": "Financeiro",
-    }.get(user.role, "Fisioterapeuta" if clinical else "Equipe da clínica")
+    }.get(user.role, ("Cirurgião-dentista" if dental else "Fisioterapeuta") if clinical else "Equipe da clínica")
     return {
+        "clinical_segment": "Odontologia" if dental else "Fisioterapia",
+        "dental_workspace": dental,
         "physio_identity": identity,
         "physio_photo": profile.photo.url if profile and profile.photo else "",
         "physio_role_label": role_label,

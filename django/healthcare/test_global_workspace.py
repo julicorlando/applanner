@@ -102,6 +102,7 @@ class GlobalPhysioWorkspaceTests(TestCase):
     def test_other_segment_and_master_keep_original_navigation(self):
         self.tenant.category = "barbearia"
         self.tenant.save()
+        TenantModule.objects.filter(tenant=self.tenant, module__slug="dentistry").delete()
         self.client.force_login(self.owner)
         response = self.client.get(
             reverse("portal-resource-list", args=["agenda", "clientes"])
