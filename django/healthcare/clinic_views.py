@@ -20,6 +20,7 @@ from .clinical import (save_structured_record,grant_care,revoke_care,attach_docu
                        change_treatment_status,schedule_followup,consume_clinical_session)
 from .clinic_forms import (RegistrationForm,StructuredClinicalForm,RectificationForm,AttachmentForm,
                            CareGrantForm,FollowUpForm,TreatmentStatusForm)
+from .clinical_activation import ClinicalActivationForm, activate_clinician, clinical_destination
 
 
 def numeric_id(value):
@@ -53,6 +54,24 @@ def dashboard(request):
         return render(request,"healthcare/clinical_setup.html",{
             "reason":"module","tenant":tenant,"clinical_access":False,
         })
+    activation_form = None
+    if user.role in {"owner", "tenant-admin"} and not user.is_superuser:
+        activation_form = ClinicalActivationForm(request.POST if request.method == "POST" else None, user=user)
+    if request.method == "POST":
+        if activation_form is None:
+            raise PermissionDenied
+        if activation_form.is_valid():
+            try:
+                activate_clinician(user=user, form=activation_form, request=request)
+            except ValidationError as exc:
+                activation_form.add_error(None, exc)
+            else:
+                messages.success(request, "Seu vínculo clínico foi configurado no perfil existente, sem criar vaga ou cobrança adicional.")
+                return redirect(clinical_destination(tenant) or "clinical-dashboard")
+        return render(request, "healthcare/clinical_setup.html", {
+            "reason": "professional", "tenant": tenant, "clinical_access": False,
+            "activation_form": activation_form,
+        })
     try:
         assert_clinical_access(user)
     except PermissionDenied:
@@ -62,6 +81,7 @@ def dashboard(request):
             raise
         return render(request,"healthcare/clinical_setup.html",{
             "reason":"professional","tenant":tenant,"clinical_access":False,
+            "activation_form": activation_form,
         })
     records=clinical_records_for(user=user,tenant=tenant)
     return render(request,"healthcare/clinic_dashboard.html",{
