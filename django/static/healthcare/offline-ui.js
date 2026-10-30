@@ -113,7 +113,7 @@
         const row=text('div','', 'co-item');row.append(text('strong',`${a.customer_name} · ${a.service_name}`),text('p',`${new Date(a.starts_at).toLocaleString('pt-BR')} · ${a.status}`));
         if(['pending','confirmed'].includes(a.status)){const button=text('button','Registrar chegada');button.disabled=state.queue.some(x=>x.kind==='checkin'&&x.data.appointment===a.id);button.onclick=()=>queue('checkin',{appointment:a.id,version:a.version,occurred_at:new Date().toISOString()});row.append(button);}
         if(snap.permissions.cash && ['pending','confirmed','waiting','in_progress'].includes(a.status)){
-          const button=text('button',`Dinheiro recebido: R$ ${a.price}`);button.disabled=state.queue.some(x=>x.kind==='cash'&&x.data.appointment===a.id);button.onclick=()=>{if(confirm(`Confirma que recebeu integralmente R$ ${a.price} em dinheiro? O servidor conciliará o lançamento ao reconectar.`))queue('cash',{appointment:a.id,version:a.version,method:'cash',amount:a.price,occurred_at:new Date().toISOString()});};row.append(button);
+          const button=text('button',`Concluir · dinheiro recebido: R$ ${a.price}`);button.disabled=state.queue.some(x=>x.kind==='cash'&&x.data.appointment===a.id);button.onclick=()=>{if(confirm(`Confirma a conclusão do atendimento e o recebimento integral de R$ ${a.price} em dinheiro? O servidor conciliará ao reconectar.`))queue('cash',{appointment:a.id,version:a.version,method:'cash',amount:a.price,occurred_at:new Date().toISOString()});};row.append(button);
         }$('co-agenda').append(row);
       }
       for(const p of patients.filter(p=>`${p.name} ${p.phone}`.toLocaleLowerCase('pt-BR').includes(term))){

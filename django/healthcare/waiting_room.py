@@ -107,7 +107,7 @@ def console(request):
     display, _ = WaitingRoomDisplay.objects.get_or_create(tenant=tenant)
     admin = request.user.role in ADMIN
     form = DisplayForm(instance=display)
-    media_form = MediaForm()
+    media_form = MediaForm(auto_id="tv-media-%s")
     if request.method == 'POST':
         if not admin:
             raise PermissionDenied
@@ -124,7 +124,7 @@ def console(request):
             append_audit(tenant=tenant, user=request.user, request=request, action='tv.link.revoked', entity_type='WaitingRoomDisplay', entity_id=display.pk)
             return redirect('waiting-room-console')
         elif action == 'upload':
-            media_form = MediaForm(request.POST, request.FILES)
+            media_form = MediaForm(request.POST, request.FILES, auto_id="tv-media-%s")
             if media_form.is_valid():
                 if display.media.filter(active=True).count() >= 10:
                     media_form.add_error(None, 'Limite de 10 mídias ativas. Desative uma antes de adicionar.')

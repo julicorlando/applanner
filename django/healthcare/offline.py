@@ -209,6 +209,9 @@ def replay(user, operation):
             if occurred < row.starts_at:
                 raise ValidationError('Recebimento/conclusão anterior ao início do atendimento.')
             settlement = settle_appointment(appointment_id=row.pk, professional=row.professional, user=user, attended=True, payment_method='cash')
+            from finance.models import FinancialTransaction
+            FinancialTransaction.objects.filter(tenant=tenant, appointment=row, idempotency_key=f'appointment:{row.pk}').update(
+                paid_at=occurred, competence_at=timezone.localtime(occurred).date())
             result = {'settlement': settlement.pk, 'appointment': row.pk}
     else:
         require_module(tenant, 'medical_records')

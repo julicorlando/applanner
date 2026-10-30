@@ -142,6 +142,7 @@ class OfflineOperationsTests(TestCase):
         self.assertEqual(self.post(operation).status_code,200)
         self.assertEqual(FinancialTransaction.objects.filter(appointment=self.appointment).count(),1)
         self.assertEqual(FinancialTransaction.objects.get(appointment=self.appointment).payment_method,'cash')
+        self.assertEqual(FinancialTransaction.objects.get(appointment=self.appointment).paid_at.isoformat(),operation['data']['occurred_at'])
 
     def test_cash_rejects_changed_price_and_unauthorized_reception(self):
         data=dict(appointment=self.appointment.pk,version=self.appointment.updated_at.isoformat(),amount='99.00',method='cash',occurred_at=timezone.now().isoformat())
