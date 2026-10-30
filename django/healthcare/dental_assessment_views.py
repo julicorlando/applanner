@@ -164,6 +164,20 @@ def assessment_editor(request, pk=None):
                 professional=appointment.professional_id,
                 appointment=appointment.pk,
             )
+    if not row and request.method == "GET" and initial.get("customer"):
+        from .dentistry import dental_history
+
+        selected_patient = get_object_or_404(
+            Customer, pk=initial["customer"], tenant_id=request.user.tenant_id
+        )
+        previous_records = dental_history(
+            tenant=request.user.tenant,
+            customer=selected_patient,
+            user=request.user,
+            ip=request.META.get("REMOTE_ADDR", ""),
+        )
+        if previous_records:
+            initial["odontogram_json"] = previous_records[-1]["data"]["odontogram"]
     action = request.POST.get("action") if request.method == "POST" else None
     if action and action not in {"draft", "finalize"}:
         raise PermissionDenied
