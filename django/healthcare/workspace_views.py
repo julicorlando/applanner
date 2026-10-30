@@ -116,7 +116,8 @@ def settings(request):
     try:
         assert_clinical_access(request.user)
     except PermissionDenied:
-        pass
+        if request.user.role in {"owner", "tenant-admin"}:
+            account.append({"title": "Configurar meu vínculo clínico", "url": reverse("clinical-dashboard")})
     else:
         account.append(
             {

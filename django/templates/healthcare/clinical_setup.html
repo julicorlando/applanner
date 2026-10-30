@@ -10,6 +10,24 @@
     <p>O cadastro da empresa está ativo, mas esta conta ainda não está vinculada a um profissional clínico autorizado.</p>
     <p>O primeiro perfil de agendamento pertence à empresa e está incluído no plano. Para acessar os prontuários, vincule o usuário do profissional responsável ao perfil ativo e informe sua habilitação profissional. O nome comercial da empresa não substitui a identificação clínica.</p>
   {% endif %}
+  {% if activation_form %}
+    <section class="pa-card" aria-labelledby="clinical-activation-title">
+      <h2 id="clinical-activation-title">Configurar meu vínculo clínico</h2>
+      <p>Use o perfil de agendamento já existente. O nome público da empresa, a agenda e o limite contratado serão preservados.</p>
+      {% if activation_form.fields.professional.queryset.exists %}
+        <form method="post" action="{% url 'clinical-dashboard' %}">
+          {% csrf_token %}
+          {{ activation_form.as_p }}
+          <p>Os dados são declarados por você e devem corresponder ao registro no conselho competente. Esta configuração não certifica a regularidade da habilitação.</p>
+          <button type="submit">Confirmar meu vínculo e acessar prontuários</button>
+        </form>
+      {% else %}
+        <p>Não há perfil ativo disponível para vincular a esta conta. Um perfil já vinculado a outro usuário não pode ser transferido por esta tela.</p>
+      {% endif %}
+      <p>Se você atua apenas na administração, mantenha sua conta administrativa e configure o acesso individual do profissional responsável.</p>
+      <a href="{% url 'clinical-registration' %}">Consultar identificação dos profissionais</a>
+    </section>
+  {% endif %}
   <p>O acesso aos dados dos pacientes será liberado apenas após a configuração das permissões correspondentes.</p>
   <a href="/app/">Voltar ao painel</a>
 </section>
