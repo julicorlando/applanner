@@ -148,3 +148,13 @@ class ClinicalDashboardSetupTests(TestCase):
         self.assertEqual(client.post(reverse("clinical-dashboard"), data).status_code, 403)
         self.profile.refresh_from_db()
         self.assertIsNone(self.profile.user_id)
+
+    def test_individual_clinic_may_use_the_responsible_person_own_name(self):
+        data = self.activation_fixture()
+        self.owner.first_name = "Ana"
+        self.owner.last_name = "Clínica Teste"
+        self.owner.save(update_fields=["first_name", "last_name"])
+        self.tenant.name = data["professional_name"]
+        self.tenant.save(update_fields=["name"])
+        response = self.client.post(reverse("clinical-dashboard"), data)
+        self.assertRedirects(response, reverse("physio-assessments"))

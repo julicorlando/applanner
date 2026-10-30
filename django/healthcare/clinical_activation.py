@@ -57,7 +57,8 @@ class ClinicalActivationForm(forms.Form):
 
     def clean_professional_name(self):
         name = self.cleaned_data["professional_name"].strip()
-        if name.casefold() == self.user.tenant.name.strip().casefold():
+        if (name.casefold() == self.user.tenant.name.strip().casefold()
+                and name.casefold() != self.user.get_full_name().strip().casefold()):
             raise ValidationError("Informe o nome da pessoa responsável; o nome comercial da clínica será preservado no agendamento.")
         return name
 
