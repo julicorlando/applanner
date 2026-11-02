@@ -8,7 +8,7 @@ from accounts.models import User
 from scheduling.models import Appointment, Professional
 from .test_waiting_room import WaitingRoomTests
 from .operation_models import ClinicRoom, DailyRoomSelection, WaitingRoomCall
-from .rooms import current_room, room_context
+from .rooms import current_room
 
 
 class ClinicRoomTests(WaitingRoomTests):
