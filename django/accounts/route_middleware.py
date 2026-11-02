@@ -21,12 +21,12 @@ RECEPTION_MUTATION_PREFIXES=(
 
 CLINIC_OPERATION_PATHS = {
     "/app/clinica/operacao/snapshot/", "/app/clinica/operacao/sincronizar/",
-    "/app/clinica/tv/", "/app/clinica/tv/chamar/",
+    "/app/clinica/tv/", "/app/clinica/tv/chamar/", "/app/clinica/tv/sala/", "/app/clinica/tv/salas/",
 }
 
 
 def _reception_mutation_allowed(path):
-    if path in {"/app/clinica/operacao/sincronizar/", "/app/clinica/tv/chamar/"}:
+    if path in {"/app/clinica/operacao/sincronizar/", "/app/clinica/tv/chamar/", "/app/clinica/tv/sala/"}:
         return True  # Views still enforce module, tenant and clinical/financial permissions per operation.
     return bool(re.fullmatch(r"/app/barbearia/comandas/[0-9]+/vale/",path)) or any(path.startswith(prefix) for prefix in RECEPTION_MUTATION_PREFIXES)
 

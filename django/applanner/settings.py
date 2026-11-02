@@ -65,6 +65,7 @@ TEMPLATES=[{
     "OPTIONS":{"context_processors":[
         "django.template.context_processors.request",
         "core.clinical_context.environment",
+        "healthcare.rooms.room_context",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
         "core.mobile_workspace.navigation","core.workspace.navigation","core.branding.platform_branding","core.simple_mode.company_context","core.unit_scope.operation_unit_context","billing.access.trial_prompt","billing.reminders.payment_reminder",

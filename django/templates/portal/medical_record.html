@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ entry.title }} — Prontuário{% endblock %}
-{% block content %}
+{% block content %}{% load room_calls %}{% patient_tv_call entry.customer_id entry.appointment_id %}
 <section class="shell portal-page narrow">
   <div class="portal-heading"><div><a class="back-link" href="{% url 'portal-resource-list' module_slug resource_slug %}">← Prontuários</a><span class="eyebrow">{% if physiotherapy %}PRONTUÁRIO FISIOTERÁPICO{% else %}PRONTUÁRIO CRIPTOGRAFADO{% endif %}</span><h1>{{ entry.title }}</h1><p>{{ entry.customer }} · {{ entry.professional }} · {{ entry.get_record_type_display }}</p><p>Registrado em {{ entry.created_at|date:"d/m/Y H:i" }} · {{ entry.created_by }}</p></div></div>
   {% if physiotherapy %}

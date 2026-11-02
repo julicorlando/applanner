@@ -12,7 +12,7 @@ from billing.models import Module, TenantModule
 from tenants.models import Tenant
 from scheduling.models import Customer, Professional, Service, Appointment
 from core.crypto import decrypt_text
-from .operation_models import WaitingRoomDisplay, WaitingRoomCall, WaitingRoomMedia
+from .operation_models import WaitingRoomDisplay, WaitingRoomCall, WaitingRoomMedia, ClinicRoom, DailyRoomSelection
 from .waiting_room import MediaForm
 
 
@@ -30,6 +30,8 @@ class WaitingRoomTests(TestCase):
         module,_=Module.objects.get_or_create(slug='waiting-room-tv',defaults={'name':'TV','active':True})
         self.entitlement=TenantModule.objects.create(tenant=self.tenant,module=module,enabled=True)
         self.display=WaitingRoomDisplay.objects.create(tenant=self.tenant,enabled=True)
+        self.room=ClinicRoom.objects.create(tenant=self.tenant,name='Sala 02')
+        DailyRoomSelection.objects.create(tenant=self.tenant,user=self.owner,day=timezone.localdate(),room=self.room)
         self.client.force_login(self.owner)
 
     def url(self, kind='screen', **kwargs):
@@ -82,6 +84,7 @@ class WaitingRoomTests(TestCase):
 
     def test_reception_can_call_but_not_configure(self):
         reception=User.objects.create_user(email='tv-reception@test.invalid',tenant=self.tenant,role='reception')
+        DailyRoomSelection.objects.create(tenant=self.tenant,user=reception,day=timezone.localdate(),room=self.room)
         self.client.force_login(reception)
         self.assertEqual(self.call().status_code,302)
         self.assertEqual(self.client.post(reverse('waiting-room-console'),{'action':'rotate'}).status_code,403)
@@ -134,6 +137,7 @@ class WaitingRoomTests(TestCase):
         role=PlatformRole.objects.create(name='Recepção teste TV',slug='reception-tv-test')
         reception=User.objects.create_user(email='tv-linked-reception@test.invalid',tenant=self.tenant,role='reception')
         UserRole.objects.create(user=reception,role=role)
+        DailyRoomSelection.objects.create(tenant=self.tenant,user=reception,day=timezone.localdate(),room=self.room)
         self.client.force_login(reception)
         response=self.client.get(reverse('waiting-room-console'))
         self.assertEqual(response.status_code,200,response.content)

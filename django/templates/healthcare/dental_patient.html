@@ -1,6 +1,6 @@
-{% extends "base.html" %}{% load static %}
+{% extends "base.html" %}{% load static room_calls %}
 {% block title %}Prontuário odontológico{% endblock %}
-{% block content %}
+{% block content %}{% patient_tv_call patient.pk %}
 <link rel="stylesheet" href="{% static 'healthcare/clinical.css' %}"><main style="max-width:1100px;margin:auto;padding:24px">
 <h1>Prontuário odontológico — {{ patient.name }}</h1>
 <a href="{% url 'dental-assessment-create' %}?customer={{ patient.pk }}">Registrar evolução</a><button type="button" onclick="window.print()">Imprimir / salvar PDF</button>

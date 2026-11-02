@@ -1,7 +1,7 @@
-{% extends 'healthcare/physio_shell.html' %}{% load static %}
+{% extends 'healthcare/physio_shell.html' %}{% load static room_calls %}
 {% block title %}Prontuário Odontológico{% endblock %}
 {% block extra_head %}{{ block.super }}{% if not dental_workspace %}<link rel="stylesheet" href="{% static 'healthcare/dental-workspace.css' %}">{% endif %}{% endblock %}
-{% block content %}<main class="pa-wrap da-wrap"><a class="da-back" href="{% url 'dental-assessments' %}">← Voltar</a>
+{% block content %}{% patient_tv_call assessment.customer_id assessment.appointment_id %}<main class="pa-wrap da-wrap"><a class="da-back" href="{% url 'dental-assessments' %}">← Voltar</a>
 <form id="dental-assessment-form" method="post" enctype="multipart/form-data" data-chart-url="{% url 'dental-chart' 0 %}" data-readonly="{{ readonly|yesno:'true,false' }}" data-patient-url="{% url 'dental-assessment-patient-options' 0 %}">{% csrf_token %}{{ form.submission_key }}{{ form.version }}{{ form.signature_png }}{{ form.goals }}{{ form.treatment_plan }}
 <header class="pa-heading"><div class="da-title"><svg><use href="#pa-icon-tooth"/></svg><div><h1>Prontuário Odontológico</h1><p>Avaliação, diagnóstico e plano de tratamento<span id="da-save-state">{% if assessment %} · {{ assessment.get_status_display }} · v{{ assessment.version }}{% endif %}</span></p></div></div><div class="da-actions"><button type="button" id="da-print">▣ Imprimir</button>{% if not readonly %}<button name="action" value="draft" formnovalidate>Salvar rascunho</button><button class="pa-primary" name="action" value="finalize">✓ Finalizar atendimento</button>{% endif %}</div></header>
 {% if form.errors %}<section class="pa-card da-errors" role="alert"><h2>Revise os campos antes de salvar</h2>{{ form.non_field_errors }}{% for field in form %}{% if field.errors %}<p>{{ field.label }}: {{ field.errors|striptags }}</p>{% endif %}{% endfor %}</section>{% endif %}
