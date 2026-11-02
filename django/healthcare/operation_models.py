@@ -51,3 +51,24 @@ class OfflineOperation(TimeStampedModel):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['tenant', 'user', 'request_id'], name='uq_clinical_offline_request')]
+
+
+class ClinicRoom(TimeStampedModel):
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='clinical_rooms')
+    name = models.CharField(max_length=60)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['name', 'pk']
+        constraints = [models.UniqueConstraint(fields=['tenant', 'name'], name='uq_clinic_room_name')]
+
+
+class DailyRoomSelection(TimeStampedModel):
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    day = models.DateField()
+    room = models.ForeignKey(ClinicRoom, on_delete=models.PROTECT, null=True, blank=True)
+    finished = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['tenant', 'user', 'day'], name='uq_daily_clinic_room')]

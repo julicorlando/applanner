@@ -1,4 +1,4 @@
-{% extends 'healthcare/physio_shell.html' %}{% load static %}{% block title %}Avaliação Fisioterapêutica{% endblock %}{% block content %}
+{% extends 'healthcare/physio_shell.html' %}{% load static room_calls %}{% block title %}Avaliação Fisioterapêutica{% endblock %}{% block content %}{% patient_tv_call assessment.customer_id assessment.appointment_id %}
 
 <main class="pa-wrap"><a href="{% url 'physio-assessments' %}">← Avaliações e histórico</a>{% if assessment %} · <a href="{% url 'clinical-patient' assessment.customer_id %}">Histórico do paciente</a>{% endif %}
 <form method="post" enctype="multipart/form-data" id="assessment-form" data-readonly="{{ readonly|yesno:'true,false' }}" data-patient-url="{% url 'physio-patient-options' 0 %}">{% csrf_token %}{{ form.version }}{{ form.submission_key }}{{ form.rom }}{{ form.strength }}{{ form.special_tests }}{{ form.body_findings }}{{ form.goals }}{{ form.treatment_plan }}{{ form.signature_png }}

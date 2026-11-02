@@ -38,3 +38,14 @@ O link curto `/tv/<token>/` redireciona ao endereço personalizado `/tv/<clinica
 Migrations aditivas `0015_offline_waiting_room` e `0016_waiting_room_catalog`. Nenhum dado clínico anterior é modificado. Faça backup restaurável do PostgreSQL antes de publicar. Colete estáticos e valide HTTPS, migrações, web/worker/beat/Redis e `/healthz/`. O Service Worker precisa atualizar antes da primeira preparação offline.
 
 Rollback: voltar ao commit anterior sem reverter tabelas nem apagar registros; desativar o módulo de TV pelo Master. Cofres de dispositivos já preparados permanecem criptografados e não devem ser apagados automaticamente com lançamentos pendentes. Validar compatibilidade antes de reativar a sincronização. Não foi realizada certificação jurídica/LGPD; a política de dispositivos, nomes na sala de espera e retenção deve ser validada pela clínica.
+
+
+## Salas diárias e chamada pelo prontuário
+
+O responsável cadastra/desativa/reativa salas em **Chamar na TV → Salas cadastradas**. Salas antigas não são removidas; as chamadas preservam o nome utilizado na ocasião. Não há criação automática de salas com base em nomes antigos, que poderiam conter erros.
+
+Com o módulo contratado, a equipe recebe a pergunta **Em qual sala você está hoje?** no primeiro acesso à área interna, após o cadastro de ao menos uma sala ativa. A seleção é persistida por usuário, empresa e data no fuso horário da clínica, inclusive após logout. **Trocar sala** está disponível em toda a área interna; **Finalizar dia** encerra a seleção até que a pessoa escolha novamente ou comece outro dia. Salas podem ser compartilhadas; este recurso não é uma reserva de ocupação.
+
+O botão **Chamar paciente na TV** fica no histórico/prontuário e nas avaliações salvas de Fisioterapia e Odontologia, fora do formulário clínico. Mostra somente atendimentos atuais autorizados daquele paciente. O envio por JavaScript não recarrega a avaliação nem perde o texto em edição. A API exige uma sala cadastrada ativa escolhida para a data corrente, revalida empresa, perfil, módulo e atendimento, e mantém a idempotência e auditoria. Após mudar de sala em outra aba, uma chamada com sala antiga é recusada até atualizar a página. Chamadas exigem conexão; nunca são enfileiradas offline.
+
+Migration aditiva: `healthcare.0017_clinic_rooms`. Não altera registros clínicos nem as chamadas históricas. Rollback de código pode manter as tabelas adicionais. Backups devem ser realizados/verificados antes de aplicar em produção.

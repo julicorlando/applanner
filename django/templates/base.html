@@ -118,6 +118,7 @@
     </nav>
     <span>© {% now "Y" %} ApPlanner</span>
   </footer>{% endblock %}
+  {% include "healthcare/room_picker.html" %}
   {% include "mobile_workspace_nav.html" %}
   <script src="{% static 'js/app-install.js' %}" defer></script>
   {% block trial_prompt %}{% include "billing/trial_prompt.html" %}{% endblock %}

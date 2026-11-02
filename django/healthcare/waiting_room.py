@@ -23,6 +23,8 @@ from billing.entitlements import require_module, module_enabled
 from core.audit import append_audit
 from core.crypto import encrypt_text, decrypt_text
 from .operation_access import operator, appointments_for, ADMIN
+from .rooms import current_room, return_to
+from .operation_models import ClinicRoom
 from .operation_models import WaitingRoomDisplay, WaitingRoomCall, WaitingRoomMedia, screen_token
 
 
@@ -151,6 +153,7 @@ def console(request):
         status__in=['pending', 'confirmed', 'waiting', 'in_progress']).select_related('customer', 'professional').order_by('starts_at')[:100]
     return render(request, 'healthcare/waiting_room_console.html', {'display': display, 'form': form, 'media_form': media_form,
         'admin': admin, 'appointments': rows, 'request_id': uuid.uuid4(),
+        'registered_rooms': ClinicRoom.objects.filter(tenant=tenant),
         'tv_url': request.build_absolute_uri(reverse('waiting-room-short', args=[display.token]))})
 
 
@@ -166,7 +169,12 @@ def call_patient(request):
     if not pk.isdigit():
         return HttpResponse('Atendimento inválido.', status=400)
     appointment = get_object_or_404(appointments_for(request.user).select_for_update(), pk=pk)
-    room = request.POST.get('room', '').strip()
+    selected_room = current_room(request.user)
+    if selected_room is None:
+        return HttpResponse('Escolha sua sala de hoje antes de chamar o paciente.', status=400)
+    room = selected_room.name
+    if request.POST.get('room') and request.POST['room'] != room:
+        return HttpResponse('A sala mudou. Atualize a página e tente novamente.', status=409)
     try:
         request_id = uuid.UUID(request.POST.get('request_id', ''))
     except (ValueError, TypeError, AttributeError):
@@ -187,8 +195,10 @@ def call_patient(request):
             expires_at=timezone.now()+timedelta(minutes=display.retention_minutes))
         append_audit(tenant=tenant, user=request.user, request=request, action='tv.patient.called', entity_type='WaitingRoomCall', entity_id=row.pk,
             after={'appointment_id': appointment.pk})
+    if request.headers.get('Accept') == 'application/json':
+        return JsonResponse({'called': True, 'room': room})
     messages.success(request, 'Paciente chamado na TV.')
-    return redirect('waiting-room-console')
+    return redirect(return_to(request))
 
 
 @require_GET
