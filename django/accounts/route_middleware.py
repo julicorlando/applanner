@@ -59,7 +59,7 @@ class CapabilityRouteMiddleware:
 
     def __call__(self,request):
         user=getattr(request,"user",None)
-        if user and user.is_authenticated and user.role=="professional" and not user.is_superuser:
+        if user and user.is_authenticated and user.role in {"professional","healthcare"} and not user.is_superuser:
             own_calendar_read = request.method in {'GET', 'HEAD'} and request.path in {'/app/calendario/', '/app/identidade/logo/'}
             from healthcare.navigation import workspace_enabled
             own_physio_read=(request.method in {'GET','HEAD'} and request.path in {'/app/','/app/fisioterapia/dashboard/','/app/fisioterapia/configuracoes/','/app/odontologia/dashboard/','/app/odontologia/configuracoes/'} and workspace_enabled(request))

@@ -100,6 +100,12 @@ class ClinicalDocumentDeliveryTests(TestCase):
         document=ClinicalIssuedDocument.objects.get(template=template)
         self.assertIn(self.patient.name,decrypt_text(document.body_encrypted));self.assertEqual(document.status,'draft');self.assertFalse(document.pdf_encrypted)
 
+    def test_healthcare_role_cannot_use_legacy_company_lists(self):
+        self.client.force_login(self.colleague)
+        self.assertEqual(self.client.get(reverse('portal-resource-list',args=['agenda','agendamentos'])).status_code,403)
+        self.assertEqual(self.client.get(reverse('operation-today')).status_code,403)
+        self.assertEqual(self.client.get(reverse('operation-calendar')).status_code,200)
+
     def test_same_clinic_other_professional_cannot_find_patient_or_document(self):
         row=self.document();other=Customer.objects.create(tenant=self.tenant,name='Paciente de outro profissional')
         from .services import create_record

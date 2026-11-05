@@ -41,6 +41,11 @@ class AppointmentManagementAPIPermissionTests(TestCase):
         self.appointment.refresh_from_db()
         self.assertEqual(self.appointment.notes,'')
 
+    def test_healthcare_role_cannot_access_company_appointment_management(self):
+        self.login_role('healthcare')
+        self.assertEqual(self.client.get(self.list_url).status_code,403)
+        self.assertEqual(self.client.get(self.detail_url).status_code,403)
+
     def test_finance_role_cannot_access_appointment_management(self):
         self.login_role('finance')
         self.assertEqual(self.client.get(self.list_url).status_code,403)

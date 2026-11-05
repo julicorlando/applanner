@@ -113,7 +113,7 @@ def professional_access(request,pk):
 
 @login_required
 def professional_area(request):
-    if request.user.role!="professional" or not request.user.tenant_id:
+    if request.user.role not in {"professional","healthcare"} or not request.user.tenant_id:
         raise PermissionDenied("Área exclusiva do profissional.")
     professional=get_object_or_404(
         Professional,tenant_id=request.user.tenant_id,user=request.user,active=True
@@ -217,7 +217,7 @@ def professional_area(request):
 
 @login_required
 def professional_waitlist(request,pk):
-    if request.user.role!="professional" or not request.user.tenant_id:
+    if request.user.role not in {"professional","healthcare"} or not request.user.tenant_id:
         raise PermissionDenied("Área exclusiva do profissional.")
     professional=get_object_or_404(Professional,tenant_id=request.user.tenant_id,user=request.user,active=True)
     if active_subscription(professional.tenant) and not module_enabled(professional.tenant,"waitlist"):
@@ -315,7 +315,7 @@ class SettlementForm(forms.Form):
 
 @login_required
 def professional_appointment(request,pk):
-    if request.user.role!="professional" or not request.user.tenant_id:
+    if request.user.role not in {"professional","healthcare"} or not request.user.tenant_id:
         raise PermissionDenied("Área exclusiva do profissional.")
     professional=get_object_or_404(Professional,tenant_id=request.user.tenant_id,user=request.user,active=True)
     appointment=get_object_or_404(
