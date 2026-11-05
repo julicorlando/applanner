@@ -335,3 +335,34 @@ class DentalAssessmentTests(TestCase):
         response=self.client.get(reverse('clinical-treatment-sales'),{'professional':other.pk})
         self.assertTrue(response.context['form'].errors)
         self.assertEqual(response.context['totals']['amount'],0)
+
+    def test_reception_legacy_treatment_receipt_requires_open_cash_and_active_method(self):
+        from tenants.models import Unit
+        from .clinical import change_treatment_status
+        from finance.models import FinancialTransaction
+        from finance.clinic_models import ClinicPaymentMethod
+        from finance import clinic_services as cash
+        self.enable_finance()
+        self.tenant.metadata={'clinical_reception_billing':True};self.tenant.save()
+        unit=Unit.objects.create(tenant=self.tenant,name='Clínica',is_primary=True)
+        self.professional.unit=unit;self.professional.save()
+        row=self.save(final=True)
+        change_treatment_status(plan=row.treatment_plan,user=self.doctor,status='accepted',attestation=True)
+        tx=FinancialTransaction.objects.get(tenant=self.tenant,source_type='clinical-plan',source_id=row.treatment_plan_id)
+        self.assertEqual(tx.unit_id,unit.pk)
+        self.client.force_login(self.reception)
+        url=reverse('clinical-finance')
+        post={'action':'paid','transaction':tx.pk,'confirm':'yes','payment_method':'cash'}
+        self.assertEqual(self.client.post(url,post).status_code,302)
+        tx.refresh_from_db();self.assertEqual(tx.status,'pending')
+        cash.open_clinic_cash(self.reception,unit,'0')
+        method=ClinicPaymentMethod.objects.create(tenant=self.tenant,name='Dinheiro',kind='cash',active=False)
+        self.client.post(url,post)
+        tx.refresh_from_db();self.assertEqual(tx.status,'pending')
+        method.active=True;method.save()
+        self.assertEqual(self.client.post(url,post).status_code,302)
+        tx.refresh_from_db();self.assertEqual(tx.status,'paid')
+        closing=cash.close_clinic_cash(user=self.reception,unit=unit,amount='180')
+        self.assertEqual(closing.expected_amount,180)
+        self.assertEqual(self.client.post(url,post).status_code,302)
+        self.assertEqual(FinancialTransaction.objects.filter(tenant=self.tenant,source_type='clinical-plan',status='paid').count(),1)

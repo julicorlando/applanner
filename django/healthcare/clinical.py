@@ -191,7 +191,7 @@ def change_treatment_status(*,plan,user,status,attestation=False):
     if status=="accepted":
         from finance.models import FinancialTransaction
         FinancialTransaction.objects.get_or_create(tenant=plan.entry.tenant,idempotency_key=f"clinical-plan-{plan.pk}",
-            defaults={"type":"income","description":f"Plano de tratamento #{plan.pk}","amount":plan.total,
+            defaults={"unit_id":plan.entry.professional.unit_id,"type":"income","description":f"Plano de tratamento #{plan.pk}","amount":plan.total,
                       "source_type":"clinical-plan","source_id":plan.pk,"status":"pending"})
     return plan
 
