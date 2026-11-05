@@ -3,8 +3,10 @@ from . import clinic_views as views
 from . import assessment_views as assessments
 from . import waiting_room, offline, rooms, document_views
 from finance import clinic_views as finance
+from . import treatment_sales
 from communications.birthdays import configuration as birthday_configuration
 urlpatterns=[
+    path("financeiro/tratamentos/",treatment_sales.treatment_sales,name="clinical-treatment-sales"),
     path("financeiro/profissional/",finance.professional_report,name="clinic-professional-finance"),
     path('documentos/',document_views.documents,name='clinical-documents'),
     path('documentos/modelos/',document_views.templates,name='clinical-document-templates'),

@@ -125,6 +125,8 @@ def shell_context(user, request=None):
         ),
         ("Configurações", reverse("dental-settings" if dental else "physio-settings"), "settings"),
     ]
+    if dental and management and module_enabled(user.tenant,"finance"):
+        rows.insert(6,("Tratamentos",reverse("clinical-treatment-sales"),"tooth"))
     path = request.path if request else reverse("physio-assessments")
     name = (
         getattr(getattr(request, "resolver_match", None), "url_name", "")
@@ -156,6 +158,8 @@ def shell_context(user, request=None):
         or "/agenda/agendamentos/" in path
     ):
         active = "Atendimentos"
+    elif name == "clinical-treatment-sales":
+        active = "Tratamentos"
     elif name in {"operation-performance", "booking-funnel"}:
         active = "Relatórios"
     elif "/financeiro/" in path or name == "clinical-finance":
