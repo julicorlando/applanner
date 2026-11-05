@@ -46,10 +46,10 @@ def desk(request):
         raise PermissionDenied('Somente a gestão pode configurar modalidades de pagamento.')
     action=request.POST.get('action') if request.method=='POST' else ''
     initial={'request_id':uuid.uuid4()}
-    charge_form=ChargeForm(request.POST if action=='charge' else None,tenant=tenant,initial=initial)
-    expense_form=ExpenseForm(request.POST if action=='expense' else None,request.FILES if action=='expense' else None,tenant=tenant,initial={'request_id':uuid.uuid4()})
-    payment_form=PaymentForm(request.POST if action=='method' else None)
-    cash_form=CashForm(request.POST if action in {'open','close'} else None)
+    charge_form=ChargeForm(request.POST if action=='charge' else None,tenant=tenant,initial=initial,auto_id='charge_%s')
+    expense_form=ExpenseForm(request.POST if action=='expense' else None,request.FILES if action=='expense' else None,tenant=tenant,initial={'request_id':uuid.uuid4()},auto_id='expense_%s')
+    payment_form=PaymentForm(request.POST if action=='method' else None,auto_id='method_%s')
+    cash_form=CashForm(request.POST if action in {'open','close'} else None,auto_id='cash_%s')
     if request.method=='POST':
         try:
             if action=='review-expense':

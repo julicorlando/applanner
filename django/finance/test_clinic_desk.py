@@ -279,3 +279,17 @@ class ClinicDeskTests(TestCase):
         with connection.cursor() as cursor:
             cursor.execute(f'INSERT INTO finance_clinicexpense ({columns}) VALUES ({placeholders})',values)
         self.assertEqual(ClinicExpense.objects.get(request_id=key).review_status,'pending')
+
+    def test_cash_charge_and_expense_labels_target_unique_controls(self):
+        from html.parser import HTMLParser
+        class Controls(HTMLParser):
+            def __init__(self):super().__init__();self.ids=[]
+            def handle_starttag(self,tag,attrs):
+                attrs=dict(attrs)
+                if tag in {'input','select','textarea'} and attrs.get('id'):self.ids.append(attrs['id'])
+        response=self.client.get(reverse('clinic-finance-desk'))
+        parser=Controls();parser.feed(response.content.decode())
+        self.assertEqual(len(parser.ids),len(set(parser.ids)))
+        self.assertContains(response,'id="cash_amount"')
+        self.assertContains(response,'id="charge_amount"')
+        self.assertContains(response,'id="expense_amount"')

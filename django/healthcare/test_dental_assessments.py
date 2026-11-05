@@ -282,3 +282,56 @@ class DentalAssessmentTests(TestCase):
         with self.assertRaises(ValidationError):self.save(final=True,**values)
         row=self.save(**values)
         self.assertEqual(row.status,'draft')
+
+    def test_dental_design_has_one_theme_control_and_preserves_other_segment(self):
+        from django.templatetags.static import static
+        self.client.force_login(self.doctor)
+        response=self.client.get(reverse('dental-assessments'))
+        self.assertContains(response,static('healthcare/dental-design.css'),count=1)
+        self.assertContains(response,'data-theme-toggle',count=1)
+        self.assertContains(response,'aria-controls="pa-sidebar"')
+        self.tenant.category='fisioterapia';self.tenant.save()
+        response=self.client.get(reverse('physio-assessments'))
+        self.assertEqual(response.status_code,200)
+        self.assertNotContains(response,static('healthcare/dental-design.css'))
+
+    def enable_finance(self):
+        from billing.models import Module,TenantModule
+        module,_=Module.objects.get_or_create(slug='finance',defaults={'name':'Financeiro'})
+        TenantModule.objects.update_or_create(tenant=self.tenant,module=module,defaults={'enabled':True})
+
+    def test_treatment_sales_report_uses_financial_values_without_clinical_content(self):
+        from .clinical import change_treatment_status
+        from finance.models import FinancialTransaction
+        self.enable_finance();row=self.save(final=True)
+        change_treatment_status(plan=row.treatment_plan,user=self.doctor,status='accepted',attestation=True)
+        FinancialTransaction.objects.create(tenant=self.other,source_type='clinical-plan',source_id=row.treatment_plan_id,type='income',amount='9999',status='paid')
+        self.client.force_login(self.owner)
+        response=self.client.get(reverse('clinical-treatment-sales'))
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.context['totals']['amount'],180)
+        self.assertEqual(response.context['totals']['count'],1)
+        self.assertEqual(response.context['totals']['pending'],180)
+        self.assertNotContains(response,'Dor dentária confidencial')
+        self.assertNotContains(response,'Histórico confidencial')
+        self.assertFalse(row.final_entry.access_log.filter(user=self.owner).exists())
+        for user in (self.reception,self.doctor,self.master):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get(reverse('clinical-treatment-sales')).status_code,403)
+
+    def test_treatment_sales_period_excludes_following_month_and_rejects_foreign_dentist(self):
+        from .clinical import change_treatment_status
+        from finance.models import FinancialTransaction
+        from scheduling.models import Professional
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        self.enable_finance();row=self.save(final=True)
+        change_treatment_status(plan=row.treatment_plan,user=self.doctor,status='accepted',attestation=True)
+        FinancialTransaction.objects.filter(tenant=self.tenant,source_type='clinical-plan').update(created_at=datetime(2026,12,1,tzinfo=ZoneInfo('America/Recife')))
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.get(reverse('clinical-treatment-sales'),{'month':11,'year':2026}).context['totals']['amount'],0)
+        self.assertEqual(self.client.get(reverse('clinical-treatment-sales'),{'month':12,'year':2026}).context['totals']['amount'],180)
+        other=Professional.objects.create(tenant=self.other,name='Outro dentista')
+        response=self.client.get(reverse('clinical-treatment-sales'),{'professional':other.pk})
+        self.assertTrue(response.context['form'].errors)
+        self.assertEqual(response.context['totals']['amount'],0)
