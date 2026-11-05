@@ -42,6 +42,8 @@ def desk(request):
         # Initial catalog only. Never re-enable methods disabled by the clinic.
         if not ClinicPaymentMethod.objects.filter(tenant=tenant,kind=kind).exists():
             ClinicPaymentMethod.objects.get_or_create(tenant=tenant,name=name,defaults={'kind':kind})
+    if request.method=='POST' and request.POST.get('action') in {'method','toggle-method'} and request.user.role not in {'owner','tenant-admin','manager'}:
+        raise PermissionDenied('Somente a gestão pode configurar modalidades de pagamento.')
     action=request.POST.get('action') if request.method=='POST' else ''
     initial={'request_id':uuid.uuid4()}
     charge_form=ChargeForm(request.POST if action=='charge' else None,tenant=tenant,initial=initial)
@@ -50,7 +52,12 @@ def desk(request):
     cash_form=CashForm(request.POST if action in {'open','close'} else None)
     if request.method=='POST':
         try:
-            if action=='arrived':
+            if action=='review-expense':
+                pk=request.POST.get('expense','')
+                if not pk.isdigit():raise ValidationError('Despesa inválida.')
+                get_object_or_404(ClinicExpense,pk=pk,session__tenant=tenant,session__unit=unit)
+                services.review_expense(user=request.user,unit=unit,pk=pk,status=request.POST.get('decision'),note=request.POST.get('note',''))
+            elif action=='arrived':
                 from django.db import transaction
                 pk=request.POST.get('appointment','')
                 if not pk.isdigit():raise ValidationError('Atendimento inválido.')

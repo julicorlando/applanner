@@ -59,6 +59,10 @@ class ClinicReceipt(TimeStampedModel):
 
 
 class ClinicExpense(TimeStampedModel):
+    review_status=models.CharField(max_length=12,default='pending',choices=[('pending','Aguardando validação'),('approved','Validada'),('questioned','Requer esclarecimento')])
+    reviewed_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,null=True,blank=True,related_name='reviewed_clinic_expenses')
+    reviewed_at=models.DateTimeField(null=True,blank=True)
+    review_note=models.CharField(max_length=500,blank=True)
     method=models.ForeignKey(ClinicPaymentMethod,on_delete=models.PROTECT)
     method_name=models.CharField(max_length=60)
     session=models.ForeignKey('finance.CashSession',on_delete=models.PROTECT,related_name='clinical_expenses')

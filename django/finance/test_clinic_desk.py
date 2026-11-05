@@ -213,3 +213,44 @@ class ClinicDeskTests(TestCase):
         self.assertEqual(list(response.context['charges'].values_list('pk',flat=True)),[mine.pk])
         self.assertEqual(self.client.post(reverse('clinic-professional-finance'),{'amount':'1'}).status_code,403)
         self.assertEqual(self.client.get(reverse('clinic-finance-desk')).status_code,403)
+
+    def test_reception_cannot_change_payment_catalog(self):
+        response=self.client.post(reverse('clinic-finance-desk'),{'action':'method','name':'Outra','kind':'pix'})
+        self.assertEqual(response.status_code,403)
+        self.assertFalse(ClinicPaymentMethod.objects.filter(tenant=self.tenant,name='Outra').exists())
+
+    def test_closed_cash_has_visible_guidance_and_no_receiving_link(self):
+        self.charge()
+        response=self.client.get(reverse('clinic-finance-desk'))
+        self.assertContains(response,'Caixa fechado')
+        self.assertContains(response,'Abra o caixa para receber')
+        self.assertContains(response,'fieldset disabled')
+        self.assertNotContains(response,'Cadastrar modalidade')
+
+    def test_expense_review_requires_management_and_preserves_paid_movement(self):
+        s.open_clinic_cash(self.reception,self.unit,'100')
+        row=s.expense(user=self.reception,unit=self.unit,description='Material',amount='10',method=self.cash,invoice='',items='',image=None,request_id=uuid.uuid4())
+        with self.assertRaises(PermissionDenied):
+            s.review_expense(user=self.reception,unit=self.unit,pk=row.pk,status='approved')
+        with self.assertRaises(ValidationError):
+            s.review_expense(user=self.owner,unit=self.unit,pk=row.pk,status='questioned')
+        s.review_expense(user=self.owner,unit=self.unit,pk=row.pk,status='questioned',note='Enviar comprovante')
+        row.refresh_from_db()
+        self.assertEqual(row.review_status,'questioned')
+        self.assertEqual(row.transaction.status,'paid')
+        self.assertEqual(row.transaction.amount,Decimal('10'))
+        s.review_expense(user=self.owner,unit=self.unit,pk=row.pk,status='approved')
+        row.refresh_from_db()
+        self.assertEqual(row.reviewed_by,self.owner)
+        self.assertEqual(row.review_status,'approved')
+
+    def test_owner_indicators_show_actual_receipts_and_reception_is_denied(self):
+        s.open_clinic_cash(self.reception,self.unit,'0')
+        self.receive(self.charge().installments.get(),'30',self.pix)
+        self.assertEqual(self.client.get(reverse('operation-performance')).status_code,403)
+        self.client.force_login(self.owner)
+        response=self.client.get(reverse('operation-performance'))
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.context['clinical_finance']['received'],'30.00')
+        self.assertContains(response,'Como está o financeiro?')
+        self.assertContains(response,'Fluxo financeiro do período')
