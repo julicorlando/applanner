@@ -110,6 +110,33 @@ class SidebarCalendarTests(TestCase):
         self.assertContains(response,'Novo agendamento')
         self.assertEqual(self.client.get(reverse('portal-resource-create',args=['agenda','agendamentos'])).status_code,200)
 
+    def test_single_active_unit_is_automatic_and_cannot_be_replaced_in_post(self):
+        reception=User.objects.create_user(email='single-unit-reception@example.test',role='reception',tenant=self.tenant)
+        self.client.force_login(reception)
+        other_tenant=Tenant.objects.create(name='Outra empresa',slug='single-unit-outsider')
+        foreign_unit=Unit.objects.create(tenant=other_tenant,name='Unidade externa')
+        Unit.objects.create(tenant=self.tenant,name='Unidade inativa',active=False)
+        url=reverse('portal-resource-create',args=['agenda','agendamentos'])
+        response=self.client.get(url)
+        self.assertTrue(response.context['form'].fields['unit'].widget.is_hidden)
+        data={'customer':self.customer.pk,'professional':self.pro.pk,'service':self.service.pk,
+              'starts_at':'2030-02-04T10:00','status':'confirmed','source':'internal'}
+        response=self.client.post(url,data)
+        self.assertEqual(response.status_code,302,response.context['form'].errors if response.status_code==200 else '')
+        appointment=Appointment.objects.get(tenant=self.tenant)
+        self.assertEqual(appointment.unit_id,self.unit.pk)
+        data.update(starts_at='2030-02-04T11:00',unit=foreign_unit.pk)
+        response=self.client.post(url,data)
+        self.assertEqual(response.status_code,302,response.context['form'].errors if response.status_code==200 else '')
+        self.assertEqual(set(Appointment.objects.filter(tenant=self.tenant).values_list('unit_id',flat=True)),{self.unit.pk})
+
+    def test_multiple_units_keep_the_unit_field_visible(self):
+        Unit.objects.create(tenant=self.tenant,name='Segunda unidade')
+        self.client.force_login(self.owner)
+        response=self.client.get(reverse('portal-resource-create',args=['agenda','agendamentos']))
+        self.assertFalse(response.context['form'].fields['unit'].widget.is_hidden)
+        self.assertFalse(response.context['form'].fields['unit'].disabled)
+
     def test_arena_windows_account_for_real_blocks(self):
         from arena.models import Court, CourtHours, CourtBlock
         court = Court.objects.create(tenant=self.tenant, unit=self.unit, name='Quadra', slug='court-test')
