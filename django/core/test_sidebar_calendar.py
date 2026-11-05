@@ -119,6 +119,7 @@ class SidebarCalendarTests(TestCase):
         url=reverse('portal-resource-create',args=['agenda','agendamentos'])
         response=self.client.get(url)
         self.assertTrue(response.context['form'].fields['unit'].widget.is_hidden)
+        self.assertNotContains(response,'<select name="unit"')
         data={'customer':self.customer.pk,'professional':self.pro.pk,'service':self.service.pk,
               'starts_at':'2030-02-04T10:00','status':'confirmed','source':'internal'}
         response=self.client.post(url,data)
@@ -136,6 +137,7 @@ class SidebarCalendarTests(TestCase):
         response=self.client.get(reverse('portal-resource-create',args=['agenda','agendamentos']))
         self.assertFalse(response.context['form'].fields['unit'].widget.is_hidden)
         self.assertFalse(response.context['form'].fields['unit'].disabled)
+        self.assertContains(response,'aria-label="Unidade da operação"')
 
     def test_arena_windows_account_for_real_blocks(self):
         from arena.models import Court, CourtHours, CourtBlock
