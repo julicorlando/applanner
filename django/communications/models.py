@@ -372,3 +372,5 @@ class TenantFlowDelivery(models.Model):
     sent_at=models.DateTimeField(null=True,blank=True)
 
 from .mobile_models import DeliveryProviderSettings,TenantDeliverySettings,CustomerDeliveryConsent,PushSubscription,PushDelivery,SMSDispatch  # noqa: F401,E402
+
+from .birthday_models import BirthdaySettings, BirthdayDelivery  # noqa: F401,E402

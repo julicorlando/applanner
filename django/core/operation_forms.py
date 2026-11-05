@@ -13,6 +13,13 @@ class OperationModelForm(forms.ModelForm):
         super().__init__(*args,**kwargs)
         self.tenant=tenant
         label=self._meta.model._meta.label_lower
+        if label=="scheduling.customer":
+            for name in ('cpf','postal_code','street','address_number','address_complement','district','city'):
+                if name in self.fields:
+                    self.fields[name].widget=forms.TextInput()
+            if 'consent_marketing' in self.fields:
+                self.fields['consent_marketing'].label='Autoriza mensagens e felicitações de aniversário'
+                self.fields['consent_marketing'].help_text='Registre somente com autorização do paciente; pode ser revogada a qualquer momento.'
         if "weekday" in self.fields:
             required=self.fields["weekday"].required
             choices=WEEKDAYS if required else (("","Todos os dias"),)+WEEKDAYS

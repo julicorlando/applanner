@@ -2,7 +2,13 @@ from django.urls import path
 from . import clinic_views as views
 from . import assessment_views as assessments
 from . import waiting_room, offline, rooms
+from finance import clinic_views as finance
+from communications.birthdays import configuration as birthday_configuration
 urlpatterns=[
+    path("financeiro/aniversarios/",birthday_configuration,name="clinic-birthday-settings"),
+    path('financeiro/',finance.desk,name='clinic-finance-desk'),
+    path('financeiro/receber/<int:pk>/',finance.receive,name='clinic-finance-receive'),
+    path('financeiro/comprovante/<int:pk>/',finance.photo,name='clinic-finance-photo'),
     path("operacao/snapshot/", offline.snapshot, name="clinical-offline-snapshot"),
     path("operacao/sincronizar/", offline.synchronize, name="clinical-offline-sync"),
     path("tv/sala/", rooms.select_room, name="waiting-room-select"),

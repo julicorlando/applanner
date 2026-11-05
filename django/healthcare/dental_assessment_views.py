@@ -286,7 +286,7 @@ def patient_options(request, pk):
             "patient": {
                 "name": patient.name,
                 "phone": patient.phone,
-                "address": demographics.get("address", ""),
+                "address": patient.full_address or demographics.get("address", ""),
                 "gender": demographics.get("gender", ""),
                 "coverage": demographics.get("coverage", ""),
                 "age": today.year

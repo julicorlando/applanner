@@ -52,6 +52,10 @@ class FinancialTransaction(TimeStampedModel):
     due_at=models.DateField(null=True,blank=True)
     paid_at=models.DateTimeField(null=True,blank=True)
 
+    @property
+    def payment_method_label(self):
+        return {'cash':'Dinheiro','dinheiro':'Dinheiro','pix':'Pix','card':'Cartão'}.get(self.payment_method,self.payment_method or 'Não informado')
+
     class Meta:
         constraints=[
             models.UniqueConstraint(
@@ -364,3 +368,5 @@ class ProductEvent(models.Model):
 from .advanced_models import CashMovement, MaterialConsumption, ServiceMaterial  # noqa: F401,E402
 
 from .market_models import CommissionPolicy, CommissionTier, CommissionSnapshot, GiftCard, GiftCardEntry  # noqa: F401,E402
+
+from .clinic_models import ClinicPaymentMethod, ClinicCharge, ClinicInstallment, ClinicReceipt, ClinicExpense, ClinicCashClosing  # noqa: F401,E402

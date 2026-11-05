@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 24219)
+Total output lines: 1677
+
 from datetime import timedelta,datetime,date,time
 import json
 from decimal import Decimal
@@ -143,7 +146,7 @@ PORTAL_MODULES = {
             "clientes": {
                 "model": "scheduling.Customer",
                 "title": "Clientes",
-                "fields": ["name","phone","email","birth_date","consent_marketing","active"],
+                "fields": ["name","phone","email","birth_date","cpf","postal_code","street","address_number","address_complement","district","city","state","consent_marketing","active"],
                 "columns": ["name","phone","email","active"],
                 "order": "name",
             },
@@ -859,135 +862,7 @@ class PhysiotherapyRecordForm(forms.Form):
     adverse_events=forms.CharField(label="Intercorrências",required=False,widget=forms.Textarea(attrs={"rows":2}))
     guidance=forms.CharField(label="Orientações ao paciente",required=False,widget=forms.Textarea(attrs={"rows":2}))
     discharge=forms.CharField(label="Reavaliação, metas funcionais e alta",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    body_findings=forms.JSONField(required=False,initial=dict,widget=forms.HiddenInput)
-    record_type=forms.ChoiceField(choices=[
-        ("physio_evaluation","Avaliação inicial"),("physio_evolution","Evolução da sessão")
-    ],widget=forms.RadioSelect,label="Tipo de registro")
-    customer=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Customer").objects.none(),label="Paciente")
-    professional=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Professional").objects.none(),label="Profissional responsável pelo registro")
-    appointment=forms.ModelChoiceField(queryset=apps.get_model("scheduling","Appointment").objects.none(),required=False,label="Agendamento relacionado")
-    chief_complaint=forms.CharField(label="Queixa principal",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    onset=forms.CharField(label="Início e contexto da queixa",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    pain_level=forms.IntegerField(label="Dor referida (0 a 10)",required=False,min_value=0,max_value=10)
-    medical_history=forms.CharField(label="Histórico de saúde relevante",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    medications_allergies=forms.CharField(label="Medicamentos, alergias e cirurgias relevantes",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    precautions=forms.CharField(label="Precauções / sinais de alerta observados",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    functional_limits=forms.CharField(label="Limitações funcionais relatadas",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    goals=forms.CharField(label="Objetivos definidos com o paciente",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    vital_signs=forms.CharField(label="Sinais vitais e medidas relevantes",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    observation=forms.CharField(label="Inspeção, postura e marcha",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    range_of_motion=forms.CharField(label="Amplitude de movimento",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    strength=forms.CharField(label="Força muscular",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    special_tests=forms.CharField(label="Testes específicos e resultados",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    functional_scale=forms.CharField(label="Escalas e testes funcionais",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    physical_assessment=forms.CharField(label="Outros achados da avaliação",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    clinical_impression=forms.CharField(label="Impressão clínica do profissional",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    initial_plan=forms.CharField(label="Plano terapêutico inicial",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    subjective=forms.CharField(label="Relato do paciente desde a última sessão",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    treatment=forms.CharField(label="Procedimentos e recursos aplicados",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    response=forms.CharField(label="Resposta, tolerância e evolução observada",required=False,widget=forms.Textarea(attrs={"rows":3}))
-    pain_session=forms.CharField(label="Dor antes/depois (0–10)",required=False,max_length=80)
-    next_plan=forms.CharField(label="Conduta / foco da próxima sessão",required=False,widget=forms.Textarea(attrs={"rows":2}))
-    body_regions=forms.MultipleChoiceField(choices=PHYSIO_BODY_AREAS,required=False,
-        widget=forms.CheckboxSelectMultiple, label="Locais tratados no mapa corporal")
-
-    assessment=forms.ModelChoiceField(queryset=apps.get_model("healthcare","PhysiotherapyAssessment").objects.none(),required=False,label="Avaliação inicial vinculada")
-
-    def __init__(self,*args,tenant=None,user=None,**kwargs):
-        super().__init__(*args,**kwargs)
-        if user:
-            from healthcare.assessment_services import assessments_for
-            self.fields["assessment"].queryset=assessments_for(user).filter(status="finalized")
-        self.fields["customer"].queryset=apps.get_model("scheduling","Customer").objects.filter(tenant=tenant,active=True).order_by("name")
-        self.fields["professional"].queryset=apps.get_model("scheduling","Professional").objects.filter(tenant=tenant,active=True).order_by("name")
-        self.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant).select_related("customer","professional").order_by("-starts_at")[:500]
-
-    def clean_body_findings(self):
-        findings=self.cleaned_data.get("body_findings")
-        if findings is None:
-            findings={}
-        if not isinstance(findings,dict) or len(findings)>len(PHYSIO_BODY_AREAS):
-            raise forms.ValidationError("Mapa corporal inválido.")
-        allowed=dict(PHYSIO_BODY_AREAS)
-        cleaned={}
-        for region,item in findings.items():
-            if region not in allowed or not isinstance(item,dict):
-                raise forms.ValidationError("Região corporal inválida.")
-            pain=item.get("pain")
-            if isinstance(pain,bool) or not isinstance(pain,int) or not 0<=pain<=10:
-                raise forms.ValidationError("Dor por região deve estar entre 0 e 10.")
-            condition=item.get("condition")
-            note=item.get("note","")
-            if condition not in {"pain","injury","edema","treated"} or not isinstance(note,str) or len(note)>2000:
-                raise forms.ValidationError("Marcação corporal inválida.")
-            cleaned[region]={"pain":pain,"condition":condition,"note":note}
-        return cleaned
-
-    def clean(self):
-        data=super().clean()
-        assessment=data.get("assessment")
-        if assessment and (data.get("record_type")!="physio_evolution" or not data.get("customer") or assessment.customer_id!=data["customer"].pk):
-            self.add_error("assessment","Vincule uma avaliação finalizada do mesmo paciente a uma evolução.")
-        appointment=data.get("appointment")
-        if appointment and data.get("customer") and appointment.customer_id!=data["customer"].pk:
-            self.add_error("appointment","Este agendamento pertence a outro paciente.")
-        if set(data.get("body_findings",{})) - set(data.get("body_regions",[])):
-            self.add_error("body_findings","Marcação sem região selecionada.")
-        if data.get("record_type")=="physio_evaluation" and not data.get("chief_complaint"):
-            self.add_error("chief_complaint","Descreva a queixa principal para iniciar a avaliação.")
-        return data
-
-
-def _save_special(obj, *, resource, request, tenant, is_new):
-    special=resource.get("special")
-    if _field(obj.__class__,"tenant"):
-        obj.tenant=tenant
-    if is_new and _field(obj.__class__,"created_by") and not getattr(obj,"created_by_id",None):
-        obj.created_by=request.user
-
-    if special=="appointment":
-        if not obj.unit_id:
-            obj.unit=tenant.units.filter(active=True).order_by("-is_primary","name").first()
-        if obj.professional_id and obj.professional.unit_id and obj.unit_id!=obj.professional.unit_id:
-            raise ValidationError({"professional":"O profissional selecionado pertence a outra unidade."})
-        if obj.service_id and obj.starts_at:
-            obj.ends_at=obj.starts_at+timedelta(minutes=obj.service.duration_minutes)
-            obj.service_price_snapshot=obj.service.price
-        if is_new:
-            obj.created_by=request.user
-    elif special=="financial_transaction":
-        if not obj.unit_id:
-            obj.unit=tenant.units.filter(active=True).order_by("-is_primary","name").first()
-        if obj.status==obj.Status.PAID and not obj.paid_at:
-            obj.paid_at=timezone.now()
-    elif special=="barber_queue":
-        if is_new:
-            obj.joined_at=timezone.now()
-        if obj.customer_id:
-            obj.customer_name=obj.customer_name or obj.customer.name
-            obj.customer_phone=obj.customer_phone or obj.customer.phone
-    elif special=="customer_package":
-        if is_new:
-            obj.purchased_at=timezone.now()
-    elif special=="arena_membership":
-        if is_new:
-            obj.created_by=request.user
-    elif special=="support_ticket":
-        if is_new:
-            from operations.triage import classify_priority
-            obj.user=request.user
-            obj.protocol=f"SUP-{tenant.pk}-{timezone.now():%Y%m%d%H%M}-{secrets.token_hex(2).upper()}"
-            obj.priority=classify_priority(obj.category,obj.subject,obj.description)
-            obj.status=obj.Status.OPEN
-    return obj
-
-
-def _value(obj, name):
-    if name=="unit":
-        unit=getattr(obj,"unit",None)
-        return unit.name if unit else "—"
-    if name=="customer" and obj._meta.label_lower=="scheduling.appointment":
-        return obj.customer_display_name
+    body_findings=forms.JSONField(required=False,initial=dict…2219 tokens truncated…        return obj.customer_display_name
     if name=="reserved_products" and obj._meta.label_lower=="scheduling.appointment":
         reservations=list(obj.product_reservations.all())
         return ", ".join(f"{item.product.name} ({item.quantity:g})" for item in reservations) or "—"
