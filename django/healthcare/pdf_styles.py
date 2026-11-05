@@ -17,5 +17,6 @@ def clinical_pdf_styles():
             pdfmetrics.registerFontFamily('ClinicalVera',normal='ClinicalVera',bold='ClinicalVera-Bold',italic='ClinicalVera-Italic',boldItalic='ClinicalVera-BoldItalic')
     styles=getSampleStyleSheet()
     for style in styles.byName.values():
-        style.fontName='ClinicalVera-Bold' if 'Bold' in style.fontName else 'ClinicalVera'
+        if hasattr(style,'fontName'):
+            style.fontName='ClinicalVera-Bold' if 'Bold' in style.fontName else 'ClinicalVera'
     return styles
