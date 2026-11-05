@@ -254,3 +254,28 @@ class ClinicDeskTests(TestCase):
         self.assertEqual(response.context['clinical_finance']['received'],'30.00')
         self.assertContains(response,'Como está o financeiro?')
         self.assertContains(response,'Fluxo financeiro do período')
+
+    def test_owner_report_excludes_exact_midnight_of_following_day(self):
+        from core.operation_insights import day_bounds
+        from zoneinfo import ZoneInfo
+        day=timezone.now().astimezone(ZoneInfo(self.tenant.timezone or 'America/Recife')).date()
+        FinancialTransaction.objects.create(tenant=self.tenant,unit=self.unit,type='income',status='paid',
+            description='Dia seguinte',amount='99',paid_at=day_bounds(self.tenant,day)[1])
+        self.client.force_login(self.owner)
+        response=self.client.get(reverse('operation-performance'),{'start':day.isoformat(),'end':day.isoformat()})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.context['clinical_finance']['received'],'0.00')
+
+    def test_previous_application_can_insert_expense_after_schema_upgrade(self):
+        from .clinic_models import ClinicExpense
+        s.open_clinic_cash(self.reception,self.unit,'100')
+        row=s.expense(user=self.reception,unit=self.unit,description='Compatibilidade rollback',amount='10',method=self.cash,invoice='',items='',image=None,request_id=uuid.uuid4())
+        key=row.request_id
+        fields=[f for f in ClinicExpense._meta.concrete_fields if not f.primary_key and not f.name.startswith('review')]
+        values=[f.get_db_prep_save(f.value_from_object(row),connection) for f in fields]
+        row.delete()
+        columns=','.join(connection.ops.quote_name(f.column) for f in fields)
+        placeholders=','.join(['%s']*len(fields))
+        with connection.cursor() as cursor:
+            cursor.execute(f'INSERT INTO finance_clinicexpense ({columns}) VALUES ({placeholders})',values)
+        self.assertEqual(ClinicExpense.objects.get(request_id=key).review_status,'pending')
