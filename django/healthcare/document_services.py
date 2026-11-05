@@ -9,7 +9,7 @@ from django.core.exceptions import PermissionDenied,ValidationError
 from django.db import transaction
 from django.utils import timezone
 from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Image as PDFImage
-from reportlab.lib.styles import getSampleStyleSheet
+from .pdf_styles import clinical_pdf_styles
 from reportlab.lib import colors
 from core.crypto import encrypt_text,decrypt_text,encrypt_json
 from core.audit import append_audit
@@ -64,7 +64,7 @@ def identity(user):
 
 
 def document_pdf(*,tenant,patient,title,body,professional,signature_image=b'',issued_at=None):
-    styles=getSampleStyleSheet();story=[];buffer=BytesIO()
+    styles=clinical_pdf_styles();story=[];buffer=BytesIO()
     import re
     color=getattr(tenant,'primary_color','') or ''
     if re.fullmatch(r'#[0-9a-fA-F]{6}',color):

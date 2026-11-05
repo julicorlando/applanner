@@ -11,7 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 from cryptography.fernet import Fernet
 from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from .pdf_styles import clinical_pdf_styles
 from pypdf import PdfReader,PdfWriter
 from core.crypto import decrypt_text,decrypt_json
 from core.audit import append_audit
@@ -128,7 +128,7 @@ def snapshot(patient):
 
 
 def render_backup(content,attachments):
-    styles=getSampleStyleSheet();story=[Paragraph('Cópia de segurança do prontuário',styles['Title'])]
+    styles=clinical_pdf_styles();story=[Paragraph('Cópia de segurança do prontuário',styles['Title'])]
     def walk(value,label=''):
         if isinstance(value,dict):
             for key,item in value.items():
