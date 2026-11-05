@@ -5,6 +5,13 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from django.http import FileResponse, JsonResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.urls import reverse
+from django import forms
+from django.core.paginator import Paginator
+from django.db.models import Exists, OuterRef, Subquery
+from accounts.permissions import has_capability
+from billing.entitlements import require_module
+from core.audit import append_audit
 from django.views.decorators.cache import never_cache
 from core.crypto import decrypt_text
 from scheduling.models import Professional, Appointment
@@ -45,9 +52,11 @@ def _documents(row):
 @login_required
 @never_cache
 def assessment_list(request):
+    if request.user.role == "reception":
+        return reception_list(request)
     rows = (
         assessments_for(request.user)
-        .select_related("customer", "professional")
+        .select_related("customer", "professional__clinical_registration", "professional__user")
         .order_by("-updated_at", "-pk")
     )
     legacy_entries = (
@@ -72,9 +81,10 @@ def assessment_list(request):
         request,
         "healthcare/dental_assessment_list.html",
         {
-            "assessments": rows[:200],
+            "assessments": Paginator(rows, 50).get_page(request.GET.get("records_page")),
             "legacy_entries": legacy_entries[:200],
             "patient": patient,
+            "patient_roster": Paginator(patients_for(request.user).filter(pk=patient.pk).order_by("pk") if patient else patients_for(request.user).order_by("name", "pk"), 50).get_page(request.GET.get("page")),
             **shell_context(request.user, request),
         },
     )
@@ -206,7 +216,7 @@ def assessment_editor(request, pk=None):
                 if saved.status == "finalized"
                 else "Rascunho salvo com histórico de versões.",
             )
-            return redirect("dental-assessment-detail", pk=saved.pk)
+            return redirect(reverse("dental-assessments") + "?customer=" + str(saved.customer_id))
         except AssessmentConflict as exc:
             form.add_error(None, exc)
             status = 409
@@ -333,3 +343,28 @@ def assessment_document(request, pk):
     response["X-Content-Type-Options"] = "nosniff"
     response["Content-Security-Policy"] = "default-src 'none'; sandbox"
     return response
+
+
+def reception_list(request):
+    user=request.user
+    if request.method not in {'GET','HEAD'} or not user.is_active or user.is_superuser or not user.tenant_id or user.tenant.archived_at or user.tenant.deleted_at or not has_capability(user,'agenda.manage'):
+        raise PermissionDenied
+    require_module(user.tenant,'dentistry');require_module(user.tenant,'medical_records')
+    from .models import DentalAssessment,MedicalRecordEntry
+    from finance.clinic_services import day_bounds
+    day_form=forms.DateField(required=False)
+    try:day=day_form.clean(request.GET.get('day'))
+    except ValidationError:raise Http404
+    if day and not 1900 <= day.year <= 2100:raise Http404
+    today=timezone.now().astimezone(day_bounds(user.tenant,timezone.localdate())[0].tzinfo).date()
+    start,end=day_bounds(user.tenant,day or today)
+    visits=Appointment.objects.filter(tenant_id=user.tenant_id,professional__tenant_id=user.tenant_id,
+        customer__tenant_id=user.tenant_id,starts_at__gte=start).exclude(status__in=['cancelled','canceled','no_show'])
+    if day:visits=visits.filter(starts_at__lte=end)
+    if request.GET.get('customer'):
+        visits=visits.filter(customer_id=_integer(request.GET['customer']))
+    status_rows=DentalAssessment.objects.filter(tenant_id=user.tenant_id,customer_id=OuterRef('customer_id'),professional_id=OuterRef('professional_id')).order_by('-updated_at','-pk')
+    entries=MedicalRecordEntry.objects.filter(tenant_id=user.tenant_id,customer_id=OuterRef('customer_id'),professional_id=OuterRef('professional_id'))
+    visits=visits.select_related('customer','professional__clinical_registration','professional__user').annotate(record_status=Subquery(status_rows.values('status')[:1]),has_record=Exists(entries),has_patient_assessment=Exists(DentalAssessment.objects.filter(tenant_id=user.tenant_id,customer_id=OuterRef('customer_id'))),has_patient_entry=Exists(MedicalRecordEntry.objects.filter(tenant_id=user.tenant_id,customer_id=OuterRef('customer_id')))).order_by('starts_at','pk')
+    append_audit(tenant=user.tenant,user=user,request=request,action='clinical.dental.reception_list',entity_type='Appointment')
+    return render(request,'healthcare/dental_assessment_list.html',{'reception_list':True,'scheduled_patients':Paginator(visits,50).get_page(request.GET.get('page')),'selected_day':day,**shell_context(user,request)})

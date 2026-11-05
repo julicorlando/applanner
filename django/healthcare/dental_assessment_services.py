@@ -187,13 +187,15 @@ def save_assessment(*, form, user, assessment_id=None, finalize=False, request=N
         if (
             not appointment
             or not data.get("attestation")
-            or not data.get("chief_complaint")
-            or not data.get("goals")
-            or not data.get("treatment_plan")
+
         ):
             raise ValidationError(
-                "Finalização exige atendimento, queixa, objetivos, plano e confirmação de autoria."
+                "Finalização exige atendimento e confirmação de autoria."
             )
+    if finalize:
+        from .dental_assessment_forms import TEXT_FIELDS
+        if not any(str(data.get(key, "")).strip() for key in TEXT_FIELDS):
+            raise ValidationError("Registre pelo menos uma informação clínica antes de finalizar; para continuar depois, salve um rascunho.")
     snapshot = (
         registration.snapshot()
         if registration
@@ -309,9 +311,10 @@ def save_assessment(*, form, user, assessment_id=None, finalize=False, request=N
     if finalize:
         from .clinical import save_structured_record
         from .models import ClinicalTreatmentPlan
-        plan_entry = save_structured_record(tenant=user.tenant, customer=patient, professional=professional, user=user, kind="treatment_plan", title="Plano do atendimento odontológico", data={"lines": [{"tooth": item["tooth"], "procedure": item["text"], "price": item["amount"], "quantity": 1} for item in data["treatment_plan"]]})
-        row.treatment_plan = ClinicalTreatmentPlan.objects.get(entry=plan_entry)
-        payload["treatment_plan_id"] = row.treatment_plan.pk
+        if data.get("treatment_plan"):
+            plan_entry = save_structured_record(tenant=user.tenant, customer=patient, professional=professional, user=user, kind="treatment_plan", title="Plano do atendimento odontológico", data={"lines": [{"tooth": item["tooth"], "procedure": item["text"], "price": item["amount"], "quantity": 1} for item in data["treatment_plan"]]})
+            row.treatment_plan = ClinicalTreatmentPlan.objects.get(entry=plan_entry)
+            payload["treatment_plan_id"] = row.treatment_plan.pk
         now = timezone.now()
         payload["signature"] = {
             "signed_by": user.pk,

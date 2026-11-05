@@ -27,10 +27,12 @@ def clinical_records_for(*, user, tenant):
     assert_clinical_access(user)
     if user.tenant_id != tenant.pk:
         raise PermissionDenied("Acesso a outra clínica negado.")
-    # Current clinic policy is strictly individual. Retain old grant rows for
-    # audit, but a grant must never expose another professional's records.
+    # Keep authorship and historical grant rows intact. Dental cross-cover is
+    # read-only and expires with the scheduled encounter (or the end of its day).
     scope=Q(professional__user=user,professional_snapshot__user_id=user.pk)
     scope |= Q(professional__user=user,created_by=user,professional_snapshot={})
+    from .dental_access import scheduled_dental_patients
+    scope |= Q(customer_id__in=scheduled_dental_patients(user),professional_snapshot__council="CRO",record_type__in=["evolution","anamnesis","procedure","observation","follow_up"])
     return MedicalRecordEntry.objects.filter(scope,tenant=tenant)
 
 

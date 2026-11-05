@@ -101,7 +101,7 @@ def shell_context(user, request=None):
         else None
     )
     dental = dental_workspace(user.tenant)
-    if dental and clinical and module_enabled(user.tenant, "dentistry"):
+    if dental and (clinical or (user.role == "reception" and agenda)) and module_enabled(user.tenant, "dentistry"):
         clinical_url = reverse("dental-assessments")
     rows = [
         ("Dashboard", reverse("dental-dashboard" if dental else "physio-dashboard"), "dashboard"),
