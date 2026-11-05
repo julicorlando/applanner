@@ -26,6 +26,8 @@ CLINIC_OPERATION_PATHS = {
 
 
 def _reception_mutation_allowed(path):
+    if re.fullmatch(r"/app/clinica/documentos/(?:[0-9]+/)?",path):
+        return True
     if path.startswith("/app/clinica/financeiro/"):
         return True  # Scoped clinical finance views enforce administrative permissions.
     if path in {"/app/clinica/operacao/sincronizar/", "/app/clinica/tv/chamar/", "/app/clinica/tv/sala/"}:
@@ -74,7 +76,9 @@ class CapabilityRouteMiddleware:
             )
         if user and user.is_authenticated and not user.is_superuser and user.role_links.exists():
             path=request.path
-            required=("agenda.manage" if user.role=="reception" else "finance.manage") if path.startswith('/app/clinica/financeiro/') else ("agenda.manage" if path in CLINIC_OPERATION_PATHS else None)
+            required=("agenda.manage" if user.role=="reception" else "healthcare.manage" if user.role in {"professional","healthcare"} else "finance.manage") if path.startswith('/app/clinica/financeiro/') else ("agenda.manage" if path in CLINIC_OPERATION_PATHS else None)
+            if user.role=='reception' and re.fullmatch(r'/app/clinica/documentos/(?:[0-9]+/)?',path):
+                required='agenda.manage'
             for prefix,capability in (() if required else PREFIX_CAPABILITIES.items()):
                 if path.startswith(prefix):
                     required=capability

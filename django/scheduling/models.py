@@ -11,6 +11,7 @@ class Customer(TimeStampedModel):
     phone=models.CharField(max_length=32,blank=True)
     email=models.EmailField(blank=True)
     birth_date=models.DateField(null=True,blank=True)
+    registered_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='registered_patients',editable=False)
     cpf=EncryptedPatientField('CPF', blank=True, max_length=14)
     cpf_hash=models.CharField(max_length=64, blank=True, default='', editable=False)
     postal_code=EncryptedPatientField('CEP', blank=True, max_length=9)

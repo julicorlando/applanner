@@ -137,3 +137,24 @@ def photo(request,pk):
     response=HttpResponse(raw,content_type=row.receipt_mime)
     response['X-Content-Type-Options']='nosniff';response['Content-Disposition']='inline; filename="comprovante.jpg"'
     return response
+
+
+@login_required
+@never_cache
+def professional_report(request):
+    from scheduling.models import Professional
+    from billing.entitlements import require_module,is_healthcare_tenant
+    user=request.user
+    if (not user.is_active or user.is_superuser or user.role not in {'professional','healthcare'} or not user.tenant_id
+        or not is_healthcare_tenant(user.tenant) or user.tenant.archived_at or user.tenant.deleted_at):raise PermissionDenied
+    require_module(user.tenant,'finance')
+    profile=get_object_or_404(Professional,user=user,tenant=user.tenant,active=True)
+    if request.method!='GET':raise PermissionDenied
+    rows=ClinicCharge.objects.filter(tenant=user.tenant,professional=profile).select_related('customer').annotate(
+        received_total=Coalesce(Sum('installments__receipts__amount'),Value(Decimal('0')),output_field=DecimalField(max_digits=12,decimal_places=2)))
+    patient=request.GET.get('patient','')
+    if patient.isdigit():rows=rows.filter(customer_id=patient)
+    totals=rows.aggregate(charged=Sum('amount'),received=Sum('received_total'))
+    return render(request,'finance/professional_clinical_report.html',{'charges':rows.order_by('-created_at')[:200],
+        'charged':totals['charged'] or Decimal(0),'received':totals['received'] or Decimal(0),
+        'pending':(totals['charged'] or Decimal(0))-(totals['received'] or Decimal(0))})

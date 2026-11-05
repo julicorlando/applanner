@@ -1,10 +1,17 @@
 from django.urls import path
 from . import clinic_views as views
 from . import assessment_views as assessments
-from . import waiting_room, offline, rooms
+from . import waiting_room, offline, rooms, document_views
 from finance import clinic_views as finance
 from communications.birthdays import configuration as birthday_configuration
 urlpatterns=[
+    path("financeiro/profissional/",finance.professional_report,name="clinic-professional-finance"),
+    path('documentos/',document_views.documents,name='clinical-documents'),
+    path('documentos/modelos/',document_views.templates,name='clinical-document-templates'),
+    path('documentos/<int:pk>/',document_views.detail,name='clinical-document-detail'),
+    path('documentos/<int:pk>/pdf/',document_views.pdf,name='clinical-document-pdf'),
+    path('assinatura/',document_views.signature,name='clinical-signature'),
+    path('assinatura/imagem/',document_views.signature_image,name='clinical-signature-image'),
     path("financeiro/aniversarios/",birthday_configuration,name="clinic-birthday-settings"),
     path('financeiro/',finance.desk,name='clinic-finance-desk'),
     path('financeiro/receber/<int:pk>/',finance.receive,name='clinic-finance-receive'),

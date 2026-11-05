@@ -15,6 +15,7 @@ class ClinicPaymentMethod(TimeStampedModel):
 
 
 class ClinicCharge(TimeStampedModel):
+    professional=models.ForeignKey('scheduling.Professional',on_delete=models.PROTECT,null=True,blank=True,related_name='clinical_charges')
     tenant=models.ForeignKey('tenants.Tenant',on_delete=models.PROTECT)
     unit=models.ForeignKey('tenants.Unit',null=True,blank=True,on_delete=models.PROTECT)
     customer=models.ForeignKey('scheduling.Customer',on_delete=models.PROTECT)

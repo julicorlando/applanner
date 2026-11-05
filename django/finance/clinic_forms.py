@@ -5,13 +5,14 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from cryptography.fernet import Fernet
 from PIL import Image, ImageOps, UnidentifiedImageError
-from scheduling.models import Customer
+from scheduling.models import Customer,Professional
 from .clinic_models import ClinicPaymentMethod
 
 
 class ChargeForm(forms.Form):
     request_id=forms.UUIDField(widget=forms.HiddenInput)
     customer=forms.ModelChoiceField(queryset=Customer.objects.none(),label='Paciente')
+    professional=forms.ModelChoiceField(queryset=Professional.objects.none(),label='Profissional responsável (relatório individual)',required=False)
     description=forms.CharField(label='Descrição administrativa da cobrança',max_length=190)
     amount=forms.DecimalField(label='Valor total cobrado (R$)',max_digits=12,decimal_places=2,min_value=Decimal('.01'))
     count=forms.IntegerField(label='Quantidade de parcelas',min_value=1,max_value=60,initial=1)
@@ -19,6 +20,7 @@ class ChargeForm(forms.Form):
     def __init__(self,*args,tenant,**kwargs):
         super().__init__(*args,**kwargs)
         self.fields['customer'].queryset=Customer.objects.filter(tenant=tenant,active=True).order_by('name')
+        self.fields['professional'].queryset=Professional.objects.filter(tenant=tenant,active=True,user__isnull=False).order_by('name')
 
 
 class ReceiptForm(forms.Form):

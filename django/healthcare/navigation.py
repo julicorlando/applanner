@@ -86,7 +86,7 @@ def shell_context(user, request=None):
         if ("agenda", "clientes") in routes
         else None
     )
-    finance_url = reverse("clinic-finance-desk") if user.role in {"owner","tenant-admin","manager","reception","finance"} and module_enabled(user.tenant,"finance") else (
+    finance_url = reverse("clinic-professional-finance") if user.role in {"professional","healthcare"} and module_enabled(user.tenant,"finance") else reverse("clinic-finance-desk") if user.role in {"owner","tenant-admin","manager","reception","finance"} and module_enabled(user.tenant,"finance") else (
         reverse("portal-resource-list", args=["financeiro", "lancamentos"])
         if ("financeiro", "lancamentos") in routes
         else reverse("clinical-finance")

@@ -18,7 +18,8 @@ class DentalEncounterForm(forms.Form):
         super().__init__(*args, **kwargs)
         for name,label in DENTAL_DETAILS.items():
             self.fields[name]=forms.CharField(label=label,required=False,max_length=20000,widget=forms.Textarea(attrs={"rows":2}))
-        self.fields["customer"].queryset = Customer.objects.filter(tenant=tenant)
+        from .patient_scope import patients_for
+        self.fields["customer"].queryset = patients_for(user)
         self.fields["professional"].queryset = Professional.objects.filter(tenant=tenant, user=user, active=True)
         self.fields["appointment"].queryset = Appointment.objects.filter(tenant=tenant, professional__user=user)
         from .models import ClinicalTreatmentPlan

@@ -194,3 +194,22 @@ class ClinicDeskTests(TestCase):
         self.assertEqual(item.amount,Decimal('200'));self.assertEqual(item.received_total,Decimal('40'))
         self.assertEqual(item.balance,Decimal('160'))
         self.assertContains(response,'Valores por paciente e plano de pagamento')
+
+    def test_dentist_sees_only_payment_plans_assigned_to_own_profile(self):
+        from scheduling.models import Professional
+        doctor=User.objects.create_user(email='own-finance-doctor@test.invalid',tenant=self.tenant,role='professional')
+        colleague=User.objects.create_user(email='other-finance-doctor@test.invalid',tenant=self.tenant,role='professional')
+        from billing.models import TenantModuleAddon
+        addon,_=Module.objects.get_or_create(slug='dental-professional-extra',defaults={'name':'Dentista adicional'})
+        TenantModuleAddon.objects.create(tenant=self.tenant,module=addon,quantity=1,monthly_price=50,status='active')
+        own=Professional.objects.create(tenant=self.tenant,user=doctor,name='Dentista responsável')
+        other=Professional.objects.create(tenant=self.tenant,user=colleague,name='Outro dentista')
+        mine=self.charge(amount='120',professional=own)
+        self.charge(amount='900',professional=other)
+        self.client.force_login(doctor)
+        response=self.client.get(reverse('clinic-professional-finance'))
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.context['charged'],Decimal('120'))
+        self.assertEqual(list(response.context['charges'].values_list('pk',flat=True)),[mine.pk])
+        self.assertEqual(self.client.post(reverse('clinic-professional-finance'),{'amount':'1'}).status_code,403)
+        self.assertEqual(self.client.get(reverse('clinic-finance-desk')).status_code,403)

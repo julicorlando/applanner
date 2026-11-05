@@ -339,15 +339,9 @@ class AssessmentTests(TestCase):
             user=self.doctor,
             reason="Atendimento compartilhado autorizado",
         )
-        self.assertEqual(
-            list(assessments_for(self.colleague).values_list("pk", flat=True)),
-            [finalized.pk],
-        )
-        response = assessment_views.assessment_editor(
-            self.req(self.colleague), pk=finalized.pk
-        )
-        self.assertContains(response, "Dra. Ana Teste")
-        self.assertNotContains(response, "Salvar rascunho")
+        self.assertFalse(assessments_for(self.colleague).filter(pk=finalized.pk).exists())
+        with self.assertRaises(PermissionDenied):
+            read_assessment(assessment=finalized,user=self.colleague)
         with self.assertRaises(PermissionDenied):
             read_assessment(assessment=finalized, user=self.colleague, version=1)
         self.assertFalse(assessments_for(self.colleague).filter(pk=draft.pk).exists())

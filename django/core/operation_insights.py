@@ -215,7 +215,8 @@ class PreferenceForm(forms.Form):
 def customer_history(request,pk):
     tenant,unit=context(request)
     if not tenant: return redirect('portal-home')
-    customer=get_object_or_404(Customer,pk=pk,tenant=tenant)
+    from healthcare.patient_scope import patients_for
+    customer=get_object_or_404(patients_for(request.user,administrative=True),pk=pk,tenant=tenant)
     form=PreferenceForm(request.POST if request.method=='POST' else None,initial={'preferences':customer.preferences})
     if request.method=='POST' and form.is_valid():
         with transaction.atomic():

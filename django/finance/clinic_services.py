@@ -61,19 +61,20 @@ def open_clinic_cash(user,unit,amount,notes=""):
 
 
 @transaction.atomic
-def create_charge(*,user,unit,customer,description,amount,count,first_due,request_id):
+def create_charge(*,user,unit,customer,description,amount,count,first_due,request_id,professional=None):
     tenant=lock_company(user)
     if customer.tenant_id!=tenant.pk or not customer.active or (unit and (unit.tenant_id!=tenant.pk or not unit.active)): raise PermissionDenied
+    if professional and (professional.tenant_id!=tenant.pk or not professional.active):raise PermissionDenied
     amount=money(amount);count=int(count)
     if not 1<=count<=60 or amount*100<count or not 1<=len(description.strip())<=190:
         raise ValidationError('Informe descrição e de 1 a 60 parcelas, com valor mínimo de R$ 0,01 por parcela.')
     existing=ClinicCharge.objects.filter(tenant=tenant,request_id=request_id).first()
     if existing:
         if (existing.customer_id!=customer.pk or existing.unit_id!=(unit.pk if unit else None) or existing.amount!=amount
-            or existing.description!=description.strip() or existing.installments.count()!=count or existing.installments.get(number=1).due_at!=first_due):
+            or existing.description!=description.strip() or existing.professional_id!=(professional.pk if professional else None) or existing.installments.count()!=count or existing.installments.get(number=1).due_at!=first_due):
             raise ValidationError('Esta operação já foi registrada com outros dados. Atualize a página.')
         return existing
-    row=ClinicCharge.objects.create(tenant=tenant,unit=unit,customer=customer,created_by=user,description=description.strip(),amount=amount,request_id=request_id)
+    row=ClinicCharge.objects.create(tenant=tenant,unit=unit,customer=customer,professional=professional,created_by=user,description=description.strip(),amount=amount,request_id=request_id)
     cents=int(amount*100);base,remainder=divmod(cents,count)
     for number in range(1,count+1):
         month=first_due.month-1+number-1;year=first_due.year+month//12;month=month%12+1

@@ -56,7 +56,7 @@ def queue_tenant(tenant_id):
         if not is_birthday(customer.birth_date,day):continue
         target=destination(customer,config.channel)
         if not target or (config.channel=='whatsapp' and not 10<=len(target)<=15):continue
-        text=config.message.replace('{nome}',customer.name.split()[0]).replace('{empresa}',config.tenant.name)
+        text=config.message.replace('{nome}',(customer.name.split()[0] if customer.name.split() else 'cliente')).replace('{empresa}',config.tenant.name)
         notice=Notification.objects.create(tenant_id=tenant_id,customer=customer,channel=config.channel,template_key='customer_birthday',
             destination=target,payload={'text':text,'subject':'Feliz aniversário!','birthday_date':day.isoformat()})
         BirthdayDelivery.objects.create(tenant_id=tenant_id,customer=customer,year=day.year,day=day,notification=notice)

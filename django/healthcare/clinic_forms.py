@@ -1,5 +1,6 @@
 from django import forms
 from scheduling.models import Customer,Professional
+from .patient_scope import patients_for
 from .models import ClinicalRegistration,ClinicalAttachment,ClinicalTreatmentPlan
 from .clinical import periodontal_chart,treatment_lines
 
@@ -25,7 +26,7 @@ class StructuredClinicalForm(forms.Form):
     def __init__(self,*args,user,kind,**kwargs):
         self.kind=kind
         super().__init__(*args,**kwargs)
-        self.fields["customer"].queryset=Customer.objects.filter(tenant_id=user.tenant_id,active=True)
+        self.fields["customer"].queryset=patients_for(user).filter(active=True)
         self.fields["professional"].queryset=Professional.objects.filter(tenant_id=user.tenant_id,user=user,active=True)
     def clean_payload(self):
         data=self.cleaned_data["payload"]
