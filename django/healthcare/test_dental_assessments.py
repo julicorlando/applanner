@@ -205,3 +205,80 @@ class DentalAssessmentTests(TestCase):
             cursor.execute('UPDATE healthcare_dentalassessment SET payload_encrypted=%s WHERE id=%s',['tamper',row.pk])
         with self.assertRaises(IntegrityError),transaction.atomic(),connection.cursor() as cursor:
             cursor.execute('DELETE FROM healthcare_dentalassessmentversion WHERE assessment_id=%s',[row.pk])
+
+    def test_minimal_draft_is_saved_and_redirects_to_patient_list(self):
+        self.client.force_login(self.doctor)
+        data=self.data(chief_complaint='',findings='',medical_history='',goals='[]',treatment_plan='[]',odontogram_json='{}',action='draft')
+        response=self.client.post(reverse('dental-assessment-create'),data)
+        self.assertEqual(response.status_code,302)
+        self.assertIn(reverse('dental-assessments'),response['Location'])
+        self.assertContains(self.client.get(response['Location']),self.patient.name)
+        self.assertEqual(DentalAssessment.objects.get().status,'draft')
+
+    def test_finalize_only_evolution_without_diagnosis_or_plan(self):
+        row=self.save(final=True,chief_complaint='',findings='',medical_history='',goals='[]',treatment_plan='[]',initial_evolution='Paciente orientado após avaliação.')
+        self.assertEqual(row.status,'finalized')
+        self.assertIsNone(row.treatment_plan_id)
+        self.client.force_login(self.doctor)
+        self.assertEqual(self.client.get(reverse('dental-assessment-detail',args=[row.pk])).status_code,200)
+        self.assertEqual(read_assessment(assessment=row,user=self.doctor)['sections']['initial_evolution'],'Paciente orientado após avaliação.')
+
+    def test_reception_list_shows_scheduled_patient_and_professional_without_clinical_content(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        from scheduling.models import Customer
+        self.appointment.starts_at=timezone.now()+timedelta(hours=1)
+        self.appointment.ends_at=self.appointment.starts_at+timedelta(minutes=30)
+        self.appointment.status='confirmed';self.appointment.save()
+        row=self.save()
+        Customer.objects.create(tenant=self.tenant,name='Paciente sem agendamento privado')
+        from accounts.models import PlatformRole,Capability,RoleCapability,UserRole
+        role=PlatformRole.objects.create(slug='dental-reception-list',name='Recepção')
+        cap,_=Capability.objects.get_or_create(slug='agenda.manage',defaults={'name':'Agenda'})
+        RoleCapability.objects.create(role=role,capability=cap);UserRole.objects.create(user=self.reception,role=role)
+        self.client.force_login(self.reception)
+        response=self.client.get(reverse('dental-assessments'))
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,self.patient.name)
+        self.assertContains(response,self.professional.name)
+        self.assertContains(response,'Rascunho salvo')
+        self.assertNotContains(response,'Dor dentária confidencial')
+        self.assertNotContains(response,'Paciente sem agendamento privado')
+        self.assertNotContains(response,reverse('dental-assessment-detail',args=[row.pk]))
+        self.assertIn(self.client.get(reverse('dental-assessment-detail',args=[row.pk])).status_code,{403,404})
+        self.assertEqual(self.client.post(reverse('dental-assessments'),{}).status_code,403)
+
+    def test_scheduled_cross_cover_is_read_only_and_expires_without_reassigning_original(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        from scheduling.models import Appointment
+        from .models import ClinicalRegistration
+        row=self.save(final=True)
+        draft=self.save()
+        ClinicalRegistration.objects.create(professional=self.colleague_profile,council='CRO',number='98765',jurisdiction='PE',professional_name='Dr. B')
+        with self.assertRaises(PermissionDenied):read_assessment(assessment=row,user=self.colleague)
+        visit=Appointment.objects.create(tenant=self.tenant,customer=self.patient,professional=self.colleague_profile,service=self.appointment.service,
+            starts_at=timezone.now()+timedelta(hours=1),ends_at=timezone.now()+timedelta(hours=2),status='confirmed')
+        self.assertEqual(read_assessment(assessment=row,user=self.colleague)['sections']['chief_complaint'],'Dor dentária confidencial')
+        with self.assertRaises(PermissionDenied):read_assessment(assessment=draft,user=self.colleague)
+        self.client.force_login(self.colleague)
+        snapshot=self.client.get(reverse('clinical-offline-snapshot'))
+        self.assertEqual(snapshot.status_code,200)
+        self.assertNotIn(row.final_entry_id,[entry['id'] for entry in snapshot.json()['entries']])
+        self.assertEqual(self.client.post(reverse('dental-assessment-detail',args=[row.pk]),{'action':'draft'}).status_code,403)
+        for status in ('completed','cancelled','no_show'):
+            visit.status=status;visit.save()
+            with self.assertRaises(PermissionDenied):read_assessment(assessment=row,user=self.colleague)
+        visit.status='confirmed';visit.starts_at=timezone.now()-timedelta(days=2);visit.ends_at=visit.starts_at+timedelta(hours=1);visit.save()
+        with self.assertRaises(PermissionDenied):read_assessment(assessment=row,user=self.colleague)
+        row.refresh_from_db()
+        self.assertEqual(row.professional_id,self.professional.pk)
+        self.assertEqual(row.created_by_id,self.doctor.pk)
+        self.assertEqual(read_assessment(assessment=row,user=self.doctor)['professional']['user_id'],self.doctor.pk)
+
+    def test_empty_clinical_information_can_be_draft_but_not_finalized(self):
+        from .dental_assessment_forms import TEXT_FIELDS
+        values={key:'' for key in TEXT_FIELDS}
+        with self.assertRaises(ValidationError):self.save(final=True,**values)
+        row=self.save(**values)
+        self.assertEqual(row.status,'draft')

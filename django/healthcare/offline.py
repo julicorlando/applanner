@@ -75,7 +75,7 @@ def snapshot(request):
     # All records read through the existing audited authorization service. No reception fallback.
     entries = []
     if clinical:
-        for row in clinical_records_for(user=user, tenant=tenant).select_related('tenant').order_by('-created_at')[:100]:
+        for row in clinical_records_for(user=user, tenant=tenant).filter(professional__user=user).select_related('tenant').order_by('-created_at')[:100]:
             entries.append({'id': row.pk, 'customer': row.customer_id, 'title': row.title, 'at': row.created_at.isoformat(),
                             'content': read_record(entry=row, user=user, ip=request.META.get('REMOTE_ADDR', ''))})
     professionals = Professional.objects.filter(tenant=tenant, active=True)
