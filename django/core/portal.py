@@ -693,7 +693,8 @@ def _resource(module_slug, resource_slug):
 
 
 def _tenant_queryset(model, tenant, user=None):
-    if user is not None and model._meta.label_lower=='scheduling.customer' and user.role in {'professional','healthcare'}:
+    from billing.entitlements import is_healthcare_tenant
+    if user is not None and model._meta.label_lower=='scheduling.customer' and user.role in {'professional','healthcare'} and is_healthcare_tenant(tenant):
         from healthcare.patient_scope import patients_for
         return patients_for(user)
     qs=model.objects.all()

@@ -216,7 +216,9 @@ def customer_history(request,pk):
     tenant,unit=context(request)
     if not tenant: return redirect('portal-home')
     from healthcare.patient_scope import patients_for
-    customer=get_object_or_404(patients_for(request.user,administrative=True),pk=pk,tenant=tenant)
+    from billing.entitlements import is_healthcare_tenant
+    customers=patients_for(request.user,administrative=True) if is_healthcare_tenant(tenant) else Customer.objects.filter(tenant=tenant)
+    customer=get_object_or_404(customers,pk=pk,tenant=tenant)
     form=PreferenceForm(request.POST if request.method=='POST' else None,initial={'preferences':customer.preferences})
     if request.method=='POST' and form.is_valid():
         with transaction.atomic():

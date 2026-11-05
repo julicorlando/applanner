@@ -37,6 +37,16 @@ class ClinicalDocumentDeliveryTests(TestCase):
         return ClinicalIssuedDocument.objects.create(tenant=self.tenant,customer=self.patient,professional=self.professional,
             kind='declaration',title='Declaração de comparecimento',body_encrypted=encrypt_text('Compareceu à clínica nesta data.'),created_by=creator or self.doctor)
 
+    def test_clinical_patient_scope_preserves_nonclinical_segment_customer_list(self):
+        from core.portal import _tenant_queryset
+        from tenants.models import Tenant
+        from accounts.models import User
+        tenant=Tenant.objects.create(name='Barbearia fictícia',slug='nonclinical-scope',category='barbearia')
+        barber=User.objects.create_user(email='barber-scope@test.invalid',tenant=tenant,role='professional')
+        customer=Customer.objects.create(tenant=tenant,name='Cliente da barbearia')
+        self.assertTrue(_tenant_queryset(Customer,tenant,user=barber).filter(pk=customer.pk).exists())
+        self.assertFalse(_tenant_queryset(Customer,self.tenant,user=self.doctor).filter(pk=customer.pk).exists())
+
     def test_signature_is_encrypted_private_and_only_owned_professional_can_upload(self):
         row=save_signature(self.doctor,self.image())
         self.assertNotIn(b'PNG',bytes(row.image_encrypted)[:12]);self.assertTrue(row.sha256)
