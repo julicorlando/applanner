@@ -6,6 +6,7 @@ from django import forms
 from django.utils import timezone
 from PIL import Image
 from scheduling.models import Customer, Professional, Appointment
+from .patient_scope import patients_for
 from .models import PhysiotherapyAssessmentDocument
 
 TEXT_FIELDS = {
@@ -159,9 +160,7 @@ class AssessmentForm(forms.Form):
                 max_length=12000,
                 widget=forms.Textarea(attrs={"rows": 3}),
             )
-        self.fields["customer"].queryset = Customer.objects.filter(
-            tenant_id=user.tenant_id, active=True
-        )
+        self.fields["customer"].queryset = patients_for(user).filter(active=True)
         self.fields["professional"].queryset = Professional.objects.filter(
             tenant_id=user.tenant_id, user=user, active=True
         )

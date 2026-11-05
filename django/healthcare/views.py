@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
 from billing.entitlements import module_enabled
-from scheduling.models import Customer
+from .patient_scope import patients_for
 from .services import assert_clinical_access
 from .dentistry import save_dental_encounter, dental_history, dental_professional_allowance, SURFACES
 from .forms import DentalEncounterForm,DENTAL_DETAILS
@@ -25,7 +25,7 @@ def dental_home(request):
     tenant = _clinic(request)
     assert_clinical_access(request.user)
     return render(request, "healthcare/dental_home.html", {
-        "patients": Customer.objects.filter(tenant=tenant).order_by("name")[:200],
+        "patients": patients_for(request.user).order_by("name")[:200],
         "professional_allowance": dental_professional_allowance(tenant),
     })
 
@@ -68,7 +68,7 @@ def dental_encounter(request):
 def dental_patient(request, customer_id):
     tenant = _clinic(request)
     assert_clinical_access(request.user)
-    patient = get_object_or_404(Customer, pk=customer_id, tenant=tenant)
+    patient = get_object_or_404(patients_for(request.user), pk=customer_id, tenant=tenant)
     return render(request, "healthcare/dental_patient.html", {
         "patient": patient, "history": dental_history(
             tenant=tenant, customer=patient, user=request.user,
@@ -81,6 +81,6 @@ def dental_patient(request, customer_id):
 @never_cache
 def dental_chart(request,customer_id):
     tenant=_clinic(request)
-    patient=get_object_or_404(Customer,pk=customer_id,tenant=tenant)
+    patient=get_object_or_404(patients_for(request.user),pk=customer_id,tenant=tenant)
     history=dental_history(tenant=tenant,customer=patient,user=request.user)
     return JsonResponse({"odontogram":history[-1]["data"]["odontogram"] if history else {}})

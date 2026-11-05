@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from core.models import TimeStampedModel
+from .patient_fields import EncryptedPatientField, normalize_cpf, cpf_fingerprint
 
 
 class Customer(TimeStampedModel):
@@ -10,12 +11,27 @@ class Customer(TimeStampedModel):
     phone=models.CharField(max_length=32,blank=True)
     email=models.EmailField(blank=True)
     birth_date=models.DateField(null=True,blank=True)
+    registered_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='registered_patients',editable=False)
+    cpf=EncryptedPatientField('CPF', blank=True, max_length=14)
+    cpf_hash=models.CharField(max_length=64, blank=True, default='', editable=False)
+    postal_code=EncryptedPatientField('CEP', blank=True, max_length=9)
+    street=EncryptedPatientField('Logradouro', blank=True, max_length=180)
+    address_number=EncryptedPatientField('Número', blank=True, max_length=20)
+    address_complement=EncryptedPatientField('Complemento', blank=True, max_length=120)
+    district=EncryptedPatientField('Bairro', blank=True, max_length=100)
+    city=EncryptedPatientField('Cidade', blank=True, max_length=100)
+    state=models.CharField('UF', max_length=2, blank=True)
     preferences=models.CharField(max_length=1000,blank=True)
     consent_marketing=models.BooleanField(default=False)
     active=models.BooleanField(default=True)
 
     def clean(self):
         super().clean()
+        self.cpf=normalize_cpf(self.cpf)
+        self.cpf_hash=cpf_fingerprint(self.cpf)
+        if self.birth_date and self.birth_date > timezone.localdate():
+            from django.core.exceptions import ValidationError
+            raise ValidationError({'birth_date':'A data de nascimento não pode estar no futuro.'})
         from .customer_identity import contact_values,identity_matches
         from billing.entitlements import is_healthcare_tenant
         from django.core.exceptions import ValidationError
@@ -37,7 +53,19 @@ class Customer(TimeStampedModel):
             if (self.phone and phones.exclude(pk=self.pk).exists()) or emails.exclude(pk=self.pk).exists():
                 raise ValidationError("Este telefone ou e-mail já pertence a um cliente da empresa. Use o cadastro existente para preservar o histórico.")
 
+    @property
+    def full_address(self):
+        return ', '.join(value for value in [self.street,self.address_number,self.address_complement,self.district,self.city,self.state,self.postal_code] if value)
+
+    def save(self, *args, **kwargs):
+        self.cpf=normalize_cpf(self.cpf)
+        self.cpf_hash=cpf_fingerprint(self.cpf)
+        if kwargs.get('update_fields') and 'cpf' in kwargs['update_fields']:
+            kwargs['update_fields']=set(kwargs['update_fields']) | {'cpf_hash'}
+        super().save(*args, **kwargs)
+
     class Meta:
+        constraints=[models.UniqueConstraint(fields=['tenant','cpf_hash'],condition=~models.Q(cpf_hash=''),name='uq_patient_tenant_cpf')]
         indexes=[
             models.Index(fields=["tenant","name"]),
             models.Index(fields=["tenant","phone"]),

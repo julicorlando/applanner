@@ -7,7 +7,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from core.crypto import decrypt_text
-from scheduling.models import Customer, Professional, Appointment
+from scheduling.models import Professional, Appointment
+from .patient_scope import patients_for
 from .assessment_forms import AssessmentForm, TEXT_FIELDS
 from .assessment_services import (
     authorize,
@@ -60,7 +61,7 @@ def assessment_list(request):
     patient = None
     if request.GET.get("customer"):
         patient = get_object_or_404(
-            Customer,
+            patients_for(request.user),
             pk=_integer(request.GET["customer"]),
             tenant_id=request.user.tenant_id,
         )
@@ -146,7 +147,7 @@ def assessment_editor(request, pk=None):
         )
         if request.GET.get("customer"):
             patient = get_object_or_404(
-                Customer,
+                patients_for(request.user),
                 tenant_id=request.user.tenant_id,
                 pk=_integer(request.GET["customer"]),
             )
@@ -251,7 +252,7 @@ def assessment_editor(request, pk=None):
 def patient_options(request, pk):
     authorize(request.user)
     patient = get_object_or_404(
-        Customer, pk=pk, tenant_id=request.user.tenant_id, active=True
+        patients_for(request.user), pk=pk, tenant_id=request.user.tenant_id, active=True
     )
     professional = request.GET.get("professional", "")
     qs = Appointment.objects.filter(

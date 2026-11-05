@@ -40,7 +40,7 @@ class ClinicalWorkflowTests(TestCase):
 
     def test_care_can_be_granted_and_revoked_by_responsible_clinician(self):
         grant=grant_care(entry=self.entry,grantee=self.colleague_profile,user=self.doctor,reason="Atendimento compartilhado autorizado")
-        self.assertEqual(read_record(entry=self.entry,user=self.colleague),"Informação clínica de teste")
+        with self.assertRaises(PermissionDenied):read_record(entry=self.entry,user=self.colleague)
         with self.assertRaises(PermissionDenied):revoke_care(grant=grant,user=self.colleague)
         revoke_care(grant=grant,user=self.doctor)
         with self.assertRaises(PermissionDenied):read_record(entry=self.entry,user=self.colleague)

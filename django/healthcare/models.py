@@ -351,3 +351,5 @@ class DentalAssessmentDocument(models.Model):
 
 # Kept separate to make operational/offline records distinct from the clinical ledger.
 from .operation_models import WaitingRoomDisplay, WaitingRoomMedia, WaitingRoomCall, OfflineOperation, ClinicRoom, DailyRoomSelection  # noqa: F401,E402
+from .document_models import ProfessionalSignature, ClinicalDocumentTemplate, ClinicalIssuedDocument  # noqa: F401,E402
+from .drive_models import ClinicalDriveConfiguration, PatientDriveBackup  # noqa: F401,E402

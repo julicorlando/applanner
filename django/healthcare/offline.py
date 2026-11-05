@@ -70,7 +70,8 @@ def snapshot(request):
     clinical = can_read_clinical(user)
     appointments = list(appointments_for(user).filter(starts_at__gte=now-timedelta(days=1), starts_at__lte=now+timedelta(days=7))
         .select_related('customer', 'service', 'professional').order_by('starts_at')[:501])
-    patients = list(Customer.objects.filter(tenant=tenant, active=True).order_by('-updated_at')[:1001])
+    from .patient_scope import patients_for
+    patients = list(patients_for(user,administrative=user.role in {'owner','tenant-admin','manager','reception'}).filter(active=True).order_by('-updated_at')[:1001])
     # All records read through the existing audited authorization service. No reception fallback.
     entries = []
     if clinical:
@@ -112,7 +113,8 @@ def referenced_customer(user, data):
         key = receipt.result['customer']
     if not str(key or '').isdigit():
         raise ValidationError('Paciente inválido.')
-    return get_object_or_404(Customer, tenant_id=user.tenant_id, pk=key, active=True)
+    from .patient_scope import patients_for
+    return get_object_or_404(patients_for(user,administrative=user.role in {'owner','tenant-admin','manager','reception'}), tenant_id=user.tenant_id, pk=key, active=True)
 
 
 def synced_at(value):
@@ -162,7 +164,7 @@ def replay(user, operation):
         phones, emails = identity_matches(tenant, fields.get('phone') or '', fields.get('email') or '')
         if (fields.get('phone') and phones.exists()) or emails.exists():
             raise ValidationError('Telefone ou e-mail já cadastrado. Revise a fila e selecione o paciente existente; não foi feita mesclagem automática.', code='customer_exists')
-        patient = Customer.objects.create(tenant=tenant, **fields)
+        patient = Customer.objects.create(tenant=tenant, registered_by=user, **fields)
         result = {'customer': patient.pk}
     elif kind == 'appointment':
         from scheduling.availability import AvailabilityService

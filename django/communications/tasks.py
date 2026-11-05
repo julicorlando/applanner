@@ -62,6 +62,11 @@ def send_notification(self,notification_id):
                     notification.save(update_fields=["status"])
                     return
 
+            birthday_row=None
+            if notification.template_key=='customer_birthday':
+                from .birthdays import validate_delivery
+                birthday_row=validate_delivery(notification)
+                if birthday_row is None:return
             if notification.channel==Notification.Channel.EMAIL:
                 subject=notification.payload.get("subject") or "ApPlanner"
                 text=notification.payload.get("text") or notification.payload.get("message") or ""
@@ -75,7 +80,10 @@ def send_notification(self,notification_id):
                     message.attach_alternative(html,"text/html")
                 message.send(fail_silently=False)
             elif notification.channel==Notification.Channel.WHATSAPP:
-                if notification.template_key=="return_invitation":
+                if notification.template_key=='customer_birthday':
+                    from .birthdays import send_birthday_whatsapp
+                    provider_id=send_birthday_whatsapp(notification,birthday_row)
+                elif notification.template_key=="return_invitation":
                     from engagement.return_automation import deliver_return_invitation
                     provider_id=deliver_return_invitation(notification)
                     if notification.status==Notification.Status.SKIPPED:
@@ -257,3 +265,10 @@ def recover_beauty_vacancy(appointment_id):
     from barber.recovery import offer_vacancy, deliver_offer
     offer=offer_vacancy(appointment_id)
     if offer:deliver_offer(offer.pk)
+
+
+@shared_task
+def queue_customer_birthdays():
+    from .birthday_models import BirthdaySettings
+    from .birthdays import queue_tenant
+    return sum(queue_tenant(pk) for pk in BirthdaySettings.objects.filter(enabled=True).values_list('tenant_id',flat=True))

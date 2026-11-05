@@ -1,3 +1,4 @@
+from healthcare.drive_views import configuration as clinical_drive_configuration, callback as clinical_drive_callback
 from .global_search import search as global_search
 from communications.mobile_portal import providers
 from django.urls import path
@@ -17,6 +18,8 @@ from operations.master_support import ticket_detail as support_ticket
 from operations.monitoring import dashboard as runtime_monitor
 
 urlpatterns=[
+    path("empresas/<int:pk>/backup-clinico/",clinical_drive_configuration,name="master-clinical-drive"),
+    path("backup-clinico/google/retorno/",clinical_drive_callback,name="master-clinical-drive-callback"),
     path("importar-clientes/", customer_import_views.upload, name="master-customer-import"),
     path("importar-clientes/modelo.csv", customer_import_views.example, name="master-customer-import-example"),
     path("importar-clientes/<int:pk>/", customer_import_views.detail, name="master-customer-import-detail"),

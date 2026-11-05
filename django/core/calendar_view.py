@@ -29,7 +29,7 @@ def access(request):
     from billing.segment_access import segment_enabled
 
     arena = segment_enabled(tenant, "arena")
-    if request.user.role == 'professional':
+    if request.user.role in {'professional','healthcare'}:
         if arena:
             raise PermissionDenied
         professional = get_object_or_404(Professional, tenant=tenant, user=request.user, active=True)
@@ -95,7 +95,7 @@ def calendar(request):
             starts_at__lt=end,
             ends_at__gt=start,
         ).select_related("professional")
-        if request.user.role == 'professional':
+        if request.user.role in {'professional','healthcare'}:
             resources = resources.filter(user=request.user)
             rows = rows.filter(professional__user=request.user)
             blocks = blocks.filter(professional__user=request.user)
@@ -138,7 +138,7 @@ def calendar(request):
             "tenant": tenant,
             "unit": unit,
             "arena": arena,
-            "professional_mode": request.user.role == 'professional',
+            "professional_mode": request.user.role in {'professional','healthcare'},
             "columns": columns,
             "resources": all_resources,
             "resource": raw,
@@ -149,7 +149,7 @@ def calendar(request):
             "today": today,
             "appointment_count": len(rows),
             "window_count": sum(len(items) for items in windows.values()),
-            "can_move": not arena and request.user.role != 'professional'
+            "can_move": not arena and request.user.role not in {'professional','healthcare'}
             and _role_resource_write(request.user, "agenda", "agendamentos"),
         },
     )
@@ -162,7 +162,7 @@ def move(request, pk):
     if (
         unit is None
         or arena
-        or request.user.role == 'professional'
+        or request.user.role in {'professional','healthcare'}
         or not _role_resource_write(request.user, "agenda", "agendamentos")
     ):
         raise PermissionDenied

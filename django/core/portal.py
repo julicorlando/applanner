@@ -143,7 +143,7 @@ PORTAL_MODULES = {
             "clientes": {
                 "model": "scheduling.Customer",
                 "title": "Clientes",
-                "fields": ["name","phone","email","birth_date","consent_marketing","active"],
+                "fields": ["name","phone","email","birth_date","cpf","postal_code","street","address_number","address_complement","district","city","state","consent_marketing","active"],
                 "columns": ["name","phone","email","active"],
                 "order": "name",
             },
@@ -692,7 +692,11 @@ def _resource(module_slug, resource_slug):
     return module,resource,model
 
 
-def _tenant_queryset(model, tenant):
+def _tenant_queryset(model, tenant, user=None):
+    from billing.entitlements import is_healthcare_tenant
+    if user is not None and model._meta.label_lower=='scheduling.customer' and user.role in {'professional','healthcare'} and is_healthcare_tenant(tenant):
+        from healthcare.patient_scope import patients_for
+        return patients_for(user)
     qs=model.objects.all()
     if _field(model,"tenant"):
         qs=qs.filter(tenant=tenant)
@@ -898,7 +902,8 @@ class PhysiotherapyRecordForm(forms.Form):
         if user:
             from healthcare.assessment_services import assessments_for
             self.fields["assessment"].queryset=assessments_for(user).filter(status="finalized")
-        self.fields["customer"].queryset=apps.get_model("scheduling","Customer").objects.filter(tenant=tenant,active=True).order_by("name")
+        from healthcare.patient_scope import patients_for
+        self.fields["customer"].queryset=patients_for(user).filter(active=True).order_by("name")
         self.fields["professional"].queryset=apps.get_model("scheduling","Professional").objects.filter(tenant=tenant,active=True).order_by("name")
         self.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant).select_related("customer","professional").order_by("-starts_at")[:500]
 
@@ -939,6 +944,8 @@ class PhysiotherapyRecordForm(forms.Form):
 
 
 def _save_special(obj, *, resource, request, tenant, is_new):
+    if is_new and obj._meta.label_lower=="scheduling.customer":
+        obj.registered_by=request.user
     special=resource.get("special")
     if _field(obj.__class__,"tenant"):
         obj.tenant=tenant
@@ -1372,7 +1379,7 @@ def resource_list(request,module_slug,resource_slug):
     tenant=_require_tenant(request)
     if tenant is None:
         return redirect("portal-home")
-    qs=_tenant_queryset(model,tenant)
+    qs=_tenant_queryset(model,tenant,request.user)
     if model._meta.label_lower=="healthcare.medicalrecordentry":
         from healthcare.services import clinical_records_for
         qs=clinical_records_for(user=request.user,tenant=tenant)
@@ -1486,6 +1493,8 @@ def resource_create(request,module_slug,resource_slug):
             return redirect(reverse("physio-assessment-create")+("?"+urlencode(params) if params else ""))
         form=(PhysiotherapyRecordForm(request.POST or None,tenant=tenant,user=request.user,initial={key:request.GET[key] for key in ("customer","assessment","record_type") if request.GET.get(key)}) if is_physio
               else MedicalRecordForm(request.POST or None,tenant=tenant))
+        from healthcare.patient_scope import patients_for
+        form.fields["customer"].queryset=patients_for(request.user).filter(active=True)
         form.fields["professional"].queryset=form.fields["professional"].queryset.filter(user=request.user)
         form.fields["appointment"].queryset=apps.get_model("scheduling","Appointment").objects.filter(tenant=tenant,professional__user=request.user)
         if request.method=="POST" and form.is_valid():
@@ -1590,7 +1599,7 @@ def resource_edit(request,module_slug,resource_slug,pk):
         raise PermissionDenied
     from core.unit_scope import selected_unit,scope_queryset
     unit=selected_unit(request,tenant)
-    obj=get_object_or_404(scope_queryset(_tenant_queryset(model,tenant),unit),pk=pk)
+    obj=get_object_or_404(scope_queryset(_tenant_queryset(model,tenant,request.user),unit),pk=pk)
     professional_existing_active=model._meta.label_lower=="scheduling.professional" and obj.active
     form=_model_form(model,resource,request.POST or None,request.FILES or None,instance=obj,tenant=tenant,unit=unit)
     if request.user.role=="reception" and model._meta.label_lower=="finance.product":
@@ -1631,7 +1640,7 @@ def resource_detail(request,module_slug,resource_slug,pk):
     if tenant is None:
         return redirect("portal-home")
     module,resource,model=_resource(module_slug,resource_slug)
-    obj=get_object_or_404(_tenant_queryset(model,tenant),pk=pk)
+    obj=get_object_or_404(_tenant_queryset(model,tenant,request.user),pk=pk)
     if resource.get("detail")=="barber_command":
         return redirect("barber-command-detail",pk=obj.pk)
     if resource.get("detail")=="auto_job":

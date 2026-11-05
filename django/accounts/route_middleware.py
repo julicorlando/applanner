@@ -26,6 +26,10 @@ CLINIC_OPERATION_PATHS = {
 
 
 def _reception_mutation_allowed(path):
+    if re.fullmatch(r"/app/clinica/documentos/(?:[0-9]+/)?",path):
+        return True
+    if path.startswith("/app/clinica/financeiro/"):
+        return True  # Scoped clinical finance views enforce administrative permissions.
     if path in {"/app/clinica/operacao/sincronizar/", "/app/clinica/tv/chamar/", "/app/clinica/tv/sala/"}:
         return True  # Views still enforce module, tenant and clinical/financial permissions per operation.
     return bool(re.fullmatch(r"/app/barbearia/comandas/[0-9]+/vale/",path)) or any(path.startswith(prefix) for prefix in RECEPTION_MUTATION_PREFIXES)
@@ -55,7 +59,7 @@ class CapabilityRouteMiddleware:
 
     def __call__(self,request):
         user=getattr(request,"user",None)
-        if user and user.is_authenticated and user.role=="professional" and not user.is_superuser:
+        if user and user.is_authenticated and user.role in {"professional","healthcare"} and not user.is_superuser:
             own_calendar_read = request.method in {'GET', 'HEAD'} and request.path in {'/app/calendario/', '/app/identidade/logo/'}
             from healthcare.navigation import workspace_enabled
             own_physio_read=(request.method in {'GET','HEAD'} and request.path in {'/app/','/app/fisioterapia/dashboard/','/app/fisioterapia/configuracoes/','/app/odontologia/dashboard/','/app/odontologia/configuracoes/'} and workspace_enabled(request))
@@ -72,7 +76,9 @@ class CapabilityRouteMiddleware:
             )
         if user and user.is_authenticated and not user.is_superuser and user.role_links.exists():
             path=request.path
-            required="agenda.manage" if path in CLINIC_OPERATION_PATHS else None
+            required=("agenda.manage" if user.role=="reception" else "healthcare.manage" if user.role in {"professional","healthcare"} else "finance.manage") if path.startswith('/app/clinica/financeiro/') else ("agenda.manage" if path in CLINIC_OPERATION_PATHS else None)
+            if user.role=='reception' and re.fullmatch(r'/app/clinica/documentos/(?:[0-9]+/)?',path):
+                required='agenda.manage'
             for prefix,capability in (() if required else PREFIX_CAPABILITIES.items()):
                 if path.startswith(prefix):
                     required=capability

@@ -42,6 +42,8 @@ def model_snapshot(obj,fields=None):
         if any(token in name.lower() for token in sensitive_tokens):
             continue
         try:
+            if getattr(obj._meta.get_field(name),'sensitive',False):
+                continue
             value=getattr(obj,name)
         except Exception:
             continue

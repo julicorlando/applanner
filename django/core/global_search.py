@@ -38,7 +38,7 @@ def search(request):
     tenant = _require_tenant(request)
     if not tenant:
         return render(request, "portal/search.html", {"q": term, "results": []})
-    if request.user.role == "professional":
+    if request.user.role in {"professional","healthcare"}:
         professional = get_object_or_404(
             Professional, user=request.user, tenant=tenant, active=True
         )
@@ -57,7 +57,7 @@ def search(request):
                         "title": row.customer_display_name,
                         "kind": row.service.name,
                         "description": row.starts_at,
-                        "url": reverse("professional-appointment", args=[row.pk]),
+                        "url": reverse("clinical-patient",args=[row.customer_id]) if request.user.role=="healthcare" else reverse("professional-appointment", args=[row.pk]),
                     }
                 )
     elif len(term) >= 2:

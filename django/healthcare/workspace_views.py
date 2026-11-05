@@ -93,6 +93,8 @@ def settings(request):
         if links:
             groups.append({"title": PORTAL_MODULES[slug]["title"], "links": links})
     account = [
+        {"title":"Documentos, receituários e declarações","url":reverse("clinical-documents")},
+        {"title":"Minha assinatura profissional","url":reverse("clinical-signature")},
         {"title": "Operação offline neste dispositivo", "url": reverse("clinical-offline-shell")},
         {"title": "Chamar na TV (módulo opcional)", "url": reverse("waiting-room-console")},
         {"title": "Segurança da conta", "url": "/account/2fa/setup/"},

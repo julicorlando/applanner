@@ -80,13 +80,13 @@ def shell_context(user, request=None):
     patient_url = (
         (
             reverse("professional-search")
-            if user.role == "professional"
+            if user.role in {"professional","healthcare"}
             else reverse("portal-resource-list", args=["agenda", "clientes"])
         )
         if ("agenda", "clientes") in routes
         else None
     )
-    finance_url = (
+    finance_url = reverse("clinic-professional-finance") if user.role in {"professional","healthcare"} and module_enabled(user.tenant,"finance") else reverse("clinic-finance-desk") if user.role in {"owner","tenant-admin","manager","reception","finance"} and module_enabled(user.tenant,"finance") else (
         reverse("portal-resource-list", args=["financeiro", "lancamentos"])
         if ("financeiro", "lancamentos") in routes
         else reverse("clinical-finance")
@@ -110,7 +110,7 @@ def shell_context(user, request=None):
         (
             "Atendimentos",
             reverse("professional-area")
-            if user.role == "professional"
+            if user.role in {"professional","healthcare"}
             else reverse("operation-today")
             if agenda
             else None,
@@ -201,11 +201,11 @@ def shell_context(user, request=None):
         "physio_menu": menu,
         "waiting_room_enabled": module_enabled(user.tenant, "waiting-room-tv"),
         "physio_search_url": reverse(
-            "professional-search" if user.role == "professional" else "operation-search"
+            "professional-search" if user.role in {"professional","healthcare"} else "operation-search"
         ),
         "physio_notifications_url": reverse(
             "professional-notification-preferences"
-            if user.role == "professional"
+            if user.role in {"professional","healthcare"}
             else "user-notification-preferences"
         ),
         "physio_clinical_access": clinical,

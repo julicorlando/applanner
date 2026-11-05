@@ -12,9 +12,10 @@ from django.views.decorators.cache import never_cache
 from billing.entitlements import require_module,module_enabled
 from core.audit import append_audit
 from core.crypto import decrypt_text
-from scheduling.models import Customer,Professional
+from scheduling.models import Professional
 from .models import (MedicalRecordAccessLog,ClinicalRegistration,
                      ClinicalAttachment,ClinicalCareGrant,ClinicalFollowUp)
+from .patient_scope import patients_for
 from .services import assert_clinical_access,clinical_records_for,read_record,create_record
 from .clinical import (save_structured_record,grant_care,revoke_care,attach_document,read_document,
                        change_treatment_status,schedule_followup,consume_clinical_session)
@@ -85,7 +86,7 @@ def dashboard(request):
         })
     records=clinical_records_for(user=user,tenant=tenant)
     return render(request,"healthcare/clinic_dashboard.html",{
-        "patients":Customer.objects.filter(tenant=tenant,active=True).order_by("name"),
+        "patients":patients_for(user).filter(active=True).order_by("name"),
         "entries":records.select_related("customer","professional").order_by("-created_at")[:100],
         "followups":ClinicalFollowUp.objects.filter(entry__in=records,completed_at__isnull=True).select_related("entry__customer").order_by("due_at")[:100],
         "dentistry":module_enabled(tenant,"dentistry"),"physiotherapy":((tenant.category or "").strip().lower()=="fisioterapia" or module_enabled(tenant,"physiotherapy")),
@@ -213,7 +214,7 @@ def attachment_download(request,pk):
 @login_required
 @never_cache
 def patient(request,pk):
-    tenant=clinic(request);customer=get_object_or_404(Customer,pk=pk,tenant=tenant)
+    tenant=clinic(request);customer=get_object_or_404(patients_for(request.user),pk=pk,tenant=tenant)
     entries=clinical_records_for(user=request.user,tenant=tenant).filter(customer=customer).order_by("created_at","pk")
     history=[];physio=[]
     for entry in entries:
@@ -233,7 +234,7 @@ def patient(request,pk):
 @login_required
 @never_cache
 def export_patient(request,pk,kind):
-    tenant=clinic(request);customer=get_object_or_404(Customer,pk=pk,tenant=tenant)
+    tenant=clinic(request);customer=get_object_or_404(patients_for(request.user),pk=pk,tenant=tenant)
     entries=clinical_records_for(user=request.user,tenant=tenant).filter(customer=customer).order_by("created_at","pk")
     rows=[]
     for entry in entries:
