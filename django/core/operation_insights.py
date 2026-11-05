@@ -211,7 +211,7 @@ def performance(request):
     from billing.entitlements import is_healthcare_tenant, module_enabled
     if is_healthcare_tenant(tenant) and module_enabled(tenant,'finance') and has_capability(request.user,'finance.manage') and not form.errors:
         from finance.clinic_services import period_summary
-        clinical_finance=period_summary(tenant,unit,day_bounds(tenant,start)[0],day_bounds(tenant,end)[1],all_units=unit is None)
+        clinical_finance=period_summary(tenant,unit,day_bounds(tenant,start)[0],day_bounds(tenant,end)[1]-timedelta(microseconds=1),all_units=unit is None)
     return render(request,'portal/performance.html',{'tenant':tenant,'unit':unit,'form':form,'rows':rows,'units':units,'overview':overview,'clinical_finance':clinical_finance})
 
 class PreferenceForm(forms.Form):

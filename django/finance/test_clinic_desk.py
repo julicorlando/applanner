@@ -254,3 +254,14 @@ class ClinicDeskTests(TestCase):
         self.assertEqual(response.context['clinical_finance']['received'],'30.00')
         self.assertContains(response,'Como está o financeiro?')
         self.assertContains(response,'Fluxo financeiro do período')
+
+    def test_owner_report_excludes_exact_midnight_of_following_day(self):
+        from core.operation_insights import day_bounds
+        from zoneinfo import ZoneInfo
+        day=timezone.now().astimezone(ZoneInfo(self.tenant.timezone or 'America/Recife')).date()
+        FinancialTransaction.objects.create(tenant=self.tenant,unit=self.unit,type='income',status='paid',
+            description='Dia seguinte',amount='99',paid_at=day_bounds(self.tenant,day)[1])
+        self.client.force_login(self.owner)
+        response=self.client.get(reverse('operation-performance'),{'start':day.isoformat(),'end':day.isoformat()})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.context['clinical_finance']['received'],'0.00')
