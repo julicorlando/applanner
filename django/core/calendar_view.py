@@ -149,6 +149,8 @@ def calendar(request):
             "today": today,
             "appointment_count": len(rows),
             "window_count": sum(len(items) for items in windows.values()),
+            "can_create_appointment": not arena and request.user.role not in {'professional','healthcare'}
+            and _role_resource_write(request.user, "agenda", "agendamentos"),
             "can_move": not arena and request.user.role not in {'professional','healthcare'}
             and _role_resource_write(request.user, "agenda", "agendamentos"),
         },

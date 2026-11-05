@@ -64,6 +64,8 @@ class SidebarCalendarTests(TestCase):
         self.assertEqual(response.context['previous'], date(2032, 1, 1))
         self.assertEqual(response.context['next'], date(2032, 3, 1))
         self.assertContains(response, 'calendar-board--month')
+        self.assertContains(response, 'Novo agendamento')
+        self.assertContains(response, reverse('portal-resource-create',args=['agenda','agendamentos']))
         outsider = Professional.objects.create(tenant=Tenant.objects.create(name='Outra', slug='sidebar-other'), name='Outro')
         with patch('core.calendar_view.access', return_value=(self.tenant, self.unit, False)):
             response = self.client.get(reverse('operation-calendar'), {'resource': outsider.pk})
@@ -98,6 +100,15 @@ class SidebarCalendarTests(TestCase):
         self.assertEqual([resource.pk for resource in response.context['resources']], [self.pro.pk])
         self.assertEqual(response.context['appointment_count'], 1)
         self.assertFalse(response.context['can_move'])
+        self.assertNotContains(response, 'Novo agendamento')
+
+    def test_reception_can_open_new_appointment_from_calendar(self):
+        reception=User.objects.create_user(email='calendar-reception@example.test',role='reception',tenant=self.tenant)
+        self.client.force_login(reception)
+        with patch('core.calendar_view.access',return_value=(self.tenant,self.unit,False)):
+            response=self.client.get(reverse('operation-calendar'))
+        self.assertContains(response,'Novo agendamento')
+        self.assertEqual(self.client.get(reverse('portal-resource-create',args=['agenda','agendamentos'])).status_code,200)
 
     def test_arena_windows_account_for_real_blocks(self):
         from arena.models import Court, CourtHours, CourtBlock
