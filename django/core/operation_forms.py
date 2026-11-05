@@ -13,6 +13,17 @@ class OperationModelForm(forms.ModelForm):
         super().__init__(*args,**kwargs)
         self.tenant=tenant
         label=self._meta.model._meta.label_lower
+        if label=="scheduling.appointment" and tenant and not self.instance.pk:
+            self.instance.tenant=tenant
+        if label=="scheduling.appointment" and tenant and "unit" in self.fields:
+            units=list(tenant.units.filter(active=True).order_by("pk")[:2])
+            if len(units)==1 and getattr(self.instance,"unit_id",None) in {None,units[0].pk}:
+                # The company, not a submitted identifier, supplies its sole unit.
+                field=self.fields["unit"]
+                field.initial=units[0].pk
+                self.initial["unit"]=units[0].pk
+                field.widget=forms.HiddenInput()
+                field.disabled=True
         if label=="scheduling.customer":
             for name in ('cpf','postal_code','street','address_number','address_complement','district','city'):
                 if name in self.fields:
