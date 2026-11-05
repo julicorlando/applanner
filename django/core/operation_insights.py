@@ -205,7 +205,14 @@ def performance(request):
                     'cancelled':sum(r['cancelled'] for r in data),'no_show':sum(r['no_show'] for r in data),
                     'service_value':sum((r['service_value'] for r in data),Decimal('0')),
                     'occupancy':round(busy*100/cap,1) if cap else None})
-    return render(request,'portal/performance.html',{'tenant':tenant,'unit':unit,'form':form,'rows':rows,'units':units})
+    overview={'scheduled':sum(r['count'] for r in rows),'completed':sum(r['completed'] for r in rows),
+        'cancelled':sum(r['cancelled'] for r in rows),'no_show':sum(r['no_show'] for r in rows)}
+    clinical_finance=None
+    from billing.entitlements import is_healthcare_tenant, module_enabled
+    if is_healthcare_tenant(tenant) and module_enabled(tenant,'finance') and has_capability(request.user,'finance.manage') and not form.errors:
+        from finance.clinic_services import period_summary
+        clinical_finance=period_summary(tenant,unit,day_bounds(tenant,start)[0],day_bounds(tenant,end)[1],all_units=unit is None)
+    return render(request,'portal/performance.html',{'tenant':tenant,'unit':unit,'form':form,'rows':rows,'units':units,'overview':overview,'clinical_finance':clinical_finance})
 
 class PreferenceForm(forms.Form):
     preferences=forms.CharField(label='Preferências de atendimento',max_length=1000,required=False,

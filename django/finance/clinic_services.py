@@ -152,14 +152,15 @@ def expense(*,user,unit,description,amount,method,invoice,items,image,request_id
     return row
 
 
-def period_summary(tenant,unit,start,end):
-    rows=FinancialTransaction.objects.filter(tenant=tenant,unit=unit,status='paid',paid_at__gte=start,paid_at__lte=end)
+def period_summary(tenant,unit,start,end,*,all_units=False):
+    scope={'tenant':tenant} if all_units else {'tenant':tenant,'unit':unit}
+    rows=FinancialTransaction.objects.filter(**scope,status='paid',paid_at__gte=start,paid_at__lte=end)
     total=lambda qs: qs.aggregate(v=Sum('amount'))['v'] or Decimal(0)
     received=total(rows.filter(type='income'));expenses=total(rows.filter(type='expense'))
-    charged=total(ClinicCharge.objects.filter(tenant=tenant,unit=unit,created_at__gte=start,created_at__lte=end))
-    charged+=total(FinancialTransaction.objects.filter(tenant=tenant,unit=unit,type='income',created_at__gte=start,created_at__lte=end)
+    charged=total(ClinicCharge.objects.filter(**scope,created_at__gte=start,created_at__lte=end))
+    charged+=total(FinancialTransaction.objects.filter(**scope,type='income',created_at__gte=start,created_at__lte=end)
         .exclude(status='cancelled').exclude(source_type__in=['clinic-receivable','clinic-receipt']))
-    pending=total(FinancialTransaction.objects.filter(tenant=tenant,unit=unit,type='income',status='pending'))
+    pending=total(FinancialTransaction.objects.filter(**scope,type='income',status='pending'))
     methods=[{'method':{'cash':'Dinheiro','pix':'Pix','card':'Cartão','dinheiro':'Dinheiro'}.get(v['payment_method'],v['payment_method'] or 'Não informado'),'type':v['type'],'amount':format(v['v'],'.2f')}
         for v in rows.values('payment_method','type').annotate(v=Sum('amount')).order_by('type','payment_method')]
     return {'charged':format(charged,'.2f'),'received':format(received,'.2f'),'expenses':format(expenses,'.2f'),'net':format(received-expenses,'.2f'),'pending':format(pending,'.2f'),'methods':methods}
@@ -185,3 +186,19 @@ def close_clinic_cash(*,user,unit,amount,notes=''):
     ClinicCashClosing.objects.create(session=session,summary=summary)
     append_audit(tenant=tenant,user=user,action='clinic.cash.closed',entity_type='CashSession',entity_id=session.pk,after=summary)
     return session
+
+
+@transaction.atomic
+def review_expense(*,user,unit,pk,status,note=''):
+    tenant=lock_company(user)
+    if user.role not in {'owner','tenant-admin','manager'}:raise PermissionDenied
+    if status not in {'approved','questioned'} or len(note)>500:
+        raise ValidationError('Informe uma decisão válida e observação de até 500 caracteres.')
+    if status=='questioned' and not note.strip():
+        raise ValidationError('Explique o que precisa ser esclarecido.')
+    row=ClinicExpense.objects.select_for_update().get(pk=pk,session__tenant=tenant,session__unit=unit)
+    before={'status':row.review_status}
+    row.review_status=status;row.review_note=note.strip();row.reviewed_by=user;row.reviewed_at=timezone.now()
+    row.save(update_fields=['review_status','review_note','reviewed_by','reviewed_at','updated_at'])
+    append_audit(tenant=tenant,user=user,action='clinic.expense.reviewed',entity_type='ClinicExpense',entity_id=row.pk,before=before,after={'status':status,'note':row.review_note})
+    return row
