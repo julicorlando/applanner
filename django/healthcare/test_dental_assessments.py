@@ -56,6 +56,8 @@ class DentalAssessmentTests(TestCase):
         self.assertContains(response,'Queixa na primeira versão')
         self.assertContains(response,'Anamnese inicial completa')
         self.assertContains(response,'Evolução inicial')
+        self.assertContains(response,'<div class="da-read-text">Hipótese em avaliação</div>',html=True)
+        self.assertNotContains(response,'data-dental-editor="goals"')
         self.assertNotContains(response,'Queixa corrigida na segunda versão')
         self.assertNotContains(response,'name="action" value="draft"')
         self.assertEqual(self.client.post(url+'?version=1',{'action':'draft'}).status_code,403)
