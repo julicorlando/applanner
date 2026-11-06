@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Configurar campanha social — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow"><div class="portal-heading"><div><a class="back-link" href="{% url 'commercial-social-list' %}">← Campanhas sociais</a><span class="eyebrow">COMERCIAL</span><h1>{% if campaign.pk %}Editar campanha{% else %}Nova campanha{% endif %}</h1><p>Uma mensagem clara, um destino para seus visitantes e acompanhamento no funil.</p></div></div>
+<form method="post" class="panel portal-form">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}{% include 'commercial/social_field.html' %}{% endfor %}<p class="muted">A opção de anúncio pago organiza a origem dos contatos. Orçamento, público e veiculação são definidos na Meta. Sua campanha começa como rascunho.</p><div class="form-actions"><button class="button primary">Salvar campanha</button><a class="button ghost" href="{% url 'commercial-social-list' %}">Voltar</a></div></form></section>
+{% endblock %}

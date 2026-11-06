@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Acesso de {{ professional.name }} · ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <header class="portal-heading"><div><a class="back-link" href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}">← Profissionais</a><span class="eyebrow">EQUIPE · {{ tenant.name }}</span><h1>Acesso de {{ professional.name }}</h1><p>Crie ou suspenda a conta individual. Ela mostra apenas a agenda e os ganhos deste profissional.</p></div></header>
+  <form method="post" class="portal-form panel">{% csrf_token %}
+    {% if professional.user_id %}<p>Conta vinculada: <strong>{{ professional.user.email }}</strong>. Deixe a senha vazia para mantê-la.</p>{% endif %}
+    {% for field in form %}<div class="form-field{% if field.field.widget.input_type == 'checkbox' %} checkbox-field{% endif %}">{{ field.label_tag }}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="form-actions"><button class="button primary" type="submit">Salvar acesso</button><a class="button ghost" href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}">Voltar</a></div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,4 @@
+{% load static %}{% if platform_branding.logo_light or platform_branding.logo_dark %}
+<img class="platform-logo platform-logo-custom brand-theme-light" src="{% url 'public-platform-logo' %}?theme=light&amp;v={{ platform_branding.updated_at|date:'U' }}" alt="Logo ApPlanner" width="56" height="56">
+<img class="platform-logo platform-logo-custom brand-theme-dark" src="{% url 'public-platform-logo' %}?theme=dark&amp;v={{ platform_branding.updated_at|date:'U' }}" alt="Logo ApPlanner" width="56" height="56">
+{% elif platform_branding.logo %}<img class="platform-logo platform-logo-custom" src="{% url 'public-platform-logo' %}" alt="Logo ApPlanner" width="56" height="56">{% else %}<img class="platform-logo platform-logo-official" src="{% static 'images/applanner-logo.png' %}" alt="Logo ApPlanner" width="56" height="56">{% endif %}

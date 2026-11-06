@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Meus dados e privacidade — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><a class="back-link" href="/">← Painel</a><span class="eyebrow">PRIVACIDADE</span><h1>Meus dados e privacidade</h1><p>Exporte seus dados, acompanhe consentimentos e envie solicitações de correção ou exclusão.</p></div><a class="button primary" href="{% url 'legal-privacy-export' %}">Exportar meus dados</a></div>
+
+  <div class="dashboard-grid">
+    <article class="panel">
+      <h2>Consentimento de marketing</h2>
+      {% if request.user.marketing_consent %}
+        <p>Autorizado{% if request.user.marketing_consent_at %} em {{ request.user.marketing_consent_at|date:"d/m/Y H:i" }}{% endif %}.</p>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="withdraw_marketing"><button class="button" type="submit">Retirar consentimento de marketing</button></form>
+      {% else %}
+        <p>Você não autorizou comunicações de marketing. E-mails necessários para segurança, cobrança e funcionamento da conta não são marketing.</p>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="grant_marketing"><button class="button ghost" type="submit">Autorizar novidades do ApPlanner</button></form>
+      {% endif %}
+    </article>
+    <article class="panel">
+      <h2>Solicitar correção</h2>
+      <form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="correction"><div class="form-field"><label for="privacy-correction">O que precisa ser corrigido?</label><textarea id="privacy-correction" name="details" maxlength="4000" rows="4" required></textarea></div><button class="button" type="submit">Solicitar correção</button></form>
+      <hr>
+      <h3>Solicitar exclusão de dados pessoais</h3>
+      <p>A solicitação passa por análise para preservar registros que precisem ser mantidos por obrigação fiscal, segurança ou auditoria.</p>
+      <form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="deletion"><div class="form-field"><label for="privacy-delete">Observações (opcional)</label><textarea id="privacy-delete" name="details" maxlength="4000" rows="3"></textarea></div><button class="button danger-action" type="submit">Solicitar exclusão dos meus dados</button></form>
+    </article>
+  </div>
+
+  <article class="panel" style="margin-top:16px">
+    <h2>Minhas solicitações de privacidade</h2>
+    <div class="table-card"><table class="portal-table"><thead><tr><th>Solicitação</th><th>Status</th><th>Aberta em</th><th>Prazo interno</th><th>Concluída em</th></tr></thead><tbody>
+      {% for row in requests %}<tr><td>#{{ row.pk }} · {{ row.get_request_type_display }}</td><td>{{ row.get_status_display }}</td><td>{{ row.created_at|date:"d/m/Y H:i" }}</td><td>{{ row.deadline_at|date:"d/m/Y"|default:"—" }}</td><td>{{ row.completed_at|date:"d/m/Y H:i"|default:"—" }}</td></tr>
+      {% empty %}<tr><td colspan="5" class="empty-table">Nenhuma solicitação registrada.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </article>
+
+  <article class="panel" style="margin-top:16px">
+    <h2>Consentimentos e termos aceitos</h2>
+    {% for row in acceptances %}<div class="module-row"><span></span><div><strong>{{ row.document.title }}</strong><small>Versão {{ row.document.version }} · aceito em {{ row.accepted_at|date:"d/m/Y H:i" }}</small></div></div>{% empty %}<p class="empty">Nenhum aceite registrado para esta conta.</p>{% endfor %}
+  </article>
+</section>
+{% endblock %}

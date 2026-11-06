@@ -1,0 +1,183 @@
+# ApPlanner: documentação de usuários e integrações
+
+Esta documentação descreve a interface Django da branch `django-replatform`. O portal personalizado em **Segurança → Documentação & API** (`/account/documentacao-api/`) exibe somente áreas permitidas ao usuário autenticado. O Master vê o catálogo completo. A documentação de API lista apenas operações efetivamente disponíveis em `/api/v1/`.
+
+## Acesso, permissões e primeiro uso
+
+1. Entre em `/account/login/`, configure a autenticação de dois fatores em **Segurança** e conclua a troca de senha temporária, quando exigida.
+2. A empresa conclui o cadastro inicial de identificação, marca, unidade, profissionais, serviços, horários, cobrança e página pública em `/inicio/`.
+3. O responsável atribui funções à equipe. Os módulos do plano e o segmento da empresa restringem as telas mesmo quando o papel possui permissão estrutural.
+4. O profissional tem área própria em `/app/profissional/`: agendamentos vinculados à sua conta, conclusão do atendimento e ganhos. Não recebe acesso amplo aos clientes ou ao financeiro da empresa.
+5. A recepção e a gestão usam `/app/` para a agenda, clientes, equipe, serviços e demais módulos autorizados. A empresa pode publicar a página `/p/<slug>/` e o link de cada profissional.
+
+## Módulos da empresa
+
+| Área | Operação principal | Requisito de acesso |
+| --- | --- | --- |
+| Agenda | Clientes, profissionais, serviços, unidades, expedientes, intervalos, folgas, agendamentos e configuração | `agenda.manage` |
+| Financeiro | Lançamentos, produtos, PDV, caixa e comissões | `finance.manage` e módulo do plano |
+| Barbearia | Fila, comandas, metas e remuneração | `barber.manage` e segmento correspondente |
+| Arena | Quadras, reservas, jogos, mensalistas, turmas e torneios | `arena.manage` e segmento correspondente |
+| Auto | Veículos, boxes, OS, inspeção, materiais e orçamentos | `auto.manage` e segmento correspondente |
+| Relacionamento | Pacotes, mensalidades, fidelidade, indicações, inteligência de retorno e lista de espera | `engagement.manage` e módulo aplicável |
+| Saúde | Prontuário com acesso auditado e consentimentos | `healthcare.manage` e segmento correspondente |
+| Comunicação | Notificações, campanhas, conversas e WhatsApp da empresa | `communications.manage` e módulo aplicável |
+| Suporte | Chamados e acompanhamento | `support.manage` |
+
+### Jornada de agendamento
+
+Configure unidade, serviços, profissionais, expedientes e folgas. Publique a página da empresa, compartilhe `/p/<slug>/` e permita agendamento público. O cliente escolhe uma disponibilidade; a agenda protege conflitos. A equipe acompanha confirmação, atendimento, ausência ou cancelamento. Na conclusão, o profissional registra pagamento e produtos, quando disponíveis, para alimentar venda, estoque e comissão. A avaliação 1 a 5 e a lista de espera são fluxos separados. Consulte o histórico e a conciliação antes de encerrar o caixa.
+
+### Relacionamento, comunicação e cobranças
+
+Pacotes e mensalidades controlam compra e uso de créditos. A fidelidade registra resgates e indicações. Campanhas exigem consentimento; descadastro deve continuar disponível. WhatsApp por QR requer o módulo liberado, o gateway interno e uma sessão persistida. O plano e as cobranças da empresa são consultados em **Meu plano e pagamento**; Pix e cartão dependem do Mercado Pago configurado e de confirmação pelo webhook. Revise notificações, impostos e dados pessoais conforme as políticas legais aplicáveis.
+
+## Master
+
+`/master/` concentra empresas, catálogo de planos e módulos, assinaturas e pagamentos da plataforma, equipe comercial, leads, propostas, campanhas, WhatsApp, chatbot, financeiro, suporte, chamados, backups, homologação, crons, integrações, identidade visual, página inicial, blog e modelos de e-mail/SMTP. A página **Documentação & API** lista individualmente os recursos cadastrados no Master e links para cada tela operacional. A assistência a uma empresa deve usar seleção explícita e auditoria; tokens não são emitidos por uma sessão de acesso assistido.
+
+## Tokens pessoais
+
+Abra `/account/documentacao-api/`, informe nome, selecione os escopos disponíveis e validade de 7, 30 ou 90 dias. Copie o segredo na tela de criação, pois só o hash SHA-256 fica no banco. Cada pessoa gerencia e revoga somente seus tokens. Após revogação, expiração, desativação da conta, mudança da versão de sessão ou perda de acesso, a chamada é recusada. Um token da empresa permanece vinculado à empresa da emissão.
+
+Use HTTPS e o cabeçalho `Authorization: Bearer ap_...`. Guarde o token no servidor ou em gerenciador de segredos; nunca em páginas públicas, URL, código versionado ou captura de tela. O limite é 60 chamadas/minuto por token, 50 registros/página (`?pagina=2`). Respostas são JSON. A API de integração v1 é **somente consulta**; não exponha operações de escrita ou endpoints internos de pagamento/WhatsApp a estes tokens.
+
+| Escopo | Recursos GET |
+| --- | --- |
+| `agenda.read` | `/api/v1/clientes/`, `profissionais/`, `servicos/`, `agendamentos/`, `unidades/` |
+| `finance.read` | `/api/v1/produtos/`, `lancamentos/`, `vendas/` |
+| `barber.read` | `/api/v1/fila/` |
+| `arena.read` | `/api/v1/reservas/` |
+| `auto.read` | `/api/v1/veiculos/` |
+| `professional.read` | `/api/v1/meus-agendamentos/`, restrito ao profissional vinculado |
+| `support.read` | `/api/v1/chamados/`, limitados à empresa |
+| `commercial.read` | `/api/v1/leads/`, `/api/v1/propostas/`, limitados ao usuário comercial responsável |
+| `master.read` | `/api/v1/visao-master/`, contagens da plataforma |
+
+Para buscar um registro use `/api/v1/clientes/<id>/` e os demais recursos da tabela. Cada resposta inclui apenas os campos documentados na página do usuário. O Master pode selecionar os escopos da empresa, mas deve informar `?empresa=<id>` em cada consulta de dados do tenant; leads e propostas comerciais são globais e não usam esse parâmetro, que é ignorado para usuários de empresa. O Master possui visão de todos os módulos na documentação, mas a API não exporta segredos, prontuários, conteúdos de conversas nem toda a base de dados da plataforma.
+
+Exemplo:
+
+```bash
+curl -H 'Authorization: Bearer ap_SEU_TOKEN' 'https://applanner.axionwebdigital.com.br/api/v1/agendamentos/?pagina=1'
+```
+
+Erros: `400` parâmetro inválido, `401` credencial inválida ou expirada, `403` escopo/permissão insuficiente, `404` registro ausente, `405` método não permitido, `429` limite excedido. A concessão do escopo não substitui a permissão atual do usuário, o segmento ou a separação entre empresas.
+
+## Limites desta versão
+
+Os fluxos de escrita, pagamentos, WhatsApp, prontuários e ações administrativas continuam no portal e nas integrações próprias; a API pessoal v1 não os executa. Amplie endpoints apenas com contratos e testes específicos de permissão, auditoria, idempotência e isolamento antes de anunciar API de escrita. A implantação requer migration `accounts.0006_personal_api_token` e deploy do `web`; a validade depende do banco e da cache compartilhada.
+
+## Chatbot comercial Master e leads
+
+O modelo comercial do construtor (`/master/whatsapp/fluxo/`) apresenta os planos ativos e públicos do banco, incluindo preço mensal regular, dias de teste e módulos. Valores de promoções, extras e outros ciclos são confirmados no checkout ou pela equipe. A base de dúvidas cobre agenda, unidades, equipe, arena, pagamentos, WhatsApp, financeiro, localização e API. Perguntas fora da base são encaminhadas para confirmação humana; o assistente se identifica como virtual.
+
+O bloco **Cadastro automático de lead** coleta nome, empresa, segmento, e-mail, número de unidades e profissionais, plano de interesse e necessidade. O WhatsApp é aproveitado quando disponível; contatos com JID LID informam telefone. A partir do nome e telefone válidos, um lead é salvo e atualizado a cada resposta, com vínculo à conversa. Dúvidas durante a coleta não apagam o campo pendente. A transferência humana recebe o histórico e o resumo no Comercial. O cliente pode solicitar um atendente diretamente, sem cadastro obrigatório. Não é registrado consentimento automático de marketing.
+
+A API v1 continua somente leitura, com Bearer pessoal, limite de 60 requisições/minuto e listas paginadas em 50 registros:
+
+| GET | Escopo | Resultado |
+| --- | --- | --- |
+| `/api/v1/leads/` e `/api/v1/leads/ID/` | `commercial.read` | Nome, telefone, e-mail, segmento, origem, notas, status, consentimento, bloqueio de contato, próximo contato e datas. Comercial vê somente leads atribuídos; Master vê todos. |
+| `/api/v1/planos-publicos/` | `commercial.read` | Planos ativos/públicos, preços mensais regulares, descrição, teste e módulos; planos personalizados são sinalizados com `is_custom`. |
+| `/api/v1/chatbot-master/` | `master.read` e usuário Master | Ativação, data de alteração, quantidade de blocos, leads vinculados e conversas com transferência humana. Não retorna chaves, variáveis nem conteúdo de mensagens. |
+
+O simulador não cria leads e não envia mensagens. O fluxo real requer gateway Master conectado, automação habilitada e Celery worker/beat disponíveis. A migração instala o modelo na configuração existente, preservando ativação e credenciais; fluxos novos recebem o modelo ao abrir o construtor. O botão **Modelo comercial pronto** permite restaurar o modelo no rascunho antes de salvar.
+
+### Aplicar OpenAI
+
+1. Crie uma chave em `https://platform.openai.com/api-keys` e configure o faturamento/créditos da API, separados do ChatGPT Plus.
+2. Em **Configurar**, informe `gpt-4.1-mini` (ou outro modelo compatível com Chat Completions disponível no seu projeto), cole a chave e marque **Habilitar chamadas de IA**. Salve. A chave é criptografada e não volta a aparecer.
+3. Adicione um bloco **Agente IA** depois da entrada da pergunta. Defina a variável de saída (`resposta_ia`) e marque envio da resposta.
+4. Nas instruções, use: `Você é o assistente virtual do ApPlanner. Responda em português com acolhimento e objetividade. Use somente as informações fornecidas. Planos atuais: {{public_plans}}. Não invente preços, recursos, confirmação de pagamentos ou prazos. Se não souber, diga que a equipe vai confirmar. Não solicite senhas nem dados de cartão.`
+5. Conecte **Sucesso** ao próximo menu/cadastro e **Falha** ao atendimento humano. O simulador usa resposta fictícia; a homologação real usa a API e pode gerar cobrança. O fluxo comercial nativo funciona sem chave de IA.
+
+### Assistente IA com triagem (Master)
+
+O arquivo `communications/master-assistant-flow.json` pode ser importado no construtor. A recepção identifica novos interessados ou clientes atuais, pergunta segmento e necessidade, apresenta os planos públicos cadastrados e oferece dúvidas, proposta ou atendimento humano. A coleta comercial só começa após a triagem e a escolha de orientação/proposta; os dados recebidos são salvos progressivamente em um único lead. Pedidos explícitos de atendimento humano interrompem a automação.
+
+Nos blocos de IA, marque **Restringir à base oficial do ApPlanner**. Nesse modo, o modelo classifica a pergunta escolhendo até dois fatos aprovados; o servidor compõe a resposta exclusivamente com esses fatos e os planos ativos. Respostas livres geradas pelo modelo não são exibidas. Assuntos fora da base recebem orientação para procurar a equipe; erro de IA segue a saída de erro/atendimento humano. Apenas a mensagem atual e a base pública são enviados ao provedor, sem o cadastro do lead ou o histórico completo. O simulador não chama a API de IA. A chave permanece cifrada, e o modelo e a habilitação continuam configuráveis.
+
+### Exclusão de leads (Master)
+
+Na ficha do lead, **Gestão Master → Excluir lead** abre uma confirmação antes da remoção definitiva do cadastro, notas e histórico comercial. A ação exige Master, sessão autenticada, POST e CSRF; o comercial não possui essa permissão. Empresas, pagamentos, propostas e mensagens de WhatsApp são preservados. Conversas vinculadas passam para atendimento humano, com contexto da coleta limpo e envios pendentes cancelados, evitando a recriação automática pelo cadastro em andamento. A exclusão fica registrada na auditoria, sem copiar dados pessoais do lead. A API de leads continua de leitura, sem endpoint de exclusão.
+
+## Chatbot visual por empresa
+
+Na conexão WhatsApp, abra **Configurar chatbot**, use o modelo de atendimento,
+ajuste mensagens e caminhos, simule e salve. A aba Configurar permite ativar o
+bot e usar a IA central do Master sem copiar ou revelar a chave. É necessário
+ter WhatsApp conectado e acesso ao módulo. A equipe vê a necessidade e a unidade
+na conversa, pode assumir o atendimento e responder pelo número da própria empresa.
+
+- `GET/POST /app/comunicacao/chatbot/`: gestão autenticada, formulário com CSRF;
+  `graph_json` é o grafo v2, `enabled` ativa o bot e `ai_enabled` usa a IA central.
+- `POST /app/comunicacao/chatbot/simular/`: JSON (`graph`, `state`, `context`,
+  `waiting`, `incoming`, `resume`) com CSRF; retorna estado, contexto, mensagens,
+  espera, caminho e encaminhamento. Nenhum envio real ou consumo de IA.
+- A empresa é determinada pelo usuário; o Master usa a empresa selecionada na
+  sessão. Não se aceita trocar empresa com `tenant_id` enviado no formulário.
+- Blocos API externos e legados são rejeitados. A IA consulta exclusivamente
+  informações públicas da empresa e não confirma reservas nem pagamentos.
+
+Veja `WHATSAPP_RETURN.md` para publicação, fila, recuperação e conexão do gateway.
+
+## Modo simples para empresas (Simple Mode)
+
+Em **Master → Empresas**, use **Simple Mode · Ativar** na empresa desejada.
+A ficha da empresa também permite ativar/desativar e visualizar o ambiente.
+Somente o superusuário Master pode alterar essa opção; a mudança fica auditada.
+A configuração é por empresa e vale para todos os dispositivos, sem depender
+de preferências locais do navegador. O modo padrão continua completo.
+
+O início simplificado apresenta ações grandes, atendimentos de hoje da unidade
+selecionada, clientes, serviços e equipe, conforme as permissões e o plano.
+As ferramentas restantes ficam em **Outras ferramentas e configurações** e
+**Mais opções**. As telas internas usam controles maiores e formulários em uma
+coluna. Profissionais continuam entrando na área própria. Página pública,
+agendamentos, limites, módulos, cobrança, segurança e permissões não são alterados.
+
+`POST /master/empresas/{id}/modo-simples/`: sessão Master e CSRF obrigatórios.
+Formulário `action=enable` ou `action=disable`; `destination=detail` retorna à ficha,
+caso contrário à lista. A operação é idempotente e não aceita empresa excluída
+ou arquivada. O campo `simple_mode` não é editável nos formulários comuns.
+
+No redeploy, o entrypoint executa a migration `tenants.0012_tenant_simple_mode`.
+O botão anterior de compactação local do dashboard passa a se chamar
+**Compactar painel**, distinguindo-o do modo simples controlado pelo Master.
+
+## Links curtos e empresa verificada
+
+- Em **Operação → Links para compartilhar**, **Minha página** e na área do profissional, use **Copiar link curto**. Os links usam `PUBLIC_BASE_URL`, com rotas `/s/<código>/` para empresa e `/s/p/<código>/` para profissional. São estáveis após mudar o nome/slug; a unidade selecionada é preservada. Páginas despublicadas, empresas arquivadas e profissionais inativos não são expostos. O acesso continua sujeito à situação da assinatura.
+- **Empresa verificada** é um módulo adicional. O Master define o preço em seu catálogo e aprova/libera pelo fluxo existente de módulos. Não é incluído automaticamente nos planos.
+- Elegibilidade: sete dias completos desde a criação da empresa, empresa ativa e todas as etapas do cadastro inicial concluídas, incluindo página e pagamentos. O selo aparece somente enquanto o módulo estiver habilitado e os requisitos forem atendidos. Confirma a conclusão do cadastro no ApPlanner; não representa uma avaliação externa de qualidade.
+- O Explorar mostra a logo da unidade (ou a da empresa), com uma inicial como alternativa, e o selo quando elegível. `GET /api/directory/` retorna também `logo_url` e `verified` em cada resultado.
+- A publicação requer `python manage.py migrate`: cria o catálogo do adicional e os códigos dos cadastros existentes. O preço permanece sob definição do Master.
+
+
+### Identidade da plataforma e navegação móvel
+
+No Master → Página inicial, configure a logo padrão, a logo do tema claro, a logo do tema escuro e o ícone da aba do navegador. As logos específicas acompanham o seletor de tema em todas as telas que usam o cabeçalho da plataforma. Se uma versão não for enviada, usa-se a logo padrão ou a outra versão disponível; sem nenhuma imagem, permanece a logo oficial. O ícone aceita PNG ou ICO e os arquivos têm limite de 5 MB. Os campos podem ser limpos separadamente.
+
+No celular, a operação mostra atalhos inferiores de acordo com o papel do usuário e os módulos disponíveis. A tela Hoje permite consultar outra data pelo calendário e pela faixa de dias da semana, mantendo a unidade selecionada. O profissional acessa a própria agenda; acesso bloqueado por assinatura mostra apenas Pagamento. As ações e permissões de atendimento seguem as regras existentes.
+
+A migração `contenthub.0005` adiciona os três campos opcionais sem alterar a logo já cadastrada. A página inicial destaca o agendamento, a equipe e o relacionamento, com condições comerciais obtidas dos planos cadastrados no Master.
+
+
+### ApPlanner como aplicativo no celular
+
+A navegação móvel usa o cabeçalho compacto e os atalhos inferiores de acordo com o perfil e os módulos do usuário. Nas telas de operação, aparece a opção “ApPlanner no seu celular → Adicionar”. Quando o navegador oferece instalação, o botão abre a confirmação nativa; caso contrário, mostra instruções para adicionar à tela inicial. No iPhone, use Compartilhar → Adicionar à Tela de Início e mantenha “Abrir como App da Web” ativo quando disponível. A sugestão pode ser fechada durante a sessão e fica oculta quando aberto como aplicativo.
+
+O app instalado abre em janela própria a partir do ícone, com autenticação e navegação conforme o perfil. O ícone usa o favicon configurado pelo Master, ajustado ao formato dos lançadores móveis; sem personalização usa a identidade oficial. No navegador comum, a barra de endereço continua sob controle do próprio navegador. É necessário acesso à internet para consultar e realizar operações.
+
+Manifesto público: `GET /imagens/app.webmanifest`. Ícones PNG: `GET /imagens/app/180.png`, `/imagens/app/192.png` e `/imagens/app/512.png`. Não há service worker ou armazenamento offline de agenda, pagamentos e dados de clientes nesta versão.
+
+
+### Valor correto de PUBLIC_BASE_URL no Coolify
+
+No campo de nome da variável, use `PUBLIC_BASE_URL`; no campo de valor, use apenas `https://applanner.com.br`. Não repita `PUBLIC_BASE_URL=` dentro do valor. A inicialização normaliza esse prefixo quando colado por engano, evitando que ele apareça nos links curtos, links de e-mail e outras URLs geradas a partir da configuração pública. Salve a variável e faça redeploy para aplicar a alteração.
+
+
+### Organização da página pública
+
+A página apresenta a capa com identidade e chamada de agendamento, atalhos horizontais por seção e um resumo da unidade selecionada com endereço e horário de hoje. A reserva fica em destaque, seguida da equipe, quadras ou serviços, produtos e benefícios disponíveis, avaliações e informações completas das unidades. Os atalhos exibem apenas seções disponíveis. Os cards de serviço colocam nome, preço e duração em evidência; profissionais sem foto mostram uma inicial. A navegação de serviços mantém o mesmo catálogo do agendamento, sem duplicar os serviços ou alterar a unidade escolhida.

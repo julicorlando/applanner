@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Campanhas de e-mail — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Master</a><span class="eyebrow">COMUNICAÇÃO</span><h1>Campanhas de e-mail</h1><p>{{ eligible_count }} contatos ativos com consentimento registrado. O envio é processado pela fila periódica.</p></div></div>
+  <div class="portal-module-grid">
+    <article class="panel"><h2>Nova campanha</h2><p>Revise a mensagem antes de colocar na fila. O cancelamento interrompe os envios pendentes.</p>
+      <form method="post" action="{% url 'master-marketing-create' %}" class="portal-form">{% csrf_token %}
+        {{ campaign_form.non_field_errors }}
+        {% for field in campaign_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endfor %}
+        <button class="button primary" type="submit">Colocar na fila</button>
+      </form>
+    </article>
+    <article class="panel"><h2>Importar contatos autorizados</h2><p>CSV em UTF-8 com colunas <code>nome,email</code>, até 5.000 linhas. Contatos já existentes, inclusive descadastrados, não são reativados.</p>
+      <form method="post" enctype="multipart/form-data" action="{% url 'master-marketing-import' %}" class="portal-form">{% csrf_token %}
+        {{ import_form.non_field_errors }}
+        {% for field in import_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
+        <button class="button primary" type="submit">Importar contatos</button>
+      </form>
+      <p><a href="{% url 'master-resource-list' 'marketing-contatos' %}">Ver todos os contatos →</a></p>
+    </article>
+  </div>
+  <h2>Envios recentes</h2>
+  <div class="table-card"><table class="portal-table"><thead><tr><th>Assunto</th><th>Status</th><th>Público</th><th>Enviados</th><th>Falhas</th><th>Data</th><th></th></tr></thead><tbody>
+  {% for campaign in campaigns %}<tr><td>{{ campaign.subject }}</td><td>{{ campaign.get_status_display }}</td><td>{{ campaign.total_count }}</td><td>{{ campaign.sent_count }}</td><td>{{ campaign.failed_count }}</td><td>{{ campaign.created_at|date:'d/m/Y H:i' }}</td><td>{% if campaign.active and campaign.status != 'completed' %}<form method="post" action="{% url 'master-marketing-cancel' campaign.pk %}">{% csrf_token %}<button class="nav-link" type="submit">Cancelar pendentes</button></form>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7">Nenhuma campanha criada.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

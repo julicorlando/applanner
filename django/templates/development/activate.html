@@ -1,0 +1,3 @@
+{% extends 'development/customer_base.html' %}
+{% block title %}Crie sua senha · ApPlanner{% endblock %}
+{% block content %}<section class="dev-panel"><h1>Crie sua senha</h1>{% if invalid %}<p>Este convite expirou, já foi utilizado ou está indisponível. Solicite um novo convite ao responsável pelo desenvolvimento.</p><a href="{% url 'accounts:login' %}">Já tenho senha: entrar</a>{% else %}<p>Defina uma senha com pelo menos 12 caracteres para acessar seus próprios pagamentos.</p><form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="dev-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}<button class="dev-button" type="submit">Criar senha</button></form>{% endif %}</section>{% endblock %}

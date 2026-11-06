@@ -1,0 +1,9 @@
+<nav class="master-sidebar-tools" aria-label="Conta e ferramentas do Master">
+  <a href="{% url 'master-global-search' %}">Buscar na plataforma</a>
+  <details class="workspace-account-menu"><summary>Minha conta e ferramentas</summary><div>
+    <a href="{% url 'portal-home' %}">Abrir operação</a><a href="/commercial/">Comercial</a>
+    {% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
+    <a href="/account/2fa/setup/">Segurança da conta</a><a href="{% url 'accounts:documentation' %}">Documentação &amp; API</a>
+    <form method="post" action="/account/logout/">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form>
+  </div></details>
+</nav>

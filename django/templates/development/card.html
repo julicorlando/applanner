@@ -1,0 +1,5 @@
+{% extends 'development/customer_base.html' %}{% load static %}
+{% block content %}<a href="{% url 'development-charge' charge.pk %}">← Acompanhar pagamento</a>
+<h1>Pagar com cartão</h1><article class="dev-panel"><h2>{{ charge.description }}</h2><p class="dev-amount">R$ {{ charge.amount }}</p><p>Pagamento processado pelo Mercado Pago cadastrado no Master. Confira o valor total e as condições antes de confirmar. Os dados completos do cartão não são armazenados pelo ApPlanner.</p>
+<form id="card-csrf" hidden>{% csrf_token %}</form><div id="cardPaymentBrick_container"></div><p id="card-feedback" role="status">Carregando formulário seguro…</p></article>{{ card_config|json_script:'card-config' }}{% endblock %}
+{% block scripts %}<script src="https://sdk.mercadopago.com/js/v2"></script><script src="{% static 'js/development-card.js' %}" defer></script>{% endblock %}

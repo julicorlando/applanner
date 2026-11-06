@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Nova proposta — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'commercial-dashboard' %}">← Comercial</a><span class="eyebrow">PROPOSTA</span><h1>Nova proposta</h1></div></div>
+  <form method="post" class="portal-form panel">{% csrf_token %}
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}<div class="form-field"><label>{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    <div class="form-actions"><button class="button primary">Salvar proposta</button><a class="button ghost" href="{% url 'commercial-dashboard' %}">Cancelar</a></div>
+  </form>
+</section>
+{% endblock %}

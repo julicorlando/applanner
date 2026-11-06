@@ -1,0 +1,11 @@
+  <div class="segment-grid public-choice-grid">
+    {% for service in services %}
+    <button type="button" class="public-choice-card public-service-card{% if not tenant.public_booking_enabled %} public-choice-card--disabled{% endif %}" {% if tenant.public_booking_enabled %}data-select-service="{{ service.pk }}"{% else %}disabled{% endif %} aria-label="{% if tenant.public_booking_enabled %}Adicionar {{ service.name }} ao agendamento{% else %}{{ service.name }}{% endif %}">
+      <span>{{ service.duration_minutes }} min</span>
+      <h3>{{ service.name }}</h3>
+      <p>{{ service.description }}</p>
+      <strong>R$ {{ service.price }}</strong>
+      <span class="public-choice-card__action">{% if tenant.public_booking_enabled %}Selecionar e agendar →{% else %}Agendamento online indisponível{% endif %}</span>
+    </button>
+    {% empty %}<p class="empty">Nenhum serviço disponível.</p>{% endfor %}
+  </div>
