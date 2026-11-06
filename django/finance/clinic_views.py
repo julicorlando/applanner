@@ -10,13 +10,14 @@ from django.db.models.functions import Coalesce
 from decimal import Decimal
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
+from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from cryptography.fernet import Fernet
 from core.audit import append_audit
 from core.unit_scope import selected_unit
 from .models import CashSession,FinancialTransaction
 from scheduling.models import Appointment
-from .clinic_models import ClinicPaymentMethod,ClinicInstallment,ClinicCharge,ClinicExpense,ClinicCashClosing
+from .clinic_models import ClinicPaymentMethod,ClinicInstallment,ClinicCharge,ClinicExpense,ClinicCashClosing,ClinicReceipt
 from .clinic_forms import ChargeForm,ReceiptForm,ExpenseForm
 from . import clinic_services as services
 from .advanced_services import cash_balance
@@ -45,6 +46,12 @@ def desk(request):
     if request.method=='POST' and request.POST.get('action') in {'method','toggle-method'} and request.user.role not in {'owner','tenant-admin','manager'}:
         raise PermissionDenied('Somente a gestão pode configurar modalidades de pagamento.')
     action=request.POST.get('action') if request.method=='POST' else ''
+    management=request.user.role!='reception'
+    panel=request.GET.get('view','overview')
+    if panel not in {'overview','receive','expense','charges','close','history','settings'}:panel='overview'
+    if panel=='settings' and request.user.role not in {'owner','tenant-admin','manager'}:raise PermissionDenied
+    if request.method=='POST':
+        panel={'expense':'expense','review-expense':'expense','charge':'charges','close':'close','open':'close','method':'settings','toggle-method':'settings'}.get(action,panel)
     initial={'request_id':uuid.uuid4()}
     charge_form=ChargeForm(request.POST if action=='charge' else None,tenant=tenant,initial=initial,auto_id='charge_%s')
     expense_form=ExpenseForm(request.POST if action=='expense' else None,request.FILES if action=='expense' else None,tenant=tenant,initial={'request_id':uuid.uuid4()},auto_id='expense_%s')
@@ -93,7 +100,14 @@ def desk(request):
                 raise PermissionDenied
             else:raise ValidationError('Revise os campos indicados antes de salvar.')
             messages.success(request,'Operação registrada com sucesso.')
-            return redirect('clinic-finance-desk')
+            destination={'open':'overview','close':'history'}.get(action,panel)
+            from urllib.parse import urlencode
+            params={'view':destination}
+            if action=='review-expense':
+                try:review_day=forms.DateField().clean(request.GET.get('day'))
+                except ValidationError:review_day=None
+                if review_day:params['day']=review_day.isoformat()
+            return redirect(reverse('clinic-finance-desk')+'?'+urlencode(params))
         except ValidationError as exc:messages.error(request,' '.join(exc.messages))
     day_field=forms.DateField(required=False)
     try:day=day_field.clean(request.GET.get('day')) or timezone.localdate(timezone=services.day_bounds(tenant,timezone.localdate())[0].tzinfo)
@@ -106,15 +120,23 @@ def desk(request):
     if patient_id.isdigit():charges=charges.filter(customer_id=patient_id)
     charges=charges.order_by('-created_at')[:100]
     session=CashSession.objects.filter(tenant=tenant,unit=unit,status='open').first()
+    cash_form.fields['amount'].label='Dinheiro contado no fechamento (R$)' if session else 'Fundo inicial em dinheiro (R$)'
+    if session and not cash_form.is_bound:cash_form.initial['amount']=None
     installments=ClinicInstallment.objects.filter(charge__tenant=tenant,charge__unit=unit).select_related('charge__customer','pending_transaction').order_by('due_at','pk')
     pending=installments.annotate(received_sum=Coalesce(Sum('receipts__amount'),Value(Decimal('0')),output_field=DecimalField(max_digits=12,decimal_places=2))).filter(amount__gt=F('received_sum'))[:200]
+    query=request.GET.get('q','').strip()[:100]
+    if query:
+        pending=installments.filter(charge__customer__name__icontains=query).annotate(received_sum=Coalesce(Sum('receipts__amount'),Value(Decimal('0')),output_field=DecimalField(max_digits=12,decimal_places=2))).filter(amount__gt=F('received_sum'))[:200]
+    from .clinic_reporting import daily_ledger
+    ledger=daily_ledger(tenant=tenant,unit=unit,start=start,end=end,page=request.GET.get('page'))
+    pending_review_count=ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,created_at__gte=start,created_at__lte=end,review_status='pending').count()
     from healthcare.finance_views import allowed as legacy_receivables_allowed
-    return render(request,'finance/clinic_desk.html',{'unit':unit,'day':day,'charges':charges,'legacy_receivables_allowed':legacy_receivables_allowed(request.user),'visits':visits.select_related('customer','professional').order_by('starts_at')[:200],'waiting_count':visits.filter(status='waiting').count(),'attending_count':visits.filter(status='in_progress').count(),'completed_count':visits.filter(status='completed').count(),'summary':services.period_summary(tenant,unit,start,end),
+    return render(request,'finance/clinic_desk.html',{'pending_review_count':pending_review_count,'panel':panel,'management':management,'ledger':ledger,'query':query,'unit':unit,'day':day,'charges':charges,'legacy_receivables_allowed':legacy_receivables_allowed(request.user),'visits':visits.select_related('customer','professional').order_by('starts_at')[:200],'waiting_count':visits.filter(status='waiting').count(),'attending_count':visits.filter(status='in_progress').count(),'completed_count':visits.filter(status='completed').count(),'summary':services.period_summary(tenant,unit,start,end),
         'birthday_admin':request.user.role in {'owner','tenant-admin','manager'},'session':session,'cash_balance':cash_balance(session) if session else None,'cash_form':cash_form,
         'charge_form':charge_form,'expense_form':expense_form,'payment_form':payment_form,'pending':pending,
         'methods':ClinicPaymentMethod.objects.filter(tenant=tenant).order_by('kind','name'),
         'transactions':FinancialTransaction.objects.filter(tenant=tenant,unit=unit,status='paid',paid_at__gte=start,paid_at__lte=end).order_by('paid_at')[:300],
-        'expenses':ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,created_at__gte=start,created_at__lte=end).select_related('transaction')[:200],
+        'expenses':ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,created_at__gte=start,created_at__lte=end).select_related('transaction','recorded_by').order_by('-created_at','-pk')[:200],
         'closings':ClinicCashClosing.objects.filter(session__tenant=tenant,session__unit=unit).select_related('session').order_by('-session__closed_at')[:30]})
 
 
@@ -131,7 +153,7 @@ def receive(request,pk):
             messages.success(request,'Recebimento registrado. O saldo da parcela foi atualizado.')
             return redirect('clinic-finance-desk')
         except ValidationError as exc:form.add_error(None,exc)
-    return render(request,'finance/clinic_receipt.html',{'row':row,'form':form})
+    return render(request,'finance/clinic_receipt.html',{'row':row,'form':form,'session':CashSession.objects.filter(tenant=tenant,unit=unit,status='open').first()})
 
 
 @login_required

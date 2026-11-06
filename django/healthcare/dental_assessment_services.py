@@ -386,9 +386,13 @@ def save_assessment(*, form, user, assessment_id=None, finalize=False, request=N
     return row
 
 
-def read_assessment_document(*, document, user, request=None):
-    read_assessment(assessment=document.assessment, user=user, request=request)
-    if document.removed_at:
+def read_assessment_document(*, document, user, request=None, version=None):
+    payload=read_assessment(assessment=document.assessment, user=user, request=request,version=version)
+    if version is not None and document.pk not in [d.get('id') for d in payload.get('documents',[]) if isinstance(d,dict)]:
+        raise PermissionDenied("Documento não pertence a esta versão do prontuário.")
+    if version is not None and not any(d.get('id')==document.pk and d.get('sha256')==document.sha256 for d in payload.get('documents',[]) if isinstance(d,dict)):
+        raise ValidationError("Integridade do documento histórico inválida.")
+    if document.removed_at and version is None:
         raise PermissionDenied("Documento desvinculado do rascunho.")
     raw = Fernet(settings.FIELD_ENCRYPTION_KEY.encode()).decrypt(
         bytes(document.content_encrypted)
@@ -402,5 +406,6 @@ def read_assessment_document(*, document, user, request=None):
         action="clinical.assessment.document.downloaded",
         entity_type="DentalAssessmentDocument",
         entity_id=document.pk,
+        after={"version":version or document.assessment.version},
     )
     return raw, decrypt_text(document.filename_encrypted)

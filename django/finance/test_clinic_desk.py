@@ -91,7 +91,7 @@ class ClinicDeskTests(TestCase):
 
     def test_reception_can_operate_but_cannot_read_clinical_records_or_other_finances(self):
         response=self.client.get(reverse('clinic-finance-desk'));self.assertEqual(response.status_code,200)
-        self.assertContains(response,'Valor cobrado no dia');self.assertContains(response,'Valor recebido no dia')
+        self.assertContains(response,'Recebido no dia');self.assertContains(response,'Gastos pagos')
         self.assertEqual(self.client.get(reverse('clinical-dashboard')).status_code,403)
         self.assertEqual(self.client.get(reverse('finance-commissions')).status_code,403)
         self.assertEqual(self.client.get(reverse('clinic-birthday-settings')).status_code,403)
@@ -193,7 +193,7 @@ class ClinicDeskTests(TestCase):
         item=list(response.context['charges'])[0]
         self.assertEqual(item.amount,Decimal('200'));self.assertEqual(item.received_total,Decimal('40'))
         self.assertEqual(item.balance,Decimal('160'))
-        self.assertContains(response,'Valores por paciente e plano de pagamento')
+        self.assertContains(self.client.get(reverse('clinic-finance-desk'),{'view':'charges'}),'Valores por paciente e plano de pagamento')
 
     def test_dentist_sees_only_payment_plans_assigned_to_own_profile(self):
         from scheduling.models import Professional
@@ -221,11 +221,37 @@ class ClinicDeskTests(TestCase):
 
     def test_closed_cash_has_visible_guidance_and_no_receiving_link(self):
         self.charge()
-        response=self.client.get(reverse('clinic-finance-desk'))
+        response=self.client.get(reverse('clinic-finance-desk'),{'view':'receive'})
         self.assertContains(response,'Caixa fechado')
         self.assertContains(response,'Abra o caixa para receber')
-        self.assertContains(response,'fieldset disabled')
+        self.assertContains(self.client.get(reverse('clinic-finance-desk'),{'view':'expense'}),'fieldset disabled')
         self.assertNotContains(response,'Cadastrar modalidade')
+
+    def test_cash_panels_separate_reception_work_from_management(self):
+        url=reverse('clinic-finance-desk')
+        response=self.client.get(url)
+        self.assertContains(response,'Caixa da recepção')
+        self.assertNotContains(response,'name="action" value="expense"')
+        self.assertNotContains(response,'Validar despesa')
+        self.assertEqual(self.client.get(url,{'view':'settings'}).status_code,403)
+        self.client.force_login(self.owner)
+        self.assertContains(self.client.get(url),'Financeiro da clínica')
+        self.assertContains(self.client.get(url,{'view':'settings'}),'Cadastrar modalidade')
+
+    def test_daily_ledger_names_patient_operator_and_excludes_other_tenant(self):
+        s.open_clinic_cash(self.reception,self.unit,'0')
+        self.receive(self.charge(amount='100').installments.get(),'35',self.pix)
+        foreign=Tenant.objects.create(name='Outra',slug='other-ledger-clinic')
+        FinancialTransaction.objects.create(tenant=foreign,type='income',status='paid',paid_at=timezone.now(),amount='999',description='Movimento privado de outra clínica')
+        self.client.force_login(self.owner)
+        response=self.client.get(reverse('clinic-finance-desk'))
+        ledger=list(response.context['ledger'])
+        self.assertEqual(len(ledger),1)
+        self.assertEqual(ledger[0].patient_name,self.patient.name)
+        self.assertEqual(ledger[0].operator_name,self.reception.email)
+        self.assertEqual(ledger[0].amount,Decimal('35'))
+        self.assertNotContains(response,'Movimento privado de outra clínica')
+        self.assertContains(response,'Registrado por')
 
     def test_expense_review_requires_management_and_preserves_paid_movement(self):
         s.open_clinic_cash(self.reception,self.unit,'100')
@@ -252,7 +278,7 @@ class ClinicDeskTests(TestCase):
         response=self.client.get(reverse('operation-performance'))
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.context['clinical_finance']['received'],'30.00')
-        self.assertContains(response,'Como está o financeiro?')
+        self.assertContains(response,'Conferência financeira da clínica')
         self.assertContains(response,'Fluxo financeiro do período')
 
     def test_owner_report_excludes_exact_midnight_of_following_day(self):
@@ -287,9 +313,8 @@ class ClinicDeskTests(TestCase):
             def handle_starttag(self,tag,attrs):
                 attrs=dict(attrs)
                 if tag in {'input','select','textarea'} and attrs.get('id'):self.ids.append(attrs['id'])
-        response=self.client.get(reverse('clinic-finance-desk'))
-        parser=Controls();parser.feed(response.content.decode())
-        self.assertEqual(len(parser.ids),len(set(parser.ids)))
-        self.assertContains(response,'id="cash_amount"')
-        self.assertContains(response,'id="charge_amount"')
-        self.assertContains(response,'id="expense_amount"')
+        for panel,control in [('close','cash_amount'),('charges','charge_amount'),('expense','expense_amount')]:
+            response=self.client.get(reverse('clinic-finance-desk'),{'view':panel})
+            parser=Controls();parser.feed(response.content.decode())
+            self.assertEqual(len(parser.ids),len(set(parser.ids)))
+            self.assertContains(response,'id="'+control+'"')

@@ -155,3 +155,10 @@
 .dental-workspace .dd-tools-menu{position:absolute;right:0;top:calc(100% + 8px);width:min(250px,80vw);padding:8px;background:var(--dd-card);border:1px solid var(--dd-line);border-radius:12px;box-shadow:var(--dd-shadow);z-index:130}
 .dental-workspace .dd-tools-menu a{display:block;padding:12px;border-radius:8px;text-decoration:none;font-size:14px}
 .dental-workspace .dd-tools-menu a:hover{background:var(--dd-soft)}
+.dental-workspace .da-history-card{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.dental-workspace .da-history-card h3{margin:4px 0}.dental-workspace .da-history-card p{margin:4px 0}
+.dental-workspace .da-history-date{font-size:12px;color:var(--dd-muted)}
+.dental-workspace .da-history-versions{width:100%;border-top:1px solid var(--dd-line)}
+.dental-workspace .da-history-versions a{display:block;padding:12px 0;border-bottom:1px solid var(--dd-line)}
+.dental-workspace .da-read-text{white-space:normal;overflow-wrap:anywhere;padding:12px 0;color:var(--dd-text);line-height:1.75}
+.dental-workspace .da-snapshot{border-left:3px solid var(--dd-primary)!important}

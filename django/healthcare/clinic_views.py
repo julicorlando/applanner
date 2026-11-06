@@ -140,6 +140,9 @@ def record_detail(request,pk):
     payload=unpack(entry,request.user)
     if getattr(entry,"physio_assessment",None) and not request.GET.get("retificar"):
         return redirect("physio-assessment-detail",pk=entry.physio_assessment.pk)
+    if request.method in {'GET','HEAD'} and getattr(entry,"dental_assessment",None) and not request.GET.get("retificar"):
+        from django.urls import reverse
+        return redirect(reverse('dental-assessment-detail',args=[entry.dental_assessment.pk])+'?view=full')
     owner=entry.professional.user_id==request.user.pk
     forms={"correct":RectificationForm(),"attach":AttachmentForm(),"grant":CareGrantForm(user=request.user),
            "followup":FollowUpForm(),"status":TreatmentStatusForm()}
