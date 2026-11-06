@@ -275,6 +275,7 @@ def assessment_editor(request, pk=None):
             "versions": row.versions.all().order_by("-number") if row and owner else [],
             "professional_profiles": profiles,
             "signature": payload.get("signature") or payload.get("professional", {}),
+            "rectifications": clinical_records_for(user=request.user,tenant=request.user.tenant).filter(supersedes_id=row.final_entry_id).order_by('created_at') if row and row.final_entry_id else [],
         },
         status=status,
     )

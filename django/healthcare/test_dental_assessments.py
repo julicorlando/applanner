@@ -23,6 +23,13 @@ class DentalAssessmentTests(TestCase):
         response=self.client.get(url)
         self.assertRedirects(response,reverse('dental-assessment-detail',args=[row.pk])+'?view=full')
         self.assertEqual(self.client.get(url,{'retificar':'1'}).status_code,200)
+        from .services import create_record
+        correction=create_record(tenant=self.tenant,customer=self.patient,professional=self.professional,user=self.doctor,
+            title='Retificação rastreável',content='Correção preservada',supersedes=row.final_entry,correction_reason='Complementação')
+        response=self.client.get(reverse('dental-assessment-detail',args=[row.pk]),{'view':'full'})
+        self.assertContains(response,reverse('clinical-record',args=[correction.pk]))
+        response=self.client.get(reverse('clinical-record',args=[row.treatment_plan.entry_id]))
+        self.assertContains(response,reverse('dental-assessment-detail',args=[row.pk])+'?view=full')
 
     def test_management_ledger_uses_only_administrative_plan_metadata(self):
         from .clinical import change_treatment_status

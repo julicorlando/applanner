@@ -147,6 +147,12 @@ def record_detail(request,pk):
     forms={"correct":RectificationForm(),"attach":AttachmentForm(),"grant":CareGrantForm(user=request.user),
            "followup":FollowUpForm(),"status":TreatmentStatusForm()}
     plan=getattr(entry,"treatment_budget",None)
+    dental_full_record=getattr(plan,'dental_assessment',None) if plan else None
+    if dental_full_record:
+        from .dental_assessment_services import assessments_for
+        try:
+            if not assessments_for(request.user).filter(pk=dental_full_record.pk).exists():dental_full_record=None
+        except PermissionDenied:dental_full_record=None
     if request.method=="POST":
         if not owner:raise PermissionDenied
         action=request.POST.get("action")
@@ -197,7 +203,7 @@ def record_detail(request,pk):
         from core.portal import PhysiotherapyRecordForm
         f=PhysiotherapyRecordForm()
         fields.extend({"label":f.fields[key].label,"value":value} for key,value in sections.items() if key in f.fields and isinstance(value,(str,int,float)) and value!="")
-    return render(request,"healthcare/clinical_record.html",{"entry":entry,"correction_reason":decrypt_text(entry.correction_reason_encrypted) if entry.correction_reason_encrypted else "","payload":payload,"fields":fields,"forms":forms,"owner":owner,"plan":plan,
+    return render(request,"healthcare/clinical_record.html",{"dental_full_record":dental_full_record,"entry":entry,"correction_reason":decrypt_text(entry.correction_reason_encrypted) if entry.correction_reason_encrypted else "","payload":payload,"fields":fields,"forms":forms,"owner":owner,"plan":plan,
         "attachments":entry.attachments.all(),"grants":ClinicalCareGrant.objects.filter(tenant=tenant,customer=entry.customer,source_professional=entry.professional,revoked_at__isnull=True).select_related("grantee") if owner else [],
         "chart_json":json.dumps(payload.get("odontogram",{})),"followups":entry.followups.all(),
         "packages":entry.customer.packages.filter(status="active") if owner else []})
