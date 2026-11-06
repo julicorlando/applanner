@@ -136,7 +136,7 @@
 }
 @media(prefers-reduced-motion:reduce){.dental-workspace *{transition:none!important;scroll-behavior:auto!important}}
 @media print{
- .dental-workspace{background:white!important;color:#111827!important}
+ .dental-workspace{--dd-text:#111827!important;--dd-muted:#374151!important;--dd-card:#ffffff!important;--dd-soft:#f1f5f9!important;--dd-line:#cbd5e1!important;--dd-primary:#1d4ed8!important;background:white!important;color:#111827!important}
  .dental-workspace #conteudo{margin:0!important}
  .dental-workspace :is(.pa-topbar,.pa-sidebar){display:none!important}
  .dental-workspace :is(.pa-card,.co-card,.panel,.card,td,th){background:white!important;color:#111827!important;box-shadow:none}
@@ -155,3 +155,10 @@
 .dental-workspace .dd-tools-menu{position:absolute;right:0;top:calc(100% + 8px);width:min(250px,80vw);padding:8px;background:var(--dd-card);border:1px solid var(--dd-line);border-radius:12px;box-shadow:var(--dd-shadow);z-index:130}
 .dental-workspace .dd-tools-menu a{display:block;padding:12px;border-radius:8px;text-decoration:none;font-size:14px}
 .dental-workspace .dd-tools-menu a:hover{background:var(--dd-soft)}
+.dental-workspace .da-history-card{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.dental-workspace .da-history-card h3{margin:4px 0}.dental-workspace .da-history-card p{margin:4px 0}
+.dental-workspace .da-history-date{font-size:12px;color:var(--dd-muted)}
+.dental-workspace .da-history-versions{width:100%;border-top:1px solid var(--dd-line)}
+.dental-workspace .da-history-versions a{display:block;padding:12px 0;border-bottom:1px solid var(--dd-line)}
+.dental-workspace .da-read-text{white-space:normal;overflow-wrap:anywhere;padding:12px 0;color:var(--dd-text);line-height:1.75}
+.dental-workspace .da-snapshot{border-left:3px solid var(--dd-primary)!important}

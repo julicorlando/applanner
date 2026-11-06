@@ -16,6 +16,75 @@ from .dentistry import dental_history
 
 
 class DentalAssessmentTests(TestCase):
+    def test_clinical_history_link_opens_full_dental_record_and_keeps_rectification_route(self):
+        row=self.save(final=True)
+        self.client.force_login(self.doctor)
+        url=reverse('clinical-record',args=[row.final_entry_id])
+        response=self.client.get(url)
+        self.assertRedirects(response,reverse('dental-assessment-detail',args=[row.pk])+'?view=full')
+        self.assertEqual(self.client.get(url,{'retificar':'1'}).status_code,200)
+        from .services import create_record
+        correction=create_record(tenant=self.tenant,customer=self.patient,professional=self.professional,user=self.doctor,
+            title='Retificação rastreável',content='Correção preservada',supersedes=row.final_entry,correction_reason='Complementação')
+        response=self.client.get(reverse('dental-assessment-detail',args=[row.pk]),{'view':'full'})
+        self.assertContains(response,reverse('clinical-record',args=[correction.pk]))
+        response=self.client.get(reverse('clinical-record',args=[row.treatment_plan.entry_id]))
+        self.assertContains(response,reverse('dental-assessment-detail',args=[row.pk])+'?view=full')
+
+    def test_management_ledger_uses_only_administrative_plan_metadata(self):
+        from .clinical import change_treatment_status
+        from finance.models import FinancialTransaction
+        self.enable_finance()
+        row=self.save(final=True)
+        change_treatment_status(plan=row.treatment_plan,user=self.doctor,status='accepted',attestation=True)
+        tx=FinancialTransaction.objects.get(source_type='clinical-plan',source_id=row.treatment_plan_id)
+        tx.status='paid';tx.paid_at=__import__('django.utils.timezone',fromlist=['now']).now();tx.save()
+        self.client.force_login(self.owner)
+        response=self.client.get(reverse('clinic-finance-desk'))
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,self.patient.name)
+        self.assertNotContains(response,'Exame confidencial')
+        self.assertNotContains(response,'Histórico confidencial')
+    def test_saved_history_opens_complete_snapshot_without_editing_it(self):
+        row=self.save(chief_complaint='Queixa na primeira versão',medical_history='Anamnese inicial completa',initial_evolution='Evolução inicial')
+        self.save(row,chief_complaint='Queixa corrigida na segunda versão')
+        self.client.force_login(self.doctor)
+        url=reverse('dental-assessment-detail',args=[row.pk])
+        response=self.client.get(url,{'version':1})
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'Prontuário completo · versão 1')
+        self.assertContains(response,'Queixa na primeira versão')
+        self.assertContains(response,'Anamnese inicial completa')
+        self.assertContains(response,'Evolução inicial')
+        self.assertContains(response,'<div class="da-read-text">Hipótese em avaliação</div>',html=True)
+        self.assertNotContains(response,'data-dental-editor="goals"')
+        self.assertNotContains(response,'Queixa corrigida na segunda versão')
+        self.assertNotContains(response,'name="action" value="draft"')
+        self.assertEqual(self.client.post(url+'?version=1',{'action':'draft'}).status_code,403)
+        row.refresh_from_db();self.assertEqual(row.version,2)
+        response=self.client.get(reverse('dental-assessments'),{'customer':self.patient.pk})
+        self.assertContains(response,url+'?view=full')
+        self.assertContains(response,url+'?version=1')
+        response=self.client.get(url,{'view':'full'})
+        self.assertContains(response,'Queixa corrigida na segunda versão')
+        self.assertContains(response,'Continuar rascunho atual')
+
+    def test_historical_document_is_available_only_in_its_original_version_to_author(self):
+        stream=BytesIO();Image.new('RGB',(16,16),'white').save(stream,format='PNG')
+        form=AssessmentForm(self.data(),{'documents':[SimpleUploadedFile('exame.png',stream.getvalue(),content_type='image/png')]},user=self.doctor)
+        self.assertTrue(form.is_valid(),form.errors)
+        row=save_assessment(form=form,user=self.doctor)
+        doc=row.documents.get()
+        self.save(row,remove_documents=[doc.pk])
+        self.client.force_login(self.doctor)
+        url=reverse('dental-assessment-document',args=[doc.pk])
+        self.assertEqual(self.client.get(url).status_code,404)
+        self.assertEqual(self.client.get(url,{'version':1}).status_code,200)
+        self.assertEqual(self.client.get(url,{'version':2}).status_code,403)
+        self.assertEqual(self.client.get(url,{'version':0}).status_code,404)
+        self.client.force_login(self.reception)
+        self.assertEqual(self.client.get(url,{'version':1}).status_code,403)
+
     def create(self, **kwargs):
         return fixtures.AssessmentTests.create(self, **kwargs)
 

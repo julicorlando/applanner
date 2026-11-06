@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.urls import reverse
 from django import forms
 from django.core.paginator import Paginator
-from django.db.models import Exists, OuterRef, Subquery
+from django.db.models import Exists, OuterRef, Subquery, Prefetch
 from accounts.permissions import has_capability
 from billing.entitlements import require_module
 from core.audit import append_audit
@@ -26,7 +26,7 @@ from .dental_assessment_services import (
     AssessmentConflict,
 )
 from .navigation import shell_context
-from .models import DentalAssessmentDocument
+from .models import DentalAssessmentDocument, DentalAssessmentVersion
 from .services import clinical_records_for
 
 
@@ -36,7 +36,19 @@ def _integer(value):
     return int(value)
 
 
-def _documents(row):
+def _snapshot_age(payload):
+    from datetime import date
+    try:
+        birth=date.fromisoformat(str(payload.get('patient',{}).get('birth_date','')))
+        evaluated=date.fromisoformat(str(payload.get('sections',{}).get('evaluation_date','')))
+    except (ValueError,TypeError):return None
+    return evaluated.year-birth.year-((evaluated.month,evaluated.day)<(birth.month,birth.day))
+
+
+def _documents(row, payload=None, historical=None):
+    documents=row.documents.filter(removed_at__isnull=True)
+    if historical:
+        documents=row.documents.filter(pk__in=[d['id'] for d in (payload or {}).get('documents',[]) if isinstance(d,dict) and isinstance(d.get('id'),int)])
     return [
         {
             "id": d.pk,
@@ -44,8 +56,9 @@ def _documents(row):
             "size": d.size,
             "mime": d.mime_type,
             "kind": d.kind,
+            "version": historical,
         }
-        for d in row.documents.filter(removed_at__isnull=True).order_by("created_at")
+        for d in documents.order_by("created_at")
     ]
 
 
@@ -57,6 +70,7 @@ def assessment_list(request):
     rows = (
         assessments_for(request.user)
         .select_related("customer", "professional__clinical_registration", "professional__user")
+        .prefetch_related(Prefetch('versions',queryset=DentalAssessmentVersion.objects.filter(created_by=request.user).only('assessment_id','number','status','created_at').order_by('-number'),to_attr='history_versions'))
         .order_by("-updated_at", "-pk")
     )
     legacy_entries = (
@@ -105,12 +119,12 @@ def assessment_editor(request, pk=None):
         else None
     )
     historical = None
+    version_row = None
     if request.GET.get("version"):
         if not row:
             raise Http404
         historical = _integer(request.GET["version"])
-        if not row.versions.filter(number=historical).exists():
-            raise Http404
+        version_row=get_object_or_404(row.versions.only('number','status','created_at'),number=historical)
     payload = (
         read_assessment(
             assessment=row, user=request.user, request=request, version=historical
@@ -122,7 +136,7 @@ def assessment_editor(request, pk=None):
         row.created_by_id == request.user.pk
         and row.professional.user_id == request.user.pk
     )
-    readonly = bool(row and (row.status == "finalized" or historical or not owner))
+    readonly = bool(row and (row.status == "finalized" or historical or not owner or request.GET.get('view')=='full'))
     if request.method == "POST" and readonly:
         if (
             owner
@@ -244,29 +258,24 @@ def assessment_editor(request, pk=None):
             "readonly": readonly,
             "owner": owner,
             "historical": historical,
-            "documents": _documents(row) if row else [],
+            "display_version": historical or (row.version if row else None),
+            "snapshot_status": version_row.get_status_display() if version_row else (row.get_status_display() if row else ''),
+            "snapshot_date": version_row.created_at if version_row else (row.updated_at if row else None),
+            "documents": _documents(row,payload,historical) if row else [],
             "payload": payload,
             "patient_initials": "".join(
                 word[0]
                 for word in payload.get("patient", {}).get("name", "").split()[:2]
             ).upper(),
-            "patient_age": (
-                timezone.localdate().year
-                - row.customer.birth_date.year
-                - (
-                    (timezone.localdate().month, timezone.localdate().day)
-                    < (row.customer.birth_date.month, row.customer.birth_date.day)
-                )
-            )
-            if row and row.customer.birth_date
-            else None,
+            "patient_age": _snapshot_age(payload),
             "sections": display_data,
             "text_fields": [form[name] for name in TEXT_FIELDS],
             "body_areas": {},
             "surfaces": sorted(__import__("healthcare.dentistry",fromlist=["SURFACES"]).SURFACES),
             "versions": row.versions.all().order_by("-number") if row and owner else [],
             "professional_profiles": profiles,
-            "signature": payload.get("signature", {}),
+            "signature": payload.get("signature") or payload.get("professional", {}),
+            "rectifications": clinical_records_for(user=request.user,tenant=request.user.tenant).filter(supersedes_id=row.final_entry_id).order_by('created_at') if row and row.final_entry_id else [],
         },
         status=status,
     )
@@ -323,16 +332,18 @@ def patient_options(request, pk):
 @never_cache
 def assessment_document(request, pk):
     authorize(request.user)
+    historical=_integer(request.GET['version']) if request.GET.get('version') else None
     document = get_object_or_404(
         DentalAssessmentDocument.objects.select_related(
             "assessment__professional", "assessment__final_entry", "assessment__tenant"
         ),
         pk=pk,
         assessment__in=assessments_for(request.user),
-        removed_at__isnull=True,
     )
+    if historical is None and document.removed_at:raise Http404
+    if historical is not None and not document.assessment.versions.filter(number=historical).exists():raise Http404
     raw, filename = read_assessment_document(
-        document=document, user=request.user, request=request
+        document=document, user=request.user, request=request, version=historical
     )
     response = FileResponse(
         BytesIO(raw),

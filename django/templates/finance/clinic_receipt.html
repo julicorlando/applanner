@@ -1,1 +1,16 @@
-{% extends 'base.html' %}{% block title %}Registrar recebimento{% endblock %}{% block content %}<main class="shell panel"><a href="{% url 'clinic-finance-desk' %}">← Caixa e financeiro diário</a><h1>Registrar valor recebido</h1><p>{{ row.charge.customer.name }} · {{ row.charge.description }} · Parcela {{ row.number }}</p><p>Valor cobrado: R$ {{ row.amount }} · Saldo a receber: R$ {{ row.remaining }}</p><p>Informe somente o valor efetivamente recebido agora. Recebimentos parciais mantêm o saldo pendente. Pix e cartão são baixas manuais conferidas pela recepção, sem confirmação automática do banco.</p><p>No cartão, registre o valor pago pelo paciente; lance taxas da operadora como despesa para não gerar saldo indevido na conta do paciente.</p><form method="post">{% csrf_token %}{{ form.as_p }}<button>Confirmar recebimento</button></form></main>{% endblock %}
+{% extends 'base.html' %}{% load static display_pt %}
+{% block title %}Receber de paciente{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'finance/clinic-desk.css' %}">
+<main class="shell clinic-desk">
+<a href="{% url 'clinic-finance-desk' %}?view=receive">← Voltar para recebimentos</a>
+<header class="desk-heading"><div><span class="desk-eyebrow">RECEPÇÃO · RECEBIMENTO</span><h1>Receber de paciente</h1><p>{{ row.charge.customer.name }}</p></div></header>
+<div class="desk-two-columns">
+<section class="co-card"><h2>Registrar valor recebido</h2><p>Informe o valor que entrou agora e escolha a modalidade.</p>
+{% if not session %}<aside class="desk-notice">Caixa fechado. <a href="{% url 'clinic-finance-desk' %}?view=close">Abra o caixa para receber.</a></aside>{% endif %}
+<form method="post">{% csrf_token %}{{ form.non_field_errors }}<fieldset {% if not session %}disabled{% endif %}>{{ form.as_p }}<button type="submit">Confirmar recebimento</button></fieldset></form>
+</section>
+<section class="co-card"><h2>Resumo da cobrança</h2><p>{{ row.charge.description }}</p><div class="desk-method-list"><div><span>Parcela</span><strong>{{ row.number }}</strong></div><div><span>Valor cobrado nesta parcela</span><strong>R$ {{ row.amount|money_pt }}</strong></div><div><span>Saldo a receber</span><strong>R$ {{ row.remaining|money_pt }}</strong></div><div><span>Vencimento</span><strong>{{ row.due_at|date:'d/m/Y' }}</strong></div></div>
+<details><summary>Pagamento parcial, Pix e cartão</summary><p>Para combinar modalidades, registre cada valor separadamente. O saldo restante permanece em aberto.</p><p>Pix e cartão são baixas manuais conferidas pela recepção, sem confirmação automática do banco. No cartão, registre o valor pago pelo paciente; taxas da operadora são despesas separadas.</p></details>
+</section></div>
+</main>{% endblock %}
