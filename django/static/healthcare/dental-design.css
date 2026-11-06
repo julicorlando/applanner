@@ -136,7 +136,7 @@
 }
 @media(prefers-reduced-motion:reduce){.dental-workspace *{transition:none!important;scroll-behavior:auto!important}}
 @media print{
- .dental-workspace{background:white!important;color:#111827!important}
+ .dental-workspace{--dd-text:#111827!important;--dd-muted:#374151!important;--dd-card:#ffffff!important;--dd-soft:#f1f5f9!important;--dd-line:#cbd5e1!important;--dd-primary:#1d4ed8!important;background:white!important;color:#111827!important}
  .dental-workspace #conteudo{margin:0!important}
  .dental-workspace :is(.pa-topbar,.pa-sidebar){display:none!important}
  .dental-workspace :is(.pa-card,.co-card,.panel,.card,td,th){background:white!important;color:#111827!important;box-shadow:none}
