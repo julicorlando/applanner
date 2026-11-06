@@ -17,7 +17,7 @@ from core.audit import append_audit
 from core.unit_scope import selected_unit
 from .models import CashSession,FinancialTransaction
 from scheduling.models import Appointment
-from .clinic_models import ClinicPaymentMethod,ClinicInstallment,ClinicCharge,ClinicExpense,ClinicCashClosing,ClinicReceipt
+from .clinic_models import ClinicPaymentMethod,ClinicInstallment,ClinicCharge,ClinicExpense,ClinicCashClosing
 from .clinic_forms import ChargeForm,ReceiptForm,ExpenseForm
 from . import clinic_services as services
 from .advanced_services import cash_balance
