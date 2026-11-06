@@ -93,9 +93,11 @@
 .dental-workspace :is(.modal-content,dialog,.dropdown-menu,.popover,.calendar-toolbar,.pa-more>div,.pa-map-options>div,.co-tools[open]){background:var(--dd-card)!important;color:var(--dd-text)!important;border:1px solid var(--dd-line)!important;border-radius:12px;box-shadow:var(--dd-shadow)}
 .dental-workspace dialog{max-width:calc(100vw - 32px)}
 .dental-workspace dialog::backdrop{background:#11182799;backdrop-filter:blur(3px)}
-.dental-workspace :is(.calendar-grid,.calendar-slot,.calendar-board,.calendar-day,.calendar-event,.calendar-block,.professional-card,.operation-day-card,.simple-day-summary){background:var(--dd-card)!important;color:var(--dd-text)!important;border-color:var(--dd-line)!important}
+.dental-workspace.physio-workspace :is(.calendar-grid,.calendar-slot,.calendar-board,.calendar-day,.calendar-event,.calendar-block,.professional-card,.operation-day-card,.simple-day-summary){background:var(--dd-card)!important;color:var(--dd-text)!important;border-color:var(--dd-line)!important}
 .dental-workspace :is(.calendar-day>h2,.calendar-event p,.calendar-event small,.portal-heading p,.clinical-wrap p){color:var(--dd-muted)!important;background:transparent!important}
-.dental-workspace .calendar-window{background:var(--dd-soft)!important;color:var(--dd-primary)!important;border-color:var(--dd-line)!important}
+.dental-workspace.physio-workspace :is(.calendar-day>h2,.calendar-event time,.calendar-free span,.calendar-free-list summary){color:var(--dd-text)!important;background:transparent!important}
+.dental-workspace.physio-workspace :is(.calendar-free,.calendar-window){background:var(--dd-soft)!important;color:var(--dd-text)!important;border-color:var(--dd-line)!important}
+.dental-workspace.physio-workspace :is(.calendar-event a,.calendar-free a,.calendar-day-link){color:var(--dd-primary)!important}
 .dental-workspace :is(.portal-header,.page-header,.calendar-header,.professional-hero,.operation-hero,.physio-hero){background:var(--dd-card)!important;color:var(--dd-text)!important;border-color:var(--dd-line)!important}
 .dental-workspace :is(.badge,.status-badge,.pill,.desk-status){background:var(--dd-soft);color:var(--dd-primary);border-color:var(--dd-line);border-radius:24px;font-size:12px;padding:6px 10px}
 .dental-workspace :is(.desk-notice,.alert-warning){background:var(--dd-orange-bg);color:var(--dd-orange);border:1px solid var(--dd-orange);border-radius:12px;padding:16px 20px}
