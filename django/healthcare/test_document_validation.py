@@ -17,6 +17,9 @@ VALID_CPF = "529.982.247-25"
 
 
 class DocumentValidationTests(TestCase):
+    def create(self, **kwargs):
+        return delivery.fixtures.ClinicalSecurityTests.create(self, **kwargs)
+
     def setUp(self):
         delivery.ClinicalDocumentDeliveryTests.setUp(self)
         self.patient.name = "Paciente Fictício da Silva"
@@ -103,6 +106,9 @@ class DocumentValidationTests(TestCase):
 
 
 class PatientRegistrationTests(TestCase):
+    def create(self, **kwargs):
+        return delivery.fixtures.ClinicalSecurityTests.create(self, **kwargs)
+
     def setUp(self):
         delivery.ClinicalDocumentDeliveryTests.setUp(self)
 
