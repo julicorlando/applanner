@@ -369,4 +369,4 @@ from .advanced_models import CashMovement, MaterialConsumption, ServiceMaterial 
 
 from .market_models import CommissionPolicy, CommissionTier, CommissionSnapshot, GiftCard, GiftCardEntry  # noqa: F401,E402
 
-from .clinic_models import ClinicPaymentMethod, ClinicCharge, ClinicInstallment, ClinicReceipt, ClinicExpense, ClinicCashClosing  # noqa: F401,E402
+from .clinic_models import ClinicPaymentMethod, ClinicCharge, ClinicInstallment, ClinicReceipt, ClinicExpense, ClinicCashClosing, ClinicCashEntry, ClinicCashCorrection  # noqa: F401,E402

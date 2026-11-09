@@ -3,6 +3,7 @@ from . import clinic_views as views
 from . import assessment_views as assessments
 from . import waiting_room, offline, rooms, document_views
 from finance import clinic_views as finance
+from finance import clinic_cash
 from . import treatment_sales
 from communications.birthdays import configuration as birthday_configuration
 urlpatterns=[
@@ -15,6 +16,8 @@ urlpatterns=[
     path('assinatura/',document_views.signature,name='clinical-signature'),
     path('assinatura/imagem/',document_views.signature_image,name='clinical-signature-image'),
     path("financeiro/aniversarios/",birthday_configuration,name="clinic-birthday-settings"),
+    path('financeiro/caixa/',clinic_cash.cash_sheet,name='clinic-cash-sheet'),
+    path('financeiro/caixa/<int:pk>/',clinic_cash.cash_sheet,name='clinic-cash-sheet-detail'),
     path('financeiro/',finance.desk,name='clinic-finance-desk'),
     path('financeiro/receber/<int:pk>/',finance.receive,name='clinic-finance-receive'),
     path('financeiro/comprovante/<int:pk>/',finance.photo,name='clinic-finance-photo'),
