@@ -6,7 +6,7 @@
 <a href="{% url 'dental-assessment-create' %}?customer={{ patient.pk }}">Registrar evolução</a><button type="button" onclick="window.print()">Imprimir / salvar PDF</button>
 {% for item in history %}
 <article style="border:1px solid #ddd;border-radius:12px;padding:18px;margin:18px 0">
-<h2>{{ item.created_at|date:"d/m/Y H:i" }}</h2>
+<h2>{% if item.transcribed %}{{ item.clinical_date|date:"d/m/Y" }} <small>· prontuário anterior transcrito na implantação em {{ item.created_at|date:"d/m/Y H:i" }}</small>{% else %}{{ item.created_at|date:"d/m/Y H:i" }}{% endif %}</h2>
 <p><strong>Anamnese:</strong> {{ item.data.anamnesis|linebreaksbr }}</p>
 <p><strong>Achados:</strong> {{ item.data.findings|linebreaksbr }}</p>
 <p><strong>Procedimentos:</strong> {{ item.data.procedures|linebreaksbr }}</p>

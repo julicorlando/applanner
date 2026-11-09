@@ -22,6 +22,7 @@ from .professional_materials import materials
 urlpatterns = [
     path("odontologia/dashboard/",physio_workspace.dashboard,name="dental-dashboard"),
     path("odontologia/configuracoes/",physio_workspace.settings,name="dental-settings"),
+    path("odontologia/implantacao/",physio_workspace.implementation,name="dental-implementation"),
     path("fisioterapia/dashboard/",physio_workspace.dashboard,name="physio-dashboard"),
     path("fisioterapia/configuracoes/",physio_workspace.settings,name="physio-settings"),
     path("agenda/expedientes/em-massa/", bulk_work_schedule, name="bulk-work-schedule"),

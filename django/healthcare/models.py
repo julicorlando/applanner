@@ -42,6 +42,13 @@ class MedicalRecordEntry(models.Model):
     professional_snapshot=models.JSONField(default=dict,db_default={},blank=True)
     supersedes=models.ForeignKey("self",null=True,blank=True,on_delete=models.PROTECT,related_name="rectifications")
     correction_reason_encrypted=models.TextField(blank=True,db_default="")
+    # Implantação: data clínica original informada; created_at continua sendo a digitação real.
+    clinical_date=models.DateField(null=True,blank=True)
+    transcribed_in_period=models.ForeignKey("ClinicalImplementationPeriod",null=True,blank=True,on_delete=models.PROTECT,related_name="entries")
+
+    @property
+    def effective_date(self):
+        return self.clinical_date or timezone.localtime(self.created_at).date()
 
     def delete(self,*args,**kwargs):
         from django.core.exceptions import ValidationError
@@ -353,3 +360,4 @@ class DentalAssessmentDocument(models.Model):
 from .operation_models import WaitingRoomDisplay, WaitingRoomMedia, WaitingRoomCall, OfflineOperation, ClinicRoom, DailyRoomSelection  # noqa: F401,E402
 from .document_models import ProfessionalSignature, ClinicalDocumentTemplate, ClinicalIssuedDocument  # noqa: F401,E402
 from .drive_models import ClinicalDriveConfiguration, PatientDriveBackup  # noqa: F401,E402
+from .implementation_models import ClinicalImplementationPeriod  # noqa: F401,E402

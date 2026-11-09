@@ -8,7 +8,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from billing.entitlements import module_enabled
 from billing.models import TenantModuleAddon
 from .models import MedicalRecordEntry
-from .services import create_record, read_record, assert_clinical_access, clinical_records_for
+from .services import create_record, read_record, assert_clinical_access, clinical_records_for, chronological
 
 PERMANENT_TEETH = frozenset(
     f"{quadrant}{tooth}" for quadrant in (1, 2, 3, 4) for tooth in range(1, 9)
@@ -85,8 +85,8 @@ def dental_history(*, tenant, customer, user, ip=""):
         raise PermissionDenied("Acesso a outra clínica negado.")
     if customer.tenant_id != tenant.pk:
         raise PermissionDenied("Paciente de outra clínica.")
-    entries = clinical_records_for(user=user, tenant=tenant).filter(customer=customer,
-        record_type=MedicalRecordEntry.Type.PROCEDURE).order_by("created_at")
+    entries = chronological(clinical_records_for(user=user, tenant=tenant).filter(customer=customer,
+        record_type=MedicalRecordEntry.Type.PROCEDURE))
     result = []
     for entry in entries:
         raw = read_record(entry=entry, user=user, ip=ip)
@@ -95,7 +95,8 @@ def dental_history(*, tenant, customer, user, ip=""):
         except (ValueError, TypeError):
             continue
         if isinstance(payload, dict) and payload.get("kind") == "dental_encounter":
-            result.append({"entry_id": entry.pk, "created_at": entry.created_at, "professional": entry.professional, "data": payload, "chart_json": json.dumps(payload["odontogram"])})
+            result.append({"entry_id": entry.pk, "created_at": entry.created_at, "professional": entry.professional, "data": payload,
+                           "clinical_date": entry.clinical_date, "transcribed": bool(entry.transcribed_in_period_id), "chart_json": json.dumps(payload["odontogram"])})
     return result
 
 

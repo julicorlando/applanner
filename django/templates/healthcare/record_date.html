@@ -1,0 +1,1 @@
+{% if entry.transcribed_in_period_id %}{{ entry.clinical_date|date:'d/m/Y' }} <small class="record-transcribed">(transcrito na implantação em {{ entry.created_at|date:'d/m/Y H:i' }})</small>{% else %}{{ entry.created_at|date:'d/m/Y H:i' }}{% endif %}

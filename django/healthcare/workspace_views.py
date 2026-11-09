@@ -1,3 +1,4 @@
+from datetime import timedelta
 from zoneinfo import ZoneInfo
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -13,8 +14,49 @@ from .navigation import workspace_enabled, resource_routes, dental_workspace
 
 def tenant_for(request):
     if not workspace_enabled(request):
-        raise PermissionDenied("Área exclusiva do estabelecimento de Fisioterapia.")
+        raise PermissionDenied("Área exclusiva de clínicas de Fisioterapia ou Odontologia.")
     return request.user.tenant
+
+
+def dental_pending(user, tenant, today):
+    """Own follow-ups (overdue or within 7 days) and budgets awaiting approval.
+
+    Only the authoring professional sees these rows; reception, Master and
+    read-only cross-cover access receive nothing.
+    """
+    from billing.entitlements import module_enabled
+    from .models import ClinicalFollowUp, ClinicalTreatmentPlan
+    from .services import clinical_records_for
+
+    if not dental_workspace(tenant) or not module_enabled(tenant, "dentistry"):
+        return None
+    try:
+        records = clinical_records_for(user=user, tenant=tenant).filter(
+            professional__user=user
+        )
+    except PermissionDenied:
+        return None
+    followups = (
+        ClinicalFollowUp.objects.filter(
+            entry__in=records,
+            completed_at__isnull=True,
+            due_at__lte=today + timedelta(days=7),
+        )
+        .select_related("entry__customer")
+        .order_by("due_at", "pk")
+    )
+    plans = (
+        ClinicalTreatmentPlan.objects.filter(
+            entry__in=records, status=ClinicalTreatmentPlan.Status.PROPOSED
+        )
+        .select_related("entry__customer")
+        .order_by("updated_at", "pk")
+    )
+    return {
+        "today": today,
+        "followups": list(followups[:20]),
+        "plans": list(plans[:20]),
+    }
 
 
 @login_required
@@ -60,6 +102,7 @@ def dashboard(request):
             "appointments": rows.select_related(
                 "customer", "professional", "service"
             ).order_by("starts_at")[:100],
+            "dental_pending": dental_pending(request.user, tenant, today),
         },
     )
 
@@ -115,6 +158,8 @@ def settings(request):
                 },
             ]
         )
+        if dental_workspace(tenant):
+            account.append({"title": "Implantação: transcrever prontuários anteriores", "url": reverse("dental-implementation")})
     from .services import assert_clinical_access
 
     try:
@@ -177,3 +222,47 @@ def settings(request):
         "healthcare/physio_settings.html",
         {"tenant": tenant, "settings_groups": groups},
     )
+
+
+@login_required
+@never_cache
+def implementation(request):
+    """Responsável da clínica abre/encerra a fase de implantação dos prontuários."""
+    from django import forms
+    from django.contrib import messages
+    from django.core.exceptions import ValidationError
+    from .implementation import (active_period, can_manage, close_period, open_period,
+                                 tenant_today, MAX_DAYS)
+    from .implementation_models import ClinicalImplementationPeriod
+
+    tenant = tenant_for(request)
+    if not dental_workspace(tenant) or not can_manage(request.user, tenant):
+        raise PermissionDenied("Somente o responsável da clínica gerencia a implantação.")
+    today = tenant_today(tenant)
+
+    class PeriodForm(forms.Form):
+        ends_on = forms.DateField(label="Término da implantação",
+                                  widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+
+    form = PeriodForm(request.POST or None, initial={"ends_on": today + timedelta(days=60)})
+    if request.method == "POST":
+        try:
+            if request.POST.get("action") == "close":
+                close_period(tenant=tenant, user=request.user, request=request)
+                messages.success(request, "Fase de implantação encerrada.")
+                return redirect("dental-implementation")
+            if request.POST.get("action") == "open" and form.is_valid():
+                open_period(tenant=tenant, user=request.user, ends_on=form.cleaned_data["ends_on"], request=request)
+                messages.success(request, "Fase de implantação ativada.")
+                return redirect("dental-implementation")
+            if request.POST.get("action") not in {"open", "close"}:
+                raise PermissionDenied
+        except ValidationError as exc:
+            form.add_error(None, exc)
+    return render(request, "healthcare/implementation.html", {
+        "tenant": tenant,
+        "period": active_period(tenant, today),
+        "history": ClinicalImplementationPeriod.objects.filter(tenant=tenant).order_by("-pk")[:20],
+        "form": form,
+        "max_days": MAX_DAYS,
+    })

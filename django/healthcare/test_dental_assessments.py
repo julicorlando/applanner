@@ -109,6 +109,22 @@ class DentalAssessmentTests(TestCase):
             self.assertContains(response,'Menu Odontologia')
             self.assertEqual(self.client.get(reverse('dental-assessment-create')).status_code,403)
 
+    def test_dashboard_lists_own_followups_and_pending_budgets_only_for_author(self):
+        from django.utils import timezone
+        from .clinical import schedule_followup
+        row=self.save(final=True)
+        followup=schedule_followup(entry=row.treatment_plan.entry,user=self.doctor,due_at=timezone.localdate(),note='Retorno fictício')
+        self.client.force_login(self.doctor)
+        pending=self.client.get(reverse('dental-dashboard')).context['dental_pending']
+        self.assertEqual(pending['followups'],[followup])
+        self.assertEqual(pending['plans'],[row.treatment_plan])
+        for user in (self.owner,self.reception):
+            self.client.force_login(user)
+            response=self.client.get(reverse('dental-dashboard'))
+            self.assertEqual(response.status_code,200)
+            pending=response.context['dental_pending']
+            self.assertFalse(pending and (pending['followups'] or pending['plans']))
+
     def test_private_upload_encrypted_and_restricted(self):
         stream=BytesIO();Image.new('RGB',(32,32),'white').save(stream,format='PNG')
         upload=SimpleUploadedFile('exame-ficticio.png',stream.getvalue(),content_type='image/png')

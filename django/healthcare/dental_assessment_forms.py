@@ -33,6 +33,16 @@ class AssessmentForm(BaseAssessmentForm):
         self.fields["odontogram_json"] = forms.JSONField(initial=dict, required=False, widget=forms.HiddenInput(attrs={"data-chart-input": ""}))
         self.fields["goals"] = forms.JSONField(label="Diagnóstico", initial=list, required=False, widget=forms.HiddenInput)
         self.fields["treatment_plan"] = forms.JSONField(label="Plano de tratamento", initial=list, required=False, widget=forms.HiddenInput)
+        from .implementation import active_period
+        self.implementation_period = active_period(getattr(self.user, "tenant", None))
+        if self.implementation_period:
+            self.fields["implementation_transcription"] = forms.BooleanField(
+                required=False,
+                label="Prontuário anterior transcrito na implantação: usar a data acima como data do atendimento original",
+            )
+            if self.is_bound and str(self.data.get("implementation_transcription", "")).lower() in {"on", "true", "1"}:
+                # Atendimentos antigos não existem na agenda do ApPlanner.
+                self.fields["appointment"].required = False
 
     def clean_odontogram_json(self):
         return validate_odontogram(self.cleaned_data.get("odontogram_json") or {})
