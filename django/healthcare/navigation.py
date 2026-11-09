@@ -168,7 +168,7 @@ def shell_context(user, request=None):
         active = "Fisioterapia"
     else:
         active = "Configurações"
-    if dental and (active == "Fisioterapia" or (path.startswith("/app/odontologia/") and name not in {"dental-dashboard", "dental-settings"})):
+    if dental and (active == "Fisioterapia" or (path.startswith("/app/odontologia/") and name not in {"dental-dashboard", "dental-settings", "dental-implementation"})):
         active = "Odontologia"
     locked = bool(request and getattr(request, "billing_locked", False))
     menu = []

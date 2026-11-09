@@ -174,6 +174,10 @@ def save_assessment(*, form, user, assessment_id=None, finalize=False, request=N
             "O atendimento deve corresponder ao paciente e ao profissional."
         )
     registration = getattr(professional, "clinical_registration", None)
+    transcription = bool(data.get("implementation_transcription", False))
+    if transcription:
+        from .implementation import validate_transcription
+        validate_transcription(tenant=user.tenant, clinical_date=data.get("evaluation_date"))
     if finalize:
         if not registration or registration.council != "CRO":
             raise ValidationError(
@@ -185,7 +189,7 @@ def save_assessment(*, form, user, assessment_id=None, finalize=False, request=N
                 "Informe o nome da pessoa responsável na identificação profissional para assinar."
             )
         if (
-            not appointment
+            (not appointment and not transcription)
             or not data.get("attestation")
 
         ):
@@ -236,6 +240,12 @@ def save_assessment(*, form, user, assessment_id=None, finalize=False, request=N
         },
         "clinic": {"id": user.tenant_id, "name": user.tenant.name},
     }
+    if transcription:
+        payload["transcription"] = {
+            "mode": "implementation",
+            "clinical_date": data.get("evaluation_date"),
+            "entered_at": timezone.now().isoformat(),
+        }
     payload.update({
         "anamnesis": data.get("medical_history", ""),
         "findings": data.get("findings", ""),
@@ -311,7 +321,8 @@ def save_assessment(*, form, user, assessment_id=None, finalize=False, request=N
     if finalize:
         from .clinical import save_structured_record
         from .models import ClinicalTreatmentPlan
-        if data.get("treatment_plan"):
+        # Orçamentos transcritos são históricos: não geram aprovação nem cobrança pendente.
+        if data.get("treatment_plan") and not transcription:
             plan_entry = save_structured_record(tenant=user.tenant, customer=patient, professional=professional, user=user, kind="treatment_plan", title="Plano do atendimento odontológico", data={"lines": [{"tooth": item["tooth"], "procedure": item["text"], "price": item["amount"], "quantity": 1} for item in data["treatment_plan"]]})
             row.treatment_plan = ClinicalTreatmentPlan.objects.get(entry=plan_entry)
             payload["treatment_plan_id"] = row.treatment_plan.pk
@@ -334,9 +345,11 @@ def save_assessment(*, form, user, assessment_id=None, finalize=False, request=N
             professional=professional,
             user=user,
             appointment=appointment,
-            title="Prontuário odontológico — " + str(data["evaluation_date"]),
+            title=("Prontuário odontológico transcrito — " if transcription else "Prontuário odontológico — ") + str(data["evaluation_date"]),
             record_type="procedure",
             content=text,
+            clinical_date=data["evaluation_date"] if transcription else None,
+            transcription=transcription,
         )
         for document in documents:
             document.final_document = ClinicalAttachment.objects.create(

@@ -16,7 +16,7 @@ from scheduling.models import Professional
 from .models import (MedicalRecordAccessLog,ClinicalRegistration,
                      ClinicalAttachment,ClinicalCareGrant,ClinicalFollowUp)
 from .patient_scope import patients_for
-from .services import assert_clinical_access,clinical_records_for,read_record,create_record
+from .services import assert_clinical_access,clinical_records_for,read_record,create_record,chronological
 from .clinical import (save_structured_record,grant_care,revoke_care,attach_document,read_document,
                        change_treatment_status,schedule_followup,consume_clinical_session)
 from .clinic_forms import (RegistrationForm,StructuredClinicalForm,RectificationForm,AttachmentForm,
@@ -215,7 +215,7 @@ def attachment_download(request,pk):
 @never_cache
 def patient(request,pk):
     tenant=clinic(request);customer=get_object_or_404(patients_for(request.user),pk=pk,tenant=tenant)
-    entries=clinical_records_for(user=request.user,tenant=tenant).filter(customer=customer).order_by("created_at","pk")
+    entries=chronological(clinical_records_for(user=request.user,tenant=tenant).filter(customer=customer))
     history=[];physio=[]
     for entry in entries:
         data=unpack(entry,request.user)
@@ -235,7 +235,7 @@ def patient(request,pk):
 @never_cache
 def export_patient(request,pk,kind):
     tenant=clinic(request);customer=get_object_or_404(patients_for(request.user),pk=pk,tenant=tenant)
-    entries=clinical_records_for(user=request.user,tenant=tenant).filter(customer=customer).order_by("created_at","pk")
+    entries=chronological(clinical_records_for(user=request.user,tenant=tenant).filter(customer=customer))
     rows=[]
     for entry in entries:
         rows.append({"id":entry.pk,"date":entry.created_at.isoformat(),"professional":entry.professional_snapshot,

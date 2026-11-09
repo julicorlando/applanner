@@ -36,10 +36,17 @@ def clinical_records_for(*, user, tenant):
     return MedicalRecordEntry.objects.filter(scope,tenant=tenant)
 
 
+def chronological(queryset):
+    """Ordena pela data clínica (transcrições da implantação) e depois pela digitação."""
+    from django.db.models.functions import Coalesce, TruncDate
+    return queryset.order_by(Coalesce("clinical_date", TruncDate("created_at")), "created_at", "pk")
+
+
 @transaction.atomic
 def create_record(*, tenant, customer, professional, title, content, user,
                   appointment=None, record_type="evolution", ip="", supersedes=None,
-                  correction_reason="",physiotherapy_assessment=None):
+                  correction_reason="",physiotherapy_assessment=None,
+                  clinical_date=None,transcription=False):
     assert_clinical_access(user)
     require_module(tenant, "medical_records")
     if (user.tenant_id != tenant.pk or customer.tenant_id != tenant.pk
@@ -70,7 +77,16 @@ def create_record(*, tenant, customer, professional, title, content, user,
         if record_type=="physio_evolution":
             if assessment.status!="finalized":raise ValidationError("Finalize a avaliação antes de registrar evoluções vinculadas.")
             read_record(entry=assessment.final_entry,user=user,ip=ip)
+    period=None
+    if transcription:
+        from .implementation import validate_transcription
+        if supersedes or physiotherapy_assessment is not None:
+            raise ValidationError("Transcrição de implantação não pode ser retificação ou evolução vinculada.")
+        period=validate_transcription(tenant=tenant,clinical_date=clinical_date)
+    elif clinical_date is not None:
+        raise ValidationError("Data clínica retroativa só é aceita na fase de implantação.")
     entry = MedicalRecordEntry.objects.create(
+        clinical_date=clinical_date if transcription else None,transcribed_in_period=period,
         tenant=tenant, customer=customer, professional=professional, appointment=appointment,
         record_type=record_type, title=title[:190], content_encrypted=encrypt_text(content),
         created_by=user, supersedes=supersedes,physiotherapy_assessment=physiotherapy_assessment,
