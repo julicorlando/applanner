@@ -1,16 +1,12 @@
 import hashlib
 import json
 from io import BytesIO
-from xml.sax.saxutils import escape
 from PIL import Image,ImageOps,UnidentifiedImageError
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.core.exceptions import PermissionDenied,ValidationError
 from django.db import transaction
 from django.utils import timezone
-from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Image as PDFImage
-from .pdf_styles import clinical_pdf_styles
-from reportlab.lib import colors
 from core.crypto import encrypt_text,decrypt_text,encrypt_json
 from core.audit import append_audit
 from billing.entitlements import require_module
@@ -63,45 +59,64 @@ def identity(user):
     return professional,registration.snapshot()
 
 
-def document_pdf(*,tenant,patient,title,body,professional,signature_image=b'',issued_at=None):
-    styles=clinical_pdf_styles();story=[];buffer=BytesIO()
-    import re
-    color=getattr(tenant,'primary_color','') or ''
-    if re.fullmatch(r'#[0-9a-fA-F]{6}',color):
-        styles['Title'].textColor=colors.HexColor(color);styles['Heading1'].textColor=colors.HexColor(color)
-    # Read local validated branding only; never fetch URLs supplied in document text.
-    if tenant.logo:
-        try:
-            with tenant.logo.open('rb') as stream:
-                raw=stream.read(3*1024*1024)
-            with Image.open(BytesIO(raw)) as source:
-                if source.width*source.height<=4000000:
-                    picture=source.convert('RGBA');picture.thumbnail((500,150));out=BytesIO();picture.save(out,'PNG')
-                    story.append(PDFImage(BytesIO(out.getvalue()),width=150,height=45,kind='proportional'))
-        except (OSError,ValueError,UnidentifiedImageError):pass
-    story.append(Paragraph(escape(tenant.name),styles['Title']))
-    contacts=' · '.join(v for v in [tenant.document,tenant.phone,tenant.email] if v)
-    if contacts:story.append(Paragraph(escape(contacts),styles['Normal']))
+def _read_image(field):
+    if not field:
+        return b''
+    try:
+        with field.open('rb') as stream:
+            return stream.read(3*1024*1024)
+    except (OSError,ValueError):
+        return b''
+
+
+def clinic_letterhead(tenant):
+    """Plain branding values for the PDF; read only validated local files."""
     unit=tenant.units.filter(active=True).order_by('-is_primary','name').first()
+    address=''
     if unit:
-        address=', '.join(str(v) for v in [unit.address,unit.address_number,unit.district,unit.city,unit.state,unit.postal_code] if v)
-        if address:story.append(Paragraph(escape(address),styles['Normal']))
-    story.extend([Spacer(1,20),Paragraph(escape(title),styles['Heading1']),Paragraph('Paciente: '+escape(patient.name),styles['Normal'])])
-    if patient.cpf:story.append(Paragraph('CPF: '+escape(patient.cpf),styles['Normal']))
-    story.extend([Paragraph('Data: '+(issued_at or timezone.now()).strftime('%d/%m/%Y %H:%M'),styles['Normal']),Spacer(1,20)])
-    for line in body.splitlines():story.append(Paragraph(escape(line) or ' ',styles['Normal']));story.append(Spacer(1,5))
-    story.append(Spacer(1,30))
-    if signature_image:story.append(PDFImage(BytesIO(signature_image),width=180,height=60,kind='proportional'))
-    text=f"{professional['name']} · {professional['council']} {professional['number']}/{professional['jurisdiction']}"
-    story.append(Paragraph(escape(text),styles['Normal']))
-    note=styles['Normal'].clone('IntegrityNote');note.fontSize=7;note.textColor=colors.grey
-    story.extend([Spacer(1,15),Paragraph('Emitido após confirmação autenticada do profissional. A imagem da assinatura não é assinatura digital certificada.',note)])
-    SimpleDocTemplate(buffer,title=title,author=professional['name']).build(story)
-    return buffer.getvalue()
+        street=', '.join(str(v) for v in [unit.address,unit.address_number] if v)
+        place=' · '.join(v for v in [street,unit.address_complement,unit.district] if v)
+        city=f"{unit.city} ({unit.state})" if unit.city and unit.state else (unit.city or '')
+        address=' · '.join(v for v in [place,city] if v)
+    return {
+        'name':tenant.name,'primary_color':getattr(tenant,'primary_color','') or '',
+        'logo':_read_image(unit.logo if unit and unit.logo else None) or _read_image(tenant.logo),
+        'city':(unit.city if unit else '') or '',
+        'phone':(unit.phone if unit else '') or tenant.phone,
+        'whatsapp':(unit.whatsapp if unit else '') or '',
+        'instagram':(unit.instagram if unit else '') or getattr(tenant,'public_instagram','') or '',
+        'email':(unit.email if unit else '') or tenant.email,
+        'address':address,
+    }
+
+
+def patient_header(patient):
+    return {'name':patient.name,'cpf':format_cpf(patient.cpf),'phone':patient.phone,'address':patient.full_address,
+            'birth_date':patient.birth_date.strftime('%d/%m/%Y') if patient.birth_date else ''}
+
+
+def format_cpf(value):
+    value=''.join(ch for ch in (value or '') if ch.isdigit())
+    return f"{value[:3]}.{value[3:6]}.{value[6:9]}-{value[9:]}" if len(value)==11 else value
+
+
+def verification_url(code,base_url=''):
+    from django.urls import reverse
+    base=(getattr(settings,'PUBLIC_BASE_URL','') or base_url or 'https://applanner.com.br').rstrip('/')
+    return base+reverse('clinical-document-validate',args=[code])
+
+
+def document_pdf(*,tenant,patient,title,body,professional,signature_image=b'',issued_at=None,kind='declaration',
+                 verification_code='',base_url=''):
+    from .document_pdf import render_document
+    return render_document(kind=kind,title=title,body=body,clinic=clinic_letterhead(tenant),patient=patient_header(patient),
+        professional=professional,issued_at=timezone.localtime(issued_at) if issued_at else timezone.localtime(),
+        signature_png=signature_image,verification_url=verification_url(verification_code,base_url) if verification_code else '',
+        verification_code='-'.join(verification_code[:12].upper()[i:i+4] for i in range(0,12,4)) if verification_code else '')
 
 
 @transaction.atomic
-def finalize_document(*,user,document,body,title,version,confirmed):
+def finalize_document(*,user,document,body,title,version,confirmed,base_url=''):
     profile,snapshot=identity(user)
     row=ClinicalIssuedDocument.objects.select_for_update().get(pk=document.pk,tenant=user.tenant,professional=profile)
     if row.status=='finalized':return row
@@ -113,7 +128,11 @@ def finalize_document(*,user,document,body,title,version,confirmed):
     signature=ProfessionalSignature.objects.filter(professional=profile).first()
     if not signature or not signature.image_encrypted:raise ValidationError('Cadastre sua assinatura profissional antes de emitir o documento.')
     raw=Fernet(settings.FIELD_ENCRYPTION_KEY.encode()).decrypt(bytes(signature.image_encrypted))
-    now=timezone.localtime();pdf=document_pdf(tenant=user.tenant,patient=row.customer,title=title,body=body,professional=snapshot,signature_image=raw,issued_at=now)
+    import secrets
+    code=secrets.token_urlsafe(24)
+    now=timezone.localtime();pdf=document_pdf(tenant=user.tenant,patient=row.customer,title=title,body=body,professional=snapshot,
+        signature_image=raw,issued_at=now,kind=row.kind,verification_code=code,base_url=base_url)
+    row.verification_code=code
     row.body_encrypted=encrypt_text(body);row.title=title;row.sha256=hashlib.sha256(pdf).hexdigest()
     row.pdf_encrypted=Fernet(settings.FIELD_ENCRYPTION_KEY.encode()).encrypt(pdf)
     row.signature_snapshot_encrypted=encrypt_json({**snapshot,'image_sha256':signature.sha256 if signature else '', 'issued_at':now.isoformat()})
@@ -130,3 +149,71 @@ def text_from_template(template,patient,professional,tenant):
         'clinica':tenant.name,'data':timezone.localdate().strftime('%d/%m/%Y')}
     for key,value in variables.items():text=text.replace('{'+key+'}',str(value or ''))
     return text
+
+
+DEFAULT_TITLES={'prescription':'Receituário','certificate':'Atestado','declaration':'Declaração','budget':'Orçamento'}
+
+
+def brl(value):
+    from decimal import Decimal
+    text=f"{Decimal(str(value)):,.2f}"
+    return 'R$ '+text.replace(',','X').replace('.',',').replace('X','.')
+
+
+def _today_visit(patient,professional):
+    from scheduling.models import Appointment
+    from .implementation import tenant_today
+    from finance.clinic_services import day_bounds
+    start,end=day_bounds(patient.tenant,tenant_today(patient.tenant))
+    return Appointment.objects.filter(tenant_id=patient.tenant_id,customer=patient,professional=professional,
+        starts_at__gte=start,starts_at__lt=end).exclude(status__in=['cancelled','canceled','no_show']).order_by('starts_at').first()
+
+
+def latest_budget_lines(user,patient):
+    """Most recent proposed/accepted plan authored by this professional, read through the audited ledger."""
+    from .models import ClinicalTreatmentPlan
+    from .services import read_record
+    plan=(ClinicalTreatmentPlan.objects.filter(entry__tenant_id=user.tenant_id,entry__customer=patient,entry__professional__user=user)
+          .exclude(status='declined').select_related('entry').order_by('-entry__created_at','-pk').first())
+    if not plan:
+        return None,[]
+    try:
+        data=json.loads(read_record(entry=plan.entry,user=user))
+    except (PermissionDenied,ValueError,TypeError):
+        return None,[]
+    return plan,[line for line in data.get('lines',[]) if isinstance(line,dict)]
+
+
+def default_body(*,kind,user,patient,professional):
+    """Editable starting text mirroring the clinic's paper models; the professional reviews before emission."""
+    name=patient.name
+    if kind=='prescription':
+        return ('- Medicamento -------- concentração -------- quantidade\n'
+                'Tomar 01 comprimido de 08/08 horas durante 07 dias.\n')
+    if kind=='certificate':
+        return (f"Atesto para fins trabalhistas que o(a) paciente {name}, esteve sob meus cuidados neste consultório "
+                "e deverá se afastar de suas atividades pelo período de 01 (um) dia, por motivo de CID ____.")
+    if kind=='declaration':
+        visit=_today_visit(patient,professional)
+        period=(f"no período de {timezone.localtime(visit.starts_at):%Hh%M} às {timezone.localtime(visit.ends_at):%Hh%M}"
+                if visit else "no período de __h às __h")
+        return (f"Declaro para os devidos fins que o(a) paciente {name}, esteve sob meus cuidados neste consultório "
+                f"{period} em razão de atendimento odontológico.")
+    if kind=='budget':
+        plan,lines=latest_budget_lines(user,patient)
+        rows=['## Procedimentos','']
+        if not lines:
+            rows+=['Descrição: ','Dentes: ','Valor: ','']
+        from decimal import Decimal
+        total=Decimal('0')
+        for line in lines:
+            quantity=int(line.get('quantity') or 1);price=Decimal(str(line.get('price') or '0'));total+=price*quantity
+            rows.append('Descrição: '+str(line.get('procedure','')).strip()+(f' (x{quantity})' if quantity>1 else ''))
+            if line.get('tooth'):rows.append('Dente: '+str(line['tooth']))
+            rows.append('Valor: '+brl(price)+(' (cada)' if quantity>1 else ''))
+            if quantity>1:rows.append('Valor total: '+brl(price*quantity))
+            rows.append('')
+        rows+=['## Formas de Pagamento',f"O investimento para o seu tratamento é de {brl(total) if lines else 'R$ ____'}.",
+               'Oferecemos flexibilidade no pagamento:','• À vista','• Parcelado: ____','','Observações: ']
+        return '\n'.join(rows)
+    return ''

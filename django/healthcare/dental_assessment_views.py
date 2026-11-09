@@ -27,6 +27,7 @@ from .dental_assessment_services import (
 )
 from .navigation import shell_context
 from .models import DentalAssessmentDocument
+from .document_models import KINDS as DOCUMENT_KINDS
 from .services import clinical_records_for
 
 
@@ -84,6 +85,7 @@ def assessment_list(request):
             "assessments": Paginator(rows, 50).get_page(request.GET.get("records_page")),
             "legacy_entries": legacy_entries[:200],
             "patient": patient,
+            "document_kinds": DOCUMENT_KINDS,
             "patient_roster": Paginator(patients_for(request.user).filter(pk=patient.pk).order_by("pk") if patient else patients_for(request.user).order_by("name", "pk"), 50).get_page(request.GET.get("page")),
             **shell_context(request.user, request),
         },
@@ -233,6 +235,11 @@ def assessment_editor(request, pk=None):
             field.disabled = True
 
     display_data = payload.get("sections", {}) if readonly else initial
+    from .patient_registration import missing_registration
+    from .document_models import ClinicalIssuedDocument
+    selected_patient = row.customer if row else (
+        patients_for(request.user).filter(pk=initial.get("customer"), tenant_id=request.user.tenant_id).first()
+        if str(initial.get("customer") or "").isdigit() else None)
     # Bound text/JSON values stay in the form after validation errors.
     return render(
         request,
@@ -267,6 +274,12 @@ def assessment_editor(request, pk=None):
             "versions": row.versions.all().order_by("-number") if row and owner else [],
             "professional_profiles": profiles,
             "signature": payload.get("signature", {}),
+            "selected_patient_id": selected_patient.pk if selected_patient else None,
+            "registration_missing": missing_registration(selected_patient) if selected_patient and owner else [],
+            "document_kinds": DOCUMENT_KINDS,
+            "issued_documents": ClinicalIssuedDocument.objects.filter(
+                tenant_id=request.user.tenant_id, customer=selected_patient, status="finalized",
+                professional__user=request.user).order_by("-finalized_at")[:10] if selected_patient else [],
         },
         status=status,
     )
@@ -292,8 +305,14 @@ def patient_options(request, pk):
     demographics = read_assessment(assessment=previous, user=request.user, request=request).get("patient", {}) if previous else {}
     today = timezone.localdate()
     birth = patient.birth_date
+    from .patient_registration import missing_registration
     return JsonResponse(
         {
+            "registration": {
+                "missing": missing_registration(patient),
+                "edit_url": reverse("dental-patient-edit", args=[patient.pk]),
+                "id": patient.pk,
+            },
             "patient": {
                 "name": patient.name,
                 "phone": patient.phone,

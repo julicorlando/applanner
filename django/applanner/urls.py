@@ -33,10 +33,11 @@ from scheduling.bundles import BundleAPIView,bundle_page
 from scheduling import card_payments
 from communications import mobile_portal
 
-from healthcare import waiting_room, offline
+from healthcare import waiting_room, offline, document_validation
 
 urlpatterns = [
     path("offline/clinica/", offline.shell, name="clinical-offline-shell"),
+    path("validar/<str:code>/", document_validation.validate, name="clinical-document-validate"),
     path("tv/<str:token>/", waiting_room.short_link, name="waiting-room-short"),
     path("tv/<slug:slug>/<str:token>/", waiting_room.screen, name="waiting-room-screen"),
     path("tv/<slug:slug>/<str:token>/dados/", waiting_room.feed, name="waiting-room-feed"),

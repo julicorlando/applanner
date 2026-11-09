@@ -6,3 +6,11 @@
 .da-print-value{display:none}@media print{.physio-workspace .da-wrap :is(input,textarea,select):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]):not([type=file]){background:#fff!important;color:#000!important;display:none!important}.da-wrap .da-print-value{display:block!important;white-space:pre-wrap;overflow-wrap:anywhere;color:#000!important;background:#fff!important;line-height:1.4;margin:4px 0}.da-wrap .da-chart-tools{display:none!important}}
 
 @media print{.da-wrap .da-chart [data-arches] text{fill:#000!important}.da-wrap .da-sign :is(canvas,img.pa-signature){filter:invert(1)}}
+
+/* Patient registration status and document issuing from the record */
+.da-warning{background:color-mix(in srgb,#f59e0b 16%,transparent);border:1px solid color-mix(in srgb,#f59e0b 45%,transparent);border-radius:10px;padding:8px 10px;font-size:.9rem}
+.da-warning a,.da-patient-links a{font-weight:600}
+.da-patient-links{margin:4px 0 8px}
+.da-issue-docs .clinical-actions{display:flex;flex-wrap:wrap;gap:8px}
+.da-issue-docs .clinical-actions a{padding:8px 12px;border-radius:999px;border:1px solid currentColor;text-decoration:none}
+@media print{.da-issue-docs,.da-patient-links,#da-patient-complete{display:none}}
