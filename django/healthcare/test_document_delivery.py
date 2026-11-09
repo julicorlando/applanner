@@ -64,7 +64,7 @@ class ClinicalDocumentDeliveryTests(TestCase):
         response=self.client.get(reverse('clinical-document-pdf',args=[row.pk]))
         self.assertEqual(response.status_code,200);self.assertTrue(response.content.startswith(b'%PDF-'))
         text=''.join(page.extract_text() for page in PdfReader(BytesIO(response.content)).pages)
-        self.assertIn('CRO 12345/PE',text);self.assertIn(self.patient.name,text)
+        self.assertIn('CRO-PE 12345',text);self.assertIn(self.patient.name,text);self.assertIn('Código de validação',text)
         original=response.content;save_signature(self.doctor,remove=True)
         self.assertEqual(self.client.get(reverse('clinical-document-pdf',args=[row.pk])).content,original)
         with self.assertRaises(ValidationError):result.save()

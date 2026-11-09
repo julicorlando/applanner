@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from core.models import TimeStampedModel
 
-KINDS=[('prescription','Receituário'),('certificate','Atestado'),('declaration','Declaração')]
+KINDS=[('prescription','Receituário'),('certificate','Atestado'),('declaration','Declaração'),('budget','Orçamento')]
 
 
 class ProfessionalSignature(TimeStampedModel):
@@ -51,6 +51,13 @@ class ClinicalIssuedDocument(TimeStampedModel):
     entry=models.OneToOneField('healthcare.MedicalRecordEntry',on_delete=models.PROTECT,null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
     finalized_at=models.DateTimeField(null=True,blank=True)
+    # Unguessable public token printed as QR code; set once at emission.
+    verification_code=models.CharField(max_length=40,unique=True,null=True,blank=True,editable=False)
+
+    @property
+    def display_code(self):
+        code=(self.verification_code or '')[:12].upper()
+        return '-'.join(code[i:i+4] for i in range(0,len(code),4))
 
     def save(self,*args,**kwargs):
         if self.pk and type(self).objects.filter(pk=self.pk,status='finalized').exists():
@@ -59,3 +66,23 @@ class ClinicalIssuedDocument(TimeStampedModel):
 
     def delete(self,*args,**kwargs):
         raise ValidationError('O documento deve permanecer no histórico do paciente.')
+
+
+class ClinicalDocumentValidation(models.Model):
+    """Append-only record of someone confirming an issued document's authenticity."""
+    document=models.ForeignKey(ClinicalIssuedDocument,on_delete=models.PROTECT,related_name='validations')
+    validator_name=models.CharField(max_length=120)
+    validator_role=models.CharField(max_length=120,blank=True)
+    ip_hash=models.CharField(max_length=64,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering=['-created_at','-pk']
+
+    def save(self,*args,**kwargs):
+        if self.pk:
+            raise ValidationError('Validações registradas são preservadas.')
+        super().save(*args,**kwargs)
+
+    def delete(self,*args,**kwargs):
+        raise ValidationError('Validações registradas são preservadas.')

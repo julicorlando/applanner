@@ -15,7 +15,7 @@ from core.audit import append_audit
 from core.crypto import encrypt_text,decrypt_text
 from scheduling.models import Professional,Customer
 from .document_models import ClinicalDocumentTemplate,ClinicalIssuedDocument,ProfessionalSignature,KINDS
-from .document_services import own_professional,save_signature,finalize_document,text_from_template
+from .document_services import own_professional,save_signature,finalize_document,text_from_template,default_body,DEFAULT_TITLES
 from .patient_scope import patients_for
 
 
@@ -104,7 +104,8 @@ class PrepareForm(forms.Form):
     template=forms.ModelChoiceField(label='Modelo (opcional)',queryset=ClinicalDocumentTemplate.objects.none(),required=False)
     kind=forms.ChoiceField(label='Tipo',choices=KINDS)
     title=forms.CharField(label='Título',max_length=150)
-    body=forms.CharField(label='Texto do documento',required=False,max_length=20000,widget=forms.Textarea(attrs={'rows':9}))
+    body=forms.CharField(label='Texto do documento',required=False,max_length=20000,widget=forms.Textarea(attrs={'rows':12}),
+        help_text='Linhas no formato "Rótulo: valor" saem com o rótulo em negrito; inicie a linha com ## para um subtítulo.')
     request_id=forms.UUIDField(widget=forms.HiddenInput)
     def __init__(self,*args,user,**kwargs):
         super().__init__(*args,**kwargs)
@@ -119,7 +120,21 @@ class PrepareForm(forms.Form):
 @never_cache
 def documents(request):
     tenant=staff(request);reception=request.user.role=='reception'
-    form=PrepareForm(request.POST or None,user=request.user,initial={'request_id':uuid.uuid4(),'customer':request.GET.get('customer')})
+    initial={'request_id':uuid.uuid4(),'customer':request.GET.get('customer')}
+    kind=request.GET.get('kind')
+    patient=None
+    if str(request.GET.get('customer') or '').isdigit():
+        patient=patients_for(request.user,administrative=reception).filter(pk=int(request.GET['customer']),active=True).first()
+    if kind in DEFAULT_TITLES and request.method=='GET':
+        initial.update(kind=kind,title=DEFAULT_TITLES[kind])
+        if patient and not reception:
+            try:
+                profile=own_professional(request.user)
+            except PermissionDenied:
+                profile=None
+            if profile:
+                initial.update(professional=profile.pk,body=default_body(kind=kind,user=request.user,patient=patient,professional=profile))
+    form=PrepareForm(request.POST or None,user=request.user,initial=initial)
     if request.method=='POST' and form.is_valid():
         data=form.cleaned_data;profile=data['professional'];patient=data['customer'];template=data['template']
         if template and template.professional_id and template.professional_id!=profile.pk:raise PermissionDenied
@@ -140,7 +155,18 @@ def documents(request):
             return redirect('clinical-document-detail',pk=row.pk)
     rows=ClinicalIssuedDocument.objects.filter(tenant=tenant)
     rows=rows.filter(created_by=request.user) if reception else rows.filter(professional__user=request.user,professional__active=True)
-    return render(request,'healthcare/documents.html',{'form':form,'rows':rows.order_by('-created_at')[:100],'reception':reception})
+    if patient:rows=rows.filter(customer=patient)
+    return render(request,'healthcare/documents.html',{'form':form,'rows':rows.order_by('-created_at')[:100],'reception':reception,
+        'patient':patient,'kinds':KINDS,'selected_kind':kind if kind in DEFAULT_TITLES else '','back_url':_record_url(tenant,patient) if patient else ''})
+
+
+def _record_url(tenant,patient):
+    from django.urls import reverse
+    from billing.entitlements import module_enabled
+    from .navigation import dental_workspace
+    if dental_workspace(tenant) and module_enabled(tenant,'dentistry'):
+        return reverse('dental-assessments')+f'?customer={patient.pk}'
+    return reverse('clinical-patient',args=[patient.pk])
 
 
 class ReviewForm(forms.Form):
@@ -164,7 +190,7 @@ def detail(request,pk):
             data=form.cleaned_data
             if request.POST.get('action')=='finalize':
                 if reception:raise PermissionDenied
-                finalize_document(user=request.user,document=row,**data)
+                finalize_document(user=request.user,document=row,base_url=request.build_absolute_uri('/'),**data)
             elif request.POST.get('action')=='draft':
                 with transaction.atomic():
                     current=ClinicalIssuedDocument.objects.select_for_update().get(pk=row.pk,status='draft')
@@ -174,7 +200,10 @@ def detail(request,pk):
             return redirect('clinical-document-detail',pk=row.pk)
         except ValidationError as exc:form.add_error(None,exc)
     append_audit(tenant=tenant,user=request.user,request=request,action='clinical.document.viewed',entity_type='ClinicalIssuedDocument',entity_id=row.pk)
-    return render(request,'healthcare/document_detail.html',{'row':row,'form':form,'reception':reception})
+    from .document_services import verification_url
+    return render(request,'healthcare/document_detail.html',{'row':row,'form':form,'reception':reception,
+        'validation_url':verification_url(row.verification_code,request.build_absolute_uri('/')) if row.verification_code else '',
+        'validations':row.validations.all()[:50] if not reception else []})
 
 
 @login_required
