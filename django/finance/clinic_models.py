@@ -78,3 +78,52 @@ class ClinicExpense(TimeStampedModel):
 class ClinicCashClosing(models.Model):
     session=models.OneToOneField('finance.CashSession',on_delete=models.PROTECT,related_name='clinical_closing')
     summary=models.JSONField()
+
+
+class ClinicCashEntry(TimeStampedModel):
+    """One line of the daily cash sheet: patient, professional, amount split and payment method."""
+    class Status(models.TextChoices):
+        PAID="paid","Recebido"
+        OPEN="open","Em aberto"
+        CANCELLED="cancelled","Cancelado"
+    session=models.ForeignKey('finance.CashSession',on_delete=models.PROTECT,related_name='clinical_entries')
+    number=models.PositiveIntegerField()
+    customer=models.ForeignKey('scheduling.Customer',on_delete=models.PROTECT,related_name='cash_entries')
+    professional=models.ForeignKey('scheduling.Professional',on_delete=models.PROTECT,null=True,blank=True,related_name='cash_entries')
+    professional_name=models.CharField(max_length=120)
+    dentist_amount=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    clinic_amount=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    other_amount=models.DecimalField(max_digits=12,decimal_places=2,default=0)
+    total=models.DecimalField(max_digits=12,decimal_places=2)
+    method=models.ForeignKey(ClinicPaymentMethod,on_delete=models.PROTECT,null=True,blank=True)
+    method_name=models.CharField(max_length=60,blank=True)
+    status=models.CharField(max_length=12,choices=Status.choices,default=Status.PAID)
+    notes=models.CharField(max_length=300,blank=True)
+    transaction=models.OneToOneField('finance.FinancialTransaction',on_delete=models.PROTECT,related_name='clinic_cash_entry')
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='clinic_cash_entries')
+    request_id=models.UUIDField(unique=True)
+
+    class Meta:
+        ordering=['number']
+        constraints=[models.UniqueConstraint(fields=['session','number'],name='uq_clinic_cash_entry_number')]
+
+
+class ClinicCashCorrection(models.Model):
+    """Manager authorization to change a closed daily cash report; every change stays in the audit trail."""
+    class Status(models.TextChoices):
+        REQUESTED="requested","Aguardando gestor"
+        APPROVED="approved","Liberada para correção"
+        REJECTED="rejected","Recusada"
+        DONE="done","Concluída"
+    session=models.ForeignKey('finance.CashSession',on_delete=models.PROTECT,related_name='clinical_corrections')
+    requested_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='+')
+    reason=models.CharField(max_length=500)
+    status=models.CharField(max_length=12,choices=Status.choices,default=Status.REQUESTED)
+    decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,null=True,blank=True,related_name='+')
+    decided_at=models.DateTimeField(null=True,blank=True)
+    decision_note=models.CharField(max_length=500,blank=True)
+    finished_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering=['-created_at','-pk']
