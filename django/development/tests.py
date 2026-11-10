@@ -406,6 +406,8 @@ class DevelopmentTests(TestCase):
         }
         with patch("development.tasks.timezone.now", return_value=self.now):
             row = queue_reminder(self.charge.pk, self.charge.due_date)
+            # The model default uses the real clock; pin it to the frozen test time.
+            Delivery.objects.filter(pk=row.pk).update(next_attempt_at=self.now)
             deliver(row.pk)
             deliver(row.pk)
         self.assertEqual(gateway.call_count, 1)
@@ -441,6 +443,8 @@ class DevelopmentTests(TestCase):
     ):
         with patch("development.tasks.timezone.now", return_value=self.now):
             row = queue_reminder(self.charge.pk, self.charge.due_date)
+            # The model default uses the real clock; pin it to the frozen test time.
+            Delivery.objects.filter(pk=row.pk).update(next_attempt_at=self.now)
             deliver(row.pk)
         row.refresh_from_db()
         self.assertEqual(row.status, "failed")
