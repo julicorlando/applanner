@@ -2,7 +2,7 @@ from healthcare.drive_views import configuration as clinical_drive_configuration
 from .global_search import search as global_search
 from communications.mobile_portal import providers
 from django.urls import path
-from . import master, master_console, master_retention, simple_mode, customer_import_views
+from . import master, master_access_release, master_console, master_retention, simple_mode, customer_import_views
 from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment,master_whatsapp_simulate
 from .master_email import email_templates,smtp_settings,waive_onboarding_email
@@ -44,6 +44,9 @@ urlpatterns=[
     path("empresas/<int:pk>/ficha/",master_console.company_detail,name="master-company-detail"),
     path("empresas/<int:pk>/<str:action>/confirmar/",master_console.company_lifecycle,name="master-company-lifecycle"),
     path("financeiro/painel/",finance_dashboard,name="master-finance-dashboard"),
+    path("liberar-acesso/",master_access_release.companies,name="master-access-release"),
+    path("liberar-acesso/<int:pk>/",master_access_release.company,name="master-access-release-company"),
+    path("liberar-acesso/<int:pk>/usuarios/<int:user_pk>/",master_access_release.release,name="master-access-release-user"),
     path("empresas/<int:pk>/acessos/",master.tenant_access,name="master-tenant-access"),
     path("empresas/<int:pk>/enviar-termos/",master.send_tenant_terms,name="master-send-tenant-terms"),
     path("usuarios/<int:pk>/excluir/",master.remove_user,name="master-user-remove"),
