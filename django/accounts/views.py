@@ -284,13 +284,19 @@ def password_reset_confirm(request,token):
             user.password_changed_at=timezone.now()
             user.must_change_password=False
             user.session_version+=1
-            user.save(update_fields=["password","password_changed_at","must_change_password","session_version"])
+            fields=["password","password_changed_at","must_change_password","session_version"]
+            if not user.email_verified_at:
+                # The link only reaches the user's inbox, so using it proves ownership of the e-mail.
+                user.email_verified_at=timezone.now()
+                fields.append("email_verified_at")
+            user.save(update_fields=fields)
             row.used_at=timezone.now()
             row.save(update_fields=["used_at"])
             user.trusted_devices.all().delete()
             messages.success(request,"Senha redefinida. Faça login com a nova senha.")
             return redirect("accounts:login")
-    return render(request,"accounts/password_reset_confirm.html",{"token":token})
+    return render(request,"accounts/password_reset_confirm.html",{"token":token,
+        "first_access":not (row.user.last_login or row.user.password_changed_at),"account_email":row.user.email})
 
 
 @login_required
