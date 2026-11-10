@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Preferências de e-mail — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow"><article class="panel"><h1>Preferências de e-mail</h1>
+  {% if unsubscribed %}<p>Seu endereço foi removido dos próximos envios de campanhas.</p>
+  {% else %}<p>Deseja deixar de receber campanhas de e-mail do ApPlanner?</p><form method="post">{% csrf_token %}<button class="button primary" type="submit">Cancelar recebimento</button></form>{% endif %}
+</article></section>
+{% endblock %}

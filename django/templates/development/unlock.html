@@ -1,0 +1,3 @@
+{% extends 'development/customer_base.html' %}
+{% block title %}Consultar cobrança · ApPlanner{% endblock %}
+{% block content %}<section class="dev-panel"><h1>Consultar cobrança</h1>{% if invalid %}<p>Este link está indisponível ou expirou. Solicite um novo link ao responsável pelo desenvolvimento.</p>{% else %}<p>Informe o CPF ou CNPJ cadastrado para abrir esta cobrança e as opções de pagamento.</p><form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="dev-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}<button type="submit">Abrir pagamento</button></form>{% endif %}</section>{% endblock %}

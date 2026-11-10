@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Termo de entrega — ApPlanner Auto{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading"><div><span class="eyebrow">ENTREGA DO VEÍCULO</span><h1>{{ term.job.vehicle }}</h1><p>{{ term.job.appointment.customer }}</p></div></div>
+  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+  <article class="panel">
+    <h2>Termo</h2>
+    <p>{{ term.terms_snapshot|linebreaks }}</p>
+    {% if term.accepted_at %}
+      <div class="status-pill">Aceito por {{ term.accepted_name }} em {{ term.accepted_at }}</div>
+    {% else %}
+      <form method="post" class="portal-form">{% csrf_token %}
+        <div class="form-field"><label>Nome de quem recebe</label><input name="accepted_name" required></div>
+        <label style="display:flex;gap:10px"><input type="checkbox" required> Li e concordo com o termo de entrega.</label>
+        <button class="button primary">Confirmar recebimento</button>
+      </form>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

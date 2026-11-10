@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<article class="shell portal-page narrow">
+  {% if post.cover %}<img class="cover-preview" src="{% url 'public-blog-image' post.pk %}" alt="Capa de {{ post.title }}">{% endif %}
+  <p><a href="/#noticias">← Voltar às notícias</a></p>
+  <h1>{{ post.title }}</h1>
+  <p>{{ post.excerpt }}</p>
+  <div>{{ post.content|safe }}</div>
+</article>
+{% endblock %}

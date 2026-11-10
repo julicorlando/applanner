@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Importação de clientes — {{ batch.tenant.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <header class="portal-heading"><div><a class="back-link" href="{% url 'master-customer-import' %}">← Importar bases</a><span class="eyebrow">EMPRESA DE DESTINO</span><h1>{{ batch.tenant.name }}</h1><p>{{ batch.source_name }} · {{ batch.get_state_display }}</p></div></header>
+  {% if batch.state == 'applied' %}
+    <article class="panel"><h2>Importação concluída</h2><p><strong>{{ batch.report.counts.create }}</strong> novos clientes · <strong>{{ batch.report.counts.skip }}</strong> registros mantidos · <strong>{{ batch.report.counts.error }}</strong> linhas não importadas.</p><p>Os clientes que já existiam continuam com seus dados e histórico originais. O arquivo de origem foi removido da prévia criptografada após a conclusão.</p><a class="button primary" href="{% url 'master-customer-import-report' batch.pk %}">Baixar relatório por linha</a></article>
+  {% else %}
+    <form method="post" class="panel portal-form">{% csrf_token %}<input type="hidden" name="action" value="preview"><h2>1. Relacione as colunas</h2><p>{{ total_rows }} linhas. Nome e telefone brasileiro com DDD são obrigatórios, seguindo as validações atuais do cadastro.</p>{{ form.non_field_errors }}{% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}<button class="button">Gerar prévia</button></form>
+    {% if summary %}
+      <article class="panel" style="margin-top:24px"><h2>2. Revise antes de confirmar</h2><p>{{ summary.create }} novos · {{ summary.skip }} já existentes ou repetidos · {{ summary.error }} inválidos.</p><p>Abaixo, até 30 linhas da prévia. Somente clientes novos serão criados.</p><div class="table-card"><table class="portal-table"><thead><tr><th>Linha</th><th>Nome</th><th>Telefone</th><th>Resultado</th></tr></thead><tbody>{% for row in preview %}<tr><td>{{ row.row }}</td><td>{{ row.data.name }}</td><td>{{ row.data.phone }}</td><td>{{ row.reason }}</td></tr>{% endfor %}</tbody></table></div>
+      <form method="post" class="portal-form">{% csrf_token %}<input type="hidden" name="action" value="apply"><input type="hidden" name="preview_token" value="{{ preview_token }}">{% if summary.error %}<label><input type="checkbox" name="allow_errors" value="yes"> Autorizo importar apenas as linhas válidas. Vou conferir no relatório as linhas não importadas.</label>{% endif %}<p><strong>Destino: {{ batch.tenant.name }}.</strong> Confira a empresa antes de confirmar.</p><button class="button primary">Confirmar importação para {{ batch.tenant.name }}</button></form></article>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

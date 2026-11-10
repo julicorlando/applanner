@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Liberar acesso empresa · Master{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <header class="portal-heading"><div><a class="back-link" href="{% url 'master-home' %}">← Central da plataforma</a><span class="eyebrow">MASTER · BOAS-VINDAS</span><h1>Liberar acesso empresa</h1><p>Escolha a empresa para ver os usuários dela. Cada usuário recebe um e-mail de boas-vindas com o botão para criar a própria senha.</p></div></header>
+  <form method="get" class="panel portal-form access-release-search"><div class="form-field"><label for="release-search">Buscar empresa</label><input id="release-search" type="search" name="q" value="{{ query }}" placeholder="Nome da empresa"></div><div class="form-actions"><button class="button primary" type="submit">Buscar</button>{% if query %}<a class="button" href="{% url 'master-access-release' %}">Limpar</a>{% endif %}</div></form>
+  <div class="table-card"><table class="portal-table"><thead><tr><th>Empresa</th><th>Usuários</th><th></th></tr></thead><tbody>
+    {% for company in companies %}<tr><td><a href="{% url 'master-access-release-company' company.pk %}"><strong>{{ company.name }}</strong></a></td><td>{{ company.user_count }}</td><td class="table-actions"><a class="button primary" href="{% url 'master-access-release-company' company.pk %}">Ver usuários e liberar</a></td></tr>
+    {% empty %}<tr><td colspan="3">Nenhuma empresa ativa encontrada.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

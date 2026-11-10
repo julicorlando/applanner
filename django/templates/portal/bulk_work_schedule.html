@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Expediente em massa — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <div class="portal-heading"><div>
+    <a class="back-link" href="{% url 'portal-resource-list' 'agenda' 'expedientes' %}?unit={{ selected_unit.pk }}">← Expedientes</a>
+    <span class="eyebrow">{{ tenant.name }} · {{ selected_unit.name }}</span>
+    <h1>Cadastrar expediente em massa</h1>
+    <p>Defina a jornada de vários profissionais e dias da semana de uma só vez.</p>
+  </div></div>
+  <form method="get" class="portal-search">
+    <label for="bulk-unit">Unidade</label>
+    <select id="bulk-unit" name="unit">{% for unit in units %}<option value="{{ unit.pk }}"{% if unit.pk == selected_unit.pk %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}</select>
+    <button class="button" type="submit">Trocar unidade</button>
+  </form>
+  <div class="panel bulk-work-help">
+    <strong>Seus cadastros são preservados.</strong>
+    <p>Horários idênticos não serão duplicados. Se houver um expediente diferente ou intervalo incompatível, nada será cadastrado até você revisar a seleção. Para alterar horários existentes, use a edição individual.</p>
+    <p>O intervalo é opcional: deixe os dois campos vazios quando não houver pausa. Folgas, férias, agendamentos, planos e valores permanecem como estão.</p>
+  </div>
+  <form method="post" action="?unit={{ selected_unit.pk }}" class="panel portal-form bulk-work-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="bulk-work-grid">
+      <fieldset class="bulk-work-choices"><legend>{{ form.professionals.label }}</legend>
+        {{ form.professionals.errors }}{{ form.professionals }}
+        <p class="muted">{{ form.professionals.help_text }}</p>
+        {% if not form.professionals.field.queryset.exists %}<p>Nenhum profissional ativo nesta unidade. <a href="{% url 'portal-resource-list' 'agenda' 'profissionais' %}?unit={{ selected_unit.pk }}">Cadastrar profissionais</a>.</p>{% endif %}
+      </fieldset>
+      <fieldset class="bulk-work-choices"><legend>{{ form.weekdays.label }}</legend>
+        {{ form.weekdays.errors }}{{ form.weekdays }}
+      </fieldset>
+    </div>
+    <fieldset><legend>Jornada e intervalo</legend><div class="bulk-work-grid">
+      <div class="form-field">{{ form.start_time.label_tag }}{{ form.start_time }}{{ form.start_time.errors }}</div>
+      <div class="form-field">{{ form.end_time.label_tag }}{{ form.end_time }}{{ form.end_time.errors }}</div>
+      <div class="form-field">{{ form.break_start.label_tag }}{{ form.break_start }}{{ form.break_start.errors }}</div>
+      <div class="form-field">{{ form.break_end.label_tag }}{{ form.break_end }}{{ form.break_end.errors }}</div>
+    </div></fieldset>
+    <div class="form-actions"><button class="button primary" type="submit">Cadastrar expedientes e intervalos</button>
+      <a class="button ghost" href="{% url 'portal-resource-list' 'agenda' 'expedientes' %}?unit={{ selected_unit.pk }}">Voltar</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

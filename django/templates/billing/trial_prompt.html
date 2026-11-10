@@ -1,0 +1,9 @@
+{% load static %}
+{% if trial_subscription_prompt %}
+<dialog id="trial-subscription-dialog" class="trial-subscription-dialog" aria-labelledby="trial-subscription-title" aria-describedby="trial-subscription-description">
+  <h2 id="trial-subscription-title">{% if trial_subscription_prompt.days == 0 %}Seu teste grátis termina hoje{% else %}Seu teste grátis termina em 2 dias{% endif %}</h2>
+  <p id="trial-subscription-description">Assine o ApPlanner para continuar usando sua agenda e todos os recursos do seu plano. O teste termina em {{ trial_subscription_prompt.ends_label }}.</p>
+  <div class="form-actions"><a class="button primary" href="{% url 'billing-subscription-status' %}">Assinar agora</a><button type="button" class="button" id="trial-subscription-close">Fechar</button></div>
+</dialog>
+<script src="{% static 'js/trial-subscription-prompt.js' %}" defer></script>
+{% endif %}

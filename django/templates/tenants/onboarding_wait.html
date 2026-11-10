@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}Configuração pendente · ApPlanner{% endblock %}
+{% block content %}<section class="shell portal-page narrow"><div class="panel"><h1>Empresa em configuração</h1><p>O responsável por {{ tenant.name }} precisa concluir o primeiro cadastro antes de liberar a operação para a equipe.</p><form method="post" action="/account/logout/">{% csrf_token %}<button class="button ghost">Sair</button></form></div></section>{% endblock %}

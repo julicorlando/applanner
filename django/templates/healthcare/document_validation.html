@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow">
+<title>Validação de documento · {{ clinic }}</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f3f4f6;color:#111827}
+main{max-width:560px;margin:0 auto;padding:24px 16px 48px}
+.card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
+.ok{display:flex;gap:12px;align-items:center;color:#065f46}
+.ok strong{font-size:1.25rem}.seal{width:44px;height:44px;border-radius:50%;background:#d1fae5;display:grid;place-items:center;font-size:1.5rem}
+dl{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;margin:16px 0 0}dt{color:#6b7280}dd{margin:0;font-weight:600;word-break:break-word}
+code{font-size:.75rem;color:#374151}
+label{display:block;margin:12px 0 4px;font-weight:600}input[type=text]{width:100%;box-sizing:border-box;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:1rem}
+.check{display:flex;gap:8px;align-items:flex-start;font-weight:400}
+button{margin-top:16px;width:100%;padding:12px;border:0;border-radius:10px;background:#065f46;color:#fff;font-size:1rem;font-weight:600}
+.notice{background:#ecfdf5;color:#065f46;padding:12px;border-radius:10px}.muted{color:#6b7280;font-size:.85rem}
+ul{padding-left:18px}.errorlist{color:#b91c1c}
+</style>
+</head>
+<body><main>
+<section class="card">
+  <div class="ok"><span class="seal" aria-hidden="true">✓</span><div><strong>Documento autêntico</strong><div class="muted">Emitido pelo ApPlanner e preservado sem alterações.</div></div></div>
+  <dl>
+    <dt>Documento</dt><dd>{{ row.get_kind_display }}</dd>
+    <dt>Clínica</dt><dd>{{ clinic }}</dd>
+    <dt>Profissional</dt><dd>{{ signature.name|default:"—" }}{% if signature.council %} · {{ signature.council }}-{{ signature.jurisdiction }} {{ signature.number }}{% endif %}</dd>
+    <dt>Paciente</dt><dd>{{ patient }}</dd>
+    <dt>Emitido em</dt><dd>{{ row.finalized_at|date:"d/m/Y H:i" }}</dd>
+    <dt>Código</dt><dd>{{ row.display_code }}</dd>
+    <dt>Impressão digital</dt><dd><code>SHA-256 {{ row.sha256 }}</code></dd>
+  </dl>
+  <p class="muted">Por privacidade, o conteúdo clínico não é exibido. Confira se os dados acima correspondem ao documento em mãos. A imagem da assinatura não substitui certificado digital ICP-Brasil.</p>
+</section>
+<section class="card">
+  <h2>Registrar validação</h2>
+  {% if registered %}<p class="notice">Validação registrada. A clínica poderá ver que este documento foi conferido.</p>{% endif %}
+  <form method="post">{% csrf_token %}{{ form.non_field_errors }}
+    <label for="{{ form.validator_name.id_for_label }}">{{ form.validator_name.label }}</label>{{ form.validator_name }}{{ form.validator_name.errors }}
+    <label for="{{ form.validator_role.id_for_label }}">{{ form.validator_role.label }}</label>{{ form.validator_role }}{{ form.validator_role.errors }}
+    <label class="check">{{ form.confirm }} {{ form.confirm.label }}</label>{{ form.confirm.errors }}
+    <button type="submit">Confirmar que validei este documento</button>
+  </form>
+</section>
+<section class="card">
+  <h2>Validações registradas</h2>
+  <ul>{% for item in validations %}<li><strong>{{ item.validator_name }}</strong>{% if item.validator_role %} · {{ item.validator_role }}{% endif %} — {{ item.created_at|date:"d/m/Y H:i" }}</li>{% empty %}<li>Nenhuma validação registrada ainda.</li>{% endfor %}</ul>
+</section>
+</main></body></html>

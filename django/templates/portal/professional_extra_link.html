@@ -1,0 +1,4 @@
+{% if request.user.is_superuser or request.user.role == 'owner' or request.user.role == 'manager' or request.user.role == 'tenant-admin' %}
+<p><a class="button" href="{% url 'portal-resource-create' 'suporte' 'chamados' %}?request=professional-extra">Solicitar profissional extra ao Master</a></p>
+<small>Solicite a quantidade desejada. O Master informa o preço vigente e as condições antes da contratação. Cada unidade adicional contratada libera mais 3 vagas.</small>
+{% endif %}
