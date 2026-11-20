@@ -217,3 +217,50 @@ def default_body(*,kind,user,patient,professional):
                'Oferecemos flexibilidade no pagamento:','• À vista','• Parcelado: ____','','Observações: ']
         return '\n'.join(rows)
     return ''
+
+
+def _logo_data_uri(raw):
+    """Small PNG data URI of the clinic logo for the on-screen document preview."""
+    import base64
+    if not raw:
+        return ''
+    try:
+        with Image.open(BytesIO(raw)) as source:
+            if source.width * source.height > 4_000_000:
+                return ''
+            picture = source.convert('RGBA')
+    except (OSError, ValueError, UnidentifiedImageError, Image.DecompressionBombError):
+        return ''
+    picture.thumbnail((520, 180))
+    out = BytesIO()
+    picture.save(out, 'PNG', optimize=True)
+    return 'data:image/png;base64,' + base64.b64encode(out.getvalue()).decode()
+
+
+def preview_data(*, tenant, user, patient=None, professional=None, kind=''):
+    """Plain values the editor uses to draw a faithful preview of the issued PDF."""
+    from django.urls import reverse
+    from .document_pdf import TITLES, ROLE_BY_COUNCIL, long_date
+    clinic = clinic_letterhead(tenant)
+    contacts = ' · '.join(v for v in (clinic.get('whatsapp') or clinic.get('phone'),
+                                      ('@' + clinic['instagram'].lstrip('@')) if clinic.get('instagram') else '',
+                                      clinic.get('email')) if v)
+    registration = getattr(professional, 'clinical_registration', None) if professional else None
+    snapshot = registration.snapshot() if registration else {}
+    council = snapshot.get('council', '')
+    color = clinic.get('primary_color') or ''
+    return {
+        'clinic': {'name': clinic.get('name', ''), 'logo': _logo_data_uri(clinic.get('logo')),
+                   'color': color if len(color) == 7 and color.startswith('#') else '#1f2937',
+                   'contacts': contacts, 'address': clinic.get('address', '')},
+        'patient': patient_header(patient) if patient else {},
+        'professional': {
+            'name': snapshot.get('name') or (professional.name if professional else ''),
+            'role': ROLE_BY_COUNCIL.get(council, 'Profissional de saúde'),
+            'registration': f"{council}-{snapshot.get('jurisdiction', '')} {snapshot.get('number', '')}".strip() if council else '',
+        },
+        'signature_url': reverse('clinical-signature-image') if professional and professional.user_id == user.pk else '',
+        'titles': TITLES,
+        'kind': kind,
+        'date': long_date(clinic.get('city', ''), timezone.localdate()),
+    }

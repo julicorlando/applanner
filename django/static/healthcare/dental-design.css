@@ -155,3 +155,29 @@
 .dental-workspace .dd-tools-menu{position:absolute;right:0;top:calc(100% + 8px);width:min(250px,80vw);padding:8px;background:var(--dd-card);border:1px solid var(--dd-line);border-radius:12px;box-shadow:var(--dd-shadow);z-index:130}
 .dental-workspace .dd-tools-menu a{display:block;padding:12px;border-radius:8px;text-decoration:none;font-size:14px}
 .dental-workspace .dd-tools-menu a:hover{background:var(--dd-soft)}
+
+/* Patient record and patient lists: avatars, action chips, outline buttons, patient cards. */
+.dental-workspace .clinical-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.dental-workspace .clinical-actions a{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--dd-line);background:var(--dd-soft);color:var(--dd-text);font-size:13px;font-weight:600;text-decoration:none}
+.dental-workspace .clinical-actions a:hover{border-color:var(--dd-primary);color:var(--dd-primary)}
+.dental-workspace a.pa-button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:10px;border:1px solid var(--dd-input-line);background:var(--dd-card);color:var(--dd-text);font-size:14px;font-weight:600;text-decoration:none;box-sizing:border-box}
+.dental-workspace a.pa-button:hover{background:var(--dd-soft);border-color:var(--dd-primary)}
+.dental-workspace .dd-avatar{flex:none;display:inline-grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--dd-soft);color:var(--dd-primary);border:1px solid var(--dd-line);font-weight:750;font-size:15px;letter-spacing:.02em}
+.dental-workspace .dd-avatar.is-large{width:64px;height:64px;font-size:22px}
+.dental-workspace .dpr-identity{display:flex;align-items:center;gap:18px}
+.dental-workspace .dpr-identity h1{margin:0}
+.dental-workspace .dpr-identity p{margin:4px 0 0}
+.dental-workspace .dpr-actions{align-items:center}
+.dental-workspace .dd-search{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:4px 0 18px}
+.dental-workspace .dd-search label{flex:1 1 260px;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:650}
+.dental-workspace .dd-search input{min-height:44px}
+.dental-workspace .dd-patient-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:0 0 6px}
+.dental-workspace .dd-patient-card{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--dd-line);border-radius:14px;background:var(--dd-card);min-width:0}
+.dental-workspace .dd-patient-card:hover{border-color:var(--dd-primary)}
+.dental-workspace .dd-patient-card div{min-width:0;flex:1}
+.dental-workspace .dd-patient-card a.dd-patient-name{display:block;font-weight:700;color:var(--dd-text);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dental-workspace .dd-patient-card a.dd-patient-name::after{content:"";position:absolute;inset:0}
+.dental-workspace .dd-patient-card{position:relative}
+.dental-workspace .dd-patient-card small{display:block;color:var(--dd-muted);font-size:13px}
+.dental-workspace .dd-patient-card .dd-card-action{position:relative;z-index:1;display:inline-block;margin-top:4px;font-size:13px;font-weight:650;white-space:nowrap}
+.dental-workspace .dd-pager{display:flex;gap:14px;align-items:center;font-size:14px;color:var(--dd-muted);margin:10px 0 24px}
