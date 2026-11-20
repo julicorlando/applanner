@@ -735,7 +735,7 @@ def _widgets_for(model, fields):
         if internal=="DateTimeField":
             widgets[name]=forms.DateTimeInput(attrs={"type":"datetime-local"},format="%Y-%m-%dT%H:%M")
         elif internal=="DateField":
-            widgets[name]=forms.DateInput(attrs={"type":"date"})
+            widgets[name]=forms.DateInput(attrs={"type":"date"},format="%Y-%m-%d")
         elif internal=="TimeField":
             widgets[name]=forms.TimeInput(attrs={"type":"time"})
         elif internal=="TextField":
@@ -1434,7 +1434,17 @@ def resource_list(request,module_slug,resource_slug):
     if not segment_enabled(tenant,"auto") and "vehicle" in columns:
         columns.remove("vehicle")
     rows=[{"obj":obj,"cells":[_value(obj,c) for c in columns]} for obj in qs]
+    dental_patients=False
+    if resource_slug=="clientes":
+        from healthcare.patient_record import access as dental_record_access
+        try:
+            dental_record_access(request.user)
+            dental_patients=True
+        except PermissionDenied:
+            pass
     return render(request,"portal/list.html",{
+        "dental_patients":dental_patients,
+        "can_schedule":has_capability(request.user,"agenda.manage") and _role_resource_write(request.user,"agenda","agendamentos"),
         "tenant":tenant,"module_slug":module_slug,"module":module,
         "resource_slug":resource_slug,"resource":resource,
         "headers":_headers(model,columns),"rows":rows,"q":q,
@@ -1543,6 +1553,9 @@ def resource_create(request,module_slug,resource_slug):
             raise PermissionDenied
         from core.unit_scope import selected_unit
         form=_model_form(model,resource,request.POST or None,request.FILES or None,tenant=tenant,unit=selected_unit(request,tenant))
+        if (request.method=="GET" and model._meta.label_lower=="scheduling.appointment" and request.GET.get("customer","").isdigit()
+                and "customer" in form.fields and form.fields["customer"].queryset.filter(pk=int(request.GET["customer"])).exists()):
+            form.initial["customer"]=int(request.GET["customer"])
         if request.user.role=="reception" and model._meta.label_lower=="finance.product":
             form.fields.pop("commission_type",None)
             form.fields.pop("commission_value",None)

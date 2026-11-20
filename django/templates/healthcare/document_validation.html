@@ -15,12 +15,13 @@ label{display:block;margin:12px 0 4px;font-weight:600}input[type=text]{width:100
 .check{display:flex;gap:8px;align-items:flex-start;font-weight:400}
 button{margin-top:16px;width:100%;padding:12px;border:0;border-radius:10px;background:#065f46;color:#fff;font-size:1rem;font-weight:600}
 .notice{background:#ecfdf5;color:#065f46;padding:12px;border-radius:10px}.muted{color:#6b7280;font-size:.85rem}
-ul{padding-left:18px}.errorlist{color:#b91c1c}
+ul{padding-left:18px}.replaced{border-left:4px solid #d97706;background:#fffbeb;padding:10px 12px;border-radius:8px}.errorlist{color:#b91c1c}
 </style>
 </head>
 <body><main>
 <section class="card">
   <div class="ok"><span class="seal" aria-hidden="true">✓</span><div><strong>Documento autêntico</strong><div class="muted">Emitido pelo ApPlanner e preservado sem alterações.</div></div></div>
+  {% if replaced_by %}<p class="replaced" role="status"><strong>Atenção: este orçamento foi substituído</strong> por uma versão revisada emitida em {{ replaced_by.finalized_at|date:"d/m/Y H:i" }} (código {{ replaced_by.display_code }}). Considere a versão mais recente.</p>{% endif %}
   <dl>
     <dt>Documento</dt><dd>{{ row.get_kind_display }}</dd>
     <dt>Clínica</dt><dd>{{ clinic }}</dd>

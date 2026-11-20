@@ -53,6 +53,12 @@ class ClinicalIssuedDocument(TimeStampedModel):
     finalized_at=models.DateTimeField(null=True,blank=True)
     # Unguessable public token printed as QR code; set once at emission.
     verification_code=models.CharField(max_length=40,unique=True,null=True,blank=True,editable=False)
+    # A revised budget points to the issued one it replaces; the old row stays untouched.
+    replaces=models.ForeignKey('self',on_delete=models.PROTECT,null=True,blank=True,related_name='revisions')
+
+    @property
+    def replaced_by(self):
+        return self.revisions.filter(status='finalized').order_by('-finalized_at','-pk').first()
 
     @property
     def display_code(self):
@@ -86,3 +92,24 @@ class ClinicalDocumentValidation(models.Model):
 
     def delete(self,*args,**kwargs):
         raise ValidationError('Validações registradas são preservadas.')
+
+
+class PatientNote(models.Model):
+    """Append-only observation added to a patient's record by the clinic team (reception included)."""
+    tenant=models.ForeignKey('tenants.Tenant',on_delete=models.PROTECT)
+    customer=models.ForeignKey('scheduling.Customer',on_delete=models.PROTECT,related_name='patient_notes')
+    text_encrypted=models.TextField()
+    author=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    author_name=models.CharField(max_length=160)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering=['-created_at','-pk']
+
+    def save(self,*args,**kwargs):
+        if self.pk:
+            raise ValidationError('Observações do prontuário não podem ser alteradas.')
+        super().save(*args,**kwargs)
+
+    def delete(self,*args,**kwargs):
+        raise ValidationError('Observações do prontuário ficam no histórico.')

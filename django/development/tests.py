@@ -467,6 +467,8 @@ class DevelopmentTests(TestCase):
     @patch("development.tasks._gateway")
     def test_stale_day_and_disabled_reminders_never_send(self, gateway):
         row = queue_reminder(self.charge.pk, self.charge.due_date)
+        # The model default uses the real clock; pin it to the frozen test time.
+        Delivery.objects.filter(pk=row.pk).update(next_attempt_at=self.now)
         with patch(
             "development.tasks.timezone.now", return_value=self.now + timedelta(days=1)
         ):

@@ -348,7 +348,7 @@ def _widgets(model,fields):
         if kind=="DateTimeField":
             result[name]=forms.DateTimeInput(attrs={"type":"datetime-local"},format="%Y-%m-%dT%H:%M")
         elif kind=="DateField":
-            result[name]=forms.DateInput(attrs={"type":"date"})
+            result[name]=forms.DateInput(attrs={"type":"date"},format="%Y-%m-%d")
         elif kind=="TextField":
             result[name]=forms.Textarea(attrs={"rows":4})
     return result

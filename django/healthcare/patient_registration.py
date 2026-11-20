@@ -82,11 +82,25 @@ class PatientForm(forms.ModelForm):
 
 def _clinical_user(request):
     user = request.user
-    assert_clinical_access(user)
     if user.is_superuser or not user.tenant_id or user.tenant.archived_at or user.tenant.deleted_at:
         raise PermissionDenied
+    from .patient_record import access as shared_access
+    try:
+        assert_clinical_access(user)
+    except PermissionDenied:
+        # Dental clinics share the patient record with the front desk and managers.
+        shared_access(user)
     require_module(user.tenant, "medical_records")
     return user.tenant
+
+
+def _editable_patients(user):
+    from .patient_record import access as shared_access, shared_patients
+    try:
+        shared_access(user)
+    except PermissionDenied:
+        return patients_for(user)
+    return shared_patients(user)
 
 
 def _return_url(request, patient):
@@ -98,6 +112,9 @@ def _return_url(request, patient):
         return target
     tenant = patient.tenant
     if dental_workspace(tenant) and module_enabled(tenant, "dentistry"):
+        from .patient_record import is_clinical
+        if not is_clinical(request.user):
+            return reverse("dental-patient-record", args=[patient.pk])
         return reverse("dental-assessment-create") + f"?customer={patient.pk}"
     return reverse("clinical-patient", args=[patient.pk])
 
@@ -106,7 +123,7 @@ def _return_url(request, patient):
 @never_cache
 def patient_form(request, pk=None):
     tenant = _clinical_user(request)
-    patient = get_object_or_404(patients_for(request.user).filter(active=True), pk=pk, tenant=tenant) if pk else None
+    patient = get_object_or_404(_editable_patients(request.user).filter(active=True), pk=pk, tenant=tenant) if pk else None
     form = PatientForm(request.POST or None, instance=patient, tenant=tenant)
     if request.method == "POST" and form.is_valid():
         changed = [name for name in form.changed_data if name in FIELDS]

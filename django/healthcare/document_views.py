@@ -160,12 +160,30 @@ def documents(request):
         'patient':patient,'kinds':KINDS,'selected_kind':kind if kind in DEFAULT_TITLES else '','back_url':_record_url(tenant,patient) if patient else ''})
 
 
+@transaction.atomic
+def revise_budget(*,user,document,request=None):
+    """Open a new draft of an issued budget. The issued one stays intact until the revision is emitted."""
+    row=ClinicalIssuedDocument.objects.select_for_update().get(pk=document.pk)
+    if row.kind!='budget' or row.status!='finalized':
+        raise PermissionDenied('Somente orçamentos emitidos podem ser revisados.')
+    if row.professional.user_id!=user.pk:raise PermissionDenied
+    if row.replaced_by:
+        raise PermissionDenied('Este orçamento já foi substituído; revise a versão mais recente.')
+    draft=row.revisions.filter(status='draft').first()
+    if draft:return draft
+    draft=ClinicalIssuedDocument.objects.create(tenant=row.tenant,customer=row.customer,professional=row.professional,template=row.template,
+        kind='budget',title=row.title,body_encrypted=row.body_encrypted,created_by=user,replaces=row)
+    append_audit(tenant=row.tenant,user=user,request=request,action='clinical.document.revision_started',entity_type='ClinicalIssuedDocument',
+                 entity_id=draft.pk,after={'replaces':row.pk})
+    return draft
+
+
 def _record_url(tenant,patient):
     from django.urls import reverse
     from billing.entitlements import module_enabled
     from .navigation import dental_workspace
     if dental_workspace(tenant) and module_enabled(tenant,'dentistry'):
-        return reverse('dental-assessments')+f'?customer={patient.pk}'
+        return reverse('dental-patient-record',args=[patient.pk])
     return reverse('clinical-patient',args=[patient.pk])
 
 
@@ -183,6 +201,9 @@ def detail(request,pk):
     rows=ClinicalIssuedDocument.objects.filter(tenant=tenant)
     rows=rows.filter(created_by=request.user,status='draft') if reception else rows.filter(professional__user=request.user,professional__active=True)
     row=get_object_or_404(rows,pk=pk)
+    if request.method=='POST' and request.POST.get('action')=='revise':
+        if reception:raise PermissionDenied
+        return redirect('clinical-document-detail',pk=revise_budget(user=request.user,document=row,request=request).pk)
     if request.method=='POST' and row.status!='draft':return HttpResponse('O documento emitido foi preservado. Emita outro para corrigir.',status=409)
     form=ReviewForm(request.POST or None,initial={'title':row.title,'body':decrypt_text(row.body_encrypted),'version':row.version})
     if request.method=='POST' and form.is_valid():
@@ -202,6 +223,8 @@ def detail(request,pk):
     append_audit(tenant=tenant,user=request.user,request=request,action='clinical.document.viewed',entity_type='ClinicalIssuedDocument',entity_id=row.pk)
     from .document_services import verification_url
     return render(request,'healthcare/document_detail.html',{'row':row,'form':form,'reception':reception,
+        'replaced_by':row.replaced_by if row.status=='finalized' else None,
+        'pending_revision':row.revisions.filter(status='draft').first() if row.status=='finalized' else None,
         'validation_url':verification_url(row.verification_code,request.build_absolute_uri('/')) if row.verification_code else '',
         'validations':row.validations.all()[:50] if not reception else []})
 

@@ -148,11 +148,15 @@ class PatientRegistrationTests(TestCase):
         self.patient.refresh_from_db()
         self.assertEqual(missing_registration(self.patient), [])
 
-    def test_reception_and_other_professionals_cannot_use_record_registration(self):
+    def test_front_desk_registers_patients_but_other_dentist_and_master_cannot(self):
+        # The front desk sees and edits every patient; each dentist only their own.
         self.client.force_login(self.reception)
-        self.assertEqual(self.client.get(reverse("dental-patient-create")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("dental-patient-create")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("dental-patient-edit", args=[self.patient.pk])).status_code, 200)
         self.client.force_login(self.colleague)
         self.assertEqual(self.client.get(reverse("dental-patient-edit", args=[self.patient.pk])).status_code, 404)
+        self.client.force_login(self.master)
+        self.assertEqual(self.client.get(reverse("dental-patient-create")).status_code, 403)
 
     def test_next_parameter_cannot_redirect_off_site(self):
         response = self.client.post(reverse("dental-patient-create"), self.data(next="https://evil.example/x"))

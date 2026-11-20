@@ -15,7 +15,7 @@ on:
 jobs:
   test:
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # postgresql-client-16 is not packaged for the newer runner image
 
     services:
       postgres:

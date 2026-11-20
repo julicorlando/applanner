@@ -72,4 +72,5 @@ def validate(request, code):
         "validations": row.validations.all()[:20],
         "form": form,
         "registered": request.GET.get("registrado") == "1",
+        "replaced_by": row.replaced_by,
     }, status=200)
