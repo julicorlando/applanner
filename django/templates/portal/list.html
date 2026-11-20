@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% load static display_pt %}
-{% block title %}{{ resource.title }} — ApPlanner{% endblock %}
+{% block title %}{% if dental_patients %}Pacientes{% else %}{{ resource.title }}{% endif %} — ApPlanner{% endblock %}
 {% block content %}
 <section class="shell portal-page">
   <div class="portal-heading">
+    {% if dental_patients %}<div><h1>Pacientes</h1><p>Abra o prontuário, agende ou edite o cadastro de cada paciente.</p></div>
+    <a class="button primary" href="{% url 'dental-patient-create' %}?next={{ request.path|urlencode }}">Novo paciente</a>{% else %}
     <div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">{{ module.title }}</span><h1>{{ resource.title }}</h1></div>
-    {% if can_create %}<a class="button primary" href="{% url 'portal-resource-create' module_slug resource_slug %}">{% if resource_slug == 'agendamentos' %}Novo agendamento{% elif resource_slug == 'profissionais' %}Novo profissional{% elif resource_slug == 'servicos' %}Novo serviço{% elif resource_slug == 'reservas' %}Nova reserva{% elif resource_slug == 'clientes' %}Novo cliente{% else %}Adicionar: {{ resource.title }}{% endif %}</a>{% endif %}
+    {% endif %}{% if can_create and not dental_patients %}<a class="button primary" href="{% url 'portal-resource-create' module_slug resource_slug %}">{% if resource_slug == 'agendamentos' %}Novo agendamento{% elif resource_slug == 'profissionais' %}Novo profissional{% elif resource_slug == 'servicos' %}Novo serviço{% elif resource_slug == 'reservas' %}Nova reserva{% elif resource_slug == 'clientes' %}Novo cliente{% else %}Adicionar: {{ resource.title }}{% endif %}</a>{% endif %}
   </div>
   {% if module_slug == 'agenda' and resource_slug == 'expedientes' and can_create %}
   <p><a class="button" href="{% url 'bulk-work-schedule' %}?unit={{ selected_unit }}">Cadastrar expediente e intervalo em massa</a></p>

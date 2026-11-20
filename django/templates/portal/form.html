@@ -3,7 +3,7 @@
 {% block title %}{{ title }} — ApPlanner{% endblock %}
 {% block content %}
 <section class="shell portal-page narrow">
-  <div class="portal-heading"><div><a class="back-link" href="{% url 'portal-resource-list' module_slug resource_slug %}">← {{ resource.title }}</a><span class="eyebrow">{{ module.title }}</span><h1>{{ title }}</h1></div></div>
+  <div class="portal-heading"><div><a class="back-link" href="{% url 'portal-resource-list' module_slug resource_slug %}">← {{ resource.title }}</a><span class="eyebrow">{{ module.title }}</span><h1>{% if resource_slug == 'clientes' and dental_workspace %}{% if form.instance.pk %}Editar paciente{% else %}Novo paciente{% endif %}{% else %}{{ title }}{% endif %}</h1></div></div>
   {% if simple_mode %}<p class="simple-help">Preencha os dados abaixo e toque em <strong>Salvar</strong>. Se precisar corrigir algo, a orientação aparecerá junto ao campo.</p>{% endif %}
   {% if resource_slug == 'expedientes' %}<p>O expediente define quando cada profissional atende. As vagas respeitam também o funcionamento da unidade, intervalos, folgas e agendamentos existentes.</p>{% elif resource_slug == 'horarios-unidades' %}<p>Defina os dias e horários de funcionamento desta unidade para exibição na página pública. O atendimento depende também do expediente de cada profissional.</p>{% endif %}
   {% if resource_slug == 'profissionais' and request.user.role == 'professional' or resource_slug == 'profissionais' and request.user.role == 'healthcare' %}<p><a href="{% url 'clinical-signature' %}">Cadastrar minha assinatura para documentos clínicos</a> · Cada profissional cadastra a própria assinatura em sua conta.</p>{% endif %}
