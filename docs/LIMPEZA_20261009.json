@@ -1,0 +1,965 @@
+{
+  "method": "git rm --cached; arquivos locais preservados; nenhum dado de produção tocado",
+  "files": [
+    {
+      "path": "app/Controllers/AuthController.php.bak-senhas",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 14190
+    },
+    {
+      "path": "app/Controllers/DashboardController.php.bak-share",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 5276
+    },
+    {
+      "path": "app/Controllers/FinanceController.php.bak-20260812-165840",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 9972
+    },
+    {
+      "path": "app/Controllers/IntelligenceController.php.bak-20260812-171036",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 460
+    },
+    {
+      "path": "app/Controllers/OperationsCenterController.php.bak-20260813-113452",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 6849
+    },
+    {
+      "path": "app/Controllers/OperationsCenterController.php.bak-20260813-113517",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 7757
+    },
+    {
+      "path": "app/Controllers/PixController.php.bak-pix402",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 5649
+    },
+    {
+      "path": "app/Controllers/ProfessionalController.php.bak-senhas",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 15753
+    },
+    {
+      "path": "app/Controllers/ProfessionalController.php.bak-share",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 16823
+    },
+    {
+      "path": "app/Controllers/PublicSportsController.php.bak-quadras-v2",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 9706
+    },
+    {
+      "path": "app/Controllers/PublicSportsController.php.bak-quadras-v3",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 9915
+    },
+    {
+      "path": "app/Core/Auth.php.bak-senhas",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 8975
+    },
+    {
+      "path": "app/Services/MercadoPagoProvider.php.bak-decimais",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 4687
+    },
+    {
+      "path": "app/Services/MercadoPagoProvider.php.bak-pix402",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 6623
+    },
+    {
+      "path": "app/Services/MercadoPagoProvider.php.bak-v2",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 4870
+    },
+    {
+      "path": "app/Services/MercadoPagoProvider.php.bak-v3",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 5057
+    },
+    {
+      "path": "app/Services/SportsAvailabilityService.php.bak-quadras-v2",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 3904
+    },
+    {
+      "path": "app/Services/SportsAvailabilityService.php.bak-quadras-v3",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 4298
+    },
+    {
+      "path": "app/Views/commercial/plans-grid.php.bak-planos",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 1974
+    },
+    {
+      "path": "app/Views/layout.php.bak-20260812-171535",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 15199
+    },
+    {
+      "path": "app/Views/layout.php.bak-fix-modulos",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 15067
+    },
+    {
+      "path": "app/Views/layout.php.bak-quadras-v2",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 17520
+    },
+    {
+      "path": "app/Views/layout.php.bak-quadras-v3",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 18071
+    },
+    {
+      "path": "app/Views/layout.php.bak-tema",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 14546
+    },
+    {
+      "path": "app/Views/layout.php.bak-tema-clientes",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 14645
+    },
+    {
+      "path": "app/Views/master/errors.php.bak-central-erros",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 1225
+    },
+    {
+      "path": "app/Views/master/operations-center.php.bak-20260813-113452",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 4057
+    },
+    {
+      "path": "app/Views/master/operations-center.php.bak-20260813-113529",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 4207
+    },
+    {
+      "path": "app/Views/master/plan-form.php.bak-planos",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 9487
+    },
+    {
+      "path": "config/app.php",
+      "reason": "Configuração real de ambiente: manter local, distribuir apenas exemplos.",
+      "bytes": 348
+    },
+    {
+      "path": "config/database.php",
+      "reason": "Configuração real de ambiente: manter local, distribuir apenas exemplos.",
+      "bytes": 200
+    },
+    {
+      "path": "cron/worker.php.bak-20260813-130833",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 9104
+    },
+    {
+      "path": "error_log",
+      "reason": "Log/relatório de runtime; não participa do deploy Django.",
+      "bytes": 5475
+    },
+    {
+      "path": "index.php.bak-20260812-171028",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 21836
+    },
+    {
+      "path": "index.php.bak-quadras-v4-20260813-190856",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 27094
+    },
+    {
+      "path": "index.php.bak-reservations-v5-20260813-191455",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 27114
+    },
+    {
+      "path": "index.php.bak-senhas",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 21624
+    },
+    {
+      "path": "public/assets/css/commercial-team.css.bak-20260812-171543",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 521
+    },
+    {
+      "path": "public/assets/js/app.js.bak-share",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 5158
+    },
+    {
+      "path": "public/assets/js/app.js.bak-tema",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 4218
+    },
+    {
+      "path": "public/assets/js/app.js.bak-tema-clientes",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 4934
+    },
+    {
+      "path": "storage/cache/cron-arena.lock",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 33
+    },
+    {
+      "path": "storage/cache/cron-auto.lock",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 33
+    },
+    {
+      "path": "storage/cache/cron-barber.lock",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 33
+    },
+    {
+      "path": "storage/cache/cron-growth.lock",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 33
+    },
+    {
+      "path": "storage/cache/cron-health_alerts.lock",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 33
+    },
+    {
+      "path": "storage/cache/cron-worker.lock",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 33
+    },
+    {
+      "path": "storage/installed.lock",
+      "reason": "Estado de instalação legado: não pertence ao código distribuído.",
+      "bytes": 39
+    },
+    {
+      "path": "storage/logs/rc1-go-live-20260826-143504.json",
+      "reason": "Log/relatório de runtime; não participa do deploy Django.",
+      "bytes": 23074
+    },
+    {
+      "path": "storage/logs/rc1-go-live-20260826-143504.md",
+      "reason": "Log/relatório de runtime; não participa do deploy Django.",
+      "bytes": 9515
+    },
+    {
+      "path": "storage/private/backups/backup-20260826-143502-b6ae9e.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 5052013
+    },
+    {
+      "path": "storage/private/backups/backup-20260827-034001-41dae4.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8439750
+    },
+    {
+      "path": "storage/private/backups/backup-20260828-034001-129cbd.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8440230
+    },
+    {
+      "path": "storage/private/backups/backup-20260829-034001-f32576.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8440501
+    },
+    {
+      "path": "storage/private/backups/backup-20260830-034001-dad7ce.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8440738
+    },
+    {
+      "path": "storage/private/backups/backup-20260831-034001-e8a8c8.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8440980
+    },
+    {
+      "path": "storage/private/backups/backup-20260901-034001-504078.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8441304
+    },
+    {
+      "path": "storage/private/backups/backup-20260902-034002-769bce.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8441686
+    },
+    {
+      "path": "storage/private/backups/backup-20260903-034001-da7515.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8441886
+    },
+    {
+      "path": "storage/private/backups/backup-20260904-034001-3f9d71.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8442150
+    },
+    {
+      "path": "storage/private/backups/backup-20260905-034001-e2b388.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8442528
+    },
+    {
+      "path": "storage/private/backups/backup-20260906-034001-2a78ad.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8442758
+    },
+    {
+      "path": "storage/private/backups/backup-20260907-034002-8db6a0.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8443081
+    },
+    {
+      "path": "storage/private/backups/backup-20260908-034001-00227b.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8443326
+    },
+    {
+      "path": "storage/private/backups/backup-20260909-034002-2d5391.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8443617
+    },
+    {
+      "path": "storage/private/backups/backup-20260910-034001-0f037b.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8443829
+    },
+    {
+      "path": "storage/private/backups/backup-20260910-203755-a9ba15.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8444216
+    },
+    {
+      "path": "storage/private/backups/backup-20260910-212243-0c3699.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8445999
+    },
+    {
+      "path": "storage/private/backups/backup-20260911-031002-50df24.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8454348
+    },
+    {
+      "path": "storage/private/backups/backup-20260911-034001-dc9283.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8455174
+    },
+    {
+      "path": "storage/private/backups/backup-20260912-031001-4777de.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8480050
+    },
+    {
+      "path": "storage/private/backups/backup-20260912-034001-e7049c.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8480715
+    },
+    {
+      "path": "storage/private/backups/backup-20260913-031001-bce906.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10356910
+    },
+    {
+      "path": "storage/private/backups/backup-20260913-034001-a03918.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10357449
+    },
+    {
+      "path": "storage/private/backups/backup-20260914-031001-268201.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10376318
+    },
+    {
+      "path": "storage/private/backups/backup-20260914-034001-77b34a.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10377329
+    },
+    {
+      "path": "storage/private/backups/backup-20260915-031001-fede13.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10399632
+    },
+    {
+      "path": "storage/private/backups/backup-20260915-034001-02dfb3.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10400151
+    },
+    {
+      "path": "storage/private/backups/backup-20260916-031001-747aa3.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10420925
+    },
+    {
+      "path": "storage/private/backups/backup-20260916-034002-d8a594.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10421478
+    },
+    {
+      "path": "storage/private/backups/backup-20260917-031001-e9b71e.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10442982
+    },
+    {
+      "path": "storage/private/backups/backup-20260917-034001-d640b6.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10443582
+    },
+    {
+      "path": "storage/private/backups/backup-20260918-031002-98f73e.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10466012
+    },
+    {
+      "path": "storage/private/backups/backup-20260918-034001-678941.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10466624
+    },
+    {
+      "path": "storage/private/backups/backup-20260919-031001-2e1212.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10488976
+    },
+    {
+      "path": "storage/private/backups/backup-20260919-034001-0b9fb7.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10489622
+    },
+    {
+      "path": "storage/private/backups/backup-20260920-031001-0b24e0.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10512319
+    },
+    {
+      "path": "storage/private/backups/backup-20260920-034001-c1ef18.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10512898
+    },
+    {
+      "path": "storage/private/backups/backup-20260921-031001-ffe42f.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10532819
+    },
+    {
+      "path": "storage/private/backups/backup-20260921-034002-7f8d26.zip.enc",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10533296
+    },
+    {
+      "path": "storage/private/cleanup-manifests/cleanup-rf-20260826-135848.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 7122
+    },
+    {
+      "path": "storage/rate_limits/09e41a82606db9f4d09f57165fe1f1b6129a729ed4ba9a4f7181b49ac29f3172.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/192c08a2047d1a46c3350083d5fe3aa78e66498d7334d0f9f47236b3e684838e.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/1f57bbdafdf3d247017dde405f5160c8d013bf42881d629a93367a741fecf888.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/272ee9de3a9fcfb3ea3a14268a2275397bab3ae50c202cc5d181d5e57a19a74b.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/371e45037562f89b79e6861dc2308335295dcc3771adcbdec80c1fd034b47ac9.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/434b41e78deb1ccdb33e7d9116dac4b6f95980fb98bd195c67920ce711ef7b02.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/487c21d0a935f502d12a5c121479fe32df6d7e9adc0c9827fb51ca85aa4a4e92.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/4a7d52c708f022513f7e4dae40d7b9c672cff2239b25935fa87be94079aa02bd.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/4c9a36375209060bfa73e6bc887c981175409cd52dcb99545364d4ec81ddb19b.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/50374d50cf8677ce3fbf07726fa561ecbe5ec2973c280613d7a1c540bb73a8f4.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/5880e1a96cdbcd43630fd919bb3ba6726dd776c2f3256011c94290913d662bc6.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/61f3fb466c1672baa1a7e2138a9cb53cc0ac9691baf2b2fd11ef79deace176ab.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/66f1d51795865be1f2e0271d6c32af38622853a564a0660e722810ccb8094cf4.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/71c4c152c651772b0539339bb3f43c2305443f336a9322c356128c4cce07aa83.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/72597d65d0f893607a6c090989850c3f95ddb32aafbd4df991d22d9c72fae702.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/78ceb4cbf0e10aa95edd4c20df8d0f9bb709fbbc426573f20df16addb38a628c.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/81c9df6ae180a43c18b0470878ba7903c3475d41fba9f69145fbca862273a17c.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/83fc5976e3956f4b977eec8bf9750afd07fdcde5ae3e070890eaaef9840b9bd5.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/847f888b77ff00705b9d51859c5ff6288392f97397c00a9e6f5874153dd7cefe.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/881b9dbd11fb7c096a665643c1007b70349418590ac01c14b43e0805b9913948.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/9e5828d9df043b7601dcdac61da81fa4a3a6917ab8fc64aba3333953039434eb.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/a07cdae011c4460ece9c2306a9c5c760cdc121b0ce45269c9e06f944d2b29de5.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/c7ce54a28f2879f45687c18aa3a28602a104efa8735acf61c8be39f9bb228c0a.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/cb799b3a5821dd0e4d248e83c1be9b01b5a04ddaf4f73731249b9e763ed898fd.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/cd30e972fb6616d87ae0cce29c9e252c85907820d4e6763dd32b70c0554accf7.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/d1b3177e740470801a1771c18ccbe60acd7a603609f6001972afc17150dbd1e7.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/d5a5a815213fe8539ec224893bfbc77ed4e66fd56ee778683539fe1800ebdbd5.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/dff56b8dc3742dd92a9ff679d8561fa97defc1a2dd149b243939e2aa11d4b81a.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/e08691c01bdae049cd9193dd281f048ef09ca28a118b9356bf6c1badccbe5fa6.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/rate_limits/e99ab7ffc7bb56bdd3341497a20de16ecac6ca3985a3ba6ad8e89b6dfc298ee8.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 30
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-150216/app/Controllers/LeadMarketingController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 16249
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-150216/app/Services/SmtpProvider.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 4258
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-150216/app/Views/master/lead-marketing.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 12319
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-150216/cron/worker.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 11643
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-150216/index.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 38261
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-151057/app/Controllers/LeadMarketingController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 27710
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-151057/app/Services/SmtpProvider.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 4258
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-151057/app/Views/master/lead-marketing.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 17460
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-151057/cron/worker.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 12323
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-151057/index.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 38737
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-152334/app/Controllers/LeadMarketingController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 32610
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-152334/app/Services/SmtpProvider.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 4258
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-152334/app/Views/master/lead-marketing.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 18139
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-152334/cron/worker.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 12323
+    },
+    {
+      "path": "storage/update-backups/email-marketing-campaign-management-20260826-152334/index.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 38861
+    },
+    {
+      "path": "storage/update-backups/email-marketing-card-20260826-144256/app/Controllers/LeadMarketingController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 14601
+    },
+    {
+      "path": "storage/update-backups/email-marketing-card-20260826-144256/app/Services/SmtpProvider.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 3499
+    },
+    {
+      "path": "storage/update-backups/email-marketing-card-20260826-144256/app/Views/master/lead-marketing.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10026
+    },
+    {
+      "path": "storage/update-backups/email-marketing-card-20260826-144256/cron/worker.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 11796
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/INSTALLED_AT.txt",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 26
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/MANIFEST.json",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1221
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Controllers/BrandController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 6297
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Controllers/CommercialController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 9856
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Controllers/MasterController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 38111
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Core/Security.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1404
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Core/bootstrap.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 2637
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Views/commercial/landing.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 13608
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Views/layout.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 23907
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Views/master/index.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 6960
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Views/public/show.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 13534
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/app/Views/settings/branding.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 7222
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/index.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 38861
+    },
+    {
+      "path": "storage/update-backups/experience-v1-20260910-203756/files/public/assets/js/app.js",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 5612
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/INSTALLED_AT.txt",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 26
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/MANIFEST.json",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 2006
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Controllers/BrandController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 8080
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Controllers/CommercialController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10358
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Controllers/MasterController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 39900
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Controllers/WebhookController.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 20215
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Core/I18n.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1478
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Core/Security.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1510
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Core/bootstrap.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 2661
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Lang/en.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1694
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Lang/es.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1709
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Lang/pt_BR.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1720
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Lang/pt_PT.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1739
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Services/ProductEvent.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 514
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Views/commercial/landing.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 13917
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Views/layout.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 22996
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Views/master/conversion-settings.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 2710
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Views/master/index.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 3830
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Views/public/show.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 14093
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Views/public/sports.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 9174
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/app/Views/settings/branding.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 10335
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/cron/run.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 2244
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/cron/worker.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 12323
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/database/migrations/044_applanner_experience_i18n_growth.sql",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1949
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/index.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 39054
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/public/assets/css/experience-v1.css",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 3258
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/public/assets/js/app.js",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 6045
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/public/assets/js/growth-tracking.js",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1514
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/public/assets/js/i18n-selector.js",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1029
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/tests/experience_v1_static.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1328
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/tools/applanner-cron-health.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 4254
+    },
+    {
+      "path": "storage/update-backups/experience-v2-20260910-212243/files/tools/install-experience-crons.php",
+      "reason": "Backup gerado: desversionado, cópia local preservada; migrations e ferramentas de rollback mantidas.",
+      "bytes": 1349
+    },
+    {
+      "path": "storage/updates/arena-v1.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 185
+    },
+    {
+      "path": "storage/updates/arena-v2.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 194
+    },
+    {
+      "path": "storage/updates/auto-v1.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 347
+    },
+    {
+      "path": "storage/updates/barber-v1.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 314
+    },
+    {
+      "path": "storage/updates/modulos-assinatura-v1.json",
+      "reason": "Estado gerado em runtime; não distribuir entre ambientes.",
+      "bytes": 220
+    },
+    {
+      "path": "tools/demo-company.php.bak-20260812-170323",
+      "reason": "Snapshot de código gerado; fonte e histórico Git preservados.",
+      "bytes": 14318
+    }
+  ]
+}

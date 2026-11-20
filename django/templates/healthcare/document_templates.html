@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% load static %}
+{% block title %}Modelos de documentos{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'healthcare/documents.css' %}">{% endblock %}
+{% block content %}
+<main class="doc-page">
+  <header class="doc-topbar"><div><a class="doc-back" href="{% url 'clinical-documents' %}">← Documentos</a><h1>Modelos de documentos</h1>
+    <p>Crie textos prontos para receituários, atestados, declarações e orçamentos. A prévia mostra o modelo já com o timbre da clínica.</p></div></header>
+  <div class="doc-editor">
+    <form method="post" class="doc-form">{% csrf_token %}<span data-preview-variables hidden></span>
+      {% if form.non_field_errors %}<ul class="doc-errors">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+      <div class="doc-field"><span class="doc-label">Tipo de documento</span>
+        <div class="doc-kinds" role="group" aria-label="Tipo de documento">{% for value, label in form.fields.kind.choices %}<button type="button" data-kind-choice="{{ value }}" aria-pressed="{% if form.kind.value == value or not form.kind.value and forloop.first %}true{% else %}false{% endif %}">{{ label }}</button>{% endfor %}</div>
+        <select name="kind" id="id_kind" class="doc-hidden" data-preview-kind tabindex="-1" aria-hidden="true">{% for value, label in form.fields.kind.choices %}<option value="{{ value }}"{% if form.kind.value == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{{ form.kind.errors }}</div>
+      <div class="doc-field"><label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>{{ form.name }}{{ form.name.errors }}</div>
+      <div class="doc-field"><label for="{{ form.text.id_for_label }}">{{ form.text.label }}</label>{{ form.text }}{{ form.text.errors }}</div>
+      <p class="doc-tips">Use <code>{nome_paciente}</code>, <code>{cpf_paciente}</code>, <code>{nome_profissional}</code>, <code>{clinica}</code> e <code>{data}</code>: o sistema troca pelos dados reais ao preparar o documento. <code>Rótulo: valor</code> sai em negrito e <code>##</code> cria um subtítulo.</p>
+      {% if admin %}<label class="doc-check">{{ form.shared }}<span>{{ form.shared.label }}</span></label>{% endif %}
+      <div class="doc-actions"><button class="doc-btn is-primary" type="submit">Salvar modelo</button></div>
+    </form>
+    <aside class="doc-side" aria-label="Prévia">{% include 'healthcare/_document_preview.html' %}</aside>
+  </div>
+  <section class="doc-history"><h2>Modelos disponíveis</h2>
+    {% if templates %}<div class="doc-template-list">{% for item in templates %}<form method="post" class="doc-template-item">{% csrf_token %}<div><strong>{{ item.name }}</strong><br><span>{{ item.get_kind_display }}{% if not item.professional_id %} · toda a clínica{% endif %}</span></div><input type="hidden" name="template" value="{{ item.pk }}"><button class="doc-btn" name="action" value="disable">Desativar</button></form>{% endfor %}</div>
+    {% else %}<p>Nenhum modelo ainda. Salve o primeiro ao lado para usá-lo em todos os pacientes.</p>{% endif %}
+  </section>
+</main>
+<script src="{% static 'healthcare/document-preview.js' %}" defer></script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{{ preview|json_script:"doc-preview-data" }}
+<div class="doc-preview-head"><h2>Como vai ficar</h2><span>Prévia do PDF em folha A4</span></div>
+<div class="doc-frame">
+  <article class="doc-paper" data-paper aria-label="Prévia do documento">
+    <img class="doc-watermark" data-paper-watermark alt="">
+    <header class="doc-head" data-paper-head></header>
+    <div class="doc-content" data-paper-body></div>
+    <div class="doc-sign" data-paper-sign></div>
+    <footer class="doc-foot">
+      <div class="doc-qr-block">
+        <div class="doc-qr-text"><span>Documento emitido eletronicamente pelo ApPlanner.</span><span>Confira a autenticidade lendo o QR code.</span><span>Código de validação gerado na emissão.</span><span>A imagem da assinatura não substitui certificado digital ICP-Brasil.</span></div>
+        <div class="doc-qr" aria-hidden="true"></div>
+      </div>
+      <div class="doc-foot-line"></div>
+      {% if preview.clinic.contacts %}<p>{{ preview.clinic.contacts }}</p>{% endif %}
+      {% if preview.clinic.address %}<p>{{ preview.clinic.address }}</p>{% endif %}
+    </footer>
+  </article>
+</div>

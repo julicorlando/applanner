@@ -1,0 +1,25 @@
+/* Larger targets and a quieter company presentation in both themes. */
+.simple-mode{font-size:17px;line-height:1.6}
+.simple-mode .topbar{position:relative;align-items:center;flex-wrap:wrap}
+.simple-primary-nav{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.simple-primary-nav a,.simple-mode .button,.simple-mode .nav-link,.simple-mode summary{min-height:48px;display:inline-flex;align-items:center;padding:12px 18px;font-size:1rem}
+.simple-primary-nav a{border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);text-decoration:none;font-weight:700}
+.simple-more{position:relative}
+.simple-more>summary{cursor:pointer;border:1px solid var(--line);border-radius:12px;list-style:none;background:var(--paper)}
+.simple-more[open]>.nav{position:absolute;right:0;top:100%;z-index:30;display:flex;flex-direction:column;align-items:stretch;width:min(340px,90vw);max-height:70vh;overflow:auto;padding:16px;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--card-shadow)}
+.simple-more:not([open])>.nav{display:none}
+.simple-more .nav a,.simple-more .nav button{min-height:44px;padding:10px;text-align:left;white-space:normal}
+.simple-mode .mobile-nav{display:none!important}
+.simple-breadcrumb{display:flex;justify-content:space-between;gap:12px;padding-block:16px;color:var(--muted)}
+.simple-breadcrumb a{color:var(--accent);font-weight:700}
+.simple-dashboard h1{font-size:clamp(1.7rem,3vw,2.4rem)}
+.simple-day-summary{display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:22px;background:var(--paper);border:1px solid var(--line);border-radius:18px;margin-bottom:24px}
+.simple-day-summary div{display:grid;gap:4px}.simple-day-summary strong{font-size:1.45rem}.simple-day-summary a{margin-left:auto}
+.simple-action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px;margin-block:24px}
+.simple-action-card{display:flex;align-items:center;gap:16px;padding:24px;min-height:136px;border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);text-decoration:none}
+.simple-action-card>span:nth-child(2){flex:1;min-width:0}.simple-action-card strong{display:block;font-size:1.2rem}.simple-action-card small{display:block;color:var(--muted);line-height:1.5;margin-top:6px;font-size:1rem}.simple-action-icon{font-size:1.8rem;color:var(--accent)}
+.simple-action-card:hover{background:var(--soft);border-color:var(--accent)}.simple-action-primary{border:2px solid var(--accent)}
+.simple-mode .panel{margin-block:20px;padding:24px}.simple-appointment{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding-block:18px;border-bottom:1px solid var(--line)}.simple-appointment:last-child{border:0}.simple-appointment time{font-size:1.4rem;font-weight:700}.simple-appointment div{flex:1;min-width:180px}.simple-appointment span{display:block;color:var(--muted)}
+.simple-tools summary{cursor:pointer;font-weight:700}.simple-tools-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:24px;margin-top:20px}.simple-tools-grid h2{font-size:1.1rem}.simple-tools-grid a{display:block;color:var(--accent);padding-block:10px;min-height:44px}
+.simple-mode .portal-form{display:grid;grid-template-columns:1fr;gap:20px;max-width:850px;margin-inline:auto}.simple-mode .portal-form .form-field{grid-column:1/-1}.simple-mode .form-field label{font-size:1.05rem}.simple-mode input:not([type=checkbox]):not([type=radio]),.simple-mode select,.simple-mode textarea{font-size:1rem;min-height:48px}.simple-mode .field-error{font-size:1rem}.simple-mode .form-field small{font-size:.95rem}.simple-mode .portal-table th,.simple-mode .portal-table td{padding:16px}.simple-mode .table-actions a{display:inline-block;min-height:44px;padding:10px}.simple-mode .portal-heading{gap:18px;flex-wrap:wrap}.simple-help{padding:16px;background:var(--soft);border-radius:12px}
+@media(max-width:700px){.simple-primary-nav{width:100%;margin-left:0;order:3}.simple-primary-nav a{flex:1;justify-content:center}.simple-more{margin-left:auto}.simple-action-card{padding:20px}.simple-mode .panel{padding:18px}.simple-day-summary{gap:16px}.simple-day-summary a{width:100%;justify-content:center}.simple-appointment .button{width:100%;justify-content:center}.simple-mode .portal-heading .button{width:100%;justify-content:center}.simple-mode .form-actions{gap:12px}.simple-mode .form-actions .button{flex:1;justify-content:center}.simple-breadcrumb{font-size:.95rem}}

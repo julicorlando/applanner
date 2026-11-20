@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Manutenção — ApPlanner{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <article class="panel" style="text-align:center;padding:42px 28px">
+    <span class="eyebrow">MANUTENÇÃO PROGRAMADA</span>
+    <h1>Voltamos em breve.</h1>
+    <p>{{ maintenance_message|default:"Estamos realizando uma manutenção programada. Tente novamente em alguns minutos." }}</p>
+    <div class="form-actions" style="justify-content:center"><a class="button" href="{% url 'platform-status' %}">Ver status dos serviços</a></div>
+  </article>
+</section>
+{% endblock %}

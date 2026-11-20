@@ -1,0 +1,1 @@
+document.addEventListener('click',async event=>{const button=event.target.closest('[data-short-copy]');if(!button)return;const field=document.getElementById(button.dataset.shortCopy);if(!field)return;try{await navigator.clipboard.writeText(field.value);button.textContent='Copiado!';}catch{field.focus();field.select();button.textContent='Selecione e copie o link';}});

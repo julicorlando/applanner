@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Liberar acesso · {{ tenant.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <header class="portal-heading"><div><a class="back-link" href="{% url 'master-access-release' %}">← Liberar acesso empresa</a><span class="eyebrow">MASTER · LIBERAR ACESSO</span><h1>{{ tenant.name }}</h1><p>Libere um usuário por vez. O e-mail sai na hora, com a logo do ApPlanner, uma prévia do painel e o botão <strong>Clique aqui para gerar sua senha</strong>. O link vale {{ link_hours }} horas e funciona uma única vez. Liberar de novo invalida o link anterior.</p></div>
+  <a class="button" href="{% url 'master-email-template-edit' 'access_release' %}">Editar texto do e-mail</a></header>
+  <p class="payment-hint">{{ released }} de {{ rows|length }} usuário(s) já receberam o e-mail de boas-vindas.</p>
+  <div class="table-card"><table class="portal-table"><thead><tr><th>Usuário</th><th>Perfil</th><th>Senha</th><th>Último envio</th><th></th></tr></thead><tbody>
+    {% for row in rows %}<tr id="usuario-{{ row.user.pk }}">
+      <td><strong>{{ row.user.get_full_name|default:row.user.email }}</strong><br><small>{{ row.user.email|default:"Sem e-mail" }}</small></td>
+      <td>{{ row.user.role }}{% if not row.user.is_active %} · inativo{% endif %}</td>
+      <td>{% if row.password_ready %}Criada{% else %}Aguardando{% endif %}</td>
+      <td>{% if row.notice %}{% if row.notice.status == "sent" %}✓ Enviado em {{ row.notice.sent_at|date:"d/m/Y H:i" }}{% else %}{{ row.notice.get_status_display }} em {{ row.notice.created_at|date:"d/m/Y H:i" }}{% if row.notice.error_message %}<br><small>{{ row.notice.error_message }}</small>{% endif %}{% endif %}{% else %}Nunca enviado{% endif %}</td>
+      <td class="table-actions">{% if row.can_release %}<form method="post" action="{% url 'master-access-release-user' tenant.pk row.user.pk %}" data-access-release>{% csrf_token %}<button class="button{% if not row.notice %} primary{% endif %}" type="submit">{% if row.notice and row.notice.status == "sent" %}Reenviar acesso{% else %}Liberar acesso{% endif %}</button></form>{% else %}<small>Ative o usuário e informe o e-mail para liberar.</small>{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="5">Esta empresa ainda não tem usuários. Cadastre-os em <a href="{% url 'master-resource-list' 'usuarios' %}">Usuários</a>.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

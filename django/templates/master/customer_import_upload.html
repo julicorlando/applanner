@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block title %}Importar base de clientes — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <header class="portal-heading"><div><span class="eyebrow">MASTER · MIGRAÇÃO ASSISTIDA</span><h1>Traga os clientes para o ApPlanner</h1><p>Importe a exportação CSV ou XLSX do sistema anterior para a empresa correta.</p></div><a class="button" href="{% url 'master-customer-import-example' %}">Baixar modelo CSV</a></header>
+  <article class="panel"><h2>Prévia antes de importar</h2><p>Até 5.000 clientes e 5 MB por arquivo. Escolha as colunas de nome, telefone com DDD, e-mail, nascimento e observações. Telefones e e-mails identificam registros já existentes, preservando seus dados e histórico.</p><p>O envio prepara uma prévia; a importação exige confirmação. Consentimento de marketing fica desativado para clientes novos. A base de origem é armazenada criptografada e removida da prévia após aplicar.</p><p>Para backups próprios de outros fornecedores, exporte primeiro a lista de clientes em CSV ou XLSX. Este fluxo importa clientes; agendamentos antigos, prontuários, senhas e lançamentos financeiros precisam de uma migração específica.</p></article>
+  <form method="post" enctype="multipart/form-data" class="panel portal-form" style="margin-top:20px">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}<button class="button primary">Preparar prévia</button></form>
+  <section class="panel" style="margin-top:24px"><h2>Importações recentes</h2><div class="table-card"><table class="portal-table"><thead><tr><th>Empresa</th><th>Arquivo</th><th>Estado</th><th></th></tr></thead><tbody>{% for batch in batches %}<tr><td>{{ batch.tenant.name }}</td><td>{{ batch.source_name }}</td><td>{{ batch.get_state_display }}</td><td><a href="{% url 'master-customer-import-detail' batch.pk %}">Abrir</a></td></tr>{% empty %}<tr><td colspan="4">Nenhuma base enviada.</td></tr>{% endfor %}</tbody></table></div></section>
+</section>
+{% endblock %}

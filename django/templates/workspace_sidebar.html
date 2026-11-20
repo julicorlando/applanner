@@ -1,0 +1,16 @@
+{% load static %}{% if workspace_groups %}
+<button class="workspace-launcher" type="button" data-sidebar-toggle aria-controls="workspace-sidebar" aria-expanded="false">☰ Menu</button>
+<button class="workspace-backdrop" type="button" data-sidebar-close aria-label="Fechar menu" hidden></button>
+<aside class="workspace-sidebar" id="workspace-sidebar" aria-label="Áreas de trabalho">
+  <button class="workspace-close" type="button" data-sidebar-close aria-label="Fechar menu">×</button>
+  <div class="workspace-identity"><a href="/" aria-label="ApPlanner início" class="workspace-brand-logo">{% include "platform_logo.html" %}</a><div><strong>ApPlanner</strong><small>{% if workspace_master %}Central Master{% elif request.user.role == 'professional' %}Área do profissional{% else %}{{ workspace_tenant.name|default:'Sua conta' }}{% endif %}</small></div></div>
+  {% if workspace_tenant %}<div class="workspace-company">{% if workspace_tenant.logo %}<img src="{% url 'workspace-company-logo' %}" width="44" height="44" alt="Logo {{ workspace_tenant.name }}">{% endif %}<strong>{{ workspace_tenant.name }}</strong></div>{% endif %}
+  <label class="workspace-search-label" for="workspace-search">Encontrar uma função</label>
+  <input id="workspace-search" type="search" placeholder="Buscar no menu…" autocomplete="off" aria-controls="workspace-sections">
+  <nav id="workspace-sections" aria-label="Menu do sistema">
+    {% for group in workspace_groups %}<details class="workspace-group" open><summary>{{ group.title }}</summary><div>{% for item in group.items %}<a href="{{ item.url }}" data-workspace-link{% if item.active %} aria-current="page"{% endif %}><span aria-hidden="true">{% include 'workspace_icon.html' with icon=item.icon %}</span>{{ item.title }}</a>{% endfor %}</div></details>{% endfor %}
+  </nav>
+  <p class="workspace-no-results" hidden role="status">Nenhuma função encontrada. Tente outro termo.</p>
+  <div class="workspace-account"><strong>{{ request.user.first_name|default:'Sua conta' }}</strong><small>{{ request.user.get_role_display }}</small>{% include 'theme_toggle.html' %}<form method="post" action="/account/logout/">{% csrf_token %}<button class="nav-link" type="submit">Sair</button></form></div>
+</aside>
+{% endif %}

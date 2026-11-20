@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Diagnóstico da operação — {{ tenant.name }}{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <header class="portal-heading"><div><a class="back-link" href="{% url 'portal-home' %}">← Operação</a><span class="eyebrow">HOMOLOGAÇÃO</span><h1>Diagnóstico da operação</h1><p>Resumo seguro da configuração da empresa. Nenhum teste dispara e-mail, WhatsApp ou cobrança.</p></div></header>
+  <div class="panel diagnostic-summary"><span class="status-pill">{% if ready %}Pronto para teste público{% else %}{{ blocking_count }} pendência(s) operacional(is){% endif %}</span><h2>{% if ready %}A operação mínima está configurada{% else %}Corrija os itens pendentes antes de divulgar o link{% endif %}</h2><p>O WhatsApp é opcional e não bloqueia agendamentos. Pagamentos online só são necessários quando a empresa desativa o pagamento na unidade.</p></div>
+  <div class="diagnostic-list">{% for check in checks %}<article class="panel diagnostic-row {% if check.ok %}is-ok{% else %}is-pending{% endif %}"><div class="diagnostic-icon" aria-hidden="true">{% if check.ok %}✓{% else %}!{% endif %}</div><div><h2>{{ check.label }}</h2><p>{{ check.detail }}</p></div><a class="button {% if check.ok %}ghost{% endif %}" href="{{ check.url }}">{% if check.ok %}Revisar{% else %}Corrigir{% endif %} →</a></article>{% endfor %}</div>
+</section>
+{% endblock %}
