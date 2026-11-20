@@ -8,6 +8,7 @@ from .permissions import has_capability
 
 RECEPTION_MUTATION_PREFIXES=(
     "/app/hoje/",
+    "/app/recepcao/painel/",
     "/app/cliente/",
     "/app/agenda/",
     "/app/financeiro/pdv/",
@@ -69,6 +70,8 @@ class CapabilityRouteMiddleware:
             own_calendar_read = request.method in {'GET', 'HEAD'} and request.path in {'/app/calendario/', '/app/identidade/logo/'}
             from healthcare.navigation import workspace_enabled
             own_physio_read=(request.method in {'GET','HEAD'} and request.path in {'/app/','/app/fisioterapia/dashboard/','/app/fisioterapia/configuracoes/','/app/odontologia/dashboard/','/app/odontologia/configuracoes/'} and workspace_enabled(request))
+            # The reception desktop app opens for every user; each keeps their own scope.
+            own_physio_read=own_physio_read or (request.method in {'GET','HEAD'} and request.path in {'/app/recepcao/painel/','/app/recepcao/instalar/','/app/recepcao/instalar/windows/'})
             if request.path.startswith("/app/") and not request.path.startswith("/app/profissional/") and not own_physio_read and not own_calendar_read and not request.path.startswith(("/app/saude/", "/app/odontologia/", "/app/clinica/")):
                 raise PermissionDenied("A conta profissional acessa apenas sua própria área.")
         if (

@@ -128,6 +128,8 @@ def shell_context(user, request=None):
     ]
     if dental and management and module_enabled(user.tenant,"finance"):
         rows.insert(6,("Tratamentos",reverse("clinical-treatment-sales"),"tooth"))
+    if dental and agenda and user.role not in {"professional", "healthcare"}:
+        rows.insert(1, ("Recepção", reverse("reception-panel"), "users"))
     path = request.path if request else reverse("physio-assessments")
     name = (
         getattr(getattr(request, "resolver_match", None), "url_name", "")
@@ -136,6 +138,8 @@ def shell_context(user, request=None):
     )
     if name in {"physio-dashboard", "dental-dashboard", "portal-home"} or path == "/":
         active = "Dashboard"
+    elif name in {"reception-panel", "reception-app-install"}:
+        active = "Recepção"
     elif name in {
         "operation-calendar",
         "professional-blocks",

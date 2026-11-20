@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <link rel="manifest" href="{% url 'web-app-manifest' %}">
+  {% block manifest %}<link rel="manifest" href="{% url 'web-app-manifest' %}">{% endblock %}
   <link rel="apple-touch-icon" sizes="180x180" href="{% url 'web-app-icon' 180 %}?v={{ platform_branding.updated_at|date:'U'|default:'1' }}">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
