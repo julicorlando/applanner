@@ -26,15 +26,17 @@ class PatientRecordTests(TestCase):
     def url(self, patient=None):
         return reverse("dental-patient-record", args=[(patient or self.patient).pk])
 
-    def test_record_shows_every_dentist_evolution_and_both_text_boxes(self):
+    def test_dentist_sees_own_record_with_both_text_boxes_and_other_dentist_cannot(self):
         self.save(final=True, initial_evolution="Restauração no 46.", orthodontic_treatment="Troca de elástico superior.")
-        self.client.force_login(self.colleague)
+        self.client.force_login(self.doctor)
         response = self.client.get(self.url())
         self.assertEqual(response.status_code, 200)
         for text in ("Procedimento clínico", "Restauração no 46.", "Tratamento ortodôntico", "Troca de elástico superior.",
                      "Informação clínica de teste", "Histórico do paciente"):
             self.assertContains(response, text)
-        self.assertTrue(MedicalRecordAccessLog.objects.filter(user=self.colleague).exists())
+        self.assertTrue(MedicalRecordAccessLog.objects.filter(user=self.doctor).exists())
+        self.client.force_login(self.colleague)
+        self.assertEqual(self.client.get(self.url()).status_code, 404)
 
     def test_editor_has_two_evolution_boxes(self):
         self.client.force_login(self.doctor)
@@ -51,14 +53,22 @@ class PatientRecordTests(TestCase):
         self.assertContains(listing, self.url(unscheduled))
         self.assertEqual(self.client.get(self.url(unscheduled)).status_code, 200)
         self.assertContains(self.client.get(self.url()), "Informação clínica de teste")
-        response = self.client.post(self.url(), {"action": "note", "text": "Paciente pediu retorno à tarde."})
+        self.assertContains(self.client.get(self.url()), 'name="procedure"')
+        self.assertEqual(self.client.post(self.url(), {"action": "note", "text": ""}).status_code, 200)
+        response = self.client.post(self.url(), {"action": "note", "procedure": "Moldagem superior realizada.",
+                                                 "orthodontic": "", "text": "Paciente pediu retorno à tarde."})
         self.assertRedirects(response, self.url(), fetch_redirect_response=False)
         note = PatientNote.objects.get(customer=self.patient)
-        self.assertEqual(decrypt_text(note.text_encrypted), "Paciente pediu retorno à tarde.")
-        self.assertNotIn("retorno", note.text_encrypted)
-        self.assertContains(self.client.get(self.url()), "Paciente pediu retorno à tarde.")
+        self.assertIn("Moldagem superior realizada.", decrypt_text(note.text_encrypted))
+        self.assertNotIn("Moldagem", note.text_encrypted)
+        page = self.client.get(self.url())
+        self.assertContains(page, "Moldagem superior realizada.")
+        self.assertContains(page, "Paciente pediu retorno à tarde.")
         with self.assertRaises(ValidationError):
             note.save()
+        # The dentist of the patient sees the front desk evolution too.
+        self.client.force_login(self.doctor)
+        self.assertContains(self.client.get(self.url()), "Moldagem superior realizada.")
 
     def test_patient_link_goes_to_record_and_other_clinic_is_hidden(self):
         self.client.force_login(self.doctor)

@@ -1,6 +1,6 @@
-"""Prontuário do paciente (odontologia): uma página com o cadastro, as evoluções e
-observações de toda a equipe da clínica, os documentos emitidos e os pagamentos,
-agrupados por dia. Receber um valor aqui lança a linha na folha do caixa como paga.
+"""Prontuário do paciente (odontologia): uma página com o cadastro, as evoluções,
+os registros da recepção, os documentos emitidos e os pagamentos, agrupados por dia.
+Cada dentista vê os próprios pacientes e registros; a recepção e a gestão veem e editam todos. Receber um valor aqui lança a linha na folha do caixa como paga.
 
 Every read of clinical content is logged (MedicalRecordAccessLog / audit trail).
 Clinical records themselves stay immutable: new content comes as new evolutions
@@ -70,11 +70,14 @@ def access(user):
 
 
 def shared_patients(user):
-    """All patients of the clinic when the shared dental record applies; otherwise none."""
+    """Patients this user may open: each dentist sees their own; the front desk and managers see all."""
     try:
-        tenant, _ = access(user)
+        tenant, clinical = access(user)
     except PermissionDenied:
         return Customer.objects.none()
+    if clinical:
+        from .patient_scope import patients_for
+        return patients_for(user)
     return Customer.objects.filter(tenant=tenant)
 
 
@@ -133,9 +136,17 @@ def _local_day(value):
     return timezone.localtime(value).date()
 
 
-def build_timeline(*, tenant, patient, user, ip=""):
+def build_timeline(*, tenant, patient, user, ip="", clinical=False):
     days = defaultdict(lambda: {"records": [], "notes": [], "payments": [], "documents": []})
-    assessments = (DentalAssessment.objects.filter(tenant=tenant, customer=patient)
+    assessments = DentalAssessment.objects.filter(tenant=tenant, customer=patient)
+    entries = MedicalRecordEntry.objects.filter(tenant=tenant, customer=patient)
+    if clinical:
+        # A dentist sees only their own records (plus the existing scheduled cross-cover).
+        from .dental_assessment_services import assessments_for
+        from .services import clinical_records_for
+        assessments = assessments.filter(pk__in=assessments_for(user).values("pk"))
+        entries = entries.filter(pk__in=clinical_records_for(user=user, tenant=tenant).values("pk"))
+    assessments = (assessments
                    .select_related("final_entry", "professional__clinical_registration", "professional__user")
                    .order_by("-updated_at", "-pk")[:100])
     for row in assessments:
@@ -156,8 +167,7 @@ def build_timeline(*, tenant, patient, user, ip=""):
             "url": reverse("dental-assessment-detail", args=[row.pk])
             if row.professional.user_id == user.pk and row.created_by_id == user.pk else "",
         })
-    entries = (MedicalRecordEntry.objects.filter(tenant=tenant, customer=patient, dental_assessment__isnull=True,
-                                                 clinicalissueddocument__isnull=True)
+    entries = (entries.filter(dental_assessment__isnull=True, clinicalissueddocument__isnull=True)
                .exclude(record_type__in=PHYSIO_TYPES)
                .select_related("professional__clinical_registration", "professional__user")
                .order_by("-created_at", "-pk")[:200])
@@ -169,8 +179,11 @@ def build_timeline(*, tenant, patient, user, ip=""):
         })
     for note in PatientNote.objects.filter(tenant=tenant, customer=patient)[:200]:
         days[_local_day(note.created_at)]["notes"].append({
-            "text": decrypt_text(note.text_encrypted), "author": note.author_name, "at": note.created_at})
-    for doc in (ClinicalIssuedDocument.objects.filter(tenant=tenant, customer=patient, status="finalized")
+            "sections": note_sections(decrypt_text(note.text_encrypted)), "author": note.author_name, "at": note.created_at})
+    documents = ClinicalIssuedDocument.objects.filter(tenant=tenant, customer=patient, status="finalized")
+    if clinical:
+        documents = documents.filter(professional__user=user)
+    for doc in (documents
                 .select_related("professional").order_by("-finalized_at")[:100]):
         days[_local_day(doc.finalized_at)]["documents"].append({
             "title": doc.title, "kind": doc.get_kind_display(), "author": doc.professional.name,
@@ -216,9 +229,31 @@ class ReceiveForm(forms.Form):
         return data
 
 
+NOTE_FIELDS = (("procedure", "Procedimento clínico"), ("orthodontic", "Tratamento ortodôntico"), ("text", "Observação"))
+
+
+def note_sections(raw):
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        data = None
+    if not isinstance(data, dict):
+        return [("Observação", raw)] if (raw or "").strip() else []
+    return [(label, str(data[key]).strip()) for key, label in NOTE_FIELDS if str(data.get(key) or "").strip()]
+
+
 class NoteForm(forms.Form):
-    text = forms.CharField(label="Nova observação", min_length=3, max_length=4000,
-                           widget=forms.Textarea(attrs={"rows": 3}))
+    procedure = forms.CharField(label="Procedimento clínico", required=False, max_length=4000,
+                                widget=forms.Textarea(attrs={"rows": 3}))
+    orthodontic = forms.CharField(label="Tratamento ortodôntico", required=False, max_length=4000,
+                                  widget=forms.Textarea(attrs={"rows": 3}))
+    text = forms.CharField(label="Observação", required=False, max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
+
+    def clean(self):
+        data = super().clean()
+        if not any(len((data.get(key) or "").strip()) >= 3 for key, _ in NOTE_FIELDS):
+            raise forms.ValidationError("Escreva o procedimento, o tratamento ortodôntico ou uma observação.")
+        return data
 
 
 def _cash_access(user):
@@ -251,7 +286,7 @@ def _default_professional(user, patient, clinical):
 @never_cache
 def patient_record(request, pk):
     tenant, clinical = access(request.user)
-    patient = get_object_or_404(Customer, pk=pk, tenant=tenant)
+    patient = get_object_or_404(shared_patients(request.user), pk=pk, tenant=tenant)
     self_url = reverse("dental-patient-record", args=[patient.pk])
     cash_tenant = _cash_access(request.user) if patient.active else None
     session = _open_session(request, tenant) if cash_tenant else None
@@ -263,12 +298,13 @@ def patient_record(request, pk):
         action = request.POST.get("action")
         if action == "note":
             if note_form.is_valid():
+                content = {key: (note_form.cleaned_data.get(key) or "").strip() for key, _ in NOTE_FIELDS}
                 note = PatientNote.objects.create(
-                    tenant=tenant, customer=patient, text_encrypted=encrypt_text(note_form.cleaned_data["text"].strip()),
+                    tenant=tenant, customer=patient, text_encrypted=encrypt_text(json.dumps(content, ensure_ascii=False)),
                     author=request.user, author_name=(request.user.get_full_name() or request.user.email)[:160])
                 append_audit(tenant=tenant, user=request.user, request=request, action="clinical.patient_note.created",
                              entity_type="PatientNote", entity_id=note.pk, after={"customer": patient.pk})
-                messages.success(request, "Observação registrada no prontuário.")
+                messages.success(request, "Evolução salva no prontuário.")
                 return redirect(self_url)
         elif action == "receive":
             if not cash_tenant:
@@ -302,7 +338,8 @@ def patient_record(request, pk):
         "patient": patient, "clinical": clinical,
         "age": (today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))) if birth else None,
         "missing": missing_registration(patient),
-        "timeline": build_timeline(tenant=tenant, patient=patient, user=request.user, ip=request.META.get("REMOTE_ADDR", "")),
+        "timeline": build_timeline(tenant=tenant, patient=patient, user=request.user, ip=request.META.get("REMOTE_ADDR", ""),
+                                   clinical=clinical),
         "can_schedule": has_capability(request.user, "agenda.manage") and request.user.role not in {"professional", "healthcare"},
         "document_kinds": DOCUMENT_KINDS,
         "receive_form": receive_form, "cash_session": session, "note_form": note_form,

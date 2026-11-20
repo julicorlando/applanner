@@ -95,12 +95,12 @@ def _clinical_user(request):
 
 
 def _editable_patients(user):
-    from .patient_record import access as shared_access
+    from .patient_record import access as shared_access, shared_patients
     try:
-        tenant, _ = shared_access(user)
+        shared_access(user)
     except PermissionDenied:
         return patients_for(user)
-    return Customer.objects.filter(tenant=tenant)
+    return shared_patients(user)
 
 
 def _return_url(request, patient):
