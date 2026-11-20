@@ -99,8 +99,7 @@ def render_document(*, kind, title, body, clinic, patient, professional, issued_
     footer_contacts = " · ".join(v for v in (
         clinic.get("whatsapp") or clinic.get("phone"),
         ("@" + clinic["instagram"].lstrip("@")) if clinic.get("instagram") else "",
-        clinic.get("email"),
-    ) if v)
+    ) if v)  # E-mail stays out: it is often the professional's personal address.
     footer_address = clinic.get("address") or ""
     qr_size = 74
 
