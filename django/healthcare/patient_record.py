@@ -303,7 +303,7 @@ def patient_record(request, pk):
         "age": (today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))) if birth else None,
         "missing": missing_registration(patient),
         "timeline": build_timeline(tenant=tenant, patient=patient, user=request.user, ip=request.META.get("REMOTE_ADDR", "")),
-        "can_schedule": has_capability(request.user, "agenda.manage"),
+        "can_schedule": has_capability(request.user, "agenda.manage") and request.user.role not in {"professional", "healthcare"},
         "document_kinds": DOCUMENT_KINDS,
         "receive_form": receive_form, "cash_session": session, "note_form": note_form,
     })

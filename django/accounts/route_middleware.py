@@ -25,8 +25,14 @@ CLINIC_OPERATION_PATHS = {
 }
 
 
+# Shared dental patient record: the views enforce clinic, module and role checks.
+DENTAL_PATIENT_PATH = re.compile(r"/app/odontologia/prontuarios/paciente/(?:novo|[0-9]+(?:/cadastro)?)/")
+
+
 def _reception_mutation_allowed(path):
     if re.fullmatch(r"/app/clinica/documentos/(?:[0-9]+/)?",path):
+        return True
+    if DENTAL_PATIENT_PATH.fullmatch(path):
         return True
     if path.startswith("/app/clinica/financeiro/"):
         return True  # Scoped clinical finance views enforce administrative permissions.
@@ -77,7 +83,7 @@ class CapabilityRouteMiddleware:
         if user and user.is_authenticated and not user.is_superuser and user.role_links.exists():
             path=request.path
             required=("agenda.manage" if user.role=="reception" else "healthcare.manage" if user.role in {"professional","healthcare"} else "finance.manage") if path.startswith('/app/clinica/financeiro/') else ("agenda.manage" if path in CLINIC_OPERATION_PATHS else None)
-            if user.role=='reception' and path=='/app/odontologia/prontuarios/':
+            if user.role=='reception' and (path=='/app/odontologia/prontuarios/' or DENTAL_PATIENT_PATH.fullmatch(path)):
                 required='agenda.manage'
             if user.role=='reception' and re.fullmatch(r'/app/clinica/documentos/(?:[0-9]+/)?',path):
                 required='agenda.manage'
