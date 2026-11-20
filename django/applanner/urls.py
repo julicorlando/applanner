@@ -1,5 +1,6 @@
 from django.contrib import admin
 from accounts.api_access import api_resource
+from core.reception_app import manifest as reception_app_manifest, icon_ico as reception_app_ico
 from django.urls import include, path
 from barber.intelligence_portal import recovery_accept
 
@@ -57,6 +58,8 @@ urlpatterns = [
     path("p/<slug:slug>/cliente/",customer_portal,name="customer-portal"),
     path("imagens/app-worker.js",web_app_worker,name="web-app-worker"),
     path("imagens/app.webmanifest",web_app_manifest,name="web-app-manifest"),
+    path("imagens/recepcao.webmanifest",reception_app_manifest,name="reception-app-manifest"),
+    path("imagens/recepcao.ico",reception_app_ico,name="reception-app-ico"),
     path("imagens/app/<int:size>.png",web_app_icon,name="web-app-icon"),
     path("s/p/<slug:code>/", professional_short_link, name="professional-short-link"),
     path("s/<slug:code>/", tenant_short_link, name="tenant-short-link"),

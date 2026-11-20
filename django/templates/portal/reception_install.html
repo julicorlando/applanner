@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Instalar o ApPlanner Recepção{% endblock %}
+{% block manifest %}<link rel="manifest" href="{% url 'reception-app-manifest' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/reception-panel.css' %}">{% endblock %}
+{% block content %}
+<main class="rp rp-install">
+  <header class="rp-head"><div><h1>ApPlanner Recepção no computador</h1><p>Abre direto na tela da recepção, em janela própria, com ícone na área de trabalho. Cada pessoa entra com o próprio usuário e vê só o que o perfil dela permite.</p></div></header>
+  <div class="rp-install-grid">
+    <section class="rp-card"><h2>Instalar pelo navegador</h2><p>No Microsoft Edge ou no Google Chrome:</p>
+      <ol><li>Abra a <a href="{% url 'reception-panel' %}">tela da Recepção</a>.</li><li>Clique no ícone de instalar na barra de endereço (um monitor com seta) ou no menu ⋯ → <strong>Aplicativos</strong> → <strong>Instalar ApPlanner Recepção</strong>.</li><li>Pronto: o app aparece no menu Iniciar e pode ser fixado na barra de tarefas.</li></ol>
+      <button class="rp-btn is-primary" type="button" data-install-app hidden>Instalar agora</button></section>
+    <section class="rp-card"><h2>Instalador para Windows</h2><p>Cria o atalho <strong>ApPlanner Recepção</strong> na área de trabalho e no menu Iniciar, abrindo o sistema em janela de aplicativo pelo Edge ou Chrome já instalados.</p>
+      <ol><li>Baixe o instalador.</li><li>Dê dois cliques no arquivo baixado. Se o Windows avisar, clique em <strong>Mais informações</strong> → <strong>Executar assim mesmo</strong>.</li><li>O app abre sozinho no final.</li></ol>
+      <a class="rp-btn is-primary" href="{% url 'reception-app-windows' %}" download>Baixar instalador (Windows)</a>
+      <p class="rp-note">Endereço do app: {{ app_url }}</p></section>
+  </div>
+</main>
+<script>
+(function(){var button=document.querySelector('[data-install-app]');var prompt=null;
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();prompt=e;button.hidden=false;});
+button.addEventListener('click',function(){if(!prompt)return;prompt.prompt();prompt.userChoice.finally(function(){button.hidden=true;prompt=null;});});})();
+</script>
+{% endblock %}

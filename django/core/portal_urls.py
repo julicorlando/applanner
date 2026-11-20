@@ -1,6 +1,6 @@
 from healthcare import workspace_views as physio_workspace
 from django.urls import path
-from . import portal, operation_insights
+from . import portal, operation_insights, reception_app
 from .branding import tenant_branding, workspace_logo
 from .unit_settings import unit_schedule_settings
 from .bulk_work_schedule import bulk_work_schedule
@@ -48,6 +48,9 @@ urlpatterns = [
     path("diagnostico/",portal.operation_diagnostics,name="portal-diagnostics"),
     path("recepcao/novo/",portal.reception_access,name="reception-access"),
     path("recepcao/agendamento/<int:pk>/",reception_appointment,name="reception-appointment"),
+    path("recepcao/painel/",reception_app.panel,name="reception-panel"),
+    path("recepcao/instalar/",reception_app.install,name="reception-app-install"),
+    path("recepcao/instalar/windows/",reception_app.windows_installer,name="reception-app-windows"),
     path("profissional/",professional_area,name="professional-area"),
     path("profissional/indicacoes/",referrals,name="professional-referrals"),
     path("profissional/espera/<int:pk>/",professional_waitlist,name="professional-waitlist"),

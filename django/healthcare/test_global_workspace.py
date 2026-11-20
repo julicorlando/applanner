@@ -141,7 +141,7 @@ class GlobalPhysioWorkspaceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="pa-sidebar"', count=1)
         self.assertNotContains(response, "Gerenciar barbearia")
-        self.assertEqual(len(response.context["physio_menu"]), 8)
+        self.assertEqual(len(response.context["physio_menu"]), 9)  # includes Recepção
 
     def test_public_booking_and_anonymous_pages_do_not_get_private_skin(self):
         req = RequestFactory().get("/directory/")
