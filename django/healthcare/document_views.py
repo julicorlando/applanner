@@ -64,7 +64,7 @@ def signature_image(request):
 class TemplateForm(forms.Form):
     name=forms.CharField(label='Nome do modelo',max_length=100)
     kind=forms.ChoiceField(label='Tipo',choices=KINDS)
-    text=forms.CharField(label='Texto padrão',max_length=20000,widget=forms.Textarea(attrs={'rows':8}))
+    text=forms.CharField(label='Texto padrão',max_length=20000,widget=forms.Textarea(attrs={'rows':14,'data-preview-body':''}))
     shared=forms.BooleanField(label='Disponível para toda a clínica',required=False)
 
 
@@ -95,7 +95,11 @@ def templates(request):
                 text_encrypted=encrypt_text(form.cleaned_data['text']),created_by=request.user)
             append_audit(tenant=tenant,user=request.user,request=request,action='clinical.document_template.created',entity_type='ClinicalDocumentTemplate',entity_id=row.pk)
             return redirect('clinical-document-templates')
-    return render(request,'healthcare/document_templates.html',{'form':form,'templates':available_templates(request.user),'admin':admin})
+    try:own=own_professional(request.user)
+    except PermissionDenied:own=None
+    from .document_services import preview_data
+    return render(request,'healthcare/document_templates.html',{'form':form,'templates':available_templates(request.user),'admin':admin,
+        'preview':preview_data(tenant=tenant,user=request.user,professional=own,kind='prescription')})
 
 
 class PrepareForm(forms.Form):
@@ -114,6 +118,10 @@ class PrepareForm(forms.Form):
         self.fields['professional'].queryset=Professional.objects.filter(tenant_id=user.tenant_id,active=True,user__isnull=False)
         if not reception:self.fields['professional'].queryset=self.fields['professional'].queryset.filter(user=user)
         self.fields['template'].queryset=available_templates(user)
+        self.fields['title'].widget.attrs['data-preview-title']=''
+        self.fields['body'].widget.attrs.update({'data-preview-body':'','rows':16})
+        self.fields['template'].widget.attrs['data-preview-template']=''
+        self.fields['customer'].widget.attrs.update({'data-preview-patient':'','data-initial':str(self.initial.get('customer') or '')})
 
 
 @login_required
@@ -156,8 +164,14 @@ def documents(request):
     rows=ClinicalIssuedDocument.objects.filter(tenant=tenant)
     rows=rows.filter(created_by=request.user) if reception else rows.filter(professional__user=request.user,professional__active=True)
     if patient:rows=rows.filter(customer=patient)
+    own=None
+    if not reception:
+        try:own=own_professional(request.user)
+        except PermissionDenied:own=None
+    from .document_services import preview_data
     return render(request,'healthcare/documents.html',{'form':form,'rows':rows.order_by('-created_at')[:100],'reception':reception,
-        'patient':patient,'kinds':KINDS,'selected_kind':kind if kind in DEFAULT_TITLES else '','back_url':_record_url(tenant,patient) if patient else ''})
+        'patient':patient,'kinds':KINDS,'selected_kind':kind if kind in DEFAULT_TITLES else '','back_url':_record_url(tenant,patient) if patient else '',
+        'preview':preview_data(tenant=tenant,user=request.user,patient=patient,professional=own,kind=kind if kind in DEFAULT_TITLES else 'prescription')})
 
 
 @transaction.atomic
@@ -188,8 +202,8 @@ def _record_url(tenant,patient):
 
 
 class ReviewForm(forms.Form):
-    title=forms.CharField(label='Título',max_length=150)
-    body=forms.CharField(label='Texto revisado',max_length=20000,widget=forms.Textarea(attrs={'rows':12}))
+    title=forms.CharField(label='Título',max_length=150,widget=forms.TextInput(attrs={'data-preview-title':''}))
+    body=forms.CharField(label='Texto do documento',max_length=20000,widget=forms.Textarea(attrs={'rows':16,'data-preview-body':''}))
     version=forms.IntegerField(widget=forms.HiddenInput)
     confirmed=forms.BooleanField(label='Revisei o conteúdo e confirmo a emissão com minha identificação e assinatura cadastrada',required=False)
 
@@ -221,8 +235,10 @@ def detail(request,pk):
             return redirect('clinical-document-detail',pk=row.pk)
         except ValidationError as exc:form.add_error(None,exc)
     append_audit(tenant=tenant,user=request.user,request=request,action='clinical.document.viewed',entity_type='ClinicalIssuedDocument',entity_id=row.pk)
-    from .document_services import verification_url
+    from .document_services import verification_url,preview_data
     return render(request,'healthcare/document_detail.html',{'row':row,'form':form,'reception':reception,
+        'preview':preview_data(tenant=tenant,user=request.user,patient=row.customer,professional=row.professional,kind=row.kind),
+        'back_url':_record_url(tenant,row.customer),
         'replaced_by':row.replaced_by if row.status=='finalized' else None,
         'pending_revision':row.revisions.filter(status='draft').first() if row.status=='finalized' else None,
         'validation_url':verification_url(row.verification_code,request.build_absolute_uri('/')) if row.verification_code else '',

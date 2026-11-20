@@ -2,7 +2,7 @@
 {% block title %}Prontuário · {{ patient.name }}{% endblock %}
 {% block content %}
 <main class="pa-wrap dpr">
-<header class="pa-heading"><div><h1>{{ patient.name }}</h1><p>Prontuário do paciente{% if age != None %} · {{ age }} anos{% endif %}{% if not patient.active %} · cadastro inativo{% endif %}</p></div>
+<header class="pa-heading"><div class="dpr-identity"><span class="dd-avatar is-large" aria-hidden="true">{{ initials }}</span><div><h1>{{ patient.name }}</h1><p>Prontuário do paciente{% if age != None %} · {{ age }} anos{% endif %}{% if patient.phone %} · {{ patient.phone }}{% endif %}{% if not patient.active %} · cadastro inativo{% endif %}</p></div></div>
 <nav class="dpr-actions" aria-label="Ações do paciente">{% if can_schedule %}<a class="pa-button" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}?customer={{ patient.pk }}">Agendar</a>{% endif %}<a class="pa-button" href="{% url 'dental-patient-edit' patient.pk %}?next={{ request.path|urlencode }}">Editar cadastro</a>{% if clinical %}<a class="pa-primary" href="{% url 'dental-assessment-create' %}?customer={{ patient.pk }}">+ Nova evolução</a>{% endif %}</nav></header>
 
 <section class="pa-card dpr-patient"><h2>Cadastro</h2>

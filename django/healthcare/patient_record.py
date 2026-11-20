@@ -336,6 +336,7 @@ def patient_record(request, pk):
     return render(request, "healthcare/dental_patient_record.html", {
         **shell_context(request.user, request),
         "patient": patient, "clinical": clinical,
+        "initials": "".join(word[0] for word in patient.name.split()[:2]).upper(),
         "age": (today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))) if birth else None,
         "missing": missing_registration(patient),
         "timeline": build_timeline(tenant=tenant, patient=patient, user=request.user, ip=request.META.get("REMOTE_ADDR", ""),

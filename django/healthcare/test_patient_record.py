@@ -199,3 +199,29 @@ class BirthDateFormTests(TestCase):
         from core.portal import _widgets_for
         widget = _widgets_for(Customer, ["birth_date"])["birth_date"]
         self.assertIn('value="1990-03-14"', widget.render("birth_date", date(1990, 3, 14)))
+
+
+class DocumentPreviewTests(TestCase):
+    def create(self, **kwargs):
+        from . import test_document_delivery as delivery
+        return delivery.fixtures.ClinicalSecurityTests.create(self, **kwargs)
+
+    def setUp(self):
+        from . import test_document_delivery as delivery
+        delivery.ClinicalDocumentDeliveryTests.setUp(self)
+
+    def test_editor_pages_show_live_preview_with_letterhead_data(self):
+        for url in (reverse("clinical-documents") + f"?customer={self.patient.pk}&kind=certificate",
+                    reverse("clinical-document-templates")):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'id="doc-preview-data"')
+            self.assertContains(response, "data-paper")
+            self.assertContains(response, "data-preview-body")
+            self.assertContains(response, "CRO-PE 12345")
+        draft = ClinicalIssuedDocument.objects.create(tenant=self.tenant, customer=self.patient, professional=self.professional,
+                                                      kind="declaration", title="Declaração", body_encrypted=encrypt_text("Compareceu."),
+                                                      created_by=self.doctor)
+        response = self.client.get(reverse("clinical-document-detail", args=[draft.pk]))
+        self.assertContains(response, "data-paper")
+        self.assertContains(response, self.patient.name)

@@ -1,1 +1,39 @@
-{% extends 'base.html' %}{% block content %}<main class="shell panel"><h1>Documentos{% if patient %} — {{ patient.name }}{% else %} do paciente{% endif %}</h1>{% if patient %}<p><a href="{{ back_url }}">← Voltar ao prontuário</a></p>{% endif %}<p>{% if reception %}Prepare o rascunho e encaminhe ao profissional. A recepção não pode emitir, aplicar assinatura nem baixar documentos clínicos emitidos.{% else %}Escolha o modelo, revise o texto e confirme a emissão. O documento sai com o timbre da clínica, sua assinatura cadastrada e um QR code de validação, e fica salvo no prontuário.{% endif %}</p>{% if patient %}<nav class="clinical-actions" aria-label="Modelos">{% for value, label in kinds %}<a href="?customer={{ patient.pk }}&amp;kind={{ value }}"{% if selected_kind == value %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}</nav>{% endif %}<form method="post">{% csrf_token %}{{ form.as_p }}<button>Preparar para revisão</button></form><h2>Histórico{% if patient %} do paciente{% endif %}</h2>{% for item in rows %}<p>{{ item.customer.name }} · {{ item.title }} · {{ item.get_status_display }} · {{ item.created_at|date:'d/m/Y H:i' }}{% if not reception or item.status == 'draft' %} · <a href="{% url 'clinical-document-detail' item.pk %}">Abrir</a>{% endif %}{% if not reception and item.status == 'finalized' %} · <a href="{% url 'clinical-document-pdf' item.pk %}" target="_blank" rel="noreferrer">PDF</a>{% endif %}</p>{% empty %}<p>Nenhum documento.</p>{% endfor %}{% if not reception %}<a href="{% url 'clinical-document-templates' %}">Cadastrar modelos</a> · <a href="{% url 'clinical-signature' %}">Minha assinatura</a>{% endif %}</main>{% endblock %}
+{% extends 'base.html' %}{% load static %}
+{% block title %}Documentos{% if patient %} · {{ patient.name }}{% endif %}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'healthcare/documents.css' %}">{% endblock %}
+{% block content %}
+<main class="doc-page">
+  <header class="doc-topbar">
+    <div>{% if patient %}<a class="doc-back" href="{{ back_url }}">← Voltar ao prontuário</a>{% endif %}
+      <h1>{% if patient %}Novo documento para {{ patient.name }}{% else %}Novo documento{% endif %}</h1>
+      <p>{% if reception %}Prepare o rascunho e encaminhe ao profissional, que revisa e emite com a assinatura dele.{% else %}Escreva ao lado e confira na prévia como o PDF vai sair, com o timbre da clínica, sua assinatura e o QR code de validação.{% endif %}</p></div>
+  </header>
+  <div class="doc-editor">
+    <form method="post" class="doc-form">{% csrf_token %}{{ form.request_id }}
+      {% if form.non_field_errors %}<ul class="doc-errors">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+      <div class="doc-field"><span class="doc-label">Tipo de documento</span>
+        <div class="doc-kinds" role="group" aria-label="Tipo de documento">{% for value, label in kinds %}<button type="button" data-kind-choice="{{ value }}" aria-pressed="{% if form.kind.value == value %}true{% else %}false{% endif %}">{{ label }}</button>{% endfor %}</div>
+        <select name="kind" id="id_kind" class="doc-hidden" data-preview-kind tabindex="-1" aria-hidden="true">{% for value, label in kinds %}<option value="{{ value }}"{% if form.kind.value == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{{ form.kind.errors }}</div>
+      <div class="doc-row">
+        <div class="doc-field"><label for="{{ form.customer.id_for_label }}">{{ form.customer.label }}</label>{{ form.customer }}{{ form.customer.errors }}</div>
+        <div class="doc-field"><label for="{{ form.professional.id_for_label }}">{{ form.professional.label }}</label>{{ form.professional }}{{ form.professional.errors }}</div>
+      </div>
+      <div class="doc-row">
+        <div class="doc-field"><label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>{{ form.title }}{{ form.title.errors }}</div>
+        <div class="doc-field"><label for="{{ form.template.id_for_label }}">{{ form.template.label }}</label>{{ form.template }}{{ form.template.errors }}</div>
+      </div>
+      <div class="doc-field"><label for="{{ form.body.id_for_label }}">{{ form.body.label }}</label>{{ form.body }}{{ form.body.errors }}</div>
+      <p class="doc-tips">Dicas: <code>Rótulo: valor</code> sai com o rótulo em negrito. Comece a linha com <code>##</code> para um subtítulo.</p>
+      <div class="doc-actions"><button class="doc-btn is-primary" type="submit">Preparar para revisão</button></div>
+      {% if not reception %}<div class="doc-links"><a href="{% url 'clinical-document-templates' %}">Modelos de texto</a><a href="{% url 'clinical-signature' %}">Minha assinatura</a></div>{% endif %}
+    </form>
+    <aside class="doc-side" aria-label="Prévia">{% include 'healthcare/_document_preview.html' %}</aside>
+  </div>
+  <section class="doc-history"><h2>{% if patient %}Documentos deste paciente{% else %}Documentos recentes{% endif %}</h2>
+    {% if rows %}<table class="doc-table"><thead><tr><th>Documento</th><th>Paciente</th><th>Situação</th><th>Data</th><th></th></tr></thead><tbody>
+    {% for item in rows %}<tr><td><strong>{{ item.title }}</strong></td><td>{{ item.customer.name }}</td><td><span class="doc-status {% if item.status == 'finalized' %}is-final{% else %}is-draft{% endif %}">{{ item.get_status_display }}</span></td><td>{{ item.created_at|date:'d/m/Y H:i' }}</td><td>{% if not reception or item.status == 'draft' %}<a href="{% url 'clinical-document-detail' item.pk %}">Abrir</a>{% endif %}{% if not reception and item.status == 'finalized' %}<a href="{% url 'clinical-document-pdf' item.pk %}" target="_blank" rel="noreferrer">PDF</a>{% endif %}</td></tr>{% endfor %}
+    </tbody></table>{% else %}<p>Nenhum documento ainda. Os documentos preparados e emitidos aparecem aqui.</p>{% endif %}
+  </section>
+</main>
+<script src="{% static 'healthcare/document-preview.js' %}" defer></script>
+{% endblock %}
