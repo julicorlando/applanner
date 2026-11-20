@@ -243,8 +243,7 @@ def preview_data(*, tenant, user, patient=None, professional=None, kind=''):
     from .document_pdf import TITLES, ROLE_BY_COUNCIL, long_date
     clinic = clinic_letterhead(tenant)
     contacts = ' · '.join(v for v in (clinic.get('whatsapp') or clinic.get('phone'),
-                                      ('@' + clinic['instagram'].lstrip('@')) if clinic.get('instagram') else '',
-                                      clinic.get('email')) if v)
+                                      ('@' + clinic['instagram'].lstrip('@')) if clinic.get('instagram') else '') if v)
     registration = getattr(professional, 'clinical_registration', None) if professional else None
     snapshot = registration.snapshot() if registration else {}
     council = snapshot.get('council', '')

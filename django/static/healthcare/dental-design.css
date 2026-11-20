@@ -181,3 +181,27 @@
 .dental-workspace .dd-patient-card small{display:block;color:var(--dd-muted);font-size:13px}
 .dental-workspace .dd-patient-card .dd-card-action{position:relative;z-index:1;display:inline-block;margin-top:4px;font-size:13px;font-weight:650;white-space:nowrap}
 .dental-workspace .dd-pager{display:flex;gap:14px;align-items:center;font-size:14px;color:var(--dd-muted);margin:10px 0 24px}
+
+/* Generic forms, finance desk and agenda details inside the dental workspace. */
+.dental-workspace a.co-button{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:10px;background:var(--dd-primary);color:var(--dd-on-primary)!important;font-weight:650;text-decoration:none}
+.dental-workspace a.co-button:hover{background:var(--dd-primary-hover)}
+.dental-workspace .portal-page.narrow{max-width:1080px}
+@media(min-width:900px){
+ .dental-workspace .portal-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;row-gap:2px;align-items:start}
+ .dental-workspace .portal-form>:is(.form-errors,.form-actions,.checkbox-group-field,.checkbox-field,input[type=hidden]),
+ .dental-workspace .portal-form>.form-field:has(textarea){grid-column:1/-1}
+}
+.dental-workspace .portal-form .form-field{margin-bottom:14px}
+.dental-workspace .portal-form .form-field>label{display:block;font-size:13px;font-weight:650;margin-bottom:6px}
+.dental-workspace .portal-form .form-field small{display:block;margin-top:6px;font-size:12px}
+.dental-workspace .portal-form .checkbox-field{display:flex;flex-direction:row-reverse;justify-content:flex-end;align-items:center;gap:10px}
+.dental-workspace .portal-form .checkbox-field>label{margin:0;font-weight:600}
+.dental-workspace .portal-form .checkbox-field input{width:20px;height:20px;min-height:0}
+.dental-workspace .portal-form .form-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;padding-top:16px;border-top:1px solid var(--dd-line)}
+.dental-workspace .field-error{display:block;color:#dc2626;font-size:13px;margin-top:4px}
+.dental-workspace .agenda-week a[aria-current=date] :is(small,strong){color:var(--dd-on-primary)!important}
+.dental-workspace .co-card p:has(>input[type=checkbox]){display:flex;flex-direction:row-reverse;justify-content:flex-end;align-items:center;gap:10px}
+.dental-workspace .dd-quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:0 0 22px}
+.dental-workspace .dd-quick a{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:14px;border:1px solid var(--dd-line);background:var(--dd-card);color:var(--dd-text);font-weight:650;font-size:14px;text-decoration:none}
+.dental-workspace .dd-quick a:hover{border-color:var(--dd-primary);color:var(--dd-primary)}
+.dental-workspace .dd-quick svg{width:22px;height:22px;flex:none;fill:none;stroke:var(--dd-primary);stroke-width:1.8}
