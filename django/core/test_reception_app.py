@@ -11,7 +11,7 @@ from tenants.models import Tenant
 
 class ReceptionAppTests(TestCase):
     def setUp(self):
-        self.tenant = Tenant.objects.create(name="Clínica Recepção Exemplo", slug="clinica-recepcao-exemplo", category="odontologia")
+        self.tenant = Tenant.objects.create(name="Clínica Recepção Exemplo", slug="clinica-recepcao-exemplo", category="estetica")
         self.reception = User.objects.create_user(email="recepcao-app@exemplo.test", tenant=self.tenant, role="reception")
         self.doctor = User.objects.create_user(email="dentista-app@exemplo.test", tenant=self.tenant, role="professional")
         self.colleague = User.objects.create_user(email="colega-app@exemplo.test", tenant=self.tenant, role="professional")

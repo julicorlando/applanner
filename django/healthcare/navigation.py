@@ -128,7 +128,7 @@ def shell_context(user, request=None):
     ]
     if dental and management and module_enabled(user.tenant,"finance"):
         rows.insert(6,("Tratamentos",reverse("clinical-treatment-sales"),"tooth"))
-    if agenda and user.role not in {"professional", "healthcare"}:
+    if dental and agenda and user.role not in {"professional", "healthcare"}:
         rows.insert(1, ("Recepção", reverse("reception-panel"), "users"))
     path = request.path if request else reverse("physio-assessments")
     name = (
