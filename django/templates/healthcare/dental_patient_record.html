@@ -1,0 +1,43 @@
+{% extends 'healthcare/physio_shell.html' %}{% load display_pt %}
+{% block title %}Prontuário · {{ patient.name }}{% endblock %}
+{% block content %}
+<main class="pa-wrap dpr">
+<header class="pa-heading"><div><h1>{{ patient.name }}</h1><p>Prontuário do paciente{% if age != None %} · {{ age }} anos{% endif %}{% if not patient.active %} · cadastro inativo{% endif %}</p></div>
+<nav class="dpr-actions" aria-label="Ações do paciente">{% if can_schedule %}<a class="pa-button" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}?customer={{ patient.pk }}">Agendar</a>{% endif %}<a class="pa-button" href="{% url 'dental-patient-edit' patient.pk %}?next={{ request.path|urlencode }}">Editar cadastro</a>{% if clinical %}<a class="pa-primary" href="{% url 'dental-assessment-create' %}?customer={{ patient.pk }}">+ Nova evolução</a>{% endif %}</nav></header>
+
+<section class="pa-card dpr-patient"><h2>Cadastro</h2>
+{% if missing %}<p class="dpr-warning"><strong>Cadastro incompleto.</strong> Faltam: {{ missing|join:", " }}. <a href="{% url 'dental-patient-edit' patient.pk %}?next={{ request.path|urlencode }}">Completar agora</a></p>{% endif %}
+<dl class="dpr-grid"><div><dt>Telefone</dt><dd>{{ patient.phone|default:"—" }}</dd></div><div><dt>E-mail</dt><dd>{{ patient.email|default:"—" }}</dd></div><div><dt>Nascimento</dt><dd>{{ patient.birth_date|date:"d/m/Y"|default:"—" }}</dd></div><div><dt>CPF</dt><dd>{% if patient.cpf %}{{ patient.cpf }}{% else %}—{% endif %}</dd></div><div class="dpr-wide"><dt>Endereço</dt><dd>{{ patient.full_address|default:"—" }}</dd></div></dl>
+{% if clinical %}<nav class="clinical-actions">{% for value, label in document_kinds %}<a href="{% url 'clinical-documents' %}?customer={{ patient.pk }}&amp;kind={{ value }}">Emitir {{ label|lower }}</a>{% endfor %}</nav>{% endif %}</section>
+
+<div class="dpr-columns">
+{% if receive_form %}<section class="pa-card dpr-receive" id="receber"><h2>Receber pagamento</h2>
+{% if cash_session %}<p>O valor entra na folha do caixa de hoje como <strong>pago</strong>, ligado a este paciente, e aparece no dia abaixo.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="receive">{{ receive_form.request_id }}{{ receive_form.non_field_errors }}
+<div class="da-two"><label>{{ receive_form.professional.label }}{{ receive_form.professional }}</label><label>{{ receive_form.professional_name.label }}{{ receive_form.professional_name }}{{ receive_form.professional_name.errors }}</label></div>
+<div class="dpr-three"><label>{{ receive_form.dentist_amount.label }}{{ receive_form.dentist_amount }}</label><label>{{ receive_form.clinic_amount.label }}{{ receive_form.clinic_amount }}</label><label>{{ receive_form.other_amount.label }}{{ receive_form.other_amount }}</label></div>
+<div class="da-two"><label>{{ receive_form.method.label }}{{ receive_form.method }}{{ receive_form.method.errors }}</label><label>{{ receive_form.notes.label }}{{ receive_form.notes }}</label></div>
+<button class="pa-primary" type="submit">Confirmar recebimento</button></form>
+{% else %}<p>O caixa desta unidade está fechado. <a href="{% url 'clinic-finance-desk' %}">Abra o caixa no Financeiro</a> para receber pagamentos.</p>{% endif %}</section>{% endif %}
+<section class="pa-card dpr-note" id="observacao"><h2>Nova observação</h2><p>Fica registrada com seu nome, data e hora, e não pode ser apagada.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="note">{{ note_form.text }}{{ note_form.text.errors }}<button class="pa-button" type="submit">Registrar observação</button></form></section>
+</div>
+
+<h2 class="dpr-history-title">Histórico do paciente</h2>
+{% for day in timeline %}<section class="pa-card dpr-day"><h3>{{ day.day|date:"d/m/Y" }} <small>{{ day.day|date:"l" }}</small></h3>
+{% for record in day.records %}<article class="dpr-item dpr-record{% if record.draft %} dpr-draft{% endif %}"><header><strong>{{ record.kind }}{% if record.title %} · {{ record.title }}{% endif %}</strong><span>{{ record.author }}</span>{% if record.url %}<a href="{{ record.url }}">Abrir</a>{% endif %}</header>
+{% for label, text in record.sections %}<p><b>{{ label }}:</b> {{ text|linebreaksbr }}</p>{% empty %}<p class="dpr-muted">Sem texto registrado.</p>{% endfor %}</article>{% endfor %}
+{% for note in day.notes %}<article class="dpr-item dpr-note-item"><header><strong>Observação</strong><span>{{ note.author }} · {{ note.at|date:"H:i" }}</span></header><p>{{ note.text|linebreaksbr }}</p></article>{% endfor %}
+{% for doc in day.documents %}<article class="dpr-item"><header><strong>{{ doc.kind }} emitido · {{ doc.title }}</strong><span>{{ doc.author }}{% if doc.replaced %} · substituído por versão revisada{% endif %}</span>{% if doc.url %}<a href="{{ doc.url }}">Abrir</a>{% endif %}</header></article>{% endfor %}
+{% for pay in day.payments %}<article class="dpr-item dpr-payment{% if pay.open %} dpr-open{% endif %}"><header><strong>{% if pay.open %}Em aberto{% else %}Pagamento recebido{% endif %} · R$ {{ pay.total|money_pt }}</strong><span>{{ pay.method }}{% if pay.professional %} · {{ pay.professional }}{% endif %} · {{ pay.source }}</span></header>{% if pay.notes %}<p>{{ pay.notes }}</p>{% endif %}</article>{% endfor %}
+</section>{% empty %}<section class="pa-card"><p>Nenhum registro ainda. As evoluções, observações, documentos e pagamentos deste paciente aparecem aqui, organizados por dia.</p></section>{% endfor %}
+</main>
+<style>
+.dpr-actions{display:flex;gap:8px;flex-wrap:wrap}.dpr-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0}.dpr-grid dt{font-size:12px;opacity:.75}.dpr-grid dd{margin:2px 0 0;overflow-wrap:anywhere}.dpr-wide{grid-column:1/-1}
+.dpr-warning{border-left:4px solid #e59b1a;padding:8px 12px;background:rgba(229,155,26,.12)}.dpr-columns{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin:16px 0}.dpr-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dpr .pa-card label{display:block;margin:6px 0}.dpr .pa-card input:not([type=hidden]),.dpr .pa-card select,.dpr .pa-card textarea{width:100%;box-sizing:border-box}
+.dpr-history-title{margin:20px 0 10px}.dpr-day h3{margin:0 0 10px}.dpr-day h3 small{font-weight:400;opacity:.7}.dpr-item{border-left:3px solid #2f8cff;padding:6px 12px;margin:10px 0}.dpr-item header{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}.dpr-item header span{opacity:.75;font-size:13px}.dpr-item p{margin:6px 0}
+.dpr-draft{border-left-color:#9aa7b8}.dpr-note-item{border-left-color:#8b5cf6}.dpr-payment{border-left-color:#16a34a}.dpr-open{border-left-color:#dc2626}.dpr-muted{opacity:.7}
+@media(max-width:900px){.dpr-columns,.dpr-grid{grid-template-columns:1fr}.dpr-three{grid-template-columns:1fr}}
+</style>
+{% endblock %}

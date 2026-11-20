@@ -21,15 +21,16 @@
   {% if module_slug == 'agenda' and resource_slug == 'agendamentos' or module_slug == 'arena' and resource_slug == 'reservas' %}<p class="payment-hint" id="agenda-live-status" role="status" aria-live="polite">Agenda atualizada automaticamente a cada 15 segundos.</p>{% endif %}
   <div class="table-card">
     <table class="portal-table">
-      <thead><tr>{% if resource_slug == 'clientes' %}<th>Histórico</th>{% endif %}{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th></th></tr></thead>
+      <thead><tr>{% if resource_slug == 'clientes' and not dental_patients %}<th>Histórico</th>{% endif %}{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th></th></tr></thead>
       <tbody{% if module_slug == 'agenda' and resource_slug == 'agendamentos' or module_slug == 'arena' and resource_slug == 'reservas' %} data-live-agenda="agendamentos"{% endif %}>
       {% for row in rows %}
         <tr>
-          {% if resource_slug == 'clientes' %}<td><a href="{% url 'customer-history' row.obj.pk %}">Histórico e preferências</a></td>{% endif %}
-          {% for cell in row.cells %}<td>{{ cell }}{% if customer_column != None and forloop.counter0 == customer_column %}<br>{% include "portal/customer_name_difference.html" with appointment=row.obj only %}{% endif %}</td>{% endfor %}
+          {% if resource_slug == 'clientes' and not dental_patients %}<td><a href="{% url 'customer-history' row.obj.pk %}">Histórico e preferências</a></td>{% endif %}
+          {% for cell in row.cells %}<td>{% if dental_patients and forloop.first %}<a href="{% url 'dental-patient-record' row.obj.pk %}">{{ cell }}</a>{% else %}{{ cell }}{% endif %}{% if customer_column != None and forloop.counter0 == customer_column %}<br>{% include "portal/customer_name_difference.html" with appointment=row.obj only %}{% endif %}</td>{% endfor %}
           <td class="table-actions">
             {% if row.obj|homologation_record %}<span class="status-pill" title="Identificado pelo nome do cadastro. Revise antes de atender.">Homologação</span>{% endif %}
             {% if module_slug == 'agenda' and resource_slug == 'agendamentos' and request.user.role == 'reception' %}<a href="{% url 'reception-appointment' row.obj.pk %}">Atendimento</a>{% endif %}
+            {% if dental_patients %}{% if can_schedule %}<a href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}?customer={{ row.obj.pk }}">Agendar</a>{% endif %}<a href="{% url 'dental-patient-record' row.obj.pk %}">Prontuário</a>{% endif %}
             {% if resource.detail %}<a href="{% url 'portal-resource-detail' module_slug resource_slug row.obj.pk %}">Abrir</a>{% endif %}
             {% if can_edit %}<a href="{% url 'portal-resource-edit' module_slug resource_slug row.obj.pk %}">Editar</a>{% endif %}
             {% if module_slug == 'agenda' and resource_slug == 'profissionais' and can_manage_professionals %}<a href="{% url 'professional-access' row.obj.pk %}">{% if row.obj.user_id %}Gerenciar acesso{% else %}Criar acesso{% endif %}</a>{% endif %}

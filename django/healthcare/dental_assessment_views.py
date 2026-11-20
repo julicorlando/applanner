@@ -50,10 +50,30 @@ def _documents(row):
     ]
 
 
+def _roster(request):
+    """Every patient of the clinic (shared dental record), optionally filtered by name or phone."""
+    from django.db.models import Q
+    from .patient_record import shared_patients
+    rows = shared_patients(request.user)
+    if not rows.exists():
+        rows = patients_for(request.user)
+    query = (request.GET.get("q") or "").strip()
+    if query:
+        rows = rows.filter(Q(name__icontains=query) | Q(phone__icontains=query) | Q(email__icontains=query))
+    return rows.order_by("name", "pk")
+
+
 @login_required
 @never_cache
 def assessment_list(request):
-    if request.user.role == "reception":
+    if request.GET.get("customer", "").isdigit() and not request.GET.get("records_page"):
+        from .patient_record import shared_patients
+        target = shared_patients(request.user).filter(pk=int(request.GET["customer"])).first()
+        if target:
+            # Clicking a patient opens the complete record with the history of every visit.
+            return redirect("dental-patient-record", pk=target.pk)
+    from .patient_record import is_clinical, team_member
+    if request.user.role == "reception" or (not is_clinical(request.user) and team_member(request.user)):
         return reception_list(request)
     rows = (
         assessments_for(request.user)
@@ -86,7 +106,8 @@ def assessment_list(request):
             "legacy_entries": legacy_entries[:200],
             "patient": patient,
             "document_kinds": DOCUMENT_KINDS,
-            "patient_roster": Paginator(patients_for(request.user).filter(pk=patient.pk).order_by("pk") if patient else patients_for(request.user).order_by("name", "pk"), 50).get_page(request.GET.get("page")),
+            "patient_roster": Paginator(_roster(request) if not patient else patients_for(request.user).filter(pk=patient.pk).order_by("pk"), 50).get_page(request.GET.get("page")),
+            "roster_query": (request.GET.get("q") or "").strip(),
             **shell_context(request.user, request),
         },
     )
@@ -386,4 +407,5 @@ def reception_list(request):
     entries=MedicalRecordEntry.objects.filter(tenant_id=user.tenant_id,customer_id=OuterRef('customer_id'),professional_id=OuterRef('professional_id'))
     visits=visits.select_related('customer','professional__clinical_registration','professional__user').annotate(record_status=Subquery(status_rows.values('status')[:1]),has_record=Exists(entries),has_patient_assessment=Exists(DentalAssessment.objects.filter(tenant_id=user.tenant_id,customer_id=OuterRef('customer_id'))),has_patient_entry=Exists(MedicalRecordEntry.objects.filter(tenant_id=user.tenant_id,customer_id=OuterRef('customer_id')))).order_by('starts_at','pk')
     append_audit(tenant=user.tenant,user=user,request=request,action='clinical.dental.reception_list',entity_type='Appointment')
-    return render(request,'healthcare/dental_assessment_list.html',{'reception_list':True,'scheduled_patients':Paginator(visits,50).get_page(request.GET.get('page')),'selected_day':day,**shell_context(user,request)})
+    return render(request,'healthcare/dental_assessment_list.html',{'reception_list':True,'scheduled_patients':Paginator(visits,50).get_page(request.GET.get('page')),'selected_day':day,
+        'patient_roster':Paginator(_roster(request),50).get_page(request.GET.get('patients_page')),'roster_query':(request.GET.get('q') or '').strip(),**shell_context(user,request)})

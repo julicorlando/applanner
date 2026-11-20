@@ -5,7 +5,7 @@ from .forms import DENTAL_DETAILS
 from .models import DentalAssessmentDocument
 from .dentistry import validate_odontogram, ALL_TEETH
 
-TEXT_FIELDS = {**DENTAL_DETAILS, "lifestyle_habits": "Hábitos e estilo de vida", "family_history": "História familiar", "complementary_notes": "Observações complementares", "findings": "Exame clínico (resumo)", "initial_evolution": "Evolução clínica", "guidance": "Orientações ao paciente"}
+TEXT_FIELDS = {**DENTAL_DETAILS, "lifestyle_habits": "Hábitos e estilo de vida", "family_history": "História familiar", "complementary_notes": "Observações complementares", "findings": "Exame clínico (resumo)", "initial_evolution": "Procedimento clínico", "orthodontic_treatment": "Tratamento ortodôntico", "guidance": "Orientações ao paciente"}
 SYSTEMIC = [(x, x) for x in ("Diabetes", "Hipertensão", "Cardiopatia", "Alergias", "Uso de medicamentos", "Outros")]
 DENTAL = [(x, x) for x in ("Bruxismo", "Tratamento ortodôntico", "Tratamento endodôntico", "Tratamento periodontal", "Cirurgias prévias", "Outros")]
 GUIDANCE = [(x, x) for x in ("Higiene bucal adequada", "Evitar alimentos duros", "Retorno conforme agendamento", "Sinais de alerta", "Outros")]

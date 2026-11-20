@@ -228,7 +228,7 @@ class DentalAssessmentTests(TestCase):
         response=self.client.post(reverse('dental-assessment-create'),data)
         self.assertEqual(response.status_code,302)
         self.assertIn(reverse('dental-assessments'),response['Location'])
-        self.assertContains(self.client.get(response['Location']),self.patient.name)
+        self.assertContains(self.client.get(response['Location'],follow=True),self.patient.name)
         self.assertEqual(DentalAssessment.objects.get().status,'draft')
 
     def test_finalize_only_evolution_without_diagnosis_or_plan(self):
@@ -259,7 +259,8 @@ class DentalAssessmentTests(TestCase):
         self.assertContains(response,self.professional.name)
         self.assertContains(response,'Rascunho salvo')
         self.assertNotContains(response,'Dor dentária confidencial')
-        self.assertNotContains(response,'Paciente sem agendamento privado')
+        # The front desk now finds every patient of the clinic, scheduled or not.
+        self.assertContains(response,'Paciente sem agendamento privado')
         self.assertNotContains(response,reverse('dental-assessment-detail',args=[row.pk]))
         self.assertIn(self.client.get(reverse('dental-assessment-detail',args=[row.pk])).status_code,{403,404})
         self.assertEqual(self.client.post(reverse('dental-assessments'),{}).status_code,403)

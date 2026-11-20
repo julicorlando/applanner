@@ -101,7 +101,8 @@ def shell_context(user, request=None):
         else None
     )
     dental = dental_workspace(user.tenant)
-    if dental and (clinical or (user.role == "reception" and agenda)) and module_enabled(user.tenant, "dentistry"):
+    shared_record = user.role in {"owner", "tenant-admin", "manager"} and module_enabled(user.tenant, "medical_records")
+    if dental and (clinical or (user.role == "reception" and agenda) or shared_record) and module_enabled(user.tenant, "dentistry"):
         clinical_url = reverse("dental-assessments")
     rows = [
         ("Dashboard", reverse("dental-dashboard" if dental else "physio-dashboard"), "dashboard"),
@@ -116,7 +117,7 @@ def shell_context(user, request=None):
             else None,
             "record",
         ),
-        ("Odontologia" if dental else "Fisioterapia", clinical_url, "tooth" if dental else "physio"),
+        ("Prontuário" if dental else "Fisioterapia", clinical_url, "tooth" if dental else "physio"),
         ("Financeiro", finance_url, "money"),
         (
             "Relatórios",
@@ -169,7 +170,7 @@ def shell_context(user, request=None):
     else:
         active = "Configurações"
     if dental and (active == "Fisioterapia" or (path.startswith("/app/odontologia/") and name not in {"dental-dashboard", "dental-settings", "dental-implementation"})):
-        active = "Odontologia"
+        active = "Prontuário"
     locked = bool(request and getattr(request, "billing_locked", False))
     menu = []
     for title, url, icon in rows:
