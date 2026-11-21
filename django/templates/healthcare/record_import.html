@@ -1,19 +1,19 @@
-{% extends 'healthcare/physio_shell.html' %}
+{% extends base_template|default:'healthcare/physio_shell.html' %}
 {% block title %}Importar fichas clínicas{% endblock %}
 {% block content %}
 <main class="pa-wrap rim">
-<header class="pa-heading"><div><h1>Importar fichas clínicas</h1><p>Traga para o ApPlanner os pacientes e atendimentos das fichas antigas em Word. Cada atendimento entra no prontuário na data escrita na ficha.</p></div></header>
+<header class="pa-heading"><div><h1>Importar fichas clínicas{% if company %} · {{ company.name }}{% endif %}</h1><p>Traga para o ApPlanner os pacientes e atendimentos das fichas antigas em Word. Cada atendimento entra no prontuário na data escrita na ficha.</p></div></header>
 {% if not rows %}
 <section class="pa-card"><h2>Enviar fichas</h2>
 <p>Envie um <strong>.zip</strong> com as fichas (modelo “Ficha clínica e ortodôntica”) ou uma ficha <strong>.docx</strong>. Primeiro mostramos tudo o que foi lido; nada é gravado até você confirmar.</p>
-<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.non_field_errors }}<label>{{ form.file.label }}{{ form.file }}</label>{{ form.file.errors }}<button class="pa-primary" type="submit">Ler fichas</button></form>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.non_field_errors }}{% if owners %}<label>Dentista responsável pelos pacientes novos<select name="owner">{% for u in owners %}<option value="{{ u.pk }}"{% if u.pk == owner_id %} selected{% endif %}>{{ u.get_full_name|default:u.email }}</option>{% endfor %}</select></label>{% endif %}<label>{{ form.file.label }}{{ form.file }}</label>{{ form.file.errors }}<button class="pa-primary" type="submit">Ler fichas</button></form>
 <ul class="rim-rules"><li>Paciente já cadastrado com o mesmo nome é reaproveitado: só completamos telefone, nascimento e cidade que estiverem vazios.</li><li>“Procedimento clínico” e “Tratamento ortodôntico” ficam separados, com valor recebido, valor pago e profissional como estão na ficha.</li><li>Orçamentos e observações também vão para o prontuário. Enviar o mesmo arquivo de novo não duplica nada.</li></ul>
 </section>
 {% else %}
 <section class="pa-card rim-summary"><h2>Confira antes de importar</h2>
 <dl class="rim-totals"><div><dt>Fichas lidas</dt><dd>{{ totals.sheets }}</dd></div><div><dt>Pacientes novos</dt><dd>{{ totals.new }}</dd></div><div><dt>Já cadastrados</dt><dd>{{ totals.matched }}</dd></div><div><dt>Procedimentos</dt><dd>{{ totals.procedures }}</dd></div><div><dt>Registros no prontuário</dt><dd>{{ totals.notes }}</dd></div><div><dt>Avisos</dt><dd>{{ totals.issues }}</dd></div></dl>
 {% if problems %}<ul class="rim-issues">{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
-<form method="post" class="rim-confirm">{% csrf_token %}<input type="hidden" name="action" value="confirm"><input type="hidden" name="payload" value="{{ payload }}"><button class="pa-primary" type="submit">Importar {{ totals.sheets }} ficha(s) para o prontuário</button><a class="pa-button" href="{% url 'dental-record-import' %}">Enviar outro arquivo</a></form>
+<form method="post" class="rim-confirm">{% csrf_token %}<input type="hidden" name="action" value="confirm">{% if owner_id %}<input type="hidden" name="owner" value="{{ owner_id }}">{% endif %}<input type="hidden" name="payload" value="{{ payload }}"><button class="pa-primary" type="submit">Importar {{ totals.sheets }} ficha(s) para o prontuário</button><a class="pa-button" href="{{ again_url }}">Enviar outro arquivo</a></form>
 </section>
 {% for row in rows %}
 <details class="pa-card rim-patient{% if row.sheet.skip %} is-skip{% endif %}">

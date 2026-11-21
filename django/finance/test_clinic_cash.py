@@ -1,13 +1,13 @@
 import uuid
 from decimal import Decimal
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from scheduling.models import Professional
 from . import clinic_cash as cash
 from . import clinic_services as s
 from . import test_clinic_desk as desk
-from .clinic_models import ClinicCashEntry, ClinicCashCorrection
+from .clinic_models import ClinicCashEntry
 from .models import FinancialTransaction
 
 
@@ -38,8 +38,9 @@ class ClinicCashSheetTests(TestCase):
         self.assertEqual(manual.professional_name, "Dra. Volante Sem Cadastro")
         with self.assertRaises(ValidationError):
             self.entry(professional=None, professional_name="")
-        with self.assertRaises(ValidationError):
-            self.entry(dentist_amount="0", clinic_amount="0")
+        zero = self.entry(dentist_amount="0", clinic_amount="0")  # avaliação ou reparo sem custo
+        self.assertEqual(zero.total, Decimal("0"))
+        cash.cancel_entry(user=self.reception, entry_id=zero.pk, reason="Teste de valor zero")
         data = cash.report(self.session)
         self.assertEqual(dict(data["kinds"]), {"Dinheiro": Decimal("100.00"), "Pix": Decimal("80.00"), "Débito/Crédito": Decimal("0")})
         self.assertEqual(data["columns"]["total"], Decimal("180.00"))
@@ -59,35 +60,24 @@ class ClinicCashSheetTests(TestCase):
         self.assertEqual(row.status, "paid")
         self.assertEqual(FinancialTransaction.objects.get(pk=row.transaction_id).status, "paid")
 
-    def test_closed_sheet_is_locked_until_manager_authorizes_and_changes_are_audited(self):
+    def test_reception_corrects_closed_day_directly_and_everything_is_audited(self):
         row = self.entry()
-        s.close_clinic_cash(user=self.reception, unit=self.unit, amount="150")
+        s.close_clinic_cash(user=self.reception, unit=self.unit, amount="150", session_id=self.session.pk)
         self.session.refresh_from_db()
-        self.assertTrue(cash.report(self.session)["locked"])
-        with self.assertRaises(PermissionDenied):
-            cash.cancel_entry(user=self.reception, entry_id=row.pk, reason="Valor errado")
-        with self.assertRaises(PermissionDenied):
-            self.entry()
-        request = cash.request_correction(user=self.reception, session_id=self.session.pk, reason="Pix lançado como dinheiro")
-        self.assertEqual(request.status, "requested")
-        with self.assertRaises(PermissionDenied):
-            cash.decide_correction(user=self.reception, correction_id=request.pk, approve=True)
-        with self.assertRaises(PermissionDenied):
-            cash.cancel_entry(user=self.reception, entry_id=row.pk, reason="Ainda bloqueado")
-        cash.decide_correction(user=self.manager, correction_id=request.pk, approve=True)
+        self.assertEqual(self.session.difference_amount, Decimal("0.00"))
         cash.update_entry(user=self.reception, entry_id=row.pk, customer=self.patient, professional=self.dentist,
                           professional_name="", dentist_amount="60", clinic_amount="40", other_amount="0",
-                          method=self.pix, notes="")
-        cash.finish_correction(user=self.reception, correction_id=request.pk)
+                          method=self.pix, notes="Era Pix")
         self.session.refresh_from_db()
         self.assertEqual(self.session.expected_amount, Decimal("50.00"))
         self.assertEqual(self.session.difference_amount, Decimal("100.00"))
-        self.assertTrue(cash.report(self.session)["locked"])
-        self.assertEqual(ClinicCashCorrection.objects.get().status, "done")
+        late = self.entry(dentist_amount="0", clinic_amount="0")
+        self.assertEqual(late.total, Decimal("0"))
+        cash.cancel_entry(user=self.reception, entry_id=late.pk, reason="Lançado em duplicidade")
         from core.models import AuditLog
-        self.assertTrue(AuditLog.objects.filter(action="clinic.cash_entry.updated", entity_id=row.pk).exists())
-        with self.assertRaises(PermissionDenied):
-            cash.cancel_entry(user=self.reception, entry_id=row.pk, reason="Depois de concluir")
+        for action in ("clinic.cash_entry.updated", "clinic.cash_entry.created", "clinic.cash_entry.cancelled",
+                       "clinic.cash_report.recalculated"):
+            self.assertTrue(AuditLog.objects.filter(action=action).exists(), action)
 
     def test_manager_can_open_correction_directly_and_rejection_keeps_lock(self):
         s.close_clinic_cash(user=self.reception, unit=self.unit, amount="50")
@@ -130,15 +120,26 @@ class DailyCashByProfessionalTests(TestCase):
         self.client.force_login(self.reception)
         sheet = self.client.get(reverse("clinic-cash-sheet-detail", args=[self.session.pk]))
         self.assertContains(sheet, "Fechamento do dia por profissional")
-        closed = s.close_clinic_cash(user=self.reception, unit=self.unit, amount="150")
+        closed = s.close_clinic_cash(user=self.reception, unit=self.unit, amount="150", session_id=self.session.pk)
         summary = {r["professional"]: r for r in closed.clinical_closing.summary["professionals"]}
         self.assertEqual(summary["Dr. Listado"]["total"], "100.00")
 
-    def test_cash_from_previous_day_must_be_closed_before_new_entries(self):
+    def test_one_sheet_per_professional_per_day_and_earlier_days_stay_editable(self):
         from datetime import timedelta
+        from django.db import transaction
         from django.utils import timezone
-        type(self.session).objects.filter(pk=self.session.pk).update(opened_at=timezone.now() - timedelta(days=1))
-        with self.assertRaisesMessage(ValidationError, "O caixa é fechado por dia"):
-            self.entry()
-        closed = s.close_clinic_cash(user=self.reception, unit=self.unit, amount="50")
+        with transaction.atomic():
+            mine = s.day_sheet(self.tenant, self.unit, self.dentist, self.reception)
+            again = s.day_sheet(self.tenant, self.unit, self.dentist, self.reception)
+            theirs = s.day_sheet(self.tenant, self.unit, None, self.reception)
+        self.assertEqual(mine.pk, again.pk)
+        self.assertNotEqual(mine.pk, theirs.pk)
+        self.assertEqual(mine.label, "Dr. Listado")
+        yesterday = timezone.localdate() - timedelta(days=1)
+        type(self.session).objects.filter(pk=self.session.pk).update(business_date=yesterday,
+                                                                     opened_at=timezone.now() - timedelta(days=1))
+        row = self.entry()
+        self.assertEqual(row.transaction.competence_at, yesterday)
+        self.assertEqual(timezone.localtime(row.transaction.paid_at).date(), yesterday)
+        closed = s.close_clinic_cash(user=self.reception, unit=self.unit, amount="150", session_id=self.session.pk)
         self.assertEqual(closed.status, "closed")

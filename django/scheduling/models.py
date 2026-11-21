@@ -50,7 +50,9 @@ class Customer(TimeStampedModel):
             self.name,self.phone,self.email=contact_values(self.name,self.phone,self.email)
         if self.tenant_id:
             phones,emails=identity_matches(self.tenant,self.phone,self.email)
-            if (self.phone and phones.exclude(pk=self.pk).exists()) or emails.exclude(pk=self.pk).exists():
+            # Clinics register families that share one phone (child with the mother's number).
+            shared_phone_ok=is_healthcare_tenant(self.tenant)
+            if (self.phone and not shared_phone_ok and phones.exclude(pk=self.pk).exists()) or emails.exclude(pk=self.pk).exists():
                 raise ValidationError("Este telefone ou e-mail já pertence a um cliente da empresa. Use o cadastro existente para preservar o histórico.")
 
     @property

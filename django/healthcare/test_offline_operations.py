@@ -130,7 +130,9 @@ class OfflineOperationsTests(TestCase):
         patient.full_clean()
         patient.save()
         self.assertEqual(self.post(operation).json(),response.json())
-        self.assertEqual(self.post(self.op('customer',name='Outro Nome',phone=self.patient.phone,email='')).status_code,409)
+        # Same phone, other person (family): allowed. Same name and phone: needs review.
+        self.assertEqual(self.post(self.op('customer',name='Outro Nome Familia',phone=self.patient.phone,email='')).status_code,200)
+        self.assertEqual(self.post(self.op('customer',name=self.patient.name,phone=self.patient.phone,email='')).status_code,409)
         self.assertEqual(self.post(self.op('customer',name='Inválido',phone='12',email='')).status_code,409)
         self.assertEqual(self.post(self.op('customer',name='Inválido',birth_date='2999-01-01')).status_code,409)
 
@@ -236,7 +238,7 @@ class OfflineReplayConcurrencyTests(TransactionTestCase):
         def run(index):
             try:
                 actor=User.objects.get(pk=user.pk)
-                operation={'id':str(uuid.uuid4()),'scope':scope(actor),'kind':'customer','data':{'name':f'Paciente {index}','phone':'81999999999','email':''}}
+                operation={'id':str(uuid.uuid4()),'scope':scope(actor),'kind':'customer','data':{'name':'Paciente Mesmo Nome','phone':'81999999999','email':''}}
                 barrier.wait(timeout=10)
                 replay(actor,operation)
                 return 'created'

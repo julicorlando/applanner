@@ -39,7 +39,15 @@ def resolve_customer(tenant, name, phone, email=""):
     # Serialize first bookings even when different professionals/courts are chosen.
     Tenant.objects.select_for_update().get(pk=tenant.pk)
     phones,emails=identity_matches(tenant,phone,email)
-    by_phone,by_email=list(phones[:2]),list(emails[:2])
+    by_phone,by_email=list(phones[:20]),list(emails[:2])
+    if len(by_phone)>1:
+        # A shared family phone: keep only the patient with this name, if any.
+        from billing.entitlements import is_healthcare_tenant
+        same=[c for c in by_phone if " ".join(c.name.lower().split())==" ".join(name.lower().split())]
+        if len(same)<=1 and is_healthcare_tenant(tenant):
+            by_phone=same
+            if not same and not by_email:
+                return Customer.objects.create(tenant=tenant,name=name,phone=phone,email=email),False
     if len(by_phone)>1 or len(by_email)>1 or (by_phone and by_email and by_phone[0].pk!=by_email[0].pk):
         raise ValidationError("Não foi possível vincular os contatos a um único cadastro. Procure o estabelecimento para conferir seus dados.")
     existing=(by_phone or by_email)

@@ -18,6 +18,7 @@ from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 
@@ -112,13 +113,14 @@ def preview_rows(sheets, tenant):
 
 
 @transaction.atomic
-def apply(tenant, user, sheets, request=None):
+def apply(tenant, user, sheets, request=None, owner=None):
     today = timezone.localdate()
     report = {"created": 0, "completed": 0, "matched": 0, "notes": 0, "already": 0, "skipped": 0}
     existing = {}
     for customer in Customer.objects.select_for_update().filter(tenant=tenant):
         existing.setdefault(fold(customer.name), customer)
     author = f"Ficha clínica importada por {(user.get_full_name() or user.email)}"[:160]
+    owner = owner or user
     for sheet in sheets:
         if sheet.get("skip"):
             report["skipped"] += 1
@@ -128,7 +130,7 @@ def apply(tenant, user, sheets, request=None):
         if patient is None:
             patient = Customer(tenant=tenant, name=sheet["name"][:150], phone=sheet["phone"], birth_date=birth,
                                city=sheet["city"][:100], state=sheet["state"])
-            patient.registered_by = user
+            patient.registered_by = owner
             patient.save()
             existing[sheet["key"]] = patient
             report["created"] += 1
@@ -163,24 +165,22 @@ def apply(tenant, user, sheets, request=None):
     return report
 
 
-@login_required
-@never_cache
-def import_sheets(request):
-    tenant = can_import(request.user)
-    context = {**shell_context(request.user, request), "form": UploadForm()}
+def handle(request, tenant, *, context, done_url, owner=None, again_url):
     if request.method == "POST" and request.POST.get("action") == "confirm":
         try:
             payload = signing.loads(request.POST.get("payload", ""), salt=SALT, max_age=6 * 3600)
         except signing.BadSignature:
             messages.error(request, "A prévia expirou ou foi alterada. Envie o arquivo novamente.")
-            return redirect("dental-record-import")
+            return redirect(again_url)
         if payload.get("tenant") != tenant.pk or payload.get("user") != request.user.pk:
             raise PermissionDenied
-        report = apply(tenant, request.user, payload["sheets"], request)
+        report = apply(tenant, request.user, payload["sheets"], request, owner=owner)
         messages.success(request, (f"Importação concluída: {report['created']} paciente(s) novo(s), {report['matched']} já "
                                    f"cadastrado(s) ({report['completed']} completado(s)), {report['notes']} registro(s) no prontuário"
                                    + (f", {report['already']} já importado(s) antes" if report["already"] else "") + "."))
-        return redirect("dental-assessments")
+        return redirect(done_url)
+    context.setdefault("form", UploadForm())
+    context["again_url"] = again_url
     if request.method == "POST":
         form = UploadForm(request.POST, request.FILES)
         context["form"] = form
@@ -202,3 +202,11 @@ def import_sheets(request):
                                "issues": sum(len(r["sheet"]["issues"]) for r in rows) + len(problems)},
                 })
     return render(request, "healthcare/record_import.html", context)
+
+
+@login_required
+@never_cache
+def import_sheets(request):
+    tenant = can_import(request.user)
+    return handle(request, tenant, context={**shell_context(request.user, request), "base_template": "healthcare/physio_shell.html"},
+                  done_url="dental-assessments", again_url=reverse("dental-record-import"))

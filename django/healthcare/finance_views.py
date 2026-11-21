@@ -43,13 +43,13 @@ def clinical_finance(request):
                         method=request.POST.get("payment_method","")
                         if method not in {'pix','card','cash','transfer'}:raise SuspiciousOperation("Modalidade inválida.")
                         if user.role=='reception':
-                            from finance.clinic_services import active_cash
+                            from finance.clinic_services import require_open_sheet
                             from finance.clinic_models import ClinicPaymentMethod
                             from core.unit_scope import selected_unit
                             plan=get_object_or_404(ClinicalTreatmentPlan,pk=row.source_id,entry__tenant_id=user.tenant_id,entry__professional__tenant_id=user.tenant_id)
                             unit=row.unit or plan.entry.professional.unit or selected_unit(request,tenant)
                             if unit and (unit.tenant_id!=tenant.pk or not unit.active):raise PermissionDenied
-                            active_cash(tenant,unit)
+                            require_open_sheet(tenant,unit)
                             if method=='transfer' or not ClinicPaymentMethod.objects.filter(tenant=tenant,kind=method,active=True).exists():
                                 raise ValidationError('Esta modalidade não está ativa no caixa da clínica.')
                             row.unit=unit

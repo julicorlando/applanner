@@ -162,8 +162,10 @@ def replay(user, operation):
             raise ValidationError(' '.join(str(x) for errors in form.errors.values() for x in errors))
         fields = form.cleaned_data
         phones, emails = identity_matches(tenant, fields.get('phone') or '', fields.get('email') or '')
-        if (fields.get('phone') and phones.exists()) or emails.exists():
-            raise ValidationError('Telefone ou e-mail já cadastrado. Revise a fila e selecione o paciente existente; não foi feita mesclagem automática.', code='customer_exists')
+        # A shared phone is fine in clinics (families); the same name + phone or the same e-mail is a duplicate.
+        same_person = fields.get('phone') and phones.filter(name__iexact=fields['name']).exists()
+        if same_person or emails.exists():
+            raise ValidationError('Paciente já cadastrado com este nome e telefone ou e-mail. Revise a fila e selecione o paciente existente; não foi feita mesclagem automática.', code='customer_exists')
         patient = Customer.objects.create(tenant=tenant, registered_by=user, **fields)
         result = {'customer': patient.pk}
     elif kind == 'appointment':

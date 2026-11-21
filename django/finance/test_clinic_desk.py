@@ -61,7 +61,7 @@ class ClinicDeskTests(TestCase):
         self.assertEqual(FinancialTransaction.objects.filter(status='paid',type='income').count(),2)
         expense=s.expense(user=self.reception,unit=self.unit,description='Material',amount='10',method=self.cash,invoice='NF 123',items='1 pacote',image=None,request_id=uuid.uuid4())
         self.assertEqual(expense.transaction.type,'expense')
-        closed=s.close_clinic_cash(user=self.reception,unit=self.unit,amount='70',notes='Conferido')
+        closed=s.close_clinic_cash(user=self.reception,unit=self.unit,amount='70',notes='Conferido',session_id=session.pk)
         self.assertEqual(closed.expected_amount,Decimal('70'))
         self.assertEqual(closed.difference_amount,0)
         report=ClinicCashClosing.objects.get(session=session).summary
@@ -82,12 +82,12 @@ class ClinicDeskTests(TestCase):
 
     def test_receipts_and_expenses_require_open_cash_and_do_not_accept_invalid_values(self):
         row=self.charge().installments.get()
-        with self.assertRaises(ValidationError):self.receive(row,'10')
-        s.open_clinic_cash(self.reception,self.unit,0)
         for value in ['NaN','Infinity','-1','1.001','0','99999999999']:
             with self.assertRaises(ValidationError):self.receive(row,value)
-        with self.assertRaises(ValidationError):s.expense(user=self.reception,unit=self.unit,description='Despesa',amount='1',method=self.cash,invoice='',items='',image=None,request_id=uuid.uuid4())
         self.assertEqual(ClinicReceipt.objects.count(),0)
+        # The day's sheet opens by itself on the first valid receipt.
+        self.receive(row,'10')
+        self.assertTrue(CashSession.objects.filter(status='open',professional__isnull=True).exists())
 
     def test_reception_can_operate_but_cannot_read_clinical_records_or_other_finances(self):
         response=self.client.get(reverse('clinic-finance-desk'));self.assertEqual(response.status_code,200)
@@ -222,9 +222,8 @@ class ClinicDeskTests(TestCase):
     def test_closed_cash_has_visible_guidance_and_no_receiving_link(self):
         self.charge()
         response=self.client.get(reverse('clinic-finance-desk'))
-        self.assertContains(response,'Caixa fechado')
-        self.assertContains(response,'Abra o caixa para receber')
-        self.assertContains(response,'fieldset disabled')
+        self.assertContains(response,'Nenhum caixa aberto hoje')
+        self.assertContains(response,'Cada profissional tem o seu caixa por dia')
         self.assertNotContains(response,'Cadastrar modalidade')
 
     def test_expense_review_requires_management_and_preserves_paid_movement(self):

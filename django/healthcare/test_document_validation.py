@@ -149,6 +149,13 @@ class PatientRegistrationTests(TestCase):
         self.patient.refresh_from_db()
         self.assertEqual(missing_registration(self.patient), [])
 
+    def test_family_members_can_share_one_phone(self):
+        self.client.post(reverse("dental-patient-create"), self.data(cpf=""))
+        response = self.client.post(reverse("dental-patient-create"), self.data(name="Filha Teste Souza", cpf=""))
+        self.assertEqual(response.status_code, 302)
+        first, second = Customer.objects.get(name="Maria Teste Souza"), Customer.objects.get(name="Filha Teste Souza")
+        self.assertEqual(first.phone, second.phone)
+
     def test_cpf_and_street_address_are_optional(self):
         data = self.data(name="Paciente Sem Documento", phone="(81) 97777-0000")
         for field in ("cpf", "street", "address_number", "district"):

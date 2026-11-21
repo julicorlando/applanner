@@ -12,13 +12,13 @@
 
 <div class="dpr-columns">
 {% if receive_form %}<section class="pa-card dpr-receive" id="receber"><h2>Receber pagamento</h2>
-{% if cash_session %}<p>O valor entra na folha do caixa de hoje como <strong>pago</strong>, ligado a este paciente, e aparece no dia abaixo.</p>
+<p>O valor entra no caixa de hoje do profissional escolhido como <strong>pago</strong>, ligado a este paciente, e aparece no dia abaixo. Pode ser R$ 0 (avaliação ou reparo).</p>
 <form method="post">{% csrf_token %}<input type="hidden" name="action" value="receive">{{ receive_form.request_id }}{{ receive_form.non_field_errors }}
 <div class="da-two"><label>{{ receive_form.professional.label }}{{ receive_form.professional }}</label><label>{{ receive_form.professional_name.label }}{{ receive_form.professional_name }}{{ receive_form.professional_name.errors }}</label></div>
 <div class="dpr-three"><label>{{ receive_form.dentist_amount.label }}{{ receive_form.dentist_amount }}</label><label>{{ receive_form.clinic_amount.label }}{{ receive_form.clinic_amount }}</label><label>{{ receive_form.other_amount.label }}{{ receive_form.other_amount }}</label></div>
 <div class="da-two"><label>{{ receive_form.method.label }}{{ receive_form.method }}{{ receive_form.method.errors }}</label><label>{{ receive_form.notes.label }}{{ receive_form.notes }}</label></div>
 <button class="pa-primary" type="submit">Confirmar recebimento</button></form>
-{% else %}<p>O caixa desta unidade está fechado. <a href="{% url 'clinic-finance-desk' %}">Abra o caixa no Financeiro</a> para receber pagamentos.</p>{% endif %}</section>{% endif %}
+</section>{% endif %}
 <section class="pa-card dpr-note" id="observacao"><h2>{% if clinical %}Nova observação{% else %}Nova evolução{% endif %}</h2><p>Fica registrado com seu nome, data e hora no histórico do paciente.</p>
 <form method="post">{% csrf_token %}<input type="hidden" name="action" value="note">{{ note_form.non_field_errors }}{% if not clinical %}<label>{{ note_form.procedure.label }}{{ note_form.procedure }}</label><label>{{ note_form.orthodontic.label }}{{ note_form.orthodontic }}</label>{% endif %}<label>{{ note_form.text.label }}{{ note_form.text }}</label><button class="pa-button" type="submit">Salvar no prontuário</button></form></section>
 </div>
