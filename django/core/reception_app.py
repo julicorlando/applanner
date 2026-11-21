@@ -88,7 +88,19 @@ def panel(request):
         "can_schedule": has_capability(user, "agenda.manage") and user.role not in CLINICAL_ROLES,
         "can_checkin": has_capability(user, "agenda.manage") and user.role not in CLINICAL_ROLES,
         "today": timezone.localdate(),
+        "offline_available": _offline_available(user),
     })
+
+
+def _offline_available(user):
+    # Same gate as the clinic offline snapshot: active clinic staff with agenda access.
+    from django.core.exceptions import PermissionDenied as Denied
+    from healthcare.operation_access import operator
+    try:
+        operator(user)
+    except Denied:
+        return False
+    return True
 
 
 @login_required

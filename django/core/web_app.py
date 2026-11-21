@@ -54,7 +54,7 @@ def worker(request):
     if not path: raise Http404
     with open(path,encoding='utf-8') as source:
         assets=[reverse('clinical-offline-shell'), *[static('healthcare/'+name) for name in ('operations.css','offline-vault.js','offline-ui.js')], static('js/app-worker-registration.js')]
-        response=HttpResponse('const CLINICAL_OFFLINE_ASSETS = '+json.dumps(assets)+';\n'+source.read(),content_type='application/javascript')
+        response=HttpResponse('const CLINICAL_OFFLINE_ASSETS = '+json.dumps(assets)+';\nconst RECEPTION_PANEL = '+json.dumps(reverse('reception-panel'))+';\n'+source.read(),content_type='application/javascript')
     response['Cache-Control']='no-cache'
     response['Service-Worker-Allowed']='/'
     response['X-Content-Type-Options']='nosniff'
