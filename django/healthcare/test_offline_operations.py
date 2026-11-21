@@ -238,7 +238,7 @@ class OfflineReplayConcurrencyTests(TransactionTestCase):
         def run(index):
             try:
                 actor=User.objects.get(pk=user.pk)
-                operation={'id':str(uuid.uuid4()),'scope':scope(actor),'kind':'customer','data':{'name':f'Paciente {index}','phone':'81999999999','email':''}}
+                operation={'id':str(uuid.uuid4()),'scope':scope(actor),'kind':'customer','data':{'name':'Paciente Mesmo Nome','phone':'81999999999','email':''}}
                 barrier.wait(timeout=10)
                 replay(actor,operation)
                 return 'created'

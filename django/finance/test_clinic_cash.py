@@ -38,8 +38,9 @@ class ClinicCashSheetTests(TestCase):
         self.assertEqual(manual.professional_name, "Dra. Volante Sem Cadastro")
         with self.assertRaises(ValidationError):
             self.entry(professional=None, professional_name="")
-        with self.assertRaises(ValidationError):
-            self.entry(dentist_amount="0", clinic_amount="0")
+        zero = self.entry(dentist_amount="0", clinic_amount="0")  # avaliação ou reparo sem custo
+        self.assertEqual(zero.total, Decimal("0"))
+        cash.cancel_entry(user=self.reception, entry_id=zero.pk, reason="Teste de valor zero")
         data = cash.report(self.session)
         self.assertEqual(dict(data["kinds"]), {"Dinheiro": Decimal("100.00"), "Pix": Decimal("80.00"), "Débito/Crédito": Decimal("0")})
         self.assertEqual(data["columns"]["total"], Decimal("180.00"))
@@ -127,11 +128,10 @@ class DailyCashByProfessionalTests(TestCase):
         from datetime import timedelta
         from django.db import transaction
         from django.utils import timezone
-        other = Professional.objects.create(tenant=self.tenant, name="Dra. Segunda")
         with transaction.atomic():
             mine = s.day_sheet(self.tenant, self.unit, self.dentist, self.reception)
             again = s.day_sheet(self.tenant, self.unit, self.dentist, self.reception)
-            theirs = s.day_sheet(self.tenant, self.unit, other, self.reception)
+            theirs = s.day_sheet(self.tenant, self.unit, None, self.reception)
         self.assertEqual(mine.pk, again.pk)
         self.assertNotEqual(mine.pk, theirs.pk)
         self.assertEqual(mine.label, "Dr. Listado")

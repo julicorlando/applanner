@@ -50,6 +50,8 @@ def _entry_time(session):
     from .clinic_services import business_today, session_day, _zone
     from datetime import datetime, time
     day = session_day(session)
+    if session.status == CashSession.Status.CLOSED and session.closed_at:
+        return session.closed_at
     if day < business_today(session.tenant):
         return timezone.make_aware(datetime.combine(day, time(12, 0)), _zone(session.tenant))
     return timezone.now()
