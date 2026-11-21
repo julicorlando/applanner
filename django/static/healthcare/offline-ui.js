@@ -2,7 +2,7 @@
 (async () => {
   'use strict';
   const $ = id => document.getElementById(id), vault = globalThis.ClinicVault;
-  let state, key, salt, release, syncing=false, busy=false, touched=Date.now(), hiddenAt=0;
+  let state, key, salt, release, syncing=false, busy=false, touched=Date.now(), hiddenAt=0, refreshedAt=0;
   const status = message => { $('co-status').textContent = message; };
   const text = (tag, value, className='') => { const node=document.createElement(tag);node.textContent=value;node.className=className;return node; };
   const expired = () => !state || new Date(state.snapshot.expires_at).getTime() <= Date.now();
@@ -27,7 +27,8 @@
     document.querySelectorAll('#co-work select').forEach(select => select.replaceChildren());
     $('co-password').value='';$('co-filter').value='';status('Cofre bloqueado.');
   }
-  async function persist() { if (!state || !key) throw Error('Cofre bloqueado.');await vault.save(await vault.seal(state,key,salt)); }
+  // Only the pending count travels outside the ciphertext, so the online panel can ask for an upload.
+  async function persist() { if (!state || !key) throw Error('Cofre bloqueado.');const sealed=await vault.seal(state,key,salt);sealed.pending=state.queue.length;sealed.saved_at=new Date().toISOString();await vault.save(sealed); }
   async function serverSnapshot() {
     const response=await fetch('/app/clinica/operacao/snapshot/', {credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000),headers:{Accept:'application/json'}});
     if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) throw Error('Entre na sua conta da clínica e confira suas permissões antes de sincronizar.');
@@ -186,7 +187,7 @@
         if(payload.result.version)for(const next of state.queue)if(next.data.appointment===payload.result.appointment && next.data.version===op.data.version)next.data.version=payload.result.version;
         try{await persist();}catch(error){state=before;throw error;}
       }
-      state.snapshot=await serverSnapshot();await persist();render();
+      state.snapshot=await serverSnapshot();refreshedAt=Date.now();await persist();render();
     } catch(error) {status(error.message);}
     finally {syncing=false;if(state)render();}
   }
@@ -198,7 +199,14 @@
     if(!confirm('Apagar a cópia local e TODOS os lançamentos ainda não sincronizados deste dispositivo? Esta ação não altera o servidor.'))return;
     await acquire();try{await vault.erase();}finally{lock();}status('Cópia local apagada.');
   });
-  addEventListener('offline',connection);addEventListener('online',()=>{connection();if(!busy)sync();});
+  async function lockedNotice() {
+    if (state) return;
+    try { const sealed=await vault.load();if(sealed?.pending&&navigator.onLine)status(`Internet disponível. Desbloqueie o cofre para enviar ${sealed.pending} lançamento(s) feito(s) sem conexão.`); } catch {}
+  }
+  lockedNotice();
+  addEventListener('offline',connection);addEventListener('online',()=>{connection();if(!busy&&state)sync();else lockedNotice();});
+  // Upload whenever the internet is back, and keep the local copy of the database fresh while online.
+  setInterval(()=>{if(state&&navigator.onLine&&!busy&&!syncing&&(state.queue.some(x=>!x.error)||Date.now()-refreshedAt>300000))sync();},60000);
   for(const type of ['pointerdown','keydown','touchstart'])addEventListener(type,()=>{touched=Date.now();},{passive:true});
   document.addEventListener('visibilitychange',()=>{hiddenAt=document.hidden?Date.now():hiddenAt;if(!document.hidden && hiddenAt && Date.now()-hiddenAt>60000&&!busy&&!syncing)lock();});
   setInterval(()=>{if(state&&!busy&&!syncing&&(Date.now()-touched>300000||(document.hidden&&Date.now()-hiddenAt>60000)))lock();},5000);

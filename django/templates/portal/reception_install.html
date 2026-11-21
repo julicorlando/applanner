@@ -14,6 +14,10 @@
       <a class="rp-btn is-primary" href="{% url 'reception-app-windows' %}" download>Baixar instalador (Windows)</a>
       <p class="rp-note">Endereço do app: {{ app_url }}</p></section>
   </div>
+  <section class="rp-card"><h2>Funciona sem internet</h2>
+    <p>Com internet, o app consulta o banco do ApPlanner em tempo real. Para usar sem conexão, clique em <strong>Ativar modo offline</strong> no painel da recepção e crie uma senha local: o computador guarda uma cópia criptografada dos pacientes e da agenda de ontem até os próximos 7 dias.</p>
+    <ol><li>Sem internet, o app abre o modo offline sozinho: dá para consultar pacientes e horários, registrar chegada, cadastrar paciente, agendar e lançar recebimento em dinheiro.</li><li>Tudo fica numa fila guardada no computador.</li><li>Quando a internet volta, a fila é enviada automaticamente e a cópia local é atualizada a partir do banco. Se algo mudou no servidor (por exemplo, um horário ocupado), o lançamento fica marcado para revisão, sem sobrescrever nada.</li></ol>
+    <p class="rp-note">Pix e cartão precisam de internet. Por segurança, o cofre bloqueia após 5 minutos sem uso; desbloqueie com a senha local para continuar ou enviar.</p></section>
 </main>
 <script>
 (function(){var button=document.querySelector('[data-install-app]');var prompt=null;

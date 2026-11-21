@@ -40,6 +40,20 @@ self.addEventListener('fetch', event => {
     })());
     return;
   }
+  // The reception desktop app opens the panel. Without internet it falls back to the
+  // public offline shell (no PHI in the cache; data stays in the encrypted local vault).
+  if (request.method === 'GET' && request.mode === 'navigate' && url.origin === self.location.origin &&
+      typeof RECEPTION_PANEL !== 'undefined' && url.pathname === RECEPTION_PANEL && typeof CLINICAL_OFFLINE_ASSETS !== 'undefined') {
+    event.respondWith((async () => {
+      try { return await fetch(request); }
+      catch {
+        const shell = await (await caches.open(CLINICAL_CACHE)).match(CLINICAL_OFFLINE_ASSETS[0]);
+        if (shell) return shell;
+        return new Response('<!doctype html><meta charset="utf-8"><title>Sem conexão</title><p style="font:16px system-ui;padding:24px">Sem internet. Ative o modo offline no painel da recepção enquanto estiver conectado.</p>', {headers:{'Content-Type':'text/html; charset=utf-8'}});
+      }
+    })());
+    return;
+  }
   if (request.method !== 'GET' || request.mode === 'navigate' || url.origin !== self.location.origin || !STATIC_FILE.test(url.pathname) || url.search) return;
   event.respondWith((async () => {
     let cache;
