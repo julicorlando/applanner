@@ -227,7 +227,7 @@ class CashSession(models.Model):
     business_date=models.DateField(null=True,blank=True,db_index=True)
 
     class Meta:
-        indexes=[models.Index(fields=["tenant","status","opened_at"]),models.Index(fields=["tenant","unit","business_date"])]
+        indexes=[models.Index(fields=["tenant","status","opened_at"]),models.Index(fields=["tenant","unit","business_date"],name="finance_cas_tenant__bd_idx")]
 
     @property
     def label(self):
