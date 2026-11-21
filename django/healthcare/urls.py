@@ -1,11 +1,12 @@
 from django.urls import path
-from . import views, dental_assessment_views as assessments, patient_registration, patient_record
+from . import views, dental_assessment_views as assessments, patient_registration, patient_record, record_import
 
 urlpatterns = [
     path("prontuarios/", assessments.assessment_list, name="dental-assessments"),
     path("prontuarios/novo/", assessments.assessment_editor, name="dental-assessment-create"),
     path("prontuarios/<int:pk>/", assessments.assessment_editor, name="dental-assessment-detail"),
     path("prontuarios/paciente/novo/", patient_registration.patient_form, name="dental-patient-create"),
+    path("prontuarios/importar-fichas/", record_import.import_sheets, name="dental-record-import"),
     path("prontuarios/paciente/<int:pk>/", patient_record.patient_record, name="dental-patient-record"),
     path("prontuarios/paciente/<int:pk>/cadastro/", patient_registration.patient_form, name="dental-patient-edit"),
     path("prontuarios/paciente/<int:pk>/opcoes/", assessments.patient_options, name="dental-assessment-patient-options"),

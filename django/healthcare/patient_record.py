@@ -177,9 +177,10 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False):
             "author": _author(entry.professional, entry.professional_snapshot),
             "sections": _entry_sections(_read_entry(entry, user, ip)), "draft": False, "url": "",
         })
-    for note in PatientNote.objects.filter(tenant=tenant, customer=patient)[:200]:
-        days[_local_day(note.created_at)]["notes"].append({
-            "sections": note_sections(decrypt_text(note.text_encrypted)), "author": note.author_name, "at": note.created_at})
+    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:500]:
+        days[_local_day(note.effective_at)]["notes"].append({
+            "sections": note_sections(decrypt_text(note.text_encrypted)), "author": note.author_name,
+            "at": note.effective_at, "imported": bool(note.import_key)})
     documents = ClinicalIssuedDocument.objects.filter(tenant=tenant, customer=patient, status="finalized")
     if clinical:
         documents = documents.filter(professional__user=user)
