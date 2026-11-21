@@ -1,0 +1,45 @@
+{% extends 'healthcare/physio_shell.html' %}
+{% block title %}Importar fichas clínicas{% endblock %}
+{% block content %}
+<main class="pa-wrap rim">
+<header class="pa-heading"><div><h1>Importar fichas clínicas</h1><p>Traga para o ApPlanner os pacientes e atendimentos das fichas antigas em Word. Cada atendimento entra no prontuário na data escrita na ficha.</p></div></header>
+{% if not rows %}
+<section class="pa-card"><h2>Enviar fichas</h2>
+<p>Envie um <strong>.zip</strong> com as fichas (modelo “Ficha clínica e ortodôntica”) ou uma ficha <strong>.docx</strong>. Primeiro mostramos tudo o que foi lido; nada é gravado até você confirmar.</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.non_field_errors }}<label>{{ form.file.label }}{{ form.file }}</label>{{ form.file.errors }}<button class="pa-primary" type="submit">Ler fichas</button></form>
+<ul class="rim-rules"><li>Paciente já cadastrado com o mesmo nome é reaproveitado: só completamos telefone, nascimento e cidade que estiverem vazios.</li><li>“Procedimento clínico” e “Tratamento ortodôntico” ficam separados, com valor recebido, valor pago e profissional como estão na ficha.</li><li>Orçamentos e observações também vão para o prontuário. Enviar o mesmo arquivo de novo não duplica nada.</li></ul>
+</section>
+{% else %}
+<section class="pa-card rim-summary"><h2>Confira antes de importar</h2>
+<dl class="rim-totals"><div><dt>Fichas lidas</dt><dd>{{ totals.sheets }}</dd></div><div><dt>Pacientes novos</dt><dd>{{ totals.new }}</dd></div><div><dt>Já cadastrados</dt><dd>{{ totals.matched }}</dd></div><div><dt>Procedimentos</dt><dd>{{ totals.procedures }}</dd></div><div><dt>Registros no prontuário</dt><dd>{{ totals.notes }}</dd></div><div><dt>Avisos</dt><dd>{{ totals.issues }}</dd></div></dl>
+{% if problems %}<ul class="rim-issues">{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+<form method="post" class="rim-confirm">{% csrf_token %}<input type="hidden" name="action" value="confirm"><input type="hidden" name="payload" value="{{ payload }}"><button class="pa-primary" type="submit">Importar {{ totals.sheets }} ficha(s) para o prontuário</button><a class="pa-button" href="{% url 'dental-record-import' %}">Enviar outro arquivo</a></form>
+</section>
+{% for row in rows %}
+<details class="pa-card rim-patient{% if row.sheet.skip %} is-skip{% endif %}">
+<summary><strong>{{ row.sheet.name|default:row.sheet.file }}</strong>
+<span>{% if row.sheet.skip %}Não será importada{% elif row.match %}Já cadastrado · completa o que falta{% else %}Novo paciente{% endif %} · {{ row.display|length }} registro(s){% if row.sheet.issues %} · {{ row.sheet.issues|length }} aviso(s){% endif %}</span></summary>
+{% if row.sheet.issues %}<ul class="rim-issues">{% for i in row.sheet.issues %}<li>{{ i }}</li>{% endfor %}</ul>{% endif %}
+{% if not row.sheet.skip %}
+<dl class="rim-grid"><div><dt>Nascimento</dt><dd>{{ row.birth|date:"d/m/Y"|default:"—" }}</dd></div><div><dt>Telefone</dt><dd>{{ row.sheet.phone|default:"—" }}</dd></div><div><dt>Cidade</dt><dd>{{ row.sheet.city|default:"—" }}{% if row.sheet.state %} - {{ row.sheet.state }}{% endif %}</dd></div><div><dt>Arquivo</dt><dd>{{ row.sheet.file }}</dd></div></dl>
+{% for note in row.display %}<article class="rim-note"><header><strong>{{ note.day|date:"d/m/Y" }}</strong><span>{{ note.kind }}</span></header>
+{% if note.procedure %}<p><b>Procedimento clínico:</b><br>{{ note.procedure|linebreaksbr }}</p>{% endif %}
+{% if note.orthodontic %}<p><b>Tratamento ortodôntico:</b><br>{{ note.orthodontic|linebreaksbr }}</p>{% endif %}
+{% if note.text %}<p>{{ note.text|linebreaksbr }}</p>{% endif %}</article>{% endfor %}
+{% endif %}
+</details>
+{% endfor %}
+{% endif %}
+</main>
+<style>
+.rim-rules{margin:16px 0 0;padding-left:20px;color:var(--dd-muted,#52647d);line-height:1.6}
+.rim-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:0 0 16px}
+.rim-totals div{border:1px solid var(--dd-line,#dbe4ef);border-radius:12px;padding:12px 14px}.rim-totals dt{font-size:13px;color:var(--dd-muted,#52647d)}.rim-totals dd{margin:2px 0 0;font-size:24px;font-weight:750;font-variant-numeric:tabular-nums}
+.rim-confirm{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.rim-patient summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline}.rim-patient summary span{color:var(--dd-muted,#52647d);font-size:14px}
+.rim-patient.is-skip{opacity:.7}
+.rim-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}.rim-grid dt{font-size:12px;color:var(--dd-muted,#52647d)}.rim-grid dd{margin:2px 0 0}
+.rim-note{border-left:4px solid #8b5cf6;padding:8px 14px;margin:10px 0;background:var(--dd-soft,#f5f7fb);border-radius:0 10px 10px 0}.rim-note header{display:flex;gap:12px}.rim-note header span{color:var(--dd-muted,#52647d)}.rim-note p{margin:6px 0}
+.rim-issues{color:#b45309;margin:8px 0;padding-left:20px}
+</style>
+{% endblock %}

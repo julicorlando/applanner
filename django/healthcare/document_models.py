@@ -102,9 +102,17 @@ class PatientNote(models.Model):
     author=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
     author_name=models.CharField(max_length=160)
     created_at=models.DateTimeField(auto_now_add=True)
+    # Imported history: the date written on the clinic's old sheet (created_at stays the import time).
+    occurred_at=models.DateTimeField(null=True,blank=True)
+    import_key=models.CharField(max_length=80,blank=True,default='',editable=False)
 
     class Meta:
         ordering=['-created_at','-pk']
+        constraints=[models.UniqueConstraint(fields=['tenant','import_key'],condition=~models.Q(import_key=''),name='uq_patient_note_import_key')]
+
+    @property
+    def effective_at(self):
+        return self.occurred_at or self.created_at
 
     def save(self,*args,**kwargs):
         if self.pk:
