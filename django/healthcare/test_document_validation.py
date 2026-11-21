@@ -139,14 +139,25 @@ class PatientRegistrationTests(TestCase):
         self.assertEqual(Customer.objects.filter(name="Outra Pessoa").count(), 0)
 
     def test_incomplete_patient_is_flagged_and_completed(self):
-        self.assertIn("CPF", missing_registration(self.patient))
+        self.assertNotIn("CPF", missing_registration(self.patient))
+        self.assertIn("cidade", missing_registration(self.patient))
         editor = self.client.get(reverse("dental-assessment-create") + f"?customer={self.patient.pk}")
         self.assertEqual(editor.status_code, 200)
-        self.assertIn("CPF", editor.context["registration_missing"])
+        self.assertIn("cidade", editor.context["registration_missing"])
         url = reverse("dental-patient-edit", args=[self.patient.pk])
         self.assertEqual(self.client.post(url, self.data(name="Paciente Fictício Completo")).status_code, 302)
         self.patient.refresh_from_db()
         self.assertEqual(missing_registration(self.patient), [])
+
+    def test_cpf_and_street_address_are_optional(self):
+        data = self.data(name="Paciente Sem Documento", phone="(81) 97777-0000")
+        for field in ("cpf", "street", "address_number", "district"):
+            data[field] = ""
+        response = self.client.post(reverse("dental-patient-create"), data)
+        self.assertEqual(response.status_code, 302)
+        patient = Customer.objects.get(name="Paciente Sem Documento")
+        self.assertEqual((patient.cpf, patient.street), ("", ""))
+        self.assertEqual(missing_registration(patient), [])
 
     def test_front_desk_registers_patients_but_other_dentist_and_master_cannot(self):
         # The front desk sees and edits every patient; each dentist only their own.

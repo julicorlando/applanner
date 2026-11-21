@@ -16,12 +16,9 @@ from .navigation import dental_workspace, shell_context
 from .patient_scope import patients_for
 from .services import assert_clinical_access
 
+# CPF, logradouro, número e bairro são opcionais: muitos pacientes chegam sem esses dados.
 REQUIRED = {
     "phone": "telefone",
-    "cpf": "CPF",
-    "street": "logradouro",
-    "address_number": "número",
-    "district": "bairro",
     "city": "cidade",
     "state": "UF",
 }
@@ -43,7 +40,8 @@ class PatientForm(forms.ModelForm):
         fields = FIELDS
         labels = {"name": "Nome completo", "phone": "Telefone / WhatsApp", "email": "E-mail (opcional)",
                   "birth_date": "Data de nascimento (opcional)", "postal_code": "CEP (opcional)",
-                  "address_complement": "Complemento (opcional)"}
+                  "address_complement": "Complemento (opcional)", "cpf": "CPF (opcional)",
+                  "street": "Logradouro (opcional)", "address_number": "Número (opcional)", "district": "Bairro (opcional)"}
         widgets = {"birth_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
                    "state": forms.TextInput(attrs={"maxlength": 2, "style": "text-transform:uppercase"})}
 
@@ -54,6 +52,8 @@ class PatientForm(forms.ModelForm):
             self.fields[field].required = True
         self.fields["name"].required = True
         self.fields["email"].required = False
+        for field in ("cpf", "street", "address_number", "district"):
+            self.fields[field].required = False
         for field in self.fields.values():
             field.widget.attrs.setdefault("class", "pa-input")
 
