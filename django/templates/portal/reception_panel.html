@@ -1,6 +1,7 @@
 {% extends "base.html" %}{% load static %}
 {% block title %}Recepção · {{ tenant.name }}{% endblock %}
 {% block manifest %}<link rel="manifest" href="{% url 'reception-app-manifest' %}">{% endblock %}
+{% block extra_head %}{% if offline_available %}<script src="{% static 'healthcare/offline-vault.js' %}" defer></script><script src="{% static 'js/reception-offline.js' %}" defer></script>{% endif %}{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/reception-panel.css' %}">{% endblock %}
 {% block content %}
 <main class="rp">
@@ -17,6 +18,11 @@
     <label for="rp-q">Buscar paciente</label>
     <div><input id="rp-q" type="search" name="q" placeholder="Nome, telefone ou e-mail" autofocus><button class="rp-btn is-primary" type="submit">Buscar</button></div>
   </form>
+
+  {% if offline_available %}<aside id="rp-offline" class="rp-offline" data-shell="{% url 'clinical-offline-shell' %}" hidden aria-live="polite">
+    <div><strong data-offline-title></strong><p data-offline-text></p></div>
+    <a class="rp-btn is-primary" data-offline-action href="{% url 'clinical-offline-shell' %}">Modo offline</a>
+  </aside>{% endif %}
 
   <section class="rp-stats" aria-label="Resumo do dia">
     <div><strong>{{ total }}</strong><span>Agendados hoje</span></div>
