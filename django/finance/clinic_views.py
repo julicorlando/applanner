@@ -19,7 +19,6 @@ from scheduling.models import Appointment
 from .clinic_models import ClinicPaymentMethod,ClinicInstallment,ClinicCharge,ClinicExpense,ClinicCashClosing
 from .clinic_forms import ChargeForm,ReceiptForm,ExpenseForm
 from . import clinic_services as services
-from .advanced_services import cash_balance
 
 
 class PaymentForm(forms.ModelForm):
@@ -30,8 +29,15 @@ class PaymentForm(forms.ModelForm):
 
 
 class CashForm(forms.Form):
+    professional=forms.ModelChoiceField(queryset=None,required=False,label='Caixa de',empty_label='Caixa da clínica (despesas e sem profissional)')
+    session=forms.IntegerField(required=False,widget=forms.HiddenInput)
     amount=forms.DecimalField(label='Valor em dinheiro (R$)',max_digits=12,decimal_places=2,min_value=0,initial=0)
     notes=forms.CharField(label='Observações',max_length=500,required=False,widget=forms.Textarea(attrs={'rows':2}))
+
+    def __init__(self,*args,tenant=None,**kwargs):
+        super().__init__(*args,**kwargs)
+        from scheduling.models import Professional
+        self.fields['professional'].queryset=Professional.objects.filter(tenant=tenant,active=True).order_by('name')
 
 
 @login_required
@@ -49,7 +55,7 @@ def desk(request):
     charge_form=ChargeForm(request.POST if action=='charge' else None,tenant=tenant,initial=initial,auto_id='charge_%s')
     expense_form=ExpenseForm(request.POST if action=='expense' else None,request.FILES if action=='expense' else None,tenant=tenant,initial={'request_id':uuid.uuid4()},auto_id='expense_%s')
     payment_form=PaymentForm(request.POST if action=='method' else None,auto_id='method_%s')
-    cash_form=CashForm(request.POST if action in {'open','close'} else None,auto_id='cash_%s')
+    cash_form=CashForm(request.POST if action in {'open','close'} else None,tenant=tenant,auto_id='cash_%s')
     if request.method=='POST':
         try:
             if action=='review-expense':
@@ -76,8 +82,8 @@ def desk(request):
                 services.expense(user=request.user,unit=unit,**data)
             elif action in {'open','close'} and cash_form.is_valid():
                 data=cash_form.cleaned_data
-                if action=='open':services.open_clinic_cash(request.user,unit,data['amount'],data['notes'])
-                else:services.close_clinic_cash(user=request.user,unit=unit,**data)
+                if action=='open':services.open_clinic_cash(request.user,unit,data['amount'],data['notes'],professional=data['professional'])
+                else:services.close_clinic_cash(user=request.user,unit=unit,amount=data['amount'],notes=data['notes'],session_id=data['session'])
             elif action=='method' and payment_form.is_valid():
                 if ClinicPaymentMethod.objects.filter(tenant=tenant,name=payment_form.cleaned_data['name']).exists():
                     raise ValidationError('Esta modalidade já existe.')
@@ -105,12 +111,16 @@ def desk(request):
     patient_id=request.GET.get('patient','')
     if patient_id.isdigit():charges=charges.filter(customer_id=patient_id)
     charges=charges.order_by('-created_at')[:100]
-    session=CashSession.objects.filter(tenant=tenant,unit=unit,status='open').first()
+    from .clinic_cash import expected_cash
+    sheets=list(CashSession.objects.filter(tenant=tenant,unit=unit,business_date=day).select_related('professional','tenant').order_by('professional__name'))
+    for sheet in sheets: sheet.expected_now=expected_cash(sheet)
+    pending_days=CashSession.objects.filter(tenant=tenant,unit=unit,status='open',business_date__lt=services.business_today(tenant)).select_related('professional').order_by('business_date')[:30]
+    session=next((x for x in sheets if x.status=='open'),None)
     installments=ClinicInstallment.objects.filter(charge__tenant=tenant,charge__unit=unit).select_related('charge__customer','pending_transaction').order_by('due_at','pk')
     pending=installments.annotate(received_sum=Coalesce(Sum('receipts__amount'),Value(Decimal('0')),output_field=DecimalField(max_digits=12,decimal_places=2))).filter(amount__gt=F('received_sum'))[:200]
     from healthcare.finance_views import allowed as legacy_receivables_allowed
     return render(request,'finance/clinic_desk.html',{'unit':unit,'day':day,'charges':charges,'legacy_receivables_allowed':legacy_receivables_allowed(request.user),'visits':visits.select_related('customer','professional').order_by('starts_at')[:200],'waiting_count':visits.filter(status='waiting').count(),'attending_count':visits.filter(status='in_progress').count(),'completed_count':visits.filter(status='completed').count(),'summary':services.period_summary(tenant,unit,start,end),
-        'birthday_admin':request.user.role in {'owner','tenant-admin','manager'},'session':session,'previous_day_open':bool(session and services.opened_before_today(session)),'cash_balance':cash_balance(session) if session else None,'cash_form':cash_form,
+        'birthday_admin':request.user.role in {'owner','tenant-admin','manager'},'session':session,'sheets':sheets,'pending_days':pending_days,'previous_day_open':False,'cash_balance':session.expected_now if session else None,'cash_form':cash_form,
         'charge_form':charge_form,'expense_form':expense_form,'payment_form':payment_form,'pending':pending,
         'methods':ClinicPaymentMethod.objects.filter(tenant=tenant).order_by('kind','name'),
         'transactions':FinancialTransaction.objects.filter(tenant=tenant,unit=unit,status='paid',paid_at__gte=start,paid_at__lte=end).order_by('paid_at')[:300],

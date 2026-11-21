@@ -131,3 +131,27 @@ class RecordImportTests(TestCase):
         response = self.client.post(reverse("dental-record-import"), {"action": "confirm", "payload": "x"})
         self.assertRedirects(response, reverse("dental-record-import"), fetch_redirect_response=False)
         self.assertEqual(PatientNote.objects.count(), 0)
+
+    def test_master_reads_records_and_imports_for_the_clinic(self):
+        from core.models import AuditLog
+        self.client.force_login(self.master)
+        listing = self.client.get(reverse("master-patient-records", args=[self.tenant.pk]))
+        self.assertEqual(listing.status_code, 200)
+        self.assertContains(listing, self.patient.name)
+        record = self.client.get(reverse("master-patient-record", args=[self.tenant.pk, self.patient.pk]))
+        self.assertEqual(record.status_code, 200)
+        self.assertTrue(AuditLog.objects.filter(action="master.patient_record.viewed", entity_id=self.patient.pk).exists())
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr("Nova.docx", docx(sheet_xml(name="Paciente Do Master")))
+        url = reverse("master-record-import", args=[self.tenant.pk])
+        preview = self.client.post(url, {"file": SimpleUploadedFile("f.zip", archive.getvalue(), content_type="application/zip"),
+                                         "owner": self.doctor.pk})
+        self.assertContains(preview, "Paciente Do Master")
+        done = self.client.post(url, {"action": "confirm", "payload": preview.context["payload"], "owner": self.doctor.pk})
+        self.assertEqual(done.status_code, 302)
+        created = Customer.objects.get(tenant=self.tenant, name="Paciente Do Master")
+        self.assertEqual(created.registered_by, self.doctor)
+        self.assertEqual(PatientNote.objects.filter(customer=created).count(), 4)
+        self.client.force_login(self.reception)
+        self.assertEqual(self.client.get(url).status_code, 403)

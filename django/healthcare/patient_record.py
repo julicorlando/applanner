@@ -311,12 +311,15 @@ def patient_record(request, pk):
             if not cash_tenant:
                 raise PermissionDenied("Seu perfil não registra recebimentos no caixa.")
             if receive_form.is_valid():
-                if not session:
-                    messages.error(request, "Abra o caixa no Financeiro antes de receber o pagamento.")
-                    return redirect(self_url)
+                from django.db import transaction
+                from core.unit_scope import selected_unit
                 from finance.clinic_cash import add_entry
+                from finance.clinic_services import day_sheet
                 data = receive_form.cleaned_data
                 try:
+                    # Each professional has their own cash sheet per day, opened on the first receipt.
+                    with transaction.atomic():
+                        session = day_sheet(tenant, selected_unit(request, tenant), data["professional"], request.user)
                     row = add_entry(user=request.user, session_id=session.pk, customer=patient, notes=data["notes"],
                                     professional=data["professional"], professional_name=data["professional_name"],
                                     dentist_amount=data["dentist_amount"], clinic_amount=data["clinic_amount"],
@@ -325,7 +328,7 @@ def patient_record(request, pk):
                     receive_form.add_error(None, exc)
                 else:
                     total = f"{row.total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    messages.success(request, f"Pagamento de R$ {total} ({row.method_name}) recebido e lançado na folha do caixa.")
+                    messages.success(request, f"Pagamento de R$ {total} ({row.method_name}) recebido e lançado no caixa de hoje de {session.label}.")
                     return redirect(self_url)
         else:
             raise PermissionDenied

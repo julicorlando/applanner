@@ -17,7 +17,6 @@ from django.views.decorators.cache import never_cache
 from core.audit import append_audit
 from core.unit_scope import selected_unit
 from scheduling.models import Customer, Professional
-from .advanced_services import cash_balance
 from .clinic_models import (ClinicCashCorrection, ClinicCashEntry, ClinicExpense, ClinicPaymentMethod,
                             ClinicReceipt, ClinicCashClosing)
 from .clinic_services import access, lock_company, money
@@ -36,12 +35,45 @@ def active_correction(session):
     return session.clinical_corrections.filter(status=ClinicCashCorrection.Status.APPROVED).first()
 
 
+TEAM = {"owner", "tenant-admin", "manager", "reception", "finance"}
+
+
 def can_edit(session, user):
-    """Open sheets are editable by the team; closed ones only under an approved correction."""
-    if session.status == CashSession.Status.OPEN:
+    """Any day's sheet stays editable by the front desk and management; every change is audited."""
+    if session.status == CashSession.Status.OPEN or user.role in TEAM:
         return True
     correction = active_correction(session)
     return bool(correction and (is_manager(user) or correction.requested_by_id == user.pk))
+
+
+def _entry_time(session):
+    from .clinic_services import business_today, session_day, _zone
+    from datetime import datetime, time
+    day = session_day(session)
+    if day < business_today(session.tenant):
+        return timezone.make_aware(datetime.combine(day, time(12, 0)), _zone(session.tenant))
+    return timezone.now()
+
+
+def refresh_closed(session, user):
+    """A closed sheet edited later gets its conference recalculated (and audited by the caller)."""
+    if session.status != CashSession.Status.CLOSED:
+        return
+    before = {"expected": str(session.expected_amount), "difference": str(session.difference_amount)}
+    session.expected_amount = expected_cash(session)
+    session.difference_amount = (session.closing_amount or Decimal(0)) - session.expected_amount
+    session.save(update_fields=["expected_amount", "difference_amount"])
+    closing = ClinicCashClosing.objects.filter(session=session).first()
+    if closing:
+        summary = dict(closing.summary or {})
+        summary.update({"cash_expected": str(session.expected_amount), "difference": str(session.difference_amount),
+                        "edited_after_close": summary.get("edited_after_close", 0) + 1,
+                        "professionals": [{k: (format(v, ".2f") if isinstance(v, Decimal) else v) for k, v in r.items()}
+                                          for r in by_professional(session)]})
+        ClinicCashClosing.objects.filter(pk=closing.pk).update(summary=summary)
+    append_audit(tenant=session.tenant, user=user, action="clinic.cash_report.recalculated", entity_type="CashSession",
+                 entity_id=session.pk, before=before,
+                 after={"expected": str(session.expected_amount), "difference": str(session.difference_amount)})
 
 
 def _lock_session(tenant, session_id):
@@ -59,10 +91,8 @@ def _professional_label(professional, manual):
 
 def _amounts(dentist, clinic, other):
     values = [money(v or 0, allow_zero=True) for v in (dentist, clinic, other)]
-    total = sum(values, Decimal("0"))
-    if total <= 0:
-        raise ValidationError("Informe pelo menos um valor (dentista, consultório ou outros).")
-    return values, total
+    # R$ 0 is valid: evaluations and repairs at no charge are still recorded on the day's sheet.
+    return values, sum(values, Decimal("0"))
 
 
 @transaction.atomic
@@ -77,8 +107,6 @@ def add_entry(*, user, session_id, customer, professional, professional_name, de
     session = _lock_session(tenant, session_id)
     if not can_edit(session, user):
         raise PermissionDenied("Caixa fechado. Peça autorização do gestor para corrigir o relatório.")
-    from .clinic_services import require_today
-    require_today(session)
     if customer.tenant_id != tenant.pk or not customer.active:
         raise PermissionDenied
     if professional and professional.tenant_id != tenant.pk:
@@ -88,14 +116,16 @@ def add_entry(*, user, session_id, customer, professional, professional_name, de
     label = _professional_label(professional, professional_name)
     (dentist, clinic, other), total = _amounts(dentist_amount, clinic_amount, other_amount)
     number = (session.clinical_entries.aggregate(v=Max("number"))["v"] or 0) + 1
-    now = timezone.now() if session.status == CashSession.Status.OPEN else session.closed_at
+    now = _entry_time(session)
+    from .clinic_services import session_day
+    day = session_day(session)
     tx = FinancialTransaction.objects.create(
         tenant=tenant, unit=session.unit, type="income", source_type="clinic-cash-entry",
         status="paid" if method else "pending", paid_at=now if method else None,
         payment_method=method.kind if method else "", amount=total,
-        description=f"Caixa {timezone.localtime(session.opened_at):%d/%m/%Y} · {customer.name}"[:190],
-        competence_at=timezone.localtime(session.opened_at).date(),
-        due_at=None if method else timezone.localtime(session.opened_at).date(),
+        description=f"Caixa {day:%d/%m/%Y} · {session.label} · {customer.name}"[:190],
+        competence_at=day,
+        due_at=None if method else day,
         idempotency_key=f"clinic-cash-entry:{request_id}",
     )
     row = ClinicCashEntry.objects.create(
@@ -109,6 +139,7 @@ def add_entry(*, user, session_id, customer, professional, professional_name, de
     append_audit(tenant=tenant, user=user, action="clinic.cash_entry.created", entity_type="ClinicCashEntry", entity_id=row.pk,
                  after={"session": session.pk, "total": str(total), "method": method.kind if method else "open",
                         "late": session.status != CashSession.Status.OPEN})
+    refresh_closed(session, user)
     return row
 
 
@@ -126,8 +157,8 @@ def update_entry(*, user, entry_id, customer, professional, professional_name, d
     session = _lock_session(tenant, row.session_id)
     if not can_edit(session, user):
         raise PermissionDenied("Caixa fechado. Peça autorização do gestor para corrigir o relatório.")
-    if session.status == CashSession.Status.OPEN and row.created_by_id != user.pk and not is_manager(user):
-        raise PermissionDenied("Somente quem lançou ou a gestão pode alterar esta linha.")
+    if row.created_by_id != user.pk and not is_manager(user) and user.role not in TEAM:
+        raise PermissionDenied("Somente quem lançou, a recepção ou a gestão pode alterar esta linha.")
     if row.status == ClinicCashEntry.Status.CANCELLED:
         raise ValidationError("Linha cancelada não pode ser alterada.")
     if customer.tenant_id != tenant.pk or (professional and professional.tenant_id != tenant.pk) or (method and method.tenant_id != tenant.pk):
@@ -145,11 +176,12 @@ def update_entry(*, user, entry_id, customer, professional, professional_name, d
     tx.amount = total
     tx.payment_method = method.kind if method else ""
     tx.status = "paid" if method else "pending"
-    tx.paid_at = (tx.paid_at or (timezone.now() if session.status == "open" else session.closed_at)) if method else None
+    tx.paid_at = (tx.paid_at or _entry_time(session)) if method else None
     tx.due_at = None if method else timezone.localtime(session.opened_at).date()
     tx.save(update_fields=["amount", "payment_method", "status", "paid_at", "due_at", "updated_at"])
     append_audit(tenant=tenant, user=user, action="clinic.cash_entry.updated", entity_type="ClinicCashEntry", entity_id=row.pk,
                  before=before, after=_snapshot(row))
+    refresh_closed(session, user)
     return row
 
 
@@ -160,8 +192,8 @@ def cancel_entry(*, user, entry_id, reason):
     session = _lock_session(tenant, row.session_id)
     if not can_edit(session, user):
         raise PermissionDenied("Caixa fechado. Peça autorização do gestor para corrigir o relatório.")
-    if session.status == CashSession.Status.OPEN and row.created_by_id != user.pk and not is_manager(user):
-        raise PermissionDenied("Somente quem lançou ou a gestão pode cancelar esta linha.")
+    if row.created_by_id != user.pk and not is_manager(user) and user.role not in TEAM:
+        raise PermissionDenied("Somente quem lançou, a recepção ou a gestão pode cancelar esta linha.")
     reason = " ".join((reason or "").split())
     if not 3 <= len(reason) <= 300:
         raise ValidationError("Informe o motivo do cancelamento.")
@@ -174,6 +206,7 @@ def cancel_entry(*, user, entry_id, reason):
     tx.save(update_fields=["status", "updated_at"])
     append_audit(tenant=tenant, user=user, action="clinic.cash_entry.cancelled", entity_type="ClinicCashEntry", entity_id=row.pk,
                  before=before, after={"status": "cancelled", "reason": reason})
+    refresh_closed(session, user)
     return row
 
 
@@ -222,7 +255,14 @@ def expected_cash(session):
     receipts = ClinicReceipt.objects.filter(session=session, method__kind="cash").aggregate(v=Sum("amount"))["v"] or Decimal(0)
     spent = ClinicExpense.objects.filter(session=session, method__kind="cash").exclude(transaction__status="cancelled").aggregate(
         v=Sum("transaction__amount"))["v"] or Decimal(0)
-    return session.opening_amount + entries + receipts - spent
+    legacy = Decimal(0)
+    if not session.professional_id:
+        # Treatment-plan receivables paid in cash at the desk are not linked to a sheet line.
+        legacy = FinancialTransaction.objects.filter(
+            tenant=session.tenant, unit=session.unit, status="paid", payment_method__in=["cash", "dinheiro"],
+            source_type="clinical-plan", paid_at__gte=session.opened_at,
+            paid_at__lte=session.closed_at or timezone.now()).aggregate(v=Sum("amount"))["v"] or Decimal(0)
+    return session.opening_amount + entries + receipts - spent + legacy
 
 
 @transaction.atomic
@@ -307,7 +347,7 @@ def report(session):
         "kinds_total": sum(by_kind.values(), Decimal(0)),
         "open_rows": open_rows, "open_total": sum((r.total for r in open_rows), Decimal(0)),
         "expenses_total": sum((e.transaction.amount for e in expenses), Decimal(0)),
-        "drawer_expected": expected_cash(session) if session.status == "closed" else cash_balance(session),
+        "drawer_expected": expected_cash(session),
         "date": opened.date(), "weekday": WEEKDAYS[opened.weekday()],
         "professionals": by_professional(session), "previous_day_open": opened_before_today(session),
         "locked": session.status == CashSession.Status.CLOSED and not active_correction(session),
@@ -359,18 +399,21 @@ def cash_sheet(request, pk=None):
     if not is_manager(request.user):
         sessions = sessions.filter(unit=unit)
     if pk:
-        session = get_object_or_404(sessions, pk=pk)
+        session = get_object_or_404(sessions.select_related("professional", "tenant"), pk=pk)
     else:
-        session = sessions.filter(unit=unit, status="open").first() or sessions.filter(unit=unit).order_by("-opened_at").first()
+        from .clinic_services import business_today
+        today = sessions.filter(unit=unit, business_date=business_today(tenant))
+        session = today.filter(status="open").order_by("professional_id").first() or today.first() \
+            or sessions.filter(unit=unit).order_by("-opened_at").first()
         if not session:
-            messages.info(request, "Abra o caixa para começar a folha do dia.")
+            messages.info(request, "Os caixas do dia são criados no primeiro recebimento, ou abra um no Financeiro.")
             return redirect("clinic-finance-desk")
         return redirect("clinic-cash-sheet-detail", pk=session.pk)
     action = request.POST.get("action") if request.method == "POST" else ""
     editing = None
     if request.GET.get("editar", "").isdigit():
         editing = session.clinical_entries.filter(pk=int(request.GET["editar"])).exclude(status="cancelled").first()
-    initial = {"request_id": uuid.uuid4()}
+    initial = {"request_id": uuid.uuid4(), "professional": session.professional_id}
     if editing:
         initial.update(entry_id=editing.pk, customer=editing.customer_id, professional=editing.professional_id,
                        professional_name="" if editing.professional_id else editing.professional_name,
@@ -380,7 +423,15 @@ def cash_sheet(request, pk=None):
     if request.method == "POST":
         try:
             if action == "add" and form.is_valid():
-                add_entry(user=request.user, session_id=session.pk, **_payload(form))
+                target = session
+                chosen = form.cleaned_data.get("professional")
+                if session.professional_id and chosen and chosen.pk != session.professional_id:
+                    # Each professional has their own sheet for the day: send the line to it.
+                    from .clinic_services import day_sheet, session_day
+                    with transaction.atomic():
+                        target = day_sheet(tenant, session.unit, chosen, request.user, day=session_day(session))
+                    messages.info(request, f"Lançado no caixa de {target.label} do mesmo dia.")
+                add_entry(user=request.user, session_id=target.pk, **_payload(form))
             elif action == "update" and form.is_valid() and form.cleaned_data.get("entry_id"):
                 payload = _payload(form)
                 payload.pop("request_id")
@@ -405,6 +456,8 @@ def cash_sheet(request, pk=None):
         except ClinicCashEntry.DoesNotExist:
             raise PermissionDenied from None
     context = report(session)
+    from .clinic_services import session_day
+    context["day_sheets"] = sessions.filter(unit=session.unit, business_date=session_day(session)).select_related("professional").order_by("professional__name")
     context.update({
         "form": form, "editing": editing, "can_edit": can_edit(session, request.user),
         "manager": is_manager(request.user),

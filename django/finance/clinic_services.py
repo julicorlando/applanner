@@ -12,8 +12,6 @@ from core.audit import append_audit
 from tenants.models import Tenant
 from .models import FinancialTransaction, CashSession
 from .clinic_models import ClinicCharge, ClinicInstallment, ClinicReceipt, ClinicExpense, ClinicCashClosing, ClinicPaymentMethod
-from .services import open_cash_session, close_cash_session
-from .advanced_services import cash_balance
 
 
 def access(user):
@@ -51,32 +49,71 @@ def _zone(tenant):
     except (ZoneInfoNotFoundError,ValueError,TypeError): return timezone.get_default_timezone()
 
 
+def business_today(tenant):
+    return timezone.localtime(timezone.now(),_zone(tenant)).date()
+
+
+def session_day(session):
+    return session.business_date or timezone.localtime(session.opened_at,_zone(session.tenant)).date()
+
+
 def opened_before_today(session):
-    """The clinic's cash is closed per day: a sheet opened on an earlier day takes no new entries."""
-    if session.status!='open': return False
-    zone=_zone(session.tenant)
-    return timezone.localtime(session.opened_at,zone).date()<timezone.localtime(timezone.now(),zone).date()
+    """Informative only: each professional has one sheet per day; earlier days stay editable (audited)."""
+    return session.status=='open' and session_day(session)<business_today(session.tenant)
 
 
 def require_today(session):
-    if opened_before_today(session):
-        day=timezone.localtime(session.opened_at,_zone(session.tenant)).strftime('%d/%m/%Y')
-        raise ValidationError(f'O caixa de {day} ainda está aberto. O caixa é fechado por dia: feche o caixa de {day} e abra o de hoje para continuar lançando.')
+    # Kept for compatibility: earlier days are now editable by the team, so nothing is blocked.
+    return None
 
 
-def active_cash(tenant,unit,*,recording=True):
-    row=CashSession.objects.select_for_update().select_related('tenant').filter(tenant=tenant,unit=unit,status='open').first()
-    if not row: raise ValidationError('Abra o caixa desta unidade antes de registrar recebimentos ou despesas.')
-    if recording: require_today(row)
+def day_sheet(tenant,unit,professional,user,day=None,opening=None):
+    """Cash sheet of one professional (None = the clinic's own) for one day, created on first use."""
+    day=day or business_today(tenant)
+    if professional and professional.tenant_id!=tenant.pk: raise PermissionDenied
+    rows=CashSession.objects.select_for_update().filter(tenant=tenant,unit=unit,business_date=day,professional=professional)
+    row=rows.filter(status='open').order_by('-pk').first()
+    if row: return row
+    if day<business_today(tenant):
+        # Earlier days: correct the day's (closed) sheet instead of creating another one.
+        row=rows.order_by('-pk').first()
+        if row: return row
+    opened=timezone.now() if day==business_today(tenant) else timezone.make_aware(datetime.combine(day,time(8,0)),_zone(tenant))
+    row=CashSession.objects.create(tenant=tenant,unit=unit,professional=professional,business_date=day,opened_by=user,
+        opening_amount=money(opening,True) if opening not in (None,'') else Decimal(0),opened_at=opened)
+    append_audit(tenant=tenant,user=user,action='clinic.cash.opened',entity_type='CashSession',entity_id=row.pk,
+        after={'professional':row.label,'day':day.isoformat(),'opening':str(row.opening_amount)})
+    return row
+
+
+def require_open_sheet(tenant,unit):
+    """Legacy treatment-plan receivables are cash-desk payments: the clinic's sheet of today must be open."""
+    row=CashSession.objects.select_for_update().filter(tenant=tenant,unit=unit,professional__isnull=True,status='open',
+        business_date=business_today(tenant)).first()
+    if not row: raise ValidationError('Abra o caixa da clínica de hoje no Financeiro antes de registrar este recebimento.')
+    return row
+
+
+def active_cash(tenant,unit,*,recording=True,professional=None,user=None):
+    """Today's sheet for receipts/expenses (professional's own, or the clinic's), opened automatically."""
+    if recording:
+        if user is None: raise ValidationError('Identifique quem está lançando no caixa.')
+        return day_sheet(tenant,unit,professional,user)
+    row=CashSession.objects.select_for_update().select_related('tenant').filter(tenant=tenant,unit=unit,status='open').order_by('-opened_at').first()
+    if not row: raise ValidationError('Não há caixa aberto para fechar.')
     return row
 
 
 @transaction.atomic
-def open_clinic_cash(user,unit,amount,notes=""):
+def open_clinic_cash(user,unit,amount,notes="",professional=None):
     tenant=lock_company(user)
     if unit and (unit.tenant_id!=tenant.pk or not unit.active): raise PermissionDenied
-    row=open_cash_session(tenant=tenant,user=user,unit=unit,opening_amount=money(amount,True),notes=notes)
-    append_audit(tenant=tenant,user=user,action='clinic.cash.opened',entity_type='CashSession',entity_id=row.pk)
+    day=business_today(tenant)
+    existing=CashSession.objects.filter(tenant=tenant,unit=unit,business_date=day,professional=professional,status='open').first()
+    if existing:
+        raise ValidationError(f'O caixa de hoje de {existing.label} já existe. Abra a folha dele para lançar.')
+    row=day_sheet(tenant,unit,professional,user,day=day,opening=amount)
+    if notes: CashSession.objects.filter(pk=row.pk).update(notes=notes[:500])
     return row
 
 
@@ -117,7 +154,7 @@ def receive(*,user,unit,installment,amount,method,request_id):
         if existing.installment_id!=row.pk or existing.recorded_by_id!=user.pk or existing.amount!=amount or existing.method_id!=method.pk:
             raise ValidationError('Identificador de recebimento já utilizado com outros dados.')
         return existing
-    session=active_cash(tenant,unit)
+    session=day_sheet(tenant,unit,row.charge.professional,user)
     method=ClinicPaymentMethod.objects.select_for_update().filter(pk=method.pk,tenant=tenant,active=True).first()
     if method is None:raise PermissionDenied
     remaining=row.remaining
@@ -158,10 +195,9 @@ def expense(*,user,unit,description,amount,method,invoice,items,image,request_id
         supplied=cipher.decrypt(image[0]) if image else b''
         if previous!=supplied:raise ValidationError('O comprovante desta operação é diferente do original.')
         return existing
-    session=active_cash(tenant,unit)
+    session=day_sheet(tenant,unit,None,user)
     method=ClinicPaymentMethod.objects.select_for_update().filter(pk=method.pk,tenant=tenant,active=True).first()
     if method is None:raise PermissionDenied
-    if method.kind=='cash' and amount>cash_balance(session): raise ValidationError('Dinheiro insuficiente no caixa para esta despesa.')
     tx=FinancialTransaction.objects.create(tenant=tenant,unit=unit,type='expense',status='paid',paid_at=timezone.now(),
         source_type='clinic-expense',description=description.strip(),amount=amount,payment_method=method.kind,
         competence_at=timezone.localdate(),idempotency_key=f'clinic-expense:{request_id}')
@@ -195,17 +231,31 @@ def day_bounds(tenant,day):
 
 
 @transaction.atomic
-def close_clinic_cash(*,user,unit,amount,notes=''):
-    tenant=lock_company(user);session=active_cash(tenant,unit,recording=False)
+def close_clinic_cash(*,user,unit,amount,notes='',session_id=None):
+    tenant=lock_company(user)
+    from .clinic_cash import by_professional, expected_cash, report
+    rows=CashSession.objects.select_for_update().filter(tenant=tenant,status='open')
+    if session_id: session=rows.filter(pk=session_id).first()
+    else: session=rows.filter(unit=unit).order_by('professional_id','-opened_at').first()
+    if not session: raise ValidationError('Este caixa já foi fechado ou não existe.')
     closing=money(amount,True)
-    summary=period_summary(tenant,unit,session.opened_at,timezone.now())
-    session=close_cash_session(session=session,user=user,closing_amount=closing,notes=notes)
-    summary.update({'opening':str(session.opening_amount),'cash_expected':str(session.expected_amount),
+    session.expected_amount=expected_cash(session)
+    session.closing_amount=closing
+    session.difference_amount=closing-session.expected_amount
+    session.closed_by=user;session.closed_at=max(timezone.now(),session.opened_at);session.status='closed'
+    if notes: session.notes=((session.notes or '')+'\n'+notes).strip()[:500]
+    session.save()
+    data=report(session)
+    window=period_summary(tenant,session.unit,session.opened_at,session.closed_at)
+    summary={'professional':session.label,'day':session_day(session).isoformat(),'charged':window['charged'],
+        'received':format(data['columns']['total'],'.2f'),'expenses':format(data['expenses_total'],'.2f'),
+        'net':format(data['columns']['total']-data['expenses_total'],'.2f'),'pending':format(data['open_total'],'.2f'),
+        'methods':[{'method':label,'type':'income','amount':format(value,'.2f')} for label,value in data['kinds']],
+        'opening':str(session.opening_amount),'cash_expected':str(session.expected_amount),
         'cash_counted':str(session.closing_amount),'difference':str(session.difference_amount),
-        'from':session.opened_at.isoformat(),'to':session.closed_at.isoformat()})
-    from .clinic_cash import by_professional
-    summary['professionals']=[{k:(format(v,'.2f') if isinstance(v,Decimal) else v) for k,v in row.items()} for row in by_professional(session)]
-    ClinicCashClosing.objects.create(session=session,summary=summary)
+        'from':session.opened_at.isoformat(),'to':session.closed_at.isoformat(),
+        'professionals':[{k:(format(v,'.2f') if isinstance(v,Decimal) else v) for k,v in row.items()} for row in by_professional(session)]}
+    ClinicCashClosing.objects.update_or_create(session=session,defaults={'summary':summary})
     append_audit(tenant=tenant,user=user,action='clinic.cash.closed',entity_type='CashSession',entity_id=session.pk,after=summary)
     return session
 

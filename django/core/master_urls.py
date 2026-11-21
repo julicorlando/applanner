@@ -2,6 +2,7 @@ from healthcare.drive_views import configuration as clinical_drive_configuration
 from .global_search import search as global_search
 from communications.mobile_portal import providers
 from django.urls import path
+from healthcare import master_records
 from . import master, master_access_release, master_console, master_retention, simple_mode, customer_import_views
 from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment,master_whatsapp_simulate
@@ -42,6 +43,9 @@ urlpatterns=[
     path("cobrancas/<int:pk>/consultar/",master_console.charge_consult,name="master-charge-consult"),
     path("relatorios/",master_console.reports,name="master-reports"),
     path("empresas/<int:pk>/ficha/",master_console.company_detail,name="master-company-detail"),
+    path("empresas/<int:pk>/prontuarios/",master_records.patients,name="master-patient-records"),
+    path("empresas/<int:pk>/prontuarios/<int:customer_pk>/",master_records.patient,name="master-patient-record"),
+    path("empresas/<int:pk>/importar-fichas/",master_records.import_sheets,name="master-record-import"),
     path("empresas/<int:pk>/<str:action>/confirmar/",master_console.company_lifecycle,name="master-company-lifecycle"),
     path("financeiro/painel/",finance_dashboard,name="master-finance-dashboard"),
     path("liberar-acesso/",master_access_release.companies,name="master-access-release"),

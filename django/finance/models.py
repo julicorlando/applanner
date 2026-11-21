@@ -222,9 +222,16 @@ class CashSession(models.Model):
     closed_at=models.DateTimeField(null=True,blank=True)
     status=models.CharField(max_length=12,choices=Status.choices,default=Status.OPEN,db_index=True)
     notes=models.CharField(max_length=500,blank=True)
+    # Clinics keep one cash sheet per professional per day; empty professional = the clinic's own sheet.
+    professional=models.ForeignKey("scheduling.Professional",null=True,blank=True,on_delete=models.PROTECT,related_name="cash_sessions")
+    business_date=models.DateField(null=True,blank=True,db_index=True)
 
     class Meta:
-        indexes=[models.Index(fields=["tenant","status","opened_at"])]
+        indexes=[models.Index(fields=["tenant","status","opened_at"]),models.Index(fields=["tenant","unit","business_date"])]
+
+    @property
+    def label(self):
+        return self.professional.name if self.professional_id else "Caixa da clínica"
 
 
 class ProfessionalCommission(TimeStampedModel):
