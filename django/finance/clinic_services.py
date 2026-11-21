@@ -45,9 +45,29 @@ def lock_company(user):
     return Tenant.objects.select_for_update().get(pk=tenant.pk)
 
 
-def active_cash(tenant,unit):
-    row=CashSession.objects.select_for_update().filter(tenant=tenant,unit=unit,status='open').first()
+def _zone(tenant):
+    from zoneinfo import ZoneInfoNotFoundError
+    try: return ZoneInfo(tenant.timezone)
+    except (ZoneInfoNotFoundError,ValueError,TypeError): return timezone.get_default_timezone()
+
+
+def opened_before_today(session):
+    """The clinic's cash is closed per day: a sheet opened on an earlier day takes no new entries."""
+    if session.status!='open': return False
+    zone=_zone(session.tenant)
+    return timezone.localtime(session.opened_at,zone).date()<timezone.localtime(timezone.now(),zone).date()
+
+
+def require_today(session):
+    if opened_before_today(session):
+        day=timezone.localtime(session.opened_at,_zone(session.tenant)).strftime('%d/%m/%Y')
+        raise ValidationError(f'O caixa de {day} ainda está aberto. O caixa é fechado por dia: feche o caixa de {day} e abra o de hoje para continuar lançando.')
+
+
+def active_cash(tenant,unit,*,recording=True):
+    row=CashSession.objects.select_for_update().select_related('tenant').filter(tenant=tenant,unit=unit,status='open').first()
     if not row: raise ValidationError('Abra o caixa desta unidade antes de registrar recebimentos ou despesas.')
+    if recording: require_today(row)
     return row
 
 
@@ -176,13 +196,15 @@ def day_bounds(tenant,day):
 
 @transaction.atomic
 def close_clinic_cash(*,user,unit,amount,notes=''):
-    tenant=lock_company(user);session=active_cash(tenant,unit)
+    tenant=lock_company(user);session=active_cash(tenant,unit,recording=False)
     closing=money(amount,True)
     summary=period_summary(tenant,unit,session.opened_at,timezone.now())
     session=close_cash_session(session=session,user=user,closing_amount=closing,notes=notes)
     summary.update({'opening':str(session.opening_amount),'cash_expected':str(session.expected_amount),
         'cash_counted':str(session.closing_amount),'difference':str(session.difference_amount),
         'from':session.opened_at.isoformat(),'to':session.closed_at.isoformat()})
+    from .clinic_cash import by_professional
+    summary['professionals']=[{k:(format(v,'.2f') if isinstance(v,Decimal) else v) for k,v in row.items()} for row in by_professional(session)]
     ClinicCashClosing.objects.create(session=session,summary=summary)
     append_audit(tenant=tenant,user=user,action='clinic.cash.closed',entity_type='CashSession',entity_id=session.pk,after=summary)
     return session
