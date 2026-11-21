@@ -8,11 +8,11 @@ Pure standard library so it can run anywhere. Each sheet has:
 Rows without a date belong to the last dated row above them (same visit).
 Nothing is dropped: anything that cannot be placed is reported and kept as text.
 """
-from datetime import date
 import io
 import re
 import unicodedata
 import zipfile
+from datetime import date
 from xml.etree import ElementTree as ET
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -75,7 +75,7 @@ def parse_date(value, issues=None, context=""):
         return None
     day, month, year = (int(x) for x in match.groups())
     if year < 100:
-        year += 2000 if year <= date.today().year % 100 else 1900
+        year += 2000 if year <= 40 else 1900
     try:
         return date(year, month, day)
     except ValueError:
@@ -85,7 +85,7 @@ def parse_date(value, issues=None, context=""):
 
 
 def _after(label, text):
-    match = re.search(re.escape(label) + r"\s*:?\s*(.*)", text, re.S | re.I)
+    match = re.search(re.escape(label) + r"\s*:?\s*(.*)", text, re.DOTALL | re.IGNORECASE)
     return match.group(1).strip() if match else ""
 
 
@@ -217,7 +217,7 @@ def parse_sheet(filename, document_xml):
                 issues.append("Quadro fora do modelo guardado como observação.")
     if not header or not header["name"]:
         return {"file": filename, "skip": True, "issues": ["Ficha sem nome do paciente; não importada."]}
-    stem = re.sub(r"\.docx$", "", filename, flags=re.I).strip()
+    stem = re.sub(r"\.docx$", "", filename, flags=re.IGNORECASE).strip()
     name = header["name"]
     # Remarks typed after the name ("Maria de Fátima da Silva - protocolo") stay as an observation.
     name_note = ""

@@ -7,9 +7,9 @@ completed (never overwritten); each dated visit becomes one note on the original
 with "Procedimento clínico" and "Tratamento ortodôntico" kept apart and the values and
 professional written exactly as on the sheet. Re-running the same file adds nothing twice.
 """
-from datetime import date, datetime, time
 import hashlib
 import json
+from datetime import date, datetime, time
 
 from django import forms
 from django.contrib import messages

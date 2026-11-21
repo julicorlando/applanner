@@ -10,9 +10,9 @@ from django.utils import timezone
 from core.crypto import decrypt_text
 from scheduling.models import Customer
 
+from . import test_dental_assessments as dental
 from .document_models import PatientNote
 from .record_import_parser import parse_sheet, read_upload
-from . import test_dental_assessments as dental
 
 W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
 
