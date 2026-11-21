@@ -81,6 +81,8 @@ class SheetParserTests(TestCase):
 
 
 class RecordImportTests(TestCase):
+    create = dental.DentalAssessmentTests.create
+
     def setUp(self):
         dental.DentalAssessmentTests.setUp(self)
 

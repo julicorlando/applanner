@@ -18,7 +18,6 @@ from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.shortcuts import redirect, render
-from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 
