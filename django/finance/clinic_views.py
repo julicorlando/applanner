@@ -110,7 +110,7 @@ def desk(request):
     pending=installments.annotate(received_sum=Coalesce(Sum('receipts__amount'),Value(Decimal('0')),output_field=DecimalField(max_digits=12,decimal_places=2))).filter(amount__gt=F('received_sum'))[:200]
     from healthcare.finance_views import allowed as legacy_receivables_allowed
     return render(request,'finance/clinic_desk.html',{'unit':unit,'day':day,'charges':charges,'legacy_receivables_allowed':legacy_receivables_allowed(request.user),'visits':visits.select_related('customer','professional').order_by('starts_at')[:200],'waiting_count':visits.filter(status='waiting').count(),'attending_count':visits.filter(status='in_progress').count(),'completed_count':visits.filter(status='completed').count(),'summary':services.period_summary(tenant,unit,start,end),
-        'birthday_admin':request.user.role in {'owner','tenant-admin','manager'},'session':session,'cash_balance':cash_balance(session) if session else None,'cash_form':cash_form,
+        'birthday_admin':request.user.role in {'owner','tenant-admin','manager'},'session':session,'previous_day_open':bool(session and services.opened_before_today(session)),'cash_balance':cash_balance(session) if session else None,'cash_form':cash_form,
         'charge_form':charge_form,'expense_form':expense_form,'payment_form':payment_form,'pending':pending,
         'methods':ClinicPaymentMethod.objects.filter(tenant=tenant).order_by('kind','name'),
         'transactions':FinancialTransaction.objects.filter(tenant=tenant,unit=unit,status='paid',paid_at__gte=start,paid_at__lte=end).order_by('paid_at')[:300],

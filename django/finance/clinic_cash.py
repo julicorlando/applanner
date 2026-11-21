@@ -77,6 +77,8 @@ def add_entry(*, user, session_id, customer, professional, professional_name, de
     session = _lock_session(tenant, session_id)
     if not can_edit(session, user):
         raise PermissionDenied("Caixa fechado. Peça autorização do gestor para corrigir o relatório.")
+    from .clinic_services import require_today
+    require_today(session)
     if customer.tenant_id != tenant.pk or not customer.active:
         raise PermissionDenied
     if professional and professional.tenant_id != tenant.pk:
@@ -248,7 +250,35 @@ def finish_correction(*, user, correction_id):
     return row
 
 
+def by_professional(session):
+    """Day's closing split per professional: what each dentist produced on this sheet."""
+    rows = {}
+
+    def line(name):
+        return rows.setdefault(name or "Sem profissional informado", {
+            "professional": name or "Sem profissional informado", "patients": 0, "dentist": Decimal(0),
+            "clinic": Decimal(0), "other": Decimal(0), "total": Decimal(0), "open": Decimal(0)})
+
+    for row in session.clinical_entries.exclude(status="cancelled"):
+        item = line(row.professional_name)
+        item["patients"] += 1
+        if row.status == "open":
+            item["open"] += row.total
+            continue
+        item["dentist"] += row.dentist_amount
+        item["clinic"] += row.clinic_amount
+        item["other"] += row.other_amount
+        item["total"] += row.total
+    for receipt in ClinicReceipt.objects.filter(session=session).select_related("installment__charge__professional"):
+        professional = receipt.installment.charge.professional
+        item = line(professional.name if professional else "")
+        item["patients"] += 1
+        item["total"] += receipt.amount
+    return sorted(rows.values(), key=lambda r: (-r["total"], r["professional"]))
+
+
 def report(session):
+    from .clinic_services import opened_before_today
     entries = list(session.clinical_entries.select_related("customer", "method").order_by("number"))
     receipts = list(ClinicReceipt.objects.filter(session=session).select_related(
         "installment__charge__customer", "installment__charge__professional", "method").order_by("created_at", "pk"))
@@ -279,6 +309,7 @@ def report(session):
         "expenses_total": sum((e.transaction.amount for e in expenses), Decimal(0)),
         "drawer_expected": expected_cash(session) if session.status == "closed" else cash_balance(session),
         "date": opened.date(), "weekday": WEEKDAYS[opened.weekday()],
+        "professionals": by_professional(session), "previous_day_open": opened_before_today(session),
         "locked": session.status == CashSession.Status.CLOSED and not active_correction(session),
         "correction": active_correction(session),
         "pending_correction": session.clinical_corrections.filter(status="requested").first(),

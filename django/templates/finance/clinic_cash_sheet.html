@@ -37,7 +37,7 @@
 <p class="no-print sheet-toolbar"><a class="pa-button" href="{% url 'clinic-finance-desk' %}">← Caixa e financeiro diário</a><button type="button" onclick="window.print()">Imprimir / salvar PDF</button></p>
 {% if locked %}<p class="lock no-print">Caixa fechado em {{ session.closed_at|date:'d/m/Y H:i' }}. O relatório está bloqueado; alterações só com autorização do gestor.</p>{% elif correction %}<p class="lock no-print">Correção liberada por {{ correction.decided_by.get_full_name|default:correction.decided_by.email }}: {{ correction.reason }}. Todas as mudanças ficam registradas na auditoria.</p>{% endif %}
 <section class="paper">
-<h1>Data: {{ date|date:'d/m/Y' }} ({{ weekday }})</h1>
+<h1>Data: {{ date|date:'d/m/Y' }} ({{ weekday }})</h1>{% if previous_day_open %}<p class="no-print" role="alert" style="border-left:4px solid #dc2626;padding:10px 14px;background:#fef2f2;color:#7f1d1d">Este caixa é de {{ date|date:"d/m/Y" }} e ainda está aberto. O caixa é fechado por dia: feche-o no Financeiro para abrir o caixa de hoje.</p>{% endif %}
 <table aria-label="Atendimentos do dia">
 <thead><tr><th>Nº</th><th class="name">Nome do Paciente</th><th>Dentista<span class="dr">Dr.</span></th><th>Consultório</th><th>Outros</th><th>Total</th><th>Forma de pagamento</th>{% if can_edit %}<th class="no-print">Ações</th>{% endif %}</tr></thead>
 <tbody>
@@ -48,6 +48,7 @@
 <tr class="total"><td></td><td class="name">Totais recebidos</td><td>{{ columns.dentist|money_pt }}</td><td>{{ columns.clinic|money_pt }}</td><td>{{ columns.other|money_pt }}</td><td>{{ columns.total|money_pt }}</td><td></td>{% if can_edit %}<td class="no-print"></td>{% endif %}</tr>
 </tbody></table>
 <table aria-label="Totais por forma de pagamento"><thead><tr>{% for label, value in kinds %}<th>{{ label }}</th>{% endfor %}<th>Total</th></tr></thead><tbody><tr class="total">{% for label, value in kinds %}<td>R$ {{ value|money_pt }}</td>{% endfor %}<td>R$ {{ kinds_total|money_pt }}</td></tr><tr class="sum">{% for label, value in kinds %}<td></td>{% endfor %}<td>{% if expenses_total %}Despesas: R$ {{ expenses_total|money_pt }}{% endif %}</td></tr></tbody></table>
+{% if professionals %}<table aria-label="Fechamento por profissional"><caption>Fechamento do dia por profissional</caption><thead><tr><th>Profissional</th><th>Pacientes</th><th>Dentista</th><th>Clínica</th><th>Outros</th><th>Recebido</th><th>Em aberto</th></tr></thead><tbody>{% for p in professionals %}<tr><td class="name">{{ p.professional }}</td><td>{{ p.patients }}</td><td>{{ p.dentist|money_pt }}</td><td>{{ p.clinic|money_pt }}</td><td>{{ p.other|money_pt }}</td><td>{{ p.total|money_pt }}</td><td>{% if p.open %}{{ p.open|money_pt }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table>{% endif %}
 <div class="box">
 Horário que abriu: {{ session.opened_at|date:'H\hi' }}<br>
 Horário que fechou: {% if session.closed_at %}{{ session.closed_at|date:'H\hi' }}{% else %}caixa aberto{% endif %}<br><br>

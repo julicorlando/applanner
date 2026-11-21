@@ -113,3 +113,32 @@ class ClinicCashSheetTests(TestCase):
         self.assertEqual(result.status_code, 302)
         self.assertEqual(ClinicCashEntry.objects.get().professional_name, "Dr. Avulso Teste")
         self.assertContains(self.client.get(url), "Dr. Avulso Teste")
+
+
+class DailyCashByProfessionalTests(TestCase):
+    setUp = ClinicCashSheetTests.setUp
+    entry = ClinicCashSheetTests.entry
+
+    def test_closing_is_split_per_professional(self):
+        self.entry()
+        self.entry(professional=None, professional_name="Dra. Volante Sem Cadastro", method="pix",
+                   dentist_amount="30", clinic_amount="20")
+        rows = {r["professional"]: r for r in cash.by_professional(self.session)}
+        self.assertEqual(rows["Dr. Listado"]["total"], Decimal("100.00"))
+        self.assertEqual(rows["Dr. Listado"]["dentist"], Decimal("60.00"))
+        self.assertEqual(rows["Dra. Volante Sem Cadastro"]["total"], Decimal("50.00"))
+        self.client.force_login(self.reception)
+        sheet = self.client.get(reverse("clinic-cash-sheet-detail", args=[self.session.pk]))
+        self.assertContains(sheet, "Fechamento do dia por profissional")
+        closed = s.close_clinic_cash(user=self.reception, unit=self.unit, amount="150")
+        summary = {r["professional"]: r for r in closed.clinical_closing.summary["professionals"]}
+        self.assertEqual(summary["Dr. Listado"]["total"], "100.00")
+
+    def test_cash_from_previous_day_must_be_closed_before_new_entries(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        type(self.session).objects.filter(pk=self.session.pk).update(opened_at=timezone.now() - timedelta(days=1))
+        with self.assertRaisesMessage(ValidationError, "O caixa é fechado por dia"):
+            self.entry()
+        closed = s.close_clinic_cash(user=self.reception, unit=self.unit, amount="50")
+        self.assertEqual(closed.status, "closed")
