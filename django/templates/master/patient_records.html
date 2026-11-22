@@ -3,7 +3,7 @@
 {% block content %}
 <section class="shell portal-page">
   <header class="portal-heading"><div><a class="back-link" href="{% url 'master-company-detail' company.pk %}">← {{ company.name }}</a><span class="eyebrow">MASTER · PRONTUÁRIOS</span><h1>Prontuários de {{ company.name }}</h1><p>Consulta do Master. Cada acesso fica registrado na auditoria da empresa e no registro de acesso clínico.</p></div>
-  <a class="button primary" href="{% url 'master-record-import' company.pk %}">Importar fichas em massa</a></header>
+  <a class="button primary" href="{% url 'master-record-import' company.pk %}">Importar fichas antigas</a></header>
   <form method="get" class="portal-search"><label>Buscar paciente<input type="search" name="q" value="{{ query }}" placeholder="Nome ou telefone"></label><button class="button">Buscar</button></form>
   <div class="table-card"><table class="portal-table"><thead><tr><th>Paciente</th><th>Telefone</th><th>Nascimento</th><th></th></tr></thead><tbody>
   {% for row in page %}<tr><td><a href="{% url 'master-patient-record' company.pk row.pk %}">{{ row.name }}</a></td><td>{{ row.phone|default:"—" }}</td><td>{{ row.birth_date|date:"d/m/Y"|default:"—" }}</td><td><a href="{% url 'master-patient-record' company.pk row.pk %}">Abrir prontuário</a></td></tr>

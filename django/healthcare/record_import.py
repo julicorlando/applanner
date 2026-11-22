@@ -34,7 +34,7 @@ from .record_import_parser import fold, read_upload
 SALT = "healthcare.record-import.v1"
 MAX_UPLOAD = 60 * 1024 * 1024
 ADMIN_ROLES = {"owner", "tenant-admin", "manager"}
-KIND_LABELS = {"visit": "Atendimento", "budget": "Orçamento", "sheet": "Observações da ficha"}
+KIND_LABELS = {"visit": "Atendimento", "budget": "Orçamento", "sheet": "Observações da ficha antiga"}
 
 
 def can_import(user):
@@ -119,7 +119,7 @@ def apply(tenant, user, sheets, request=None, owner=None):
     existing = {}
     for customer in Customer.objects.select_for_update().filter(tenant=tenant):
         existing.setdefault(fold(customer.name), customer)
-    author = f"Ficha clínica importada por {(user.get_full_name() or user.email)}"[:160]
+    author = f"Ficha antiga importada por {(user.get_full_name() or user.email)}"[:160]
     owner = owner or user
     for sheet in sheets:
         if sheet.get("skip"):

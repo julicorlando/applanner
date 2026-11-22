@@ -120,7 +120,7 @@ class RecordImportTests(TestCase):
         self.client.post(reverse("dental-record-import"), {"action": "confirm", "payload": payload})
         self.assertEqual(PatientNote.objects.filter(customer=created).count(), 4)
         record = self.client.get(reverse("dental-patient-record", args=[created.pk]))
-        self.assertContains(record, "Ficha clínica")
+        self.assertContains(record, "Ficha antiga")
         self.assertContains(record, "06/05/2023")
         self.assertContains(record, "Sup. 0,17 x 0,25 Niti")
 
