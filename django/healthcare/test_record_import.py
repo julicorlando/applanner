@@ -197,3 +197,16 @@ class RecordImportTests(TestCase):
         self.assertEqual(PatientNote.objects.filter(customer=created).count(), 4)
         self.client.force_login(self.reception)
         self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_master_operating_the_clinic_is_sent_to_master_records(self):
+        self.client.force_login(self.master)
+        session = self.client.session
+        session["portal_tenant_id"] = self.tenant.pk
+        session.save()
+        self.assertRedirects(self.client.get("/app/clinica/"), reverse("master-patient-records", args=[self.tenant.pk]),
+                             fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("portal-resource-list", args=["saude", "prontuarios"])),
+                             reverse("clinical-dashboard"), fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("dental-patient-record", args=[self.patient.pk])),
+                             reverse("master-patient-record", args=[self.tenant.pk, self.patient.pk]), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse("master-patient-records", args=[self.tenant.pk])).status_code, 200)

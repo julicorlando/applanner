@@ -56,6 +56,25 @@ PREFIX_CAPABILITIES={
 }
 
 
+MASTER_RECORD_PATIENT = re.compile(r"/app/odontologia/prontuarios/paciente/([0-9]+)/")
+
+
+def _master_records_target(request):
+    path=request.path
+    if not path.startswith(("/app/clinica/","/app/saude/","/app/odontologia/prontuarios/")):
+        return None
+    from django.urls import reverse
+    tenant_id=request.session.get("portal_tenant_id")
+    if not tenant_id:
+        return reverse("master-home")
+    patient=MASTER_RECORD_PATIENT.match(path)
+    if patient:
+        return reverse("master-patient-record",args=[tenant_id,int(patient.group(1))])
+    if path.startswith("/app/odontologia/prontuarios/importar-fichas/"):
+        return reverse("master-record-import",args=[tenant_id])
+    return reverse("master-patient-records",args=[tenant_id])
+
+
 class CapabilityRouteMiddleware:
     """
     Enforces RBAC after a user has explicit UserRole links.
@@ -66,6 +85,13 @@ class CapabilityRouteMiddleware:
 
     def __call__(self,request):
         user=getattr(request,"user",None)
+        if user and user.is_authenticated and user.is_superuser and request.method in {"GET","HEAD"}:
+            # Clinical records are closed to the operation view; the Master reads them in the
+            # audited Master pages of the company being operated.
+            target=_master_records_target(request)
+            if target:
+                from django.shortcuts import redirect
+                return redirect(target)
         if user and user.is_authenticated and user.role in {"professional","healthcare"} and not user.is_superuser:
             own_calendar_read = request.method in {'GET', 'HEAD'} and request.path in {'/app/calendario/', '/app/identidade/logo/'}
             from healthcare.navigation import workspace_enabled
