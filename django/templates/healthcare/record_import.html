@@ -7,7 +7,7 @@
 <section class="pa-card"><h2>Enviar fichas antigas</h2>
 <p>Envie um <strong>.zip</strong> com as fichas (modelo “Ficha clínica e ortodôntica”) ou uma ficha <strong>.docx</strong>. Primeiro mostramos tudo o que foi lido; nada é gravado até você confirmar.</p>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.non_field_errors }}{% if owners %}<label>Dentista responsável pelos pacientes novos<select name="owner">{% for u in owners %}<option value="{{ u.pk }}"{% if u.pk == owner_id %} selected{% endif %}>{{ u.get_full_name|default:u.email }}</option>{% endfor %}</select></label>{% endif %}<label>{{ form.file.label }}{{ form.file }}</label>{{ form.file.errors }}<button class="pa-primary" type="submit">Ler fichas antigas</button></form>
-<ul class="rim-rules"><li>Paciente já cadastrado com o mesmo nome é reaproveitado: só completamos telefone, nascimento e cidade que estiverem vazios.</li><li>“Procedimento clínico” e “Tratamento ortodôntico” ficam separados, com valor recebido, valor pago e profissional como estão na ficha.</li><li>Orçamentos e observações também vão para o prontuário. Enviar o mesmo arquivo de novo não duplica nada.</li></ul>
+<ul class="rim-rules"><li>Paciente já cadastrado com o mesmo nome continua com o cadastro como está: só entra no prontuário o que tem na ficha.</li><li>“Procedimento clínico” e “Tratamento ortodôntico” ficam separados, com valor recebido, valor pago e profissional como estão na ficha.</li><li>Orçamentos e observações também vão para o prontuário. Enviar o mesmo arquivo de novo não duplica nada.</li></ul>
 </section>
 {% else %}
 <section class="pa-card rim-summary"><h2>Confira antes de importar</h2>
@@ -18,7 +18,7 @@
 {% for row in rows %}
 <details class="pa-card rim-patient{% if row.sheet.skip %} is-skip{% endif %}">
 <summary><strong>{{ row.sheet.name|default:row.sheet.file }}</strong>
-<span>{% if row.sheet.skip %}Não será importada{% elif row.match %}Já cadastrado · completa o que falta{% else %}Novo paciente{% endif %} · {{ row.display|length }} registro(s){% if row.sheet.issues %} · {{ row.sheet.issues|length }} aviso(s){% endif %}</span></summary>
+<span>{% if row.sheet.skip %}Não será importada{% elif row.match %}Já cadastrado · só lança a ficha{% else %}Novo paciente{% endif %} · {{ row.display|length }} registro(s){% if row.sheet.issues %} · {{ row.sheet.issues|length }} aviso(s){% endif %}</span></summary>
 {% if row.sheet.issues %}<ul class="rim-issues">{% for i in row.sheet.issues %}<li>{{ i }}</li>{% endfor %}</ul>{% endif %}
 {% if not row.sheet.skip %}
 <dl class="rim-grid"><div><dt>Nascimento</dt><dd>{{ row.birth|date:"d/m/Y"|default:"—" }}</dd></div><div><dt>Telefone</dt><dd>{{ row.sheet.phone|default:"—" }}</dd></div><div><dt>Cidade</dt><dd>{{ row.sheet.city|default:"—" }}{% if row.sheet.state %} - {{ row.sheet.state }}{% endif %}</dd></div><div><dt>Arquivo</dt><dd>{{ row.sheet.file }}</dd></div></dl>

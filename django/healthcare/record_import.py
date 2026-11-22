@@ -29,12 +29,12 @@ from scheduling.models import Customer
 from .document_models import PatientNote
 from .navigation import shell_context
 from .patient_record import access, is_clinical
-from .record_import_parser import fold, read_upload
+from .record_import_parser import fold, read_upload, same_person
 
 SALT = "healthcare.record-import.v1"
 MAX_UPLOAD = 60 * 1024 * 1024
 ADMIN_ROLES = {"owner", "tenant-admin", "manager"}
-KIND_LABELS = {"visit": "Atendimento", "budget": "Orçamento", "sheet": "Observações da ficha antiga"}
+KIND_LABELS = {"visit": "Atendimento", "budget": "Orçamento", "observation": "Observações clínicas", "sheet": "Observações da ficha antiga"}
 
 
 def can_import(user):
@@ -76,7 +76,13 @@ def plan_notes(sheet, today):
     for day, text in sorted(sheet["budgets"].items()):
         if day:
             notes.append((day, "budget", {"procedure": "", "orthodontic": "", "text": f"Orçamento/procedimentos:\n{text}"}))
+    clinical = sheet.get("clinical_notes") or {}
+    for day, text in sorted(clinical.items()):
+        if day:
+            notes.append((day, "observation", {"procedure": "", "orthodontic": "", "text": f"Observações clínicas:\n{text}"}))
     summary = []
+    if clinical.get(""):
+        summary.append(f"Observações clínicas:\n{clinical['']}")
     if sheet["observations"]:
         summary.append(f"Observações da ficha:\n{sheet['observations']}")
     if sheet["budgets"].get(""):
@@ -94,10 +100,23 @@ def plan_notes(sheet, today):
     return notes
 
 
+def _existing(queryset):
+    found = {}
+    for customer in queryset:
+        found.setdefault(fold(customer.name), []).append(customer)
+    return found
+
+
+def find_patient(existing, sheet):
+    """Existing patient with the same name (accents/case ignored) and a compatible birth date."""
+    for customer in existing.get(sheet["key"].split("#")[0], []):
+        if same_person(customer.birth_date and customer.birth_date.isoformat(), sheet["birth_date"]):
+            return customer
+    return None
+
+
 def preview_rows(sheets, tenant):
-    existing = {}
-    for customer in Customer.objects.filter(tenant=tenant).only("pk", "name"):
-        existing.setdefault(fold(customer.name), customer)
+    existing = _existing(Customer.objects.filter(tenant=tenant).only("pk", "name", "birth_date"))
     today = timezone.localdate()
     rows = []
     for sheet in sheets:
@@ -105,7 +124,7 @@ def preview_rows(sheets, tenant):
             rows.append({"sheet": sheet, "notes": [], "match": None})
             continue
         notes = plan_notes(sheet, today)
-        rows.append({"sheet": sheet, "match": existing.get(sheet["key"]), "notes": notes,
+        rows.append({"sheet": sheet, "match": find_patient(existing, sheet), "notes": notes,
                      "birth": date.fromisoformat(sheet["birth_date"]) if sheet["birth_date"] else None,
                      "display": [{"day": date.fromisoformat(day), "kind": KIND_LABELS[kind], **content} for day, kind, content in notes],
                      "procedures": sum(len(v["procedure"]) + len(v["orthodontic"]) for v in sheet["visits"].values())})
@@ -116,35 +135,25 @@ def preview_rows(sheets, tenant):
 def apply(tenant, user, sheets, request=None, owner=None):
     today = timezone.localdate()
     report = {"created": 0, "completed": 0, "matched": 0, "notes": 0, "already": 0, "skipped": 0}
-    existing = {}
-    for customer in Customer.objects.select_for_update().filter(tenant=tenant):
-        existing.setdefault(fold(customer.name), customer)
+    existing = _existing(Customer.objects.select_for_update().filter(tenant=tenant))
+    created_here = {}
     author = f"Ficha antiga importada por {(user.get_full_name() or user.email)}"[:160]
     owner = owner or user
     for sheet in sheets:
         if sheet.get("skip"):
             report["skipped"] += 1
             continue
-        patient = existing.get(sheet["key"])
+        patient = created_here.get(sheet["key"]) or find_patient(existing, sheet)
         birth = date.fromisoformat(sheet["birth_date"]) if sheet["birth_date"] else None
         if patient is None:
             patient = Customer(tenant=tenant, name=sheet["name"][:150], phone=sheet["phone"], birth_date=birth,
                                city=sheet["city"][:100], state=sheet["state"])
             patient.registered_by = owner
             patient.save()
-            existing[sheet["key"]] = patient
+            created_here[sheet["key"]] = patient
             report["created"] += 1
         else:
-            # Complete what is missing; never overwrite what the clinic already typed.
-            changed = []
-            for field, value in (("phone", sheet["phone"]), ("birth_date", birth), ("city", sheet["city"][:100]),
-                                 ("state", sheet["state"])):
-                if value and not getattr(patient, field):
-                    setattr(patient, field, value)
-                    changed.append(field)
-            if changed:
-                patient.save(update_fields=changed + ["updated_at"])
-                report["completed"] += 1
+            # Already registered: the registration stays as the clinic typed it; only the sheet goes in.
             report["matched"] += 1
         for day, kind, content in plan_notes(sheet, today):
             raw = json.dumps(content, ensure_ascii=False, sort_keys=True)
@@ -176,7 +185,7 @@ def handle(request, tenant, *, context, done_url, owner=None, again_url):
             raise PermissionDenied
         report = apply(tenant, request.user, payload["sheets"], request, owner=owner)
         messages.success(request, (f"Importação concluída: {report['created']} paciente(s) novo(s), {report['matched']} já "
-                                   f"cadastrado(s) ({report['completed']} completado(s)), {report['notes']} registro(s) no prontuário"
+                                   f"cadastrado(s) (cadastro mantido), {report['notes']} registro(s) no prontuário"
                                    + (f", {report['already']} já importado(s) antes" if report["already"] else "") + "."))
         return redirect(done_url)
     context.setdefault("form", UploadForm())

@@ -80,6 +80,48 @@ class SheetParserTests(TestCase):
         self.assertEqual(problems, [])
 
 
+def ortho_xml(name="Paciente Orto Exemplo", birth="26/08/1988"):
+    header = _table([[f"Paciente: {name}", f"Data de Nascimento: {birth}"],
+                     ["Documentação digital: [ X ] SIM [ ] NÃO", "Cidade: Carpina"]])
+    visits = _table([
+        ["Aparelho Metálico Convencional", "R$ 70,00"],
+        ["Data", "Procedimento Clínico", "Próx. Consulta"],
+        ["29/03/2023", "Sup. 0,18 Niti / Inf. CDB 35 e 45", "CDT 16 e 26"],
+        ["03/2024", "Sup. 0,16 Niti", "Evoluir"],
+        ["08/01/2025", "", ""],
+        ["A realizar", "Contenção", ""],
+    ])
+    return f"<w:document {W}><w:body>{header}{visits}</w:body></w:document>".encode()
+
+
+class OrthoSheetTests(TestCase):
+    def test_orthodontic_sheet_and_windows_zip_names(self):
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as z:
+            info = zipfile.ZipInfo("PACIENTES DE ORTO/Pacientes com TTO em Andamento/Ortodôntico.docx".encode("cp850").decode("cp437"))
+            z.writestr(info, docx(ortho_xml()))
+        (sheet,), problems = read_upload("orto.zip", archive.getvalue())
+        self.assertEqual(problems, [])
+        self.assertEqual(sheet["file"], "Ortodôntico.docx")
+        self.assertEqual((sheet["name"], sheet["birth_date"], sheet["city"]), ("Paciente Orto Exemplo", "1988-08-26", "Carpina"))
+        self.assertEqual(sheet["visits"]["2023-03-29"]["orthodontic"],
+                         ["Sup. 0,18 Niti / Inf. CDB 35 e 45 · Próx. consulta: CDT 16 e 26"])
+        self.assertEqual(sheet["visits"]["2024-03-01"]["orthodontic"], ["[Data na ficha: 03/2024] Sup. 0,16 Niti · Próx. consulta: Evoluir"])
+        self.assertEqual(sheet["visits"]["2025-01-08"]["orthodontic"], ["Consulta registrada na ficha, sem procedimento descrito."])
+        self.assertEqual(sheet["visits"][""]["orthodontic"], ["[A realizar] Contenção"])
+        self.assertIn("Documentação digital: Sim", sheet["sheet_details"])
+        self.assertIn("Aparelho/tratamento: Aparelho Metálico Convencional · R$ 70,00", sheet["sheet_details"])
+        self.assertIn("Pasta da ficha: PACIENTES DE ORTO / Pacientes com TTO em Andamento", sheet["sheet_details"])
+
+    def test_same_name_different_birth_year_stays_two_patients(self):
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr("F/a.docx", docx(ortho_xml(name="Carla Exemplo", birth="20/08/1990")))
+            z.writestr("F/b.docx", docx(ortho_xml(name="Carla Exemplo", birth="21/10/2006")))
+        sheets, _ = read_upload("f.zip", archive.getvalue())
+        self.assertEqual(len({s["key"] for s in sheets}), 2)
+
+
 class RecordImportTests(TestCase):
     create = dental.DentalAssessmentTests.create
 
@@ -111,7 +153,7 @@ class RecordImportTests(TestCase):
         self.assertEqual(created.city, "Paudalho")
         self.assertEqual(created.registered_by, self.doctor)
         existing.refresh_from_db()
-        self.assertEqual(existing.birth_date, date(1996, 4, 21))
+        self.assertIsNone(existing.birth_date)  # cadastro existente não é alterado
         self.assertEqual(existing.phone, "5581989880142")
         notes = PatientNote.objects.filter(customer=created).order_by("occurred_at")
         self.assertEqual([timezone.localtime(n.occurred_at).date() for n in notes],
