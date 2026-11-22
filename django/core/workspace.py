@@ -30,67 +30,58 @@ def navigation(request):
             }
         ]
     elif user.is_superuser and not request.path.startswith('/app/'):
+        def section(title, rows):
+            return {"title": title, "items": [link(label, reverse(route, args=args), icon) for label, route, args, icon in rows]}
         groups = [
-            {
-                "title": "Plataforma",
-                "items": [
-                    link("Visão geral", reverse("master-home")),
-                    link(
-                        "Empresas",
-                        reverse("master-resource-list", args=["empresas"]),
-                        "users",
-                    ),
-                    link(
-                        "Planos",
-                        reverse("master-resource-list", args=["planos"]),
-                        "card",
-                    ),
-                    link("Financeiro", reverse("master-finance-dashboard"), "card"),
-                ],
-            },
-            {
-                "title": "Relacionamento",
-                "items": [
-                    link(
-                        "Leads",
-                        reverse("master-resource-list", args=["leads"]),
-                        "users",
-                    ),
-                    link("WhatsApp", reverse("master-whatsapp"), "chat"),
-                    link("Campanhas", reverse("master-marketing"), "chat"),
-                    link("Campanhas sociais", reverse("commercial-social-list"), "chat"),
-                ],
-            },
+            section("Início", [
+                ("Visão geral", "master-home", [], "home"),
+                ("Alertas", "master-alerts", [], "home"),
+                ("Buscar na plataforma", "master-global-search", [], "home"),
+            ]),
+            section("Empresas", [
+                ("Empresas", "master-companies", [], "users"),
+                ("Liberar acesso empresa", "master-access-release", [], "users"),
+                ("Saúde das empresas", "master-company-health", [], "users"),
+                ("Importar base de clientes", "master-customer-import", [], "users"),
+                ("Abrir operação de empresa", "portal-home", [], "home"),
+            ]),
+            section("Financeiro", [
+                ("Financeiro", "master-finance-dashboard", [], "card"),
+                ("Cobranças", "master-charges", [], "card"),
+                ("Planos", "master-resource-list", ["planos"], "card"),
+                ("Relatórios", "master-reports", [], "card"),
+                ("Central NFS-e", "master-nfse-center", [], "card"),
+                ("Cadastro bancário", "master-platform-payment", [], "card"),
+            ]),
+            section("Comercial", [
+                ("Comercial", "commercial-dashboard", [], "users"),
+                ("Leads", "master-resource-list", ["leads"], "users"),
+                ("Retenção", "master-retention", [], "users"),
+                ("Campanhas de e-mail", "master-marketing", [], "chat"),
+                ("Campanhas sociais", "commercial-social-list", [], "chat"),
+                ("Clientes de desenvolvimento", "development-clients", [], "users"),
+            ]),
+            section("Atendimento", [
+                ("WhatsApp Master", "master-whatsapp", [], "chat"),
+                ("Chamados", "master-resource-list", ["suporte"], "chat"),
+                ("Fluxo do WhatsApp", "master-whatsapp-flow", [], "chat"),
+                ("Chatbot", "master-chatbot", [], "chat"),
+            ]),
+            section("Plataforma", [
+                ("Monitoramento", "master-runtime-monitor", [], "home"),
+                ("Página inicial do site", "master-homepage", [], "home"),
+                ("E-mail SMTP", "master-smtp-settings", [], "chat"),
+                ("Modelos de e-mail", "master-email-templates", [], "chat"),
+                ("Push e SMS", "master-delivery-providers", [], "chat"),
+                ("Configuração fiscal", "master-fiscal-settings", [], "card"),
+            ]),
         ]
         from .master import MASTER_RESOURCES
-        groups.append({'title': 'Todas as funções Master', 'items': [
-            link(config['title'], reverse('master-resource-list', args=[slug]), 'home')
-            for slug, config in MASTER_RESOURCES.items()
-            if slug not in {'empresas', 'planos', 'leads'}
-        ]})
-        groups.append({'title': 'Centrais e configurações', 'items': [
-            link(title, reverse(route), icon) for title, route, icon in [
-                ('Importar base de clientes', 'master-customer-import', 'users'),
-                ('Clientes de desenvolvimento', 'development-clients', 'users'),
-                ('Comercial', 'commercial-dashboard', 'users'),
-                ('Cadastro bancário', 'master-platform-payment', 'card'),
-                ('Cobranças', 'master-charges', 'card'),
-                ('Relatórios', 'master-reports', 'card'),
-                ('Retenção', 'master-retention', 'users'),
-                ('Saúde das empresas', 'master-company-health', 'users'),
-                ('Monitoramento', 'master-runtime-monitor', 'home'),
-                ('Alertas', 'master-alerts', 'home'),
-                ('Personalização da plataforma', 'master-homepage', 'home'),
-                ('E-mail SMTP', 'master-smtp-settings', 'chat'),
-                ('Modelos de e-mail', 'master-email-templates', 'chat'),
-                ('Fluxo WhatsApp', 'master-whatsapp-flow', 'chat'),
-                ('Chatbot', 'master-chatbot', 'chat'),
-                ('Push e SMS', 'master-delivery-providers', 'chat'),
-                ('Central NFS-e', 'master-nfse-center', 'card'),
-                ('Configuração fiscal', 'master-fiscal-settings', 'card'),
-                ('Abrir operação de empresa', 'portal-home', 'home'),
-            ]
-        ]})
+        listed = {item["url"] for group in groups for item in group["items"]}
+        groups.append({"title": "Cadastros (avançado)", "collapsed": True, "items": [
+            link(config["title"], reverse("master-resource-list", args=[slug]), "home")
+            for slug, config in sorted(MASTER_RESOURCES.items(), key=lambda kv: kv[1]["title"])
+            if reverse("master-resource-list", args=[slug]) not in listed]})
     elif user.role in {'master-finance', 'master-support', 'master-commercial'}:
         definitions = {
             'master-finance': [('Financeiro', 'master-finance-dashboard'), ('Cobranças', 'master-charges'), ('Relatórios', 'master-reports')],
