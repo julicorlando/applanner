@@ -67,3 +67,9 @@ def money_pt(value):
         return number_format(Decimal(str(value)), decimal_pos=2, use_l10n=True, force_grouping=True)
     except (InvalidOperation, TypeError, ValueError):
         return "—"
+
+
+@register.filter
+def role_label(value):
+    from core.audit_labels import role_label as label
+    return label(value)

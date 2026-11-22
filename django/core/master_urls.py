@@ -3,7 +3,7 @@ from .global_search import search as global_search
 from communications.mobile_portal import providers
 from django.urls import path
 from healthcare import master_records
-from . import master, master_access_release, master_console, master_retention, simple_mode, customer_import_views
+from . import master, master_access_release, master_board, master_console, master_retention, simple_mode, customer_import_views
 from .branding import platform_homepage
 from communications.master_whatsapp import master_whatsapp_flow,master_whatsapp_messages,master_whatsapp_attachment,master_whatsapp_simulate
 from .master_email import email_templates,smtp_settings,waive_onboarding_email
@@ -27,6 +27,8 @@ urlpatterns=[
     path("importar-clientes/<int:pk>/relatorio/", customer_import_views.report, name="master-customer-import-report"),
     path("provedores-notificacao/",providers,name="master-delivery-providers"),
     path("busca/",global_search,name="master-global-search"),
+    path("painel-empresas/",master_board.companies,name="master-companies"),
+    path("sair-da-empresa/",master_board.leave_company,name="master-leave-company"),
     path("empresas/<int:pk>/modo-simples/",simple_mode.set_mode,name="master-company-simple-mode"),
     path("fiscal/configuracao/",fiscal_settings,name="master-fiscal-settings"),
     path("fiscal/notas/",nfse_center,name="master-nfse-center"),

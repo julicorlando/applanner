@@ -389,17 +389,21 @@ def home(request):
         if slug in {"usuarios","empresas"} else apps.get_model(cfg["model"]).objects.count()
     )} for slug,cfg in MASTER_RESOURCES.items()]
     sections=[
-        ("Vendas e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","reajustes-assinaturas","checkouts","cupons","faturas","notas-fiscais","pagamentos","pix","eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","contas-bancarias"}),
-        ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte"}),
-        ("Comercial e comunicação",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","campanhas-indicacao","recompensas-indicacao","marketing-contatos","marketing-campanhas","marketing-entregas","whatsapp-conversas","blog","landings","avaliacoes-publicas","faq","aquisicao","meta-conversoes"}),
-        ("Suporte e operação",{"despesas","financeiro","suporte","incidentes","backups","homologacao","crons","imports","operacao","alertas-cron","verificacoes-backup","solicitacoes-billing","solicitacoes-lgpd"}),
+        ("Empresas e pessoas",{"empresas","usuarios","papeis-usuarios","onboarding","historico-empresas","acessos-suporte","imports"}),
+        ("Financeiro e planos",{"planos","modulos","solicitacoes-modulos","assinaturas","addons-modulos","ajustes-modulos","isencoes-assinaturas","historico-assinaturas","reajustes-assinaturas","checkouts","cupons","faturas","notas-fiscais","pagamentos","pix","contas-bancarias","despesas","financeiro","solicitacoes-billing"}),
+        ("Comercial e marketing",{"equipe-comercial","comerciais","comissoes-comerciais","leads","propostas","campanhas-indicacao","recompensas-indicacao","marketing-contatos","marketing-campanhas","marketing-entregas","blog","landings","avaliacoes-publicas","faq","aquisicao","meta-conversoes"}),
+        ("Atendimento",{"suporte","whatsapp-conversas","incidentes","solicitacoes-lgpd"}),
+        ("Avançado (técnico)",{"eventos-provedor","conexoes-pagamento","transacoes-pagamento","recorrencias-pagamento","backups","homologacao","crons","operacao","alertas-cron","verificacoes-backup"}),
     ]
     assigned=set().union(*(slugs for _,slugs in sections))
     grouped=[{"title":title,"cards":[card for card in cards if card["slug"] in slugs]} for title,slugs in sections]
-    grouped.append({"title":"Auditoria e configurações","cards":[card for card in cards if card["slug"] not in assigned]})
+    rest=[card for card in cards if card["slug"] not in assigned]
+    if rest: grouped[-1]["cards"].extend(rest)
     from .master_console import overview
+    from . import master_board
     return render(request,"master/home.html",{
         "overview":overview(),
+        "attention":master_board.attention(),
         "cards":cards,"groups":grouped,
         "public_plans":Plan.objects.filter(active=True,public_visible=True,is_custom=False).count(),
         "active_modules":Module.objects.filter(active=True).count(),

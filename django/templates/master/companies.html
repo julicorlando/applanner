@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Empresas — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page">
+  <header class="portal-heading"><div><span class="eyebrow">MASTER · EMPRESAS</span><h1>Empresas</h1><p>Situação, uso recente, cobrança e chamados de cada empresa. Clique no nome para abrir a ficha.</p></div><a class="button" href="{% url 'master-resource-create' 'empresas' %}">Nova empresa</a></header>
+  <form method="get" class="mb-filters">
+    <label>Buscar<input type="search" name="q" value="{{ query }}" placeholder="Nome, e-mail, usuário, telefone ou CNPJ"></label>
+    <label>Situação<select name="situacao">{% for key, label in situations %}<option value="{{ key }}"{% if key == situation %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Segmento<select name="categoria"><option value="">Todos</option>{% for c in categories %}<option value="{{ c }}"{% if c == chosen_category %} selected{% endif %}>{{ c|capfirst }}</option>{% endfor %}</select></label>
+    <label>Ordenar por<select name="ordem"><option value="nome"{% if sort == 'nome' %} selected{% endif %}>Nome</option><option value="acesso"{% if sort == 'acesso' %} selected{% endif %}>Último acesso</option><option value="agendamentos"{% if sort == 'agendamentos' %} selected{% endif %}>Agendamentos na semana</option><option value="cadastro"{% if sort == 'cadastro' %} selected{% endif %}>Mais recentes</option></select></label>
+    <button class="button primary">Filtrar</button>{% if query or situation or chosen_category %}<a href="{% url 'master-companies' %}">Limpar filtros</a>{% endif %}
+  </form>
+  <p class="mb-count">{{ page.paginator.count }} empresa(s)</p>
+  <div class="table-card"><table class="portal-table mb-table"><thead><tr><th>Empresa</th><th>Plano</th><th>Situação</th><th>Último acesso</th><th>Agendamentos 7 dias</th><th>Chamados</th><th>Cobrança</th></tr></thead><tbody>
+  {% for row in page %}<tr>
+    <td><a href="{% url 'master-company-detail' row.pk %}"><strong>{{ row.name }}</strong></a><br><small>{{ row.category_label }}</small></td>
+    <td>{% if row.subscription %}{{ row.subscription.plan.name }}<br><small>{{ row.subscription.get_status_display }}{% if row.subscription.trial_ends_at and row.subscription.status == 'trial' %} até {{ row.subscription.trial_ends_at|date:'d/m' }}{% endif %}</small>{% else %}—{% endif %}</td>
+    <td>{{ row.get_status_display }}</td>
+    <td>{{ row.last_login|date:'d/m/Y'|default:'Nunca' }}</td>
+    <td class="mb-num">{{ row.bookings_week }}</td>
+    <td class="mb-num">{% if row.open_tickets %}<a href="{% url 'master-company-detail' row.pk %}?aba=suporte">{{ row.open_tickets }} aberto(s)</a>{% else %}—{% endif %}</td>
+    <td>{% if row.overdue %}<a class="mb-late" href="{% url 'master-company-detail' row.pk %}?aba=plano">Vencida</a>{% else %}Em dia{% endif %}</td>
+  </tr>{% empty %}<tr><td colspan="7">Nenhuma empresa neste filtro.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if page.has_other_pages %}<p>{% if page.has_previous %}<a href="?{{ params }}&pagina={{ page.previous_page_number }}">← Anterior</a> · {% endif %}Página {{ page.number }} de {{ page.paginator.num_pages }}{% if page.has_next %} · <a href="?{{ params }}&pagina={{ page.next_page_number }}">Próxima →</a>{% endif %}</p>{% endif %}
+  <p><a href="{% url 'master-resource-list' 'empresas' %}">Lista completa de cadastro (todos os campos)</a></p>
+</section>
+<style>
+.mb-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin:0 0 12px}.mb-filters label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+.mb-filters input,.mb-filters select{padding:9px 10px;border-radius:10px;border:1px solid var(--border,#cfd8e3);font:inherit;font-weight:400}.mb-filters input{min-width:260px}
+.mb-count{margin:0 0 8px;opacity:.75}.mb-num{font-variant-numeric:tabular-nums;text-align:right}.mb-late{color:#b91c1c;font-weight:650}
+</style>
+{% endblock %}

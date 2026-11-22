@@ -15,21 +15,7 @@ def search(request):
     results = []
     if request.user.is_superuser and request.path.startswith("/master/"):
         if len(term) >= 2:
-            for row in (
-                Tenant.objects.filter(deleted_at__isnull=True, archived_at__isnull=True)
-                .filter(Q(name__icontains=term) | Q(email__icontains=term))
-                .order_by("name")[:30]
-            ):
-                results.append(
-                    {
-                        "title": row.name,
-                        "kind": "Empresa",
-                        "description": row.get_status_display(),
-                        "url": reverse(
-                            "master-resource-edit", args=["empresas", row.pk]
-                        ),
-                    }
-                )
+            results = platform_results(term)
         return render(
             request,
             "portal/search.html",
@@ -106,3 +92,28 @@ def search(request):
     return render(
         request, "portal/search.html", {"q": term, "results": results, "tenant": tenant}
     )
+
+
+def platform_results(term):
+    """Master search: companies, users and support tickets, each opening the right Master page."""
+    from accounts.models import User
+    from operations.models import SupportTicket
+    from .audit_labels import role_label
+    digits = "".join(c for c in term if c.isdigit())
+    company = Q(name__icontains=term) | Q(email__icontains=term) | Q(slug__icontains=term)
+    if len(digits) >= 4:
+        company |= Q(phone__contains=digits) | Q(document__contains=digits)
+    results = [{"title": row.name, "kind": "Empresa", "description": f"{row.get_status_display()} · {row.email or 'sem e-mail'}",
+                "url": reverse("master-company-detail", args=[row.pk])}
+               for row in Tenant.objects.filter(deleted_at__isnull=True).filter(company).order_by("name")[:25]]
+    people = Q(email__icontains=term) | Q(first_name__icontains=term) | Q(last_name__icontains=term)
+    for user in User.objects.filter(deleted_at__isnull=True).filter(people).select_related("tenant").order_by("email")[:25]:
+        if user.tenant_id:
+            results.append({"title": user.get_full_name() or user.email, "kind": "Usuário",
+                            "description": f"{user.email} · {user.tenant.name} · {role_label(user.role)}",
+                            "url": reverse("master-company-detail", args=[user.tenant_id]) + "?aba=acessos"})
+    for ticket in SupportTicket.objects.filter(Q(protocol__icontains=term) | Q(subject__icontains=term)).select_related("tenant").order_by("-created_at")[:15]:
+        results.append({"title": f"{ticket.protocol} · {ticket.subject}", "kind": "Chamado",
+                        "description": f"{ticket.tenant.name} · {ticket.get_status_display()}",
+                        "url": reverse("master-support-ticket", args=[ticket.pk])})
+    return results
