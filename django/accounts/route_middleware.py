@@ -57,22 +57,24 @@ PREFIX_CAPABILITIES={
 
 
 MASTER_RECORD_PATIENT = re.compile(r"/app/odontologia/prontuarios/paciente/([0-9]+)/")
+MASTER_RECORD_ENTRIES = {"/app/clinica/", "/app/odontologia/prontuarios/"}
 
 
 def _master_records_target(request):
-    path=request.path
-    if not path.startswith(("/app/clinica/","/app/saude/","/app/odontologia/prontuarios/")):
-        return None
-    from django.urls import reverse
+    """Only while the Master operates a company, and only for the record entry pages."""
     tenant_id=request.session.get("portal_tenant_id")
     if not tenant_id:
-        return reverse("master-home")
-    patient=MASTER_RECORD_PATIENT.match(path)
+        return None
+    from django.urls import reverse
+    path=request.path
+    patient=MASTER_RECORD_PATIENT.fullmatch(path)
     if patient:
         return reverse("master-patient-record",args=[tenant_id,int(patient.group(1))])
-    if path.startswith("/app/odontologia/prontuarios/importar-fichas/"):
+    if path=="/app/odontologia/prontuarios/importar-fichas/":
         return reverse("master-record-import",args=[tenant_id])
-    return reverse("master-patient-records",args=[tenant_id])
+    if path in MASTER_RECORD_ENTRIES:
+        return reverse("master-patient-records",args=[tenant_id])
+    return None
 
 
 class CapabilityRouteMiddleware:
