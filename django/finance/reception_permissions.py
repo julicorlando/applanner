@@ -9,7 +9,8 @@ MANAGERS = {"owner", "tenant-admin", "manager"}
 
 PERMISSIONS = [
     ("prontuarios", "Ver os prontuários dos pacientes", True),
-    ("evolucao", "Registrar evolução e plano de tratamento no prontuário", True),
+    ("evolucao", "Registrar evolução no prontuário", True),
+    ("plano", "Criar e editar o plano de tratamento do paciente", True),
     ("cadastro", "Cadastrar e editar pacientes", True),
     ("agenda", "Ver a agenda e agendar atendimentos", True),
     ("caixa", "Receber pagamentos no caixa", True),

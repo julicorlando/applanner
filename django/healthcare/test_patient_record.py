@@ -167,6 +167,10 @@ class PatientRecordPaymentTests(TestCase):
         self.assertContains(page, "Total do plano: R$ 270,00")
         self.assertContains(page, "05/10/2026")
         self.assertContains(page, 'value="Limpeza"')  # current plan comes back as editable rows
+        history = [label for day in page.context["timeline"] for note in day["notes"] for label, _ in note["sections"]]
+        self.assertIn("Procedimento clínico", history)
+        self.assertNotIn("Plano de tratamento", history)  # the plan stays in its own card
+        self.assertContains(page, "Versões salvas do plano (1)")
         self.assertContains(page, "Salvar alterações do plano")
         self.client.post(self.url(), {"action": "plan", "plan_tooth": ["16", ""], "plan_procedure": ["Restauração", "Canal"],
                                       "plan_price": ["150,00", "400"]})
@@ -180,6 +184,21 @@ class PatientRecordPaymentTests(TestCase):
         self.assertContains(page, "Todos os itens do plano foram removidos.")
         self.assertNotContains(page, 'value="Canal"')
         self.assertEqual(PatientNote.objects.filter(customer=self.patient).count(), 4)  # history is kept
+
+    def test_reception_edits_saved_plan_unless_manager_turns_it_off(self):
+        from finance import reception_permissions as perms
+        self.client.post(self.url(), {"action": "plan", "plan_tooth": ["11"], "plan_procedure": ["Clareamento"], "plan_price": ["300"]})
+        page = self.client.get(self.url())
+        self.assertContains(page, 'value="Clareamento"')
+        self.client.post(self.url(), {"action": "plan", "plan_tooth": ["11", ""], "plan_procedure": ["Clareamento", "Faceta"],
+                                      "plan_price": ["250", "900"]})
+        self.assertContains(self.client.get(self.url()), "Total do plano: R$ 1.150,00")
+        values = perms.current(self.tenant)
+        values.update(plano=False)
+        perms.save(self.tenant, self.owner, values)
+        page = self.client.get(self.url())
+        self.assertNotContains(page, 'id="plano"')
+        self.assertEqual(self.client.post(self.url(), {"action": "plan", "plan_procedure": ["X"], "plan_price": ["1"]}).status_code, 403)
 
     def test_payment_requires_method_and_open_cash(self):
         from finance.clinic_models import ClinicCashEntry
