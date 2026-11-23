@@ -8,7 +8,8 @@ Clinical records themselves stay immutable: new content comes as new evolutions
 import json
 import uuid
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+from decimal import Decimal, InvalidOperation
 
 from django import forms
 from django.contrib import messages
@@ -216,6 +217,7 @@ class ReceiveForm(forms.Form):
     other_amount = forms.DecimalField(label="Outros (R$)", max_digits=12, decimal_places=2, min_value=0, initial=0, required=False)
     method = forms.ModelChoiceField(queryset=Customer.objects.none(), label="Forma de pagamento")
     notes = forms.CharField(label="Observação (opcional)", max_length=300, required=False)
+    paid_on = forms.DateField(label="Data do recebimento", required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
 
     def __init__(self, *args, tenant, **kwargs):
         from finance.clinic_models import ClinicPaymentMethod
@@ -227,10 +229,25 @@ class ReceiveForm(forms.Form):
         data = super().clean()
         if not data.get("professional") and not (data.get("professional_name") or "").strip():
             self.add_error("professional_name", "Selecione o profissional ou digite o nome de quem atendeu.")
+        _not_future(self, data, "paid_on")
         return data
 
 
-NOTE_FIELDS = (("procedure", "Procedimento clínico"), ("orthodontic", "Tratamento ortodôntico"), ("text", "Observação"))
+def _not_future(form, data, field):
+    data[field] = data.get(field) or timezone.localdate()
+    if data[field] > timezone.localdate():
+        form.add_error(field, "A data não pode ser no futuro.")
+
+
+def _at_day(day):
+    """Today keeps the real time; an earlier day is filed at noon of that day."""
+    if not day or day == timezone.localdate():
+        return None
+    return timezone.make_aware(datetime.combine(day, time(12, 0)))
+
+
+EVOLUTION_FIELDS = (("procedure", "Procedimento clínico"), ("orthodontic", "Tratamento ortodôntico"), ("text", "Observação"))
+NOTE_FIELDS = EVOLUTION_FIELDS + (("plan", "Plano de tratamento"),)
 
 
 def note_sections(raw):
@@ -249,12 +266,72 @@ class NoteForm(forms.Form):
     orthodontic = forms.CharField(label="Tratamento ortodôntico", required=False, max_length=4000,
                                   widget=forms.Textarea(attrs={"rows": 3}))
     text = forms.CharField(label="Observação", required=False, max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
+    occurred_on = forms.DateField(label="Data da evolução", required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
 
     def clean(self):
         data = super().clean()
-        if not any(len((data.get(key) or "").strip()) >= 3 for key, _ in NOTE_FIELDS):
+        if not any(len((data.get(key) or "").strip()) >= 3 for key, _ in EVOLUTION_FIELDS):
             raise forms.ValidationError("Escreva o procedimento, o tratamento ortodôntico ou uma observação.")
+        _not_future(self, data, "occurred_on")
         return data
+
+
+PLAN_ROWS = 30
+
+
+class PlanForm(forms.Form):
+    occurred_on = forms.DateField(label="Data do plano", required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    professional = forms.ModelChoiceField(queryset=Professional.objects.none(), label="Dentista responsável", required=False,
+                                          empty_label="Não informado")
+    notes = forms.CharField(label="Observação do plano (opcional)", required=False, max_length=2000,
+                            widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, tenant, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["professional"].queryset = Professional.objects.filter(tenant=tenant, active=True).order_by("name")
+        self.items = []
+
+    def clean(self):
+        data = super().clean()
+        _not_future(self, data, "occurred_on")
+        post, items = self.data, []
+        teeth, procedures, prices = post.getlist("plan_tooth"), post.getlist("plan_procedure"), post.getlist("plan_price")
+        for index, procedure in enumerate(procedures[:PLAN_ROWS]):
+            procedure = " ".join(procedure.split())[:200]
+            tooth = " ".join((teeth[index] if index < len(teeth) else "").split())[:20]
+            raw = (prices[index] if index < len(prices) else "").strip().replace("R$", "").replace(" ", "")
+            if not procedure and not raw and not tooth:
+                continue
+            if not procedure:
+                raise forms.ValidationError(f"Item {index + 1}: informe o procedimento.")
+            try:
+                price = Decimal((raw.replace(".", "").replace(",", ".") if "," in raw else raw) or "0").quantize(Decimal("0.01"))
+            except InvalidOperation:
+                raise forms.ValidationError(f"Item {index + 1}: valor inválido.")
+            if not price.is_finite() or price < 0 or price > Decimal("999999.99"):
+                raise forms.ValidationError(f"Item {index + 1}: valor inválido.")
+            items.append({"tooth": tooth, "procedure": procedure, "price": price})
+        if not items:
+            raise forms.ValidationError("Adicione pelo menos um procedimento ao plano de tratamento.")
+        self.items = items
+        return data
+
+    def text(self):
+        lines = []
+        professional = self.cleaned_data.get("professional")
+        if professional:
+            lines.append(f"Dentista responsável: {professional.name}")
+        for number, item in enumerate(self.items, start=1):
+            tooth = f"Dente {item['tooth']} · " if item["tooth"] else ""
+            lines.append(f"{number}. {tooth}{item['procedure']} · {_brl(item['price'])}")
+        lines.append(f"Total do plano: {_brl(sum((i['price'] for i in self.items), Decimal('0')))}")
+        if (self.cleaned_data.get("notes") or "").strip():
+            lines.append(f"Observação: {self.cleaned_data['notes'].strip()}")
+        return "\n".join(lines)
+
+
+def _brl(value):
+    return "R$ " + f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _cash_access(user):
@@ -292,20 +369,34 @@ def patient_record(request, pk):
     cash_tenant = _cash_access(request.user) if patient.active else None
     session = _open_session(request, tenant) if cash_tenant else None
     receive_form = ReceiveForm(request.POST if request.POST.get("action") == "receive" else None, tenant=tenant,
-                               initial={"request_id": uuid.uuid4(),
+                               initial={"request_id": uuid.uuid4(), "paid_on": timezone.localdate(),
                                         "professional": _default_professional(request.user, patient, clinical)}) if cash_tenant else None
-    note_form = NoteForm(request.POST if request.POST.get("action") == "note" else None)
+    note_form = NoteForm(request.POST if request.POST.get("action") == "note" else None, initial={"occurred_on": timezone.localdate()})
+    plan_form = PlanForm(request.POST if request.POST.get("action") == "plan" else None, tenant=tenant,
+                         initial={"occurred_on": timezone.localdate(), "professional": _default_professional(request.user, patient, clinical)})
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "note":
             if note_form.is_valid():
-                content = {key: (note_form.cleaned_data.get(key) or "").strip() for key, _ in NOTE_FIELDS}
+                content = {key: (note_form.cleaned_data.get(key) or "").strip() for key, _ in EVOLUTION_FIELDS}
                 note = PatientNote.objects.create(
                     tenant=tenant, customer=patient, text_encrypted=encrypt_text(json.dumps(content, ensure_ascii=False)),
-                    author=request.user, author_name=(request.user.get_full_name() or request.user.email)[:160])
+                    author=request.user, author_name=(request.user.get_full_name() or request.user.email)[:160],
+                    occurred_at=_at_day(note_form.cleaned_data["occurred_on"]))
                 append_audit(tenant=tenant, user=request.user, request=request, action="clinical.patient_note.created",
                              entity_type="PatientNote", entity_id=note.pk, after={"customer": patient.pk})
                 messages.success(request, "Evolução salva no prontuário.")
+                return redirect(self_url)
+        elif action == "plan":
+            if plan_form.is_valid():
+                note = PatientNote.objects.create(
+                    tenant=tenant, customer=patient,
+                    text_encrypted=encrypt_text(json.dumps({"plan": plan_form.text()}, ensure_ascii=False)),
+                    author=request.user, author_name=(request.user.get_full_name() or request.user.email)[:160],
+                    occurred_at=_at_day(plan_form.cleaned_data["occurred_on"]))
+                append_audit(tenant=tenant, user=request.user, request=request, action="clinical.patient_plan.created",
+                             entity_type="PatientNote", entity_id=note.pk, after={"customer": patient.pk, "items": len(plan_form.items)})
+                messages.success(request, "Plano de tratamento salvo no prontuário.")
                 return redirect(self_url)
         elif action == "receive":
             if not cash_tenant:
@@ -319,7 +410,8 @@ def patient_record(request, pk):
                 try:
                     # Each professional has their own cash sheet per day, opened on the first receipt.
                     with transaction.atomic():
-                        session = day_sheet(tenant, selected_unit(request, tenant), data["professional"], request.user)
+                        session = day_sheet(tenant, selected_unit(request, tenant), data["professional"], request.user,
+                                            day=data["paid_on"])
                     row = add_entry(user=request.user, session_id=session.pk, customer=patient, notes=data["notes"],
                                     professional=data["professional"], professional_name=data["professional_name"],
                                     dentist_amount=data["dentist_amount"], clinic_amount=data["clinic_amount"],
@@ -328,7 +420,7 @@ def patient_record(request, pk):
                     receive_form.add_error(None, exc)
                 else:
                     total = f"{row.total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    messages.success(request, f"Pagamento de R$ {total} ({row.method_name}) recebido e lançado no caixa de hoje de {session.label}.")
+                    messages.success(request, f"Pagamento de R$ {total} ({row.method_name}) recebido e lançado no caixa de {data['paid_on']:%d/%m/%Y} de {session.label}.")
                     return redirect(self_url)
         else:
             raise PermissionDenied
@@ -347,5 +439,6 @@ def patient_record(request, pk):
                                    clinical=clinical),
         "can_schedule": has_capability(request.user, "agenda.manage") and request.user.role not in {"professional", "healthcare"},
         "document_kinds": DOCUMENT_KINDS,
-        "receive_form": receive_form, "cash_session": session, "note_form": note_form,
+        "receive_form": receive_form, "cash_session": session, "note_form": note_form, "plan_form": plan_form,
+        "plan_rows": range(8),
     })
