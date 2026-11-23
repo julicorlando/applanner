@@ -467,8 +467,10 @@ def patient_record(request, pk):
                          initial={"occurred_on": timezone.localdate(), "professional": _default_professional(request.user, patient, clinical)})
     if request.method == "POST":
         action = request.POST.get("action")
-        if action in {"note", "plan"}:
+        if action == "note":
             require(request.user, "evolucao")
+        if action == "plan":
+            require(request.user, "plano")
         if action == "note":
             if note_form.is_valid():
                 content = {key: (note_form.cleaned_data.get(key) or "").strip() for key, _ in EVOLUTION_FIELDS}
@@ -555,6 +557,7 @@ def patient_record(request, pk):
         "plan_receivables": list(_plan_receivables(tenant, patient)[:50]) if cash_tenant and allowed(request.user, "caixa") else [],
         "payment_methods": _payment_methods(tenant) if cash_tenant else [],
         "note_form": note_form, "plan_form": plan_form, "can_evolve": allowed(request.user, "evolucao"),
+        "can_plan": allowed(request.user, "plano"),
         "plan_items": _posted_plan(request) if plan_form.is_bound else (plan_now["items"] if plan_now else []),
         "plan_existing": bool(plan_now and plan_now["items"]),
         "plan_versions": plan_versions(tenant, patient) if plan_now else [],

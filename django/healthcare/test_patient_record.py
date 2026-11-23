@@ -185,6 +185,21 @@ class PatientRecordPaymentTests(TestCase):
         self.assertNotContains(page, 'value="Canal"')
         self.assertEqual(PatientNote.objects.filter(customer=self.patient).count(), 4)  # history is kept
 
+    def test_reception_edits_saved_plan_unless_manager_turns_it_off(self):
+        from finance import reception_permissions as perms
+        self.client.post(self.url(), {"action": "plan", "plan_tooth": ["11"], "plan_procedure": ["Clareamento"], "plan_price": ["300"]})
+        page = self.client.get(self.url())
+        self.assertContains(page, 'value="Clareamento"')
+        self.client.post(self.url(), {"action": "plan", "plan_tooth": ["11", ""], "plan_procedure": ["Clareamento", "Faceta"],
+                                      "plan_price": ["250", "900"]})
+        self.assertContains(self.client.get(self.url()), "Total do plano: R$ 1.150,00")
+        values = perms.current(self.tenant)
+        values.update(plano=False)
+        perms.save(self.tenant, self.owner, values)
+        page = self.client.get(self.url())
+        self.assertNotContains(page, "data-plan-form")
+        self.assertEqual(self.client.post(self.url(), {"action": "plan", "plan_procedure": ["X"], "plan_price": ["1"]}).status_code, 403)
+
     def test_payment_requires_method_and_open_cash(self):
         from finance.clinic_models import ClinicCashEntry
         response = self.client.post(self.url(), {
