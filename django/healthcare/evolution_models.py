@@ -163,7 +163,8 @@ class PatientNoteRectification(models.Model):
     """Retificação de uma evolução antiga (PatientNote): a nota fica intacta e passa a ser 'retificada'."""
     objects = _GuardedQuerySet.as_manager()
     note = models.OneToOneField("healthcare.PatientNote", on_delete=models.PROTECT, related_name="rectification")
-    replacement = models.OneToOneField(DentalEvolution, on_delete=models.PROTECT, related_name="replaces_note")
+    # Empty when the note was voided (lançado por engano): nothing replaces it.
+    replacement = models.OneToOneField(DentalEvolution, null=True, blank=True, on_delete=models.PROTECT, related_name="replaces_note")
     reason_encrypted = models.TextField()
     rectified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     rectified_at = models.DateTimeField(default=timezone.now, editable=False)
