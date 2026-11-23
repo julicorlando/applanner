@@ -1,15 +1,17 @@
-"""Prontuário do paciente (odontologia): uma página com o cadastro, as evoluções,
-os registros da recepção, os documentos emitidos e os pagamentos, agrupados por dia.
-Cada dentista vê os próprios pacientes e registros; a recepção e a gestão veem e editam todos. Receber um valor aqui lança a linha na folha do caixa como paga.
+"""Prontuário do paciente (odontologia): uma página com o cadastro, a evolução clínica, o plano de
+tratamento, os documentos emitidos e os pagamentos, agrupados por dia.
+Cada dentista vê os próprios pacientes e registros; a recepção e a gestão veem e editam todos.
+Receber um valor aqui lança a linha na folha do caixa como paga.
 
-Every read of clinical content is logged (MedicalRecordAccessLog / audit trail).
-Clinical records themselves stay immutable: new content comes as new evolutions
-(dentists) or team observations (anyone with access, reception included)."""
+Evolução clínica (evolution_services): nasce RASCUNHO (o autor edita/exclui), vira FINALIZADO
+(imutável) no botão "Salvar e finalizar atendimento" ou após DENTAL_EVOLUTION_DRAFT_HOURS, e só
+muda por "Retificar lançamento" (original RETIFICADO preservado + novo registro ligado a ele).
+O plano de tratamento é orçamento: fica no próprio quadro e não entra no histórico até ser executado.
+Every read of clinical content is logged (MedicalRecordAccessLog / audit trail)."""
 import json
-import re
 import uuid
 from collections import defaultdict
-from datetime import datetime, time, timedelta
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django import forms
@@ -24,11 +26,15 @@ from django.views.decorators.cache import never_cache
 from accounts.permissions import has_capability
 from billing.entitlements import module_enabled, require_module
 from core.audit import append_audit
-from core.crypto import decrypt_text, encrypt_text
+from core.crypto import decrypt_text
 from scheduling.models import Appointment, Customer, Professional
 
 from .dental_assessment_forms import TEXT_FIELDS
 from .document_models import KINDS as DOCUMENT_KINDS, ClinicalIssuedDocument, PatientNote
+from .evolution_models import DentalEvolution, DentalPlanItem, PatientNoteRectification
+from .evolution_services import (can_rectify, clean_fields, create_draft, delete_draft, draft_hours, evolution_text,
+                                 execute_plan_item, finalize_attendance, finalize_expired, plan_items, rectify,
+                                 rectify_note, save_plan, update_draft)
 from .models import DentalAssessment, MedicalRecordAccessLog, MedicalRecordEntry
 from .navigation import dental_workspace, shell_context
 from .services import _ip_hash, assert_clinical_access
@@ -138,8 +144,66 @@ def _local_day(value):
     return timezone.localtime(value).date()
 
 
-def build_timeline(*, tenant, patient, user, ip="", clinical=False):
-    days = defaultdict(lambda: {"records": [], "notes": [], "payments": [], "documents": []})
+def _person(user):
+    return (user.get_full_name() or user.email) if user else "Sistema"
+
+
+def _fill(tooth, procedure, orthodontic, notes, day, professional_id):
+    """Prefill of the edit/rectify dialog (the same text the page already shows)."""
+    return json.dumps({"tooth": tooth or "", "procedure": procedure or "", "orthodontic": orthodontic or "",
+                       "notes": notes or "", "clinical_date": day.isoformat(), "professional": professional_id or ""},
+                      ensure_ascii=False)
+
+
+def _evolution_sections(text, tooth=""):
+    out = [("Dente", tooth)] if tooth else []
+    return out + [(label, text[key]) for key, label in EVOLUTION_LABELS if text.get(key)]
+
+
+def evolution_view(evolution, user, can_evolve=False):
+    text = evolution_text(evolution)
+    previous = evolution.previous
+    note_link = getattr(evolution, "replaces_note", None) if evolution.previous_id is None else None
+    row = {
+        "id": evolution.pk, "status": evolution.status, "status_label": evolution.get_status_display(),
+        "sections": _evolution_sections(text, evolution.tooth), "author": evolution.author_name,
+        "professional": evolution.professional.name if evolution.professional_id else "",
+        "at": evolution.created_at, "finalized_at": evolution.finalized_at, "auto": evolution.finalized_automatically,
+        "from_plan": bool(evolution.plan_item_id),
+        "corrects": previous.clinical_date if previous else (timezone.localtime(note_link.note.effective_at).date() if note_link else None),
+        "rectified": None, "can_edit": False, "can_rectify": False,
+        "fill": _fill(evolution.tooth, text["procedure"], text["orthodontic"], text["notes"], evolution.clinical_date,
+                      evolution.professional_id),
+    }
+    if evolution.status == DentalEvolution.Status.RECTIFIED:
+        row["rectified"] = {"at": evolution.rectified_at, "by": _person(evolution.rectified_by),
+                            "reason": decrypt_text(evolution.rectification_reason_encrypted)}
+    elif evolution.status == DentalEvolution.Status.FINALIZED:
+        row["can_rectify"] = can_evolve and can_rectify(user, evolution.created_by_id)
+    else:
+        row["can_edit"] = can_evolve and evolution.created_by_id == user.pk
+        row["expires_at"] = evolution.created_at + timedelta(hours=draft_hours())
+    return row
+
+
+def _evolutions(tenant, patient):
+    return (DentalEvolution.objects.filter(tenant=tenant, customer=patient)
+            .select_related("professional", "previous", "rectified_by", "replaces_note__note"))
+
+
+def hidden_rectified(tenant, patient):
+    """How many rectified records the default view hides (shown with the audit toggle)."""
+    return (_evolutions(tenant, patient).filter(status=DentalEvolution.Status.RECTIFIED).count()
+            + PatientNoteRectification.objects.filter(note__tenant=tenant, note__customer=patient).count())
+
+
+def current_drafts(tenant, patient, user, can_evolve=False):
+    return [evolution_view(e, user, can_evolve) for e in
+            _evolutions(tenant, patient).filter(status=DentalEvolution.Status.DRAFT).order_by("created_at", "pk")]
+
+
+def build_timeline(*, tenant, patient, user, ip="", clinical=False, audit=False, can_evolve=False):
+    days = defaultdict(lambda: {"records": [], "evolutions": [], "notes": [], "payments": [], "documents": []})
     assessments = DentalAssessment.objects.filter(tenant=tenant, customer=patient)
     entries = MedicalRecordEntry.objects.filter(tenant=tenant, customer=patient)
     if clinical:
@@ -179,13 +243,31 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False):
             "author": _author(entry.professional, entry.professional_snapshot),
             "sections": _entry_sections(_read_entry(entry, user, ip)), "draft": False, "url": "",
         })
+    # Evolução clínica: rascunhos ficam no quadro do atendimento; retificados só no modo auditoria.
+    evolutions = _evolutions(tenant, patient).exclude(status=DentalEvolution.Status.DRAFT)
+    if not audit:
+        evolutions = evolutions.exclude(status=DentalEvolution.Status.RECTIFIED)
+    for evolution in evolutions[:500]:
+        days[evolution.clinical_date]["evolutions"].append(evolution_view(evolution, user, can_evolve))
+    rectified = {r.note_id: r for r in PatientNoteRectification.objects.filter(note__tenant=tenant, note__customer=patient)
+                 .select_related("rectified_by")}
     for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:500]:
         raw = decrypt_text(note.text_encrypted)
         if _is_plan(raw):
             continue  # the treatment plan lives in its own card, not in the history
-        days[_local_day(note.effective_at)]["notes"].append({
-            "sections": note_sections(raw), "author": note.author_name,
-            "at": note.effective_at, "imported": bool(note.import_key)})
+        link = rectified.get(note.pk)
+        if link and not audit:
+            continue
+        fields = note_fields(raw)
+        day = _local_day(note.effective_at)
+        days[day]["notes"].append({
+            "id": note.pk, "sections": note_sections(raw), "author": note.author_name,
+            "at": note.effective_at, "imported": bool(note.import_key),
+            "rectified": {"at": link.rectified_at, "by": _person(link.rectified_by),
+                          "reason": decrypt_text(link.reason_encrypted)} if link else None,
+            "can_rectify": bool(can_evolve and not link and can_rectify(user, note.author_id)),
+            "fill": _fill("", fields.get("procedure"), fields.get("orthodontic"), fields.get("text"), day, None),
+        })
     documents = ClinicalIssuedDocument.objects.filter(tenant=tenant, customer=patient, status="finalized")
     if clinical:
         documents = documents.filter(professional__user=user)
@@ -243,110 +325,101 @@ def _not_future(form, data, field):
         form.add_error(field, "A data não pode ser no futuro.")
 
 
-def _at_day(day):
-    """Today keeps the real time; an earlier day is filed at noon of that day."""
-    if not day or day == timezone.localdate():
-        return None
-    return timezone.make_aware(datetime.combine(day, time(12, 0)))
+EVOLUTION_LABELS = (("procedure", "Procedimento clínico"), ("orthodontic", "Tratamento ortodôntico"), ("notes", "Observação"))
+# Legacy PatientNote keys (evolutions written before the draft/finalized lifecycle).
+NOTE_FIELDS = (("procedure", "Procedimento clínico"), ("orthodontic", "Tratamento ortodôntico"), ("text", "Observação"),
+               ("plan", "Plano de tratamento"))
 
 
-EVOLUTION_FIELDS = (("procedure", "Procedimento clínico"), ("orthodontic", "Tratamento ortodôntico"), ("text", "Observação"))
-NOTE_FIELDS = EVOLUTION_FIELDS + (("plan", "Plano de tratamento"),)
-
-
-def note_sections(raw):
+def note_fields(raw):
     try:
         data = json.loads(raw)
     except (TypeError, ValueError):
         data = None
     if not isinstance(data, dict):
-        return [("Observação", raw)] if (raw or "").strip() else []
-    return [(label, str(data[key]).strip()) for key, label in NOTE_FIELDS if str(data.get(key) or "").strip()]
+        return {"text": raw or ""}
+    return {key: str(data.get(key) or "").strip() for key, _ in NOTE_FIELDS}
 
 
-class NoteForm(forms.Form):
+def note_sections(raw):
+    fields = note_fields(raw)
+    return [(label, fields[key]) for key, label in NOTE_FIELDS if fields.get(key)]
+
+
+class EvolutionForm(forms.Form):
+    """Lançamento rápido da evolução clínica: nasce como rascunho."""
+    professional = forms.ModelChoiceField(queryset=Professional.objects.none(), label="Dentista responsável", required=False,
+                                          empty_label="Não informado")
+    tooth = forms.CharField(label="Dente", required=False, max_length=20,
+                            widget=forms.TextInput(attrs={"inputmode": "numeric", "placeholder": "Ex.: 46", "autocomplete": "off"}))
     procedure = forms.CharField(label="Procedimento clínico", required=False, max_length=4000,
-                                widget=forms.Textarea(attrs={"rows": 3}))
+                                widget=forms.Textarea(attrs={"rows": 2}))
     orthodontic = forms.CharField(label="Tratamento ortodôntico", required=False, max_length=4000,
-                                  widget=forms.Textarea(attrs={"rows": 3}))
-    text = forms.CharField(label="Observação", required=False, max_length=4000, widget=forms.Textarea(attrs={"rows": 3}))
-    occurred_on = forms.DateField(label="Data da evolução", required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+                                  widget=forms.Textarea(attrs={"rows": 2}))
+    notes = forms.CharField(label="Observação", required=False, max_length=4000, widget=forms.Textarea(attrs={"rows": 2}))
+    clinical_date = forms.DateField(label="Data do atendimento", required=False,
+                                    widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+
+    def __init__(self, *args, tenant, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["professional"].queryset = Professional.objects.filter(tenant=tenant, active=True).order_by("name")
 
     def clean(self):
         data = super().clean()
-        if not any(len((data.get(key) or "").strip()) >= 3 for key, _ in EVOLUTION_FIELDS):
-            raise forms.ValidationError("Escreva o procedimento, o tratamento ortodôntico ou uma observação.")
-        _not_future(self, data, "occurred_on")
-        return data
+        if self.errors:
+            return data
+        try:
+            return clean_fields(data)
+        except ValidationError as exc:
+            raise forms.ValidationError(exc.messages)
 
 
 PLAN_ROWS = 30
 
 
-class PlanForm(forms.Form):
-    occurred_on = forms.DateField(label="Data do plano", required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
-    professional = forms.ModelChoiceField(queryset=Professional.objects.none(), label="Dentista responsável", required=False,
-                                          empty_label="Não informado")
-    notes = forms.CharField(label="Observação do plano (opcional)", required=False, max_length=2000,
-                            widget=forms.Textarea(attrs={"rows": 2}))
-
-    def __init__(self, *args, tenant, previous=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["professional"].queryset = Professional.objects.filter(tenant=tenant, active=True).order_by("name")
-        self.items = []
-        self.previous = previous or []
-
-    def clean(self):
-        data = super().clean()
-        _not_future(self, data, "occurred_on")
-        post, items = self.data, []
-        teeth, procedures, prices = post.getlist("plan_tooth"), post.getlist("plan_procedure"), post.getlist("plan_price")
-        for index, procedure in enumerate(procedures[:PLAN_ROWS]):
-            procedure = " ".join(procedure.split())[:200]
-            tooth = " ".join((teeth[index] if index < len(teeth) else "").split())[:20]
-            raw = (prices[index] if index < len(prices) else "").strip().replace("R$", "").replace(" ", "")
-            if not procedure and not raw and not tooth:
-                continue
-            if not procedure:
-                raise forms.ValidationError(f"Item {index + 1}: informe o procedimento.")
-            try:
-                price = Decimal((raw.replace(".", "").replace(",", ".") if "," in raw else raw) or "0").quantize(Decimal("0.01"))
-            except InvalidOperation:
-                raise forms.ValidationError(f"Item {index + 1}: valor inválido.")
-            if not price.is_finite() or price < 0 or price > Decimal("999999.99"):
-                raise forms.ValidationError(f"Item {index + 1}: valor inválido.")
-            items.append({"tooth": tooth, "procedure": procedure, "price": price})
-        if not items and not self.previous:
-            raise forms.ValidationError("Adicione pelo menos um procedimento ao plano de tratamento.")
-        self.items = items
-        return data
-
-    def text(self):
-        lines = []
-        professional = self.cleaned_data.get("professional")
-        if professional:
-            lines.append(f"Dentista responsável: {professional.name}")
-        for number, item in enumerate(self.items, start=1):
-            tooth = f"Dente {item['tooth']} · " if item["tooth"] else ""
-            lines.append(f"{number}. {tooth}{item['procedure']} · {_brl(item['price'])}")
-        if not self.items:
-            lines.append("Todos os itens do plano foram removidos.")
-        kept = {_plan_key(item) for item in self.items}
-        removed = [item for item in self.previous if _plan_key(item) not in kept]
-        for item in removed:
-            tooth = f"Dente {item['tooth']} · " if item["tooth"] else ""
-            lines.append(f"Removido: {tooth}{item['procedure']} · {_brl(item['price'])}")
-        lines.append(f"Total do plano: {_brl(sum((i['price'] for i in self.items), Decimal('0')))}")
-        if (self.cleaned_data.get("notes") or "").strip():
-            lines.append(f"Observação: {self.cleaned_data['notes'].strip()}")
-        return "\n".join(lines)
+def _price(raw):
+    raw = (raw or "").strip().replace("R$", "").replace(" ", "")
+    price = Decimal((raw.replace(".", "").replace(",", ".") if "," in raw else raw) or "0").quantize(Decimal("0.01"))
+    if not price.is_finite() or price < 0 or price > Decimal("999999.99"):
+        raise InvalidOperation
+    return price
 
 
-def _plan_key(item):
-    return (item["tooth"], item["procedure"], Decimal(item["price"]))
+def posted_plan_rows(post):
+    """Rows of the plan table, in screen order. Raises ValidationError with the row number."""
+    ids, teeth, procedures, prices, statuses = (post.getlist(name) for name in
+                                                ("plan_id", "plan_tooth", "plan_procedure", "plan_price", "plan_status"))
+    rows = []
+    for index, procedure in enumerate(procedures[:PLAN_ROWS]):
+        procedure = " ".join(procedure.split())[:200]
+        tooth = " ".join((teeth[index] if index < len(teeth) else "").split())[:20]
+        raw = prices[index] if index < len(prices) else ""
+        pk = ids[index] if index < len(ids) else ""
+        if not procedure and not raw.strip() and not tooth:
+            continue
+        if not procedure:
+            raise ValidationError(f"Item {index + 1}: informe o procedimento.")
+        try:
+            price = _price(raw)
+        except (InvalidOperation, ValueError):
+            raise ValidationError(f"Item {index + 1}: valor inválido.")
+        status = statuses[index] if index < len(statuses) else ""
+        rows.append({"id": int(pk) if pk.isdigit() else None, "tooth": tooth, "procedure": procedure, "price": price,
+                     "status": status if status in {"planned", "quoted"} else "planned"})
+    return rows
 
 
-PLAN_LINE = re.compile(r"^\d+\.\s+(?:Dente\s+(?P<tooth>.+?)\s+·\s+)?(?P<procedure>.+?)\s+·\s+R\$\s*(?P<price>[\d.]+,\d{2})$")
+def plan_view(tenant, patient):
+    items = list(plan_items(tenant, patient).prefetch_related("evolutions"))
+    open_items, done = [], []
+    for item in items:
+        row = {"id": item.pk, "tooth": item.tooth, "procedure": decrypt_text(item.procedure_encrypted), "price": item.price,
+               "status": item.status, "status_label": item.get_status_display(), "executed_at": item.executed_at,
+               "professional_id": item.professional_id}
+        (open_items if item.status in DentalPlanItem.EDITABLE else done).append(row)
+    professional = next((i["professional_id"] for i in open_items if i["professional_id"]), None)
+    return {"open": open_items, "done": done, "professional": professional,
+            "total": sum((i["price"] for i in open_items), Decimal("0"))}
 
 
 def _is_plan(raw):
@@ -358,7 +431,7 @@ def _is_plan(raw):
 
 
 def plan_versions(tenant, patient, limit=20):
-    """Saved versions of the treatment plan, newest first (shown inside the plan card)."""
+    """Versions of the plan saved before plan items existed (read-only history inside the plan card)."""
     out = []
     for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:300]:
         raw = decrypt_text(note.text_encrypted)
@@ -367,37 +440,6 @@ def plan_versions(tenant, patient, limit=20):
             if len(out) >= limit:
                 break
     return out
-
-
-def current_plan(tenant, patient):
-    """The latest treatment plan of the patient, as editable items (newest note wins; old notes are kept)."""
-    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:300]:
-        try:
-            data = json.loads(decrypt_text(note.text_encrypted))
-        except (TypeError, ValueError):
-            continue
-        if not isinstance(data, dict) or not str(data.get("plan") or "").strip():
-            continue
-        items = []
-        if isinstance(data.get("plan_items"), list):
-            for raw in data["plan_items"][:PLAN_ROWS]:
-                try:
-                    items.append({"tooth": str(raw.get("tooth", ""))[:20], "procedure": str(raw["procedure"])[:200],
-                                  "price": Decimal(str(raw.get("price", "0"))).quantize(Decimal("0.01"))})
-                except (KeyError, TypeError, AttributeError, InvalidOperation):
-                    continue
-        else:
-            for line in str(data["plan"]).splitlines():
-                match = PLAN_LINE.match(line.strip())
-                if match:
-                    price = Decimal(match["price"].replace(".", "").replace(",", "."))
-                    items.append({"tooth": (match["tooth"] or "").strip(), "procedure": match["procedure"].strip(), "price": price})
-        return {"note": note, "items": items}
-    return None
-
-
-def _brl(value):
-    return "R$ " + f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _cash_access(user):
@@ -440,11 +482,88 @@ def _payment_methods(tenant):
     return list(ClinicPaymentMethod.objects.filter(tenant=tenant, active=True).order_by("kind", "name"))
 
 
-def _posted_plan(request):
-    """Rows the user typed, shown again when the plan form has an error."""
+def _can_documents(user):
+    """Same rule as the documents page: the clinic team prepares, the professional reviews and emits."""
+    try:
+        from .document_views import staff
+        staff(type("R", (), {"user": user})())
+        return True
+    except PermissionDenied:
+        return False
+
+
+EVOLUTION_ACTIONS = {"evolution", "evolution-edit", "evolution-delete", "finalize", "rectify", "rectify-note"}
+
+
+def _evolution_action(request, action, tenant, patient):
+    """Rascunho, finalização e retificação da evolução. Returns the bound form when it must be shown again."""
+    user, post = request.user, request.POST
+    form = EvolutionForm(post, tenant=tenant)
+    if action == "evolution":
+        if not form.is_valid():
+            # “Finalizar” with an empty form just closes the drafts already in the attendance.
+            if post.get("finish") and not any((post.get(k) or "").strip() for k in ("tooth", "procedure", "orthodontic", "notes")):
+                done = finalize_attendance(user=user, patient=patient, request=request)
+                messages.success(request, f"Atendimento finalizado: {len(done)} lançamento(s) registrados no prontuário."
+                                 if done else "Não há rascunhos seus para finalizar.")
+                return None
+            return form
+        create_draft(user=user, patient=patient, data=form.cleaned_data, request=request)
+        if post.get("finish"):
+            done = finalize_attendance(user=user, patient=patient, request=request)
+            messages.success(request, f"Atendimento finalizado: {len(done)} lançamento(s) registrados no prontuário.")
+        else:
+            messages.success(request, "Lançamento adicionado ao atendimento como rascunho.")
+        return None
+    if action == "finalize":
+        done = finalize_attendance(user=user, patient=patient, request=request)
+        messages.success(request, f"Atendimento finalizado: {len(done)} lançamento(s) registrados no prontuário."
+                         if done else "Não há rascunhos seus para finalizar.")
+        return None
+    target = post.get("evolution") or ""
+    if not target.isdigit() and action != "rectify-note":
+        raise PermissionDenied
+    if action == "evolution-delete":
+        evolution = get_object_or_404(DentalEvolution, pk=target, tenant=tenant, customer=patient)
+        delete_draft(user=user, evolution_id=evolution.pk, request=request)
+        messages.success(request, "Rascunho excluído.")
+        return None
+    if not form.is_valid():
+        messages.error(request, " ".join(e for errors in form.errors.values() for e in errors))
+        return None
+    if action == "evolution-edit":
+        evolution = get_object_or_404(DentalEvolution, pk=target, tenant=tenant, customer=patient)
+        update_draft(user=user, evolution_id=evolution.pk, data=form.cleaned_data, request=request)
+        messages.success(request, "Rascunho atualizado.")
+    elif action == "rectify":
+        evolution = get_object_or_404(DentalEvolution, pk=target, tenant=tenant, customer=patient)
+        rectify(user=user, evolution_id=evolution.pk, reason=post.get("reason"), data=form.cleaned_data, request=request)
+        messages.success(request, "Lançamento retificado. O registro original fica guardado para auditoria.")
+    else:
+        note_id = post.get("note") or ""
+        note = get_object_or_404(PatientNote, pk=note_id if note_id.isdigit() else 0, tenant=tenant, customer=patient)
+        rectify_note(user=user, note=note, reason=post.get("reason"), data=form.cleaned_data, request=request)
+        messages.success(request, "Lançamento retificado. O registro original fica guardado para auditoria.")
+    return None
+
+
+def _plan_action(request, tenant, patient):
     post = request.POST
-    rows = zip(post.getlist("plan_tooth"), post.getlist("plan_procedure"), post.getlist("plan_price"))
-    return [{"tooth": a, "procedure": b, "price": c} for a, b, c in list(rows)[:PLAN_ROWS] if a or b or c]
+    try:
+        rows = posted_plan_rows(post)
+        professional = None
+        if (post.get("plan_professional") or "").isdigit():
+            professional = get_object_or_404(Professional, pk=post["plan_professional"], tenant=tenant, active=True)
+        save_plan(user=request.user, patient=patient, rows=rows, professional=professional, request=request)
+        execute = post.get("execute") or ""
+        if execute.isdigit():
+            item = get_object_or_404(DentalPlanItem, pk=execute, tenant=tenant, customer=patient)
+            execute_plan_item(user=request.user, item_id=item.pk, request=request)
+            messages.success(request, "Procedimento executado: lançado na evolução como rascunho. Revise e finalize o atendimento.")
+        else:
+            messages.success(request, "Plano de tratamento salvo.")
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
 
 
 @login_required
@@ -455,47 +574,31 @@ def patient_record(request, pk):
     require(request.user, "prontuarios")
     patient = get_object_or_404(shared_patients(request.user), pk=pk, tenant=tenant)
     self_url = reverse("dental-patient-record", args=[patient.pk])
+    # Time-based finalization also runs here, so an open page never offers to edit an expired draft.
+    finalize_expired(customer=patient)
     cash_tenant = _cash_access(request.user) if patient.active else None
     session = _open_session(request, tenant) if cash_tenant else None
     receive_form = ReceiveForm(request.POST if request.POST.get("action") == "receive" else None, tenant=tenant,
                                initial={"request_id": uuid.uuid4(), "paid_on": timezone.localdate(),
                                         "professional": _default_professional(request.user, patient, clinical)}) if cash_tenant else None
-    note_form = NoteForm(request.POST if request.POST.get("action") == "note" else None, initial={"occurred_on": timezone.localdate()})
-    plan_now = current_plan(tenant, patient)
-    plan_form = PlanForm(request.POST if request.POST.get("action") == "plan" else None, tenant=tenant,
-                         previous=plan_now["items"] if plan_now else None,
-                         initial={"occurred_on": timezone.localdate(), "professional": _default_professional(request.user, patient, clinical)})
+    evolution_form = EvolutionForm(tenant=tenant, initial={"clinical_date": timezone.localdate(),
+                                                           "professional": _default_professional(request.user, patient, clinical)})
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "note":
+        if action in EVOLUTION_ACTIONS:
             require(request.user, "evolucao")
-        if action == "plan":
-            require(request.user, "plano")
-        if action == "note":
-            if note_form.is_valid():
-                content = {key: (note_form.cleaned_data.get(key) or "").strip() for key, _ in EVOLUTION_FIELDS}
-                note = PatientNote.objects.create(
-                    tenant=tenant, customer=patient, text_encrypted=encrypt_text(json.dumps(content, ensure_ascii=False)),
-                    author=request.user, author_name=(request.user.get_full_name() or request.user.email)[:160],
-                    occurred_at=_at_day(note_form.cleaned_data["occurred_on"]))
-                append_audit(tenant=tenant, user=request.user, request=request, action="clinical.patient_note.created",
-                             entity_type="PatientNote", entity_id=note.pk, after={"customer": patient.pk})
-                messages.success(request, "Evolução salva no prontuário.")
-                return redirect(self_url)
+            try:
+                bound = _evolution_action(request, action, tenant, patient)
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
+                bound = None
+            if bound is None:
+                return redirect(self_url + "#evolucao")
+            evolution_form = bound
         elif action == "plan":
-            if plan_form.is_valid():
-                note = PatientNote.objects.create(
-                    tenant=tenant, customer=patient,
-                    text_encrypted=encrypt_text(json.dumps({"plan": plan_form.text(), "plan_items": [
-                        {"tooth": i["tooth"], "procedure": i["procedure"], "price": str(i["price"])} for i in plan_form.items]},
-                        ensure_ascii=False)),
-                    author=request.user, author_name=(request.user.get_full_name() or request.user.email)[:160],
-                    occurred_at=_at_day(plan_form.cleaned_data["occurred_on"]))
-                append_audit(tenant=tenant, user=request.user, request=request, action="clinical.patient_plan.created",
-                             entity_type="PatientNote", entity_id=note.pk, after={"customer": patient.pk, "items": len(plan_form.items),
-                                    "replaces": plan_now["note"].pk if plan_now else None})
-                messages.success(request, "Plano de tratamento atualizado." if plan_now else "Plano de tratamento salvo.")
-                return redirect(self_url)
+            require(request.user, "plano")
+            _plan_action(request, tenant, patient)
+            return redirect(self_url + "#plano")
         elif action == "receive":
             if not cash_tenant:
                 raise PermissionDenied("Seu perfil não registra recebimentos no caixa.")
@@ -538,11 +641,15 @@ def patient_record(request, pk):
             return redirect(self_url)
         else:
             raise PermissionDenied
-    append_audit(tenant=tenant, user=request.user, request=request, action="clinical.dental.patient_record.viewed",
+    audit = request.GET.get("auditoria") == "1"
+    append_audit(tenant=tenant, user=request.user, request=request,
+                 action="clinical.dental.patient_record.audit_viewed" if audit else "clinical.dental.patient_record.viewed",
                  entity_type="Customer", entity_id=patient.pk)
     from .patient_registration import missing_registration
     birth = patient.birth_date
     today = timezone.localdate()
+    can_evolve = allowed(request.user, "evolucao")
+    plan = plan_view(tenant, patient)
     return render(request, "healthcare/dental_patient_record.html", {
         **shell_context(request.user, request),
         "patient": patient, "clinical": clinical,
@@ -550,15 +657,21 @@ def patient_record(request, pk):
         "age": (today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))) if birth else None,
         "missing": missing_registration(patient),
         "timeline": build_timeline(tenant=tenant, patient=patient, user=request.user, ip=request.META.get("REMOTE_ADDR", ""),
-                                   clinical=clinical),
+                                   clinical=clinical, audit=audit, can_evolve=can_evolve),
+        "audit": audit, "hidden_rectified": hidden_rectified(tenant, patient),
         "can_schedule": has_capability(request.user, "agenda.manage") and request.user.role not in {"professional", "healthcare"},
-        "document_kinds": DOCUMENT_KINDS,
+        "document_kinds": DOCUMENT_KINDS, "can_documents": patient.active and _can_documents(request.user),
         "receive_form": receive_form if allowed(request.user, "caixa") else None, "cash_session": session,
         "plan_receivables": list(_plan_receivables(tenant, patient)[:50]) if cash_tenant and allowed(request.user, "caixa") else [],
         "payment_methods": _payment_methods(tenant) if cash_tenant else [],
-        "note_form": note_form, "plan_form": plan_form, "can_evolve": allowed(request.user, "evolucao"),
-        "can_plan": allowed(request.user, "plano"),
-        "plan_items": _posted_plan(request) if plan_form.is_bound else (plan_now["items"] if plan_now else []),
-        "plan_existing": bool(plan_now and plan_now["items"]),
-        "plan_versions": plan_versions(tenant, patient) if plan_now else [],
+        "evolution_form": evolution_form, "can_evolve": can_evolve,
+        "drafts": current_drafts(tenant, patient, request.user, can_evolve), "draft_hours": draft_hours(),
+        "professionals": list(Professional.objects.filter(tenant=tenant, active=True).order_by("name").values("pk", "name")),
+        "can_plan": allowed(request.user, "plano"), "plan": plan,
+        "plan_professional": plan["professional"] or _default_professional(request.user, patient, clinical),
+        "plan_versions": plan_versions(tenant, patient),
+        "reasons": RECTIFY_REASONS,
     })
+
+
+RECTIFY_REASONS = ("Erro de digitação", "Dente incorreto", "Procedimento incorreto", "Data incorreta")

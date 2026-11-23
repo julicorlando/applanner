@@ -10,7 +10,7 @@ from billing.models import Module, TenantModule
 from core.crypto import decrypt_text, encrypt_text
 from scheduling.models import Customer
 
-from .document_models import ClinicalIssuedDocument, PatientNote
+from .document_models import ClinicalIssuedDocument
 from .models import MedicalRecordAccessLog
 from . import test_dental_assessments as dental
 
@@ -45,7 +45,8 @@ class PatientRecordTests(TestCase):
         self.assertContains(response, 'name="orthodontic_treatment"')
         self.assertContains(response, "Tratamento ortodôntico")
 
-    def test_reception_opens_any_patient_without_appointment_and_adds_observation(self):
+    def test_reception_opens_any_patient_without_appointment_and_adds_evolution(self):
+        from .evolution_models import DentalEvolution
         unscheduled = Customer.objects.create(tenant=self.tenant, name="Paciente Sem Agenda Exemplo")
         self.client.force_login(self.reception)
         listing = self.client.get(reverse("dental-assessments"))
@@ -54,18 +55,19 @@ class PatientRecordTests(TestCase):
         self.assertEqual(self.client.get(self.url(unscheduled)).status_code, 200)
         self.assertContains(self.client.get(self.url()), "Informação clínica de teste")
         self.assertContains(self.client.get(self.url()), 'name="procedure"')
-        self.assertEqual(self.client.post(self.url(), {"action": "note", "text": ""}).status_code, 200)
-        response = self.client.post(self.url(), {"action": "note", "procedure": "Moldagem superior realizada.",
-                                                 "orthodontic": "", "text": "Paciente pediu retorno à tarde."})
-        self.assertRedirects(response, self.url(), fetch_redirect_response=False)
-        note = PatientNote.objects.get(customer=self.patient)
-        self.assertIn("Moldagem superior realizada.", decrypt_text(note.text_encrypted))
-        self.assertNotIn("Moldagem", note.text_encrypted)
+        self.assertEqual(self.client.post(self.url(), {"action": "evolution", "notes": ""}).status_code, 200)
+        response = self.client.post(self.url(), {"action": "evolution", "procedure": "Moldagem superior realizada.",
+                                                 "orthodontic": "", "notes": "Paciente pediu retorno à tarde.", "finish": "1"})
+        self.assertRedirects(response, self.url() + "#evolucao", fetch_redirect_response=False)
+        evolution = DentalEvolution.objects.get(customer=self.patient)
+        self.assertEqual(evolution.status, "finalized")
+        self.assertEqual(decrypt_text(evolution.procedure_encrypted), "Moldagem superior realizada.")
+        self.assertNotIn("Moldagem", evolution.procedure_encrypted)
         page = self.client.get(self.url())
         self.assertContains(page, "Moldagem superior realizada.")
         self.assertContains(page, "Paciente pediu retorno à tarde.")
         with self.assertRaises(ValidationError):
-            note.save()
+            evolution.save()
         # The dentist of the patient sees the front desk evolution too.
         self.client.force_login(self.doctor)
         self.assertContains(self.client.get(self.url()), "Moldagem superior realizada.")
@@ -147,52 +149,35 @@ class PatientRecordPaymentTests(TestCase):
             "paid_on": (timezone.localdate() + timedelta(days=1)).isoformat()})
         self.assertContains(future, "A data não pode ser no futuro")
 
-    def test_dated_evolution_and_treatment_plan_go_into_the_history(self):
+    def test_dated_evolution_goes_into_the_history_and_plan_stays_in_its_card(self):
         from datetime import date
-        from django.utils import timezone
-        from .document_models import PatientNote
-        self.client.post(self.url(), {"action": "note", "procedure": "Restauração 16", "orthodontic": "", "text": "",
-                                      "occurred_on": "2026-10-05"})
-        note = PatientNote.objects.get(customer=self.patient)
-        self.assertEqual(timezone.localtime(note.occurred_at).date(), date(2026, 10, 5))
-        empty = self.client.post(self.url(), {"action": "plan", "plan_procedure": ["", ""], "plan_price": ["", ""]})
-        self.assertContains(empty, "Adicione pelo menos um procedimento")
+        from .evolution_models import DentalEvolution, DentalPlanItem
+        self.client.post(self.url(), {"action": "evolution", "procedure": "Restauração 16", "clinical_date": "2026-10-05",
+                                      "finish": "1"})
+        self.assertEqual(DentalEvolution.objects.get(customer=self.patient).clinical_date, date(2026, 10, 5))
+        empty = self.client.post(self.url(), {"action": "plan", "plan_procedure": ["", "x"], "plan_price": ["", "abc"]})
+        self.assertEqual(empty.status_code, 302)
+        self.assertFalse(DentalPlanItem.objects.exists())
         response = self.client.post(self.url(), {
-            "action": "plan", "occurred_on": "", "professional": "", "notes": "Começar pela urgência",
-            "plan_tooth": ["16", "", ""], "plan_procedure": ["Restauração", "Limpeza", ""], "plan_price": ["150,00", "120", ""]})
-        self.assertRedirects(response, self.url(), fetch_redirect_response=False)
+            "action": "plan", "plan_id": ["", "", ""], "plan_tooth": ["16", "", ""], "plan_procedure": ["Restauração", "Limpeza", ""],
+            "plan_price": ["150,00", "120", ""], "plan_status": ["planned", "planned", "planned"]})
+        self.assertRedirects(response, self.url() + "#plano", fetch_redirect_response=False)
         page = self.client.get(self.url())
-        self.assertContains(page, "Plano de tratamento")
-        self.assertContains(page, "1. Dente 16 · Restauração · R$ 150,00")
-        self.assertContains(page, "Total do plano: R$ 270,00")
         self.assertContains(page, "05/10/2026")
-        self.assertContains(page, 'value="Limpeza"')  # current plan comes back as editable rows
-        history = [label for day in page.context["timeline"] for note in day["notes"] for label, _ in note["sections"]]
+        self.assertContains(page, 'value="Limpeza"')
+        self.assertEqual(page.context["plan"]["total"], Decimal("270.00"))
+        history = [label for day in page.context["timeline"] for e in day["evolutions"] for label, _ in e["sections"]]
         self.assertIn("Procedimento clínico", history)
         self.assertNotIn("Plano de tratamento", history)  # the plan stays in its own card
-        self.assertContains(page, "Versões salvas do plano (1)")
-        self.assertContains(page, "Salvar alterações do plano")
-        self.client.post(self.url(), {"action": "plan", "plan_tooth": ["16", ""], "plan_procedure": ["Restauração", "Canal"],
-                                      "plan_price": ["150,00", "400"]})
-        page = self.client.get(self.url())
-        self.assertContains(page, "Removido: Limpeza · R$ 120,00")
-        self.assertContains(page, "Total do plano: R$ 550,00")
-        self.assertNotContains(page, 'value="Limpeza"')
-        self.assertContains(page, 'value="Canal"')
-        self.client.post(self.url(), {"action": "plan", "plan_procedure": [""], "plan_price": [""]})
-        page = self.client.get(self.url())
-        self.assertContains(page, "Todos os itens do plano foram removidos.")
-        self.assertNotContains(page, 'value="Canal"')
-        self.assertEqual(PatientNote.objects.filter(customer=self.patient).count(), 4)  # history is kept
 
     def test_reception_edits_saved_plan_unless_manager_turns_it_off(self):
         from finance import reception_permissions as perms
+        from .evolution_models import DentalPlanItem
         self.client.post(self.url(), {"action": "plan", "plan_tooth": ["11"], "plan_procedure": ["Clareamento"], "plan_price": ["300"]})
-        page = self.client.get(self.url())
-        self.assertContains(page, 'value="Clareamento"')
-        self.client.post(self.url(), {"action": "plan", "plan_tooth": ["11", ""], "plan_procedure": ["Clareamento", "Faceta"],
-                                      "plan_price": ["250", "900"]})
-        self.assertContains(self.client.get(self.url()), "Total do plano: R$ 1.150,00")
+        item = DentalPlanItem.objects.get()
+        self.client.post(self.url(), {"action": "plan", "plan_id": [str(item.pk), ""], "plan_tooth": ["11", ""],
+                                      "plan_procedure": ["Clareamento", "Faceta"], "plan_price": ["250", "900"]})
+        self.assertEqual(self.client.get(self.url()).context["plan"]["total"], Decimal("1150.00"))
         values = perms.current(self.tenant)
         values.update(plano=False)
         perms.save(self.tenant, self.owner, values)

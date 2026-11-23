@@ -52,11 +52,21 @@ def save_signature(user,upload=None,remove=False):
 
 
 def identity(user):
-    professional=own_professional(user)
+    return professional_identity(own_professional(user))
+
+
+def professional_identity(professional,*,own=True):
     registration=ClinicalRegistration.objects.filter(professional=professional).first()
-    if not registration:raise ValidationError('Informe seu CRO/UF ou CREFITO no cadastro profissional antes de emitir.')
+    if not registration:
+        raise ValidationError('Informe seu CRO/UF ou CREFITO no cadastro profissional antes de emitir.' if own else
+                              f'{professional.name} ainda não cadastrou o CRO/UF; o documento não pode ser emitido.')
     registration.full_clean()
     return professional,registration.snapshot()
+
+
+def reception_may_emit(user):
+    from finance.reception_permissions import allowed
+    return getattr(user,'role','')=='reception' and allowed(user,'documentos')
 
 
 def _read_image(field):
@@ -117,16 +127,30 @@ def document_pdf(*,tenant,patient,title,body,professional,signature_image=b'',is
 
 @transaction.atomic
 def finalize_document(*,user,document,body,title,version,confirmed,base_url=''):
-    profile,snapshot=identity(user)
-    row=ClinicalIssuedDocument.objects.select_for_update().get(pk=document.pk,tenant=user.tenant,professional=profile)
+    """Emite o documento. A recepção (se o gestor liberou) emite em nome do dentista escolhido no documento,
+    com a identificação e a assinatura cadastradas dele; quem emitiu fica no registro e no log de auditoria."""
+    on_behalf=getattr(user,'role','')=='reception'
+    if on_behalf:
+        if not reception_may_emit(user):raise PermissionDenied('O gestor não liberou a emissão de documentos pela recepção.')
+        row=ClinicalIssuedDocument.objects.select_for_update(of=('self',)).select_related('professional__user').get(
+            pk=document.pk,tenant=user.tenant,created_by=user)
+        if not row.professional.active or not row.professional.user_id:raise PermissionDenied
+        profile,snapshot=professional_identity(row.professional,own=False)
+        author=row.professional.user
+    else:
+        profile,snapshot=identity(user)
+        row=ClinicalIssuedDocument.objects.select_for_update().get(pk=document.pk,tenant=user.tenant,professional=profile)
+        author=user
     if row.status=='finalized':return row
     if row.version!=version:raise ValidationError('Outro acesso alterou o rascunho. Atualize a página antes de emitir.')
     if row.kind=='prescription' and snapshot['council']!='CRO':raise ValidationError('O receituário odontológico exige identificação CRO válida.')
     if not confirmed:raise ValidationError('Revise e confirme a autoria antes da emissão.')
-    if not patients_for(user).filter(pk=row.customer_id).exists():raise PermissionDenied
+    if not patients_for(user,administrative=on_behalf).filter(pk=row.customer_id).exists():raise PermissionDenied
     if not body.strip() or len(body)>20000:raise ValidationError('Informe um texto de até 20 mil caracteres.')
     signature=ProfessionalSignature.objects.filter(professional=profile).first()
-    if not signature or not signature.image_encrypted:raise ValidationError('Cadastre sua assinatura profissional antes de emitir o documento.')
+    if not signature or not signature.image_encrypted:
+        raise ValidationError(f'{profile.name} ainda não cadastrou a assinatura; o documento não pode ser emitido.' if on_behalf else
+                              'Cadastre sua assinatura profissional antes de emitir o documento.')
     raw=Fernet(settings.FIELD_ENCRYPTION_KEY.encode()).decrypt(bytes(signature.image_encrypted))
     import secrets
     code=secrets.token_urlsafe(24)
@@ -135,11 +159,17 @@ def finalize_document(*,user,document,body,title,version,confirmed,base_url=''):
     row.verification_code=code
     row.body_encrypted=encrypt_text(body);row.title=title;row.sha256=hashlib.sha256(pdf).hexdigest()
     row.pdf_encrypted=Fernet(settings.FIELD_ENCRYPTION_KEY.encode()).encrypt(pdf)
-    row.signature_snapshot_encrypted=encrypt_json({**snapshot,'image_sha256':signature.sha256 if signature else '', 'issued_at':now.isoformat()})
-    row.entry=create_record(tenant=user.tenant,customer=row.customer,professional=profile,user=user,title=title,
-        content=json.dumps({'document_id':row.pk,'kind':row.kind,'body':body,'sha256':row.sha256,'signature':snapshot},ensure_ascii=False),record_type='observation')
+    issued_by={'user_id':user.pk,'name':user.get_full_name() or user.email,'role':user.role} if on_behalf else None
+    row.signature_snapshot_encrypted=encrypt_json({**snapshot,'image_sha256':signature.sha256 if signature else '', 'issued_at':now.isoformat(),
+                                                   **({'issued_by':issued_by} if issued_by else {})})
+    content={'document_id':row.pk,'kind':row.kind,'body':body,'sha256':row.sha256,'signature':snapshot}
+    if issued_by:content['issued_by']=issued_by
+    # The clinical ledger entry is the professional's (their signature); the front-desk issuer is kept inside it.
+    row.entry=create_record(tenant=user.tenant,customer=row.customer,professional=profile,user=author,title=title,
+        content=json.dumps(content,ensure_ascii=False),record_type='observation')
     row.status='finalized';row.finalized_at=now;row.version+=1;row.save()
-    append_audit(tenant=user.tenant,user=user,action='clinical.document.finalized',entity_type='ClinicalIssuedDocument',entity_id=row.pk,after={'sha256':row.sha256})
+    append_audit(tenant=user.tenant,user=user,action='clinical.document.finalized',entity_type='ClinicalIssuedDocument',entity_id=row.pk,
+                 after={'sha256':row.sha256,'professional_id':profile.pk,'on_behalf_of_professional':on_behalf})
     return row
 
 
@@ -151,7 +181,8 @@ def text_from_template(template,patient,professional,tenant):
     return text
 
 
-DEFAULT_TITLES={'prescription':'Receituário','certificate':'Atestado','declaration':'Declaração','budget':'Orçamento'}
+DEFAULT_TITLES={'prescription':'Receituário','certificate':'Atestado','declaration':'Declaração','report':'Laudo odontológico',
+                'referral':'Encaminhamento','exam_request':'Solicitação de exames','budget':'Orçamento'}
 
 
 def brl(value):
@@ -184,9 +215,38 @@ def latest_budget_lines(user,patient):
     return plan,[line for line in data.get('lines',[]) if isinstance(line,dict)]
 
 
+def _cpf(patient):
+    return f", CPF {patient.cpf}," if getattr(patient,'cpf','') else ""
+
+
+def _identity(patient):
+    """Patient data lines that open reports and requests (only what the record has)."""
+    lines=[]
+    if getattr(patient,'cpf',''):lines.append(f"CPF: {patient.cpf}")
+    birth=getattr(patient,'birth_date',None)
+    if birth:
+        today=timezone.localdate()
+        age=today.year-birth.year-((today.month,today.day)<(birth.month,birth.day))
+        lines.append(f"Data de nascimento: {birth:%d/%m/%Y} ({age} anos)")
+    return ''.join(line+'\n' for line in lines)+'\n'
+
+
 def default_body(*,kind,user,patient,professional):
     """Editable starting text mirroring the clinic's paper models; the professional reviews before emission."""
     name=patient.name
+    identity=_identity(patient)
+    if kind=='report':
+        return (f"Paciente: {name}\n{identity}"
+                "## Histórico e queixa\n\n## Exame clínico\n\n## Exames complementares\n\n## Diagnóstico\n\n## Conclusão\n"
+                "Declaro, para os devidos fins, que as informações acima refletem o exame clínico realizado neste consultório.")
+    if kind=='referral':
+        return (f"Encaminho o(a) paciente {name}{_cpf(patient)} para avaliação e conduta especializada.\n\n"
+                "Especialidade / profissional: \nMotivo do encaminhamento: \nDente(s) / região: \n"
+                "Informações clínicas relevantes: \n\nAgradeço a atenção e coloco-me à disposição para informações adicionais.")
+    if kind=='exam_request':
+        return (f"Paciente: {name}\n{identity}"
+                "Solicito a realização do(s) seguinte(s) exame(s):\n\n- Radiografia panorâmica\n- \n\n"
+                "Indicação clínica: ")
     if kind=='prescription':
         return ('- Medicamento -------- concentração -------- quantidade\n'
                 'Tomar 01 comprimido de 08/08 horas durante 07 dias.\n')

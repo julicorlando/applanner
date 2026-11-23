@@ -22,7 +22,8 @@ from .pdf_styles import clinical_pdf_styles
 MONTHS = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
           "agosto", "setembro", "outubro", "novembro", "dezembro")
 TITLES = {"prescription": "RECEITUÁRIO", "certificate": "ATESTADO",
-          "declaration": "DECLARAÇÃO", "budget": "ORÇAMENTO"}
+          "declaration": "DECLARAÇÃO", "report": "LAUDO", "referral": "ENCAMINHAMENTO",
+          "exam_request": "SOLICITAÇÃO DE EXAMES", "budget": "ORÇAMENTO"}
 ROLE_BY_COUNCIL = {"CRO": "Cirurgião-Dentista", "CREFITO": "Fisioterapeuta"}
 LABEL_LINE = re.compile(r"^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ /().º°-]{1,38}):(\s.*|)$")
 PAGE_W, PAGE_H = A4
@@ -162,7 +163,7 @@ def render_document(*, kind, title, body, clinic, patient, professional, issued_
     doc.addPageTemplates([PageTemplate(id="letterhead", frames=[frame], onPage=decorate)])
 
     story = [Paragraph(f"<u>{escape(TITLES.get(kind, title.upper()))}</u>", styles["title"])]
-    justify = kind in {"certificate", "declaration"}
+    justify = kind in {"certificate", "declaration", "report", "referral"}
     if kind == "prescription":
         story += [Paragraph(f"<b>Para:</b> {escape(patient.get('name', ''))}", styles["body"]), Spacer(1, 10)]
     elif kind == "budget":
