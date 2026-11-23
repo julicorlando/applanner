@@ -1,0 +1,58 @@
+{% extends 'base.html' %}{% load display_pt %}{% load static %}
+{% block title %}Relatório do caixa{% endblock %}
+{% block content %}<link rel="stylesheet" href="{% static 'finance/cash-panel.css' %}">
+<main class="cp" aria-labelledby="cr-title">
+<div class="cp-print-head"><strong>{{ request.user.tenant.name }}</strong>{% if unit %} · {{ unit.name }}{% endif %} — Relatório do caixa de {{ start|date:'d/m/Y' }} a {{ end|date:'d/m/Y' }}</div>
+<header class="cp-head">
+  <div><p class="cp-eyebrow"><a href="{% url 'clinic-finance-desk' %}">Financeiro</a> · <a href="{% url 'clinic-cash-panel' %}">Caixa</a></p>
+    <h1 id="cr-title">Relatório do caixa</h1>
+    <p>{{ start|date:'d/m/Y' }}{% if start != end %} a {{ end|date:'d/m/Y' }}{% endif %} · {{ kpis.days }} dia(s) com caixa{% if unit %} · {{ unit.name }}{% endif %}</p></div>
+  <div class="cp-actions"><a class="cp-btn" href="{{ csv_url }}">Exportar CSV</a><button type="button" class="cp-btn" data-print>Imprimir / PDF</button><a class="cp-btn is-primary" href="{% url 'clinic-cash-panel' %}">Caixa de hoje</a></div>
+</header>
+
+<nav class="cp-presets" aria-label="Períodos rápidos">{% for key, label in presets %}<a href="?periodo={{ key }}{% if filters.professional %}&amp;profissional={{ filters.professional }}{% endif %}{% if filters.status %}&amp;status={{ filters.status }}{% endif %}{% if filters.kind %}&amp;forma={{ filters.kind }}{% endif %}" class="{% if filters.preset == key %}is-on{% endif %}">{{ label }}</a>{% endfor %}</nav>
+<form method="get" class="cp-filters" aria-label="Filtros do relatório">
+  <label>De<input type="date" name="de" value="{{ start|date:'Y-m-d' }}" max="{{ end|date:'Y-m-d' }}"></label>
+  <label>Até<input type="date" name="ate" value="{{ end|date:'Y-m-d' }}"></label>
+  <label>Profissional<select name="profissional"><option value="">Todos</option><option value="clinica"{% if filters.professional == 'clinica' %} selected{% endif %}>Caixa da clínica</option>{% for p in professionals %}<option value="{{ p.pk }}"{% if filters.professional == p.pk|stringformat:'s' %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label>
+  <label>Situação<select name="status">{% for value, label in status_filters %}<option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Forma de pagamento<select name="forma"><option value="">Todas</option>{% for value, label in kinds %}<option value="{{ value }}"{% if filters.kind == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <div><button class="cp-btn is-primary" style="width:100%;justify-content:center">Aplicar filtros</button></div>
+</form>
+
+{% if sheets %}
+<dl class="cp-kpis" aria-label="Resumo do período">
+  <div class="cp-kpi is-lead"><dt>Recebido</dt><dd>R$ {{ kpis.received|money_pt }}</dd><small>Média de R$ {{ kpis.average|money_pt }} por dia</small></div>
+  <div class="cp-kpi"><dt>Despesas</dt><dd>R$ {{ kpis.expenses|money_pt }}</dd><small>Pagas no caixa</small></div>
+  <div class="cp-kpi {% if kpis.net < 0 %}is-err{% else %}is-ok{% endif %}"><dt>Resultado</dt><dd>R$ {{ kpis.net|money_pt }}</dd><small>Recebido − despesas</small></div>
+  <div class="cp-kpi"><dt>Em aberto</dt><dd>R$ {{ kpis.open_total|money_pt }}</dd><small>Atendimentos não pagos</small></div>
+  <div class="cp-kpi"><dt>Caixas</dt><dd>{{ kpis.sheets }}</dd><small>{{ kpis.lines }} lançamento(s) · {% if kpis.open %}{{ kpis.open }} aberto(s){% else %}todos fechados{% endif %}{% if kpis.divergent %} · <span class="cp-neg">{{ kpis.divergent }} com divergência</span>{% endif %}</small></div>
+</dl>
+
+<section class="cp-panel" aria-labelledby="cr-methods"><header><h2 id="cr-methods">Por forma de pagamento</h2></header>
+  <div class="cp-bar" role="img" aria-label="{% for m in methods %}{{ m.label }} {{ m.share }}%{% if not forloop.last %}, {% endif %}{% endfor %}">{% for m in methods %}{% if m.share %}<span class="k-{{ m.kind }}" style="width:{{ m.share }}%"></span>{% endif %}{% endfor %}</div>
+  <ul class="cp-legend">{% for m in methods %}<li><span class="cp-dot k-{{ m.kind }}"></span>{{ m.label }} <strong>R$ {{ m.amount|money_pt }}</strong> <span class="cp-hint" style="margin:0">{{ m.share }}%</span></li>{% endfor %}</ul>
+</section>
+
+<div class="cp-two">
+<section class="cp-panel" aria-labelledby="cr-prof"><header><h2 id="cr-prof">Por profissional</h2><span class="cp-hint" style="margin:0">Divisão do que foi recebido</span></header>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Profissional</th><th>Caixas</th><th>Dentista</th><th>Consultório</th><th>Outros</th><th>Recebido</th></tr></thead><tbody>
+{% for p in by_professional %}<tr><td>{{ p.label }}{% if p.divergent %} <span class="cp-badge s-divergent">{{ p.divergent }}</span>{% endif %}<span class="cp-meter" aria-hidden="true"><span style="width:{{ p.share }}%"></span></span></td><td>{{ p.sheets }}</td><td>R$ {{ p.dentist|money_pt }}</td><td>R$ {{ p.clinic|money_pt }}</td><td>R$ {{ p.other|money_pt }}</td><td><strong>R$ {{ p.received|money_pt }}</strong>{% if p.open_total %}<br><small class="cp-hint" style="margin:0">+ R$ {{ p.open_total|money_pt }} em aberto</small>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></section>
+
+<section class="cp-panel" aria-labelledby="cr-day"><header><h2 id="cr-day">Por dia</h2></header>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Dia</th><th>Caixas</th><th>Recebido</th><th>Despesas</th><th>Resultado</th></tr></thead><tbody>
+{% for d in by_day %}<tr><td><a href="{% url 'clinic-cash-panel' %}?dia={{ d.day|date:'Y-m-d' }}">{{ d.day|date:'d/m D' }}</a>{% if d.open %} <span class="cp-badge s-open">{{ d.open }} aberto</span>{% endif %}{% if d.divergent %} <span class="cp-badge s-divergent">{{ d.divergent }}</span>{% endif %}</td><td>{{ d.sheets }}</td><td>R$ {{ d.received|money_pt }}</td><td>R$ {{ d.expenses|money_pt }}</td><td class="{% if d.net < 0 %}cp-neg{% endif %}">R$ {{ d.net|money_pt }}</td></tr>{% endfor %}
+</tbody></table></div></section>
+</div>
+
+<section class="cp-panel" aria-labelledby="cr-sheets"><header><h2 id="cr-sheets">Caixas do período</h2><span class="cp-hint" style="margin:0">{{ sheets|length }} caixa(s)</span></header>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Dia</th><th class="is-left">Caixa</th><th class="is-left">Situação</th><th>Lanç.</th><th>Dinheiro</th><th>Pix</th><th>Débito/Crédito</th><th>Recebido</th><th>Despesas</th><th>Diferença na gaveta</th><th class="no-print"><span class="sr-only">Abrir</span></th></tr></thead><tbody>
+{% for r in sheets %}<tr><td>{{ r.day|date:'d/m/Y' }}</td><td class="is-left">{{ r.label }}</td><td class="is-left"><span class="cp-badge s-{{ r.status }}">{{ r.status_label }}</span></td><td>{{ r.lines }}</td><td>R$ {{ r.kinds.cash|money_pt }}</td><td>R$ {{ r.kinds.pix|money_pt }}</td><td>R$ {{ r.kinds.card|money_pt }}</td><td><strong>R$ {{ r.received|money_pt }}</strong></td><td>R$ {{ r.expenses|money_pt }}</td><td class="{% if r.difference %}cp-neg{% endif %}">{% if r.difference is None %}—{% else %}R$ {{ r.difference|money_pt }}{% endif %}</td><td class="no-print"><a href="{% url 'clinic-cash-sheet-detail' r.session.pk %}">Folha</a></td></tr>{% endfor %}
+</tbody><tfoot><tr><td colspan="7" class="is-left">Total</td><td>R$ {{ kpis.received|money_pt }}</td><td>R$ {{ kpis.expenses|money_pt }}</td><td colspan="2"></td></tr></tfoot></table></div></section>
+{% else %}
+<div class="cp-empty"><strong>Nenhum caixa encontrado</strong>Não há caixas para os filtros escolhidos. Tente outro período ou limpe os filtros.<p style="margin-top:14px"><a class="cp-btn" href="{% url 'clinic-cash-report' %}">Limpar filtros</a></p></div>
+{% endif %}
+</main>
+<script>document.querySelector('[data-print]')?.addEventListener('click',()=>window.print());</script>
+{% endblock %}

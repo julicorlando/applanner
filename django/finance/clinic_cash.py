@@ -427,6 +427,16 @@ class EntryForm(forms.Form):
         return data
 
 
+CLOSED_CONFIRMATION = ("Este caixa já foi fechado. Marque a confirmação para lançar ou alterar nele: "
+                       "a conferência é recalculada e a alteração fica na auditoria.")
+
+
+def _require_closed_confirmation(request, session):
+    """Changing a closed sheet is allowed (audited), but never by accident."""
+    if session.status == CashSession.Status.CLOSED and request.POST.get("confirm_closed") != "1":
+        raise ValidationError(CLOSED_CONFIRMATION)
+
+
 def _payload(form):
     data = dict(form.cleaned_data)
     data.pop("entry_id", None)
@@ -474,8 +484,10 @@ def cash_sheet(request, pk=None):
                     with transaction.atomic():
                         target = day_sheet(tenant, session.unit, chosen, request.user, day=session_day(session))
                     messages.info(request, f"Lançado no caixa de {target.label} do mesmo dia.")
+                _require_closed_confirmation(request, target)
                 add_entry(user=request.user, session_id=target.pk, **_payload(form))
             elif action == "update" and form.is_valid() and form.cleaned_data.get("entry_id"):
+                _require_closed_confirmation(request, session)
                 payload = _payload(form)
                 payload.pop("request_id")
                 update_entry(user=request.user, entry_id=form.cleaned_data["entry_id"], **payload)

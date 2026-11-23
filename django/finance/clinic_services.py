@@ -106,15 +106,24 @@ def active_cash(tenant,unit,*,recording=True,professional=None,user=None):
 
 
 @transaction.atomic
-def open_clinic_cash(user,unit,amount,notes="",professional=None):
+def open_clinic_cash(user,unit,amount,notes="",professional=None,day=None):
+    """Abre o caixa de um profissional (ou da clínica) em um dia. Dias anteriores seguem a permissão
+    "dias_anteriores" da recepção; dia futuro não é aceito."""
     from .reception_permissions import require
     require(user,'abrir_fechar')
     tenant=lock_company(user)
     if unit and (unit.tenant_id!=tenant.pk or not unit.active): raise PermissionDenied
-    day=business_today(tenant)
-    existing=CashSession.objects.filter(tenant=tenant,unit=unit,business_date=day,professional=professional,status='open').first()
-    if existing:
-        raise ValidationError(f'O caixa de hoje de {existing.label} já existe. Abra a folha dele para lançar.')
+    if professional and (professional.tenant_id!=tenant.pk or not professional.active): raise PermissionDenied
+    today=business_today(tenant)
+    day=day or today
+    if day>today: raise ValidationError('Não é possível abrir caixa para uma data futura.')
+    if day<today: require(user,'dias_anteriores')
+    existing=CashSession.objects.filter(tenant=tenant,unit=unit,business_date=day,professional=professional,deleted_at__isnull=True).order_by('-pk').first()
+    if existing and existing.status=='open':
+        raise ValidationError(f'O caixa de {existing.label} deste dia já está aberto. Abra a folha dele para lançar.')
+    if existing and day<today:
+        # Earlier days keep one sheet: adjust the closed one instead of opening another.
+        raise ValidationError(f'O caixa de {existing.label} deste dia já foi fechado. Para ajustar, abra a folha e peça a correção.')
     row=day_sheet(tenant,unit,professional,user,day=day,opening=amount)
     if notes: CashSession.objects.filter(pk=row.pk).update(notes=notes[:500])
     return row
@@ -237,8 +246,23 @@ def day_bounds(tenant,day):
     return start,start+timedelta(days=1)-timedelta(microseconds=1)
 
 
+def _conference(data,expected_cash_amount,counted):
+    """Esperado x informado por forma de pagamento. counted: {kind: valor informado}; ausente = não conferido."""
+    expected={'cash':expected_cash_amount}
+    expected.update({{'Pix':'pix','Débito/Crédito':'card'}[label]:value for label,value in data['kinds'] if label!='Dinheiro'})
+    rows={}
+    for kind in ('cash','pix','card'):
+        if kind not in counted: continue
+        informed=money(counted[kind],True)
+        rows[kind]={'expected':format(expected.get(kind,Decimal(0)),'.2f'),'informed':format(informed,'.2f'),
+                    'difference':format(informed-expected.get(kind,Decimal(0)),'.2f')}
+    return rows
+
+
 @transaction.atomic
-def close_clinic_cash(*,user,unit,amount,notes='',session_id=None):
+def close_clinic_cash(*,user,unit,amount,notes='',session_id=None,counted=None):
+    """Fecha um caixa. amount = dinheiro contado na gaveta. counted (opcional) = valores conferidos de Pix e
+    cartão; qualquer divergência exige observação e fica no resumo congelado do fechamento."""
     from .reception_permissions import require
     require(user,'abrir_fechar')
     tenant=lock_company(user)
@@ -248,6 +272,13 @@ def close_clinic_cash(*,user,unit,amount,notes='',session_id=None):
     else: session=rows.filter(unit=unit).order_by('professional_id','-opened_at').first()
     if not session: raise ValidationError('Este caixa já foi fechado ou não existe.')
     closing=money(amount,True)
+    strict=counted is not None
+    counted={**(counted or {}),'cash':closing}
+    pre=report(session)
+    conference=_conference(pre,expected_cash(session),counted)
+    divergent=[kind for kind,row in conference.items() if Decimal(row['difference'])]
+    if divergent and strict and not (notes or '').strip():
+        raise ValidationError('Há divergência entre o esperado e o conferido. Explique na observação antes de fechar.')
     session.expected_amount=expected_cash(session)
     session.closing_amount=closing
     session.difference_amount=closing-session.expected_amount
@@ -263,7 +294,8 @@ def close_clinic_cash(*,user,unit,amount,notes='',session_id=None):
         'opening':str(session.opening_amount),'cash_expected':str(session.expected_amount),
         'cash_counted':str(session.closing_amount),'difference':str(session.difference_amount),
         'from':session.opened_at.isoformat(),'to':session.closed_at.isoformat(),
-        'professionals':[{k:(format(v,'.2f') if isinstance(v,Decimal) else v) for k,v in row.items()} for row in by_professional(session)]}
+        'professionals':[{k:(format(v,'.2f') if isinstance(v,Decimal) else v) for k,v in row.items()} for row in by_professional(session)],
+        'conference':conference,'divergent':divergent}
     ClinicCashClosing.objects.update_or_create(session=session,defaults={'summary':summary})
     append_audit(tenant=tenant,user=user,action='clinic.cash.closed',entity_type='CashSession',entity_id=session.pk,after=summary)
     return session
