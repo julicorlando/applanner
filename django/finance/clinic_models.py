@@ -127,3 +127,23 @@ class ClinicCashCorrection(models.Model):
 
     class Meta:
         ordering=['-created_at','-pk']
+
+
+class ClinicCashEntryRemoval(models.Model):
+    """Front desk asks to delete a cash line; the clinic's manager approves or declines."""
+    class Status(models.TextChoices):
+        REQUESTED="requested","Aguardando gestor"
+        APPROVED="approved","Apagado"
+        REJECTED="rejected","Recusado"
+    entry=models.ForeignKey(ClinicCashEntry,on_delete=models.PROTECT,related_name='removal_requests')
+    requested_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='+')
+    reason=models.CharField(max_length=300)
+    status=models.CharField(max_length=12,choices=Status.choices,default=Status.REQUESTED,db_index=True)
+    decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,null=True,blank=True,related_name='+')
+    decided_at=models.DateTimeField(null=True,blank=True)
+    decision_note=models.CharField(max_length=300,blank=True)
+    created_at=models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering=['-created_at','-pk']
+        constraints=[models.UniqueConstraint(fields=['entry'],condition=models.Q(status='requested'),name='uq_clinic_cash_removal_pending')]

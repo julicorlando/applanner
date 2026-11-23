@@ -20,8 +20,9 @@ def access(user):
         or not is_healthcare_tenant(user.tenant) or user.tenant.archived_at or user.tenant.deleted_at):
         raise PermissionDenied
     if user.role=='reception':
-        if not has_capability(user,'agenda.manage') or (user.tenant.metadata or {}).get('clinical_reception_billing') is False:
-            raise PermissionDenied('A gestão desativou a operação financeira da recepção.')
+        from .reception_permissions import allowed
+        if not any(allowed(user,key) for key in ('caixa','despesas','abrir_fechar')):
+            raise PermissionDenied('O gestor não liberou o financeiro para a recepção.')
     elif not has_capability(user,'finance.manage'):
         raise PermissionDenied
     require_module(user.tenant,'finance')
@@ -71,7 +72,7 @@ def day_sheet(tenant,unit,professional,user,day=None,opening=None):
     """Cash sheet of one professional (None = the clinic's own) for one day, created on first use."""
     day=day or business_today(tenant)
     if professional and professional.tenant_id!=tenant.pk: raise PermissionDenied
-    rows=CashSession.objects.select_for_update().filter(tenant=tenant,unit=unit,business_date=day,professional=professional)
+    rows=CashSession.objects.select_for_update().filter(tenant=tenant,unit=unit,business_date=day,professional=professional,deleted_at__isnull=True)
     row=rows.filter(status='open').order_by('-pk').first()
     if row: return row
     if day<business_today(tenant):
@@ -106,6 +107,8 @@ def active_cash(tenant,unit,*,recording=True,professional=None,user=None):
 
 @transaction.atomic
 def open_clinic_cash(user,unit,amount,notes="",professional=None):
+    from .reception_permissions import require
+    require(user,'abrir_fechar')
     tenant=lock_company(user)
     if unit and (unit.tenant_id!=tenant.pk or not unit.active): raise PermissionDenied
     day=business_today(tenant)
@@ -147,6 +150,8 @@ def create_charge(*,user,unit,customer,description,amount,count,first_due,reques
 
 @transaction.atomic
 def receive(*,user,unit,installment,amount,method,request_id):
+    from .reception_permissions import require
+    require(user,'caixa')
     tenant=lock_company(user);amount=money(amount)
     row=ClinicInstallment.objects.select_for_update().select_related('charge').get(pk=installment.pk,charge__tenant=tenant,charge__unit=unit)
     existing=ClinicReceipt.objects.filter(request_id=request_id).first()
@@ -180,6 +185,8 @@ def receive(*,user,unit,installment,amount,method,request_id):
 
 @transaction.atomic
 def expense(*,user,unit,description,amount,method,invoice,items,image,request_id):
+    from .reception_permissions import require
+    require(user,'despesas')
     tenant=lock_company(user);amount=money(amount)
     existing=ClinicExpense.objects.filter(request_id=request_id).select_related('transaction','session').first()
     if existing:
@@ -232,9 +239,11 @@ def day_bounds(tenant,day):
 
 @transaction.atomic
 def close_clinic_cash(*,user,unit,amount,notes='',session_id=None):
+    from .reception_permissions import require
+    require(user,'abrir_fechar')
     tenant=lock_company(user)
     from .clinic_cash import by_professional, expected_cash, report
-    rows=CashSession.objects.select_for_update().filter(tenant=tenant,status='open')
+    rows=CashSession.objects.select_for_update().filter(tenant=tenant,status='open',deleted_at__isnull=True)
     if session_id: session=rows.filter(pk=session_id).first()
     else: session=rows.filter(unit=unit).order_by('professional_id','-opened_at').first()
     if not session: raise ValidationError('Este caixa já foi fechado ou não existe.')

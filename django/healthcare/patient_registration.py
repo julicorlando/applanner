@@ -123,6 +123,8 @@ def _return_url(request, patient):
 @never_cache
 def patient_form(request, pk=None):
     tenant = _clinical_user(request)
+    from finance.reception_permissions import require
+    require(request.user, "cadastro")
     patient = get_object_or_404(_editable_patients(request.user).filter(active=True), pk=pk, tenant=tenant) if pk else None
     form = PatientForm(request.POST or None, instance=patient, tenant=tenant)
     if request.method == "POST" and form.is_valid():

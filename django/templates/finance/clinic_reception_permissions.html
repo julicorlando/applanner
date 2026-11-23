@@ -1,0 +1,12 @@
+{% extends 'base.html' %}{% load static %}{% block title %}Permissões da recepção{% endblock %}{% block content %}<link rel="stylesheet" href="{% static 'healthcare/operations.css' %}">
+<main class="co-page co-shell">
+<header class="co-header"><a href="{% url 'clinic-finance-desk' %}">← Financeiro</a></header>
+<h1>Permissões da recepção</h1>
+<p>Você, como gestor, decide o que a recepção pode fazer. Vale para todos os usuários com função Recepção desta empresa{% if team %} ({% for u in team %}{{ u.get_full_name|default:u.email }}{% if not forloop.last %}, {% endif %}{% endfor %}){% endif %}. Toda mudança fica registrada na auditoria.</p>
+<form method="post" class="co-card rp-perms">{% csrf_token %}
+{% for row in rows %}<label class="rp-perm"><input type="checkbox" name="{{ row.key }}"{% if row.on %} checked{% endif %}><span>{{ row.label }}{% if row.key == 'apagar_lancamento' %}<small>Desligado: a recepção usa “Pedir para apagar” e você aprova em Caixas por data.</small>{% endif %}{% if row.key == 'dias_anteriores' %}<small>Desligado: a recepção só lança no caixa aberto de hoje.</small>{% endif %}</span></label>{% endfor %}
+<button class="co-button" type="submit">Salvar permissões</button></form>
+<p><small>Apagar um caixa inteiro e aprovar pedidos de apagar lançamento são sempre do gestor.</small></p>
+</main>
+<style>.rp-perms{display:flex;flex-direction:column;gap:12px;max-width:720px}.rp-perm{display:flex;gap:12px;align-items:flex-start;font-weight:600}.rp-perm input{width:20px;height:20px;margin-top:2px}.rp-perm small{display:block;font-weight:400;opacity:.75}</style>
+{% endblock %}
