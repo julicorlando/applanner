@@ -197,7 +197,7 @@ class PatientRecordPaymentTests(TestCase):
         values.update(plano=False)
         perms.save(self.tenant, self.owner, values)
         page = self.client.get(self.url())
-        self.assertNotContains(page, "data-plan-form")
+        self.assertNotContains(page, 'id="plano"')
         self.assertEqual(self.client.post(self.url(), {"action": "plan", "plan_procedure": ["X"], "plan_price": ["1"]}).status_code, 403)
 
     def test_payment_requires_method_and_open_cash(self):
