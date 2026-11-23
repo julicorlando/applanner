@@ -35,6 +35,10 @@ def user_capabilities(user):
         ).values_list("slug",flat=True).distinct()
     )
     linked.update(LEGACY_ROLE_CAPABILITIES.get(getattr(user,"role",""),set()))
+    if getattr(user,"role","")=="reception" and getattr(user,"tenant_id",None):
+        from finance.reception_permissions import current
+        if not current(user.tenant).get("agenda",True):
+            linked.discard("agenda.manage")
     if getattr(user,"role","")=="commercial":
         from commercial.models import CommercialProfile
         if CommercialProfile.objects.filter(

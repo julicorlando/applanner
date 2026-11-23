@@ -39,11 +39,21 @@ TEAM = {"owner", "tenant-admin", "manager", "reception", "finance"}
 
 
 def can_edit(session, user):
-    """Any day's sheet stays editable by the front desk and management; every change is audited."""
+    """Any day's sheet stays editable by management; the front desk only if the manager allowed it. Audited."""
+    from .reception_permissions import allowed
+    if session.deleted_at:
+        return False
+    if user.role == "reception" and (session.status != CashSession.Status.OPEN or _earlier_day(session)):
+        return allowed(user, "dias_anteriores")
     if session.status == CashSession.Status.OPEN or user.role in TEAM:
         return True
     correction = active_correction(session)
     return bool(correction and (is_manager(user) or correction.requested_by_id == user.pk))
+
+
+def _earlier_day(session):
+    from .clinic_services import business_today, session_day
+    return session_day(session) < business_today(session.tenant)
 
 
 def _entry_time(session):
@@ -106,9 +116,11 @@ def add_entry(*, user, session_id, customer, professional, professional_name, de
         if existing.session.tenant_id != tenant.pk or existing.created_by_id != user.pk or existing.customer_id != customer.pk:
             raise ValidationError("Este lançamento já foi registrado com outros dados. Atualize a página.")
         return existing
+    from .reception_permissions import require
+    require(user, "caixa")
     session = _lock_session(tenant, session_id)
     if not can_edit(session, user):
-        raise PermissionDenied("Caixa fechado. Peça autorização do gestor para corrigir o relatório.")
+        raise PermissionDenied("Este caixa é de outro dia ou já foi fechado, e o gestor não liberou correções para a recepção.")
     if customer.tenant_id != tenant.pk or not customer.active:
         raise PermissionDenied
     if professional and professional.tenant_id != tenant.pk:
@@ -188,7 +200,10 @@ def update_entry(*, user, entry_id, customer, professional, professional_name, d
 
 
 @transaction.atomic
-def cancel_entry(*, user, entry_id, reason):
+def cancel_entry(*, user, entry_id, reason, approved_removal=False):
+    from .reception_permissions import allowed
+    if not approved_removal and not allowed(user, "apagar_lancamento"):
+        raise PermissionDenied("Para apagar este lançamento, peça ao gestor: use “Pedir para apagar”.")
     tenant = lock_company(user)
     row = ClinicCashEntry.objects.select_for_update().get(pk=entry_id, session__tenant=tenant)
     session = _lock_session(tenant, row.session_id)
@@ -397,7 +412,7 @@ def _payload(form):
 def cash_sheet(request, pk=None):
     tenant = access(request.user)
     unit = selected_unit(request, tenant)
-    sessions = CashSession.objects.filter(tenant=tenant)
+    sessions = CashSession.objects.filter(tenant=tenant, deleted_at__isnull=True)
     if not is_manager(request.user):
         sessions = sessions.filter(unit=unit)
     if pk:
@@ -440,6 +455,17 @@ def cash_sheet(request, pk=None):
                 update_entry(user=request.user, entry_id=form.cleaned_data["entry_id"], **payload)
             elif action == "cancel" and request.POST.get("entry", "").isdigit():
                 cancel_entry(user=request.user, entry_id=int(request.POST["entry"]), reason=request.POST.get("reason", ""))
+            elif action == "request-removal" and request.POST.get("entry", "").isdigit():
+                request_removal(user=request.user, entry_id=int(request.POST["entry"]), reason=request.POST.get("reason", ""))
+                messages.success(request, "Pedido enviado ao gestor. O lançamento continua no caixa até a aprovação.")
+                return redirect(reverse("clinic-cash-sheet-detail", args=[session.pk]))
+            elif action in {"approve-removal", "reject-removal"} and request.POST.get("removal", "").isdigit():
+                decide_removal(user=request.user, removal_id=int(request.POST["removal"]),
+                               approve=action == "approve-removal", note=request.POST.get("note", ""))
+            elif action == "delete-sheet":
+                delete_sheet(user=request.user, session_id=session.pk, reason=request.POST.get("reason", ""))
+                messages.success(request, "Caixa apagado. Os lançamentos foram cancelados e tudo ficou registrado na auditoria.")
+                return redirect("clinic-cash-days")
             elif action == "request-correction":
                 request_correction(user=request.user, session_id=session.pk, reason=request.POST.get("reason", ""))
             elif action in {"approve", "reject"} and request.POST.get("correction", "").isdigit():
@@ -460,9 +486,94 @@ def cash_sheet(request, pk=None):
     context = report(session)
     from .clinic_services import session_day
     context["day_sheets"] = sessions.filter(unit=session.unit, business_date=session_day(session)).select_related("professional").order_by("professional__name")
+    from .clinic_models import ClinicCashEntryRemoval
+    from .reception_permissions import allowed, is_manager as gestor
+    removals = ClinicCashEntryRemoval.objects.filter(entry__session=session).select_related("entry", "requested_by")
+    pending = {r.entry_id: r for r in removals if r.status == ClinicCashEntryRemoval.Status.REQUESTED}
+    for row in context.get("entries", []):
+        row.pending_removal = pending.get(row.pk)
     context.update({
         "form": form, "editing": editing, "can_edit": can_edit(session, request.user),
-        "manager": is_manager(request.user),
+        "manager": is_manager(request.user), "gestor": gestor(request.user),
+        "can_delete_line": allowed(request.user, "apagar_lancamento"), "pending_removals": list(pending.values()),
         "history": sessions.filter(unit=session.unit).order_by("-opened_at")[:15],
     })
     return render(request, "finance/clinic_cash_sheet.html", context)
+
+
+@transaction.atomic
+def request_removal(*, user, entry_id, reason):
+    from .clinic_models import ClinicCashEntryRemoval
+    tenant = lock_company(user)
+    row = ClinicCashEntry.objects.select_for_update().select_related("session").get(pk=entry_id, session__tenant=tenant)
+    if row.status == ClinicCashEntry.Status.CANCELLED or row.session.deleted_at:
+        raise ValidationError("Este lançamento já foi apagado.")
+    reason = " ".join((reason or "").split())
+    if len(reason) < 3:
+        raise ValidationError("Informe o motivo para o gestor.")
+    pending = ClinicCashEntryRemoval.objects.filter(entry=row, status=ClinicCashEntryRemoval.Status.REQUESTED).first()
+    if pending:
+        return pending
+    item = ClinicCashEntryRemoval.objects.create(entry=row, requested_by=user, reason=reason[:300])
+    append_audit(tenant=tenant, user=user, action="clinic.cash_entry.removal_requested", entity_type="ClinicCashEntry",
+                 entity_id=row.pk, after={"reason": reason[:300], "total": str(row.total)})
+    return item
+
+
+@transaction.atomic
+def decide_removal(*, user, removal_id, approve, note=""):
+    from .clinic_models import ClinicCashEntryRemoval
+    from .reception_permissions import is_manager as gestor
+    tenant = lock_company(user)
+    if not gestor(user):
+        raise PermissionDenied("Somente o gestor aprova pedidos para apagar lançamentos.")
+    item = ClinicCashEntryRemoval.objects.select_for_update().select_related("entry").get(
+        pk=removal_id, entry__session__tenant=tenant)
+    if item.status != ClinicCashEntryRemoval.Status.REQUESTED:
+        raise ValidationError("Este pedido já foi decidido.")
+    item.decided_by, item.decided_at, item.decision_note = user, timezone.now(), " ".join((note or "").split())[:300]
+    if approve:
+        cancel_entry(user=user, entry_id=item.entry_id, reason=f"Pedido da recepção aprovado: {item.reason}"[:300], approved_removal=True)
+        item.status = ClinicCashEntryRemoval.Status.APPROVED
+    else:
+        item.status = ClinicCashEntryRemoval.Status.REJECTED
+    item.save(update_fields=["status", "decided_by", "decided_at", "decision_note"])
+    append_audit(tenant=tenant, user=user, action="clinic.cash_entry.removal_" + ("approved" if approve else "rejected"),
+                 entity_type="ClinicCashEntry", entity_id=item.entry_id, after={"note": item.decision_note})
+    return item
+
+
+@transaction.atomic
+def delete_sheet(*, user, session_id, reason):
+    """Manager deletes a day's cash sheet: its lines are cancelled and the sheet leaves every list (audited)."""
+    from .reception_permissions import is_manager as gestor
+    tenant = lock_company(user)
+    if not gestor(user):
+        raise PermissionDenied("Somente o gestor da empresa pode apagar um caixa.")
+    session = _lock_session(tenant, session_id)
+    if session.deleted_at:
+        raise ValidationError("Este caixa já foi apagado.")
+    reason = " ".join((reason or "").split())
+    if len(reason) < 3:
+        raise ValidationError("Informe o motivo para apagar o caixa.")
+    if ClinicReceipt.objects.filter(session=session).exists():
+        raise ValidationError("Este caixa tem recebimentos de parcelas. Estorne esses recebimentos antes de apagar o caixa.")
+    if ClinicExpense.objects.filter(session=session).exclude(transaction__status="cancelled").exists():
+        raise ValidationError("Este caixa tem despesas lançadas. Cancele as despesas antes de apagar o caixa.")
+    cancelled = 0
+    for row in session.clinical_entries.select_for_update().exclude(status=ClinicCashEntry.Status.CANCELLED):
+        tx = FinancialTransaction.objects.select_for_update().get(pk=row.transaction_id)
+        row.status = ClinicCashEntry.Status.CANCELLED
+        row.notes = (f"{row.notes} · " if row.notes else "") + f"Caixa apagado pelo gestor: {reason}"[:200]
+        row.save(update_fields=["status", "notes", "updated_at"])
+        tx.status = "cancelled"
+        tx.save(update_fields=["status", "updated_at"])
+        cancelled += 1
+    before = {"status": session.status, "label": session.label, "day": str(session.business_date or "")}
+    session.deleted_at, session.deleted_by, session.deleted_reason = timezone.now(), user, reason[:300]
+    if session.status == CashSession.Status.OPEN:
+        session.status, session.closed_at, session.closed_by = CashSession.Status.CLOSED, timezone.now(), user
+    session.save()
+    append_audit(tenant=tenant, user=user, action="clinic.cash.deleted", entity_type="CashSession", entity_id=session.pk,
+                 before=before, after={"reason": reason[:300], "cancelled_lines": cancelled})
+    return session

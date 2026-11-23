@@ -40,7 +40,7 @@ class ClinicCashSheetTests(TestCase):
             self.entry(professional=None, professional_name="")
         zero = self.entry(dentist_amount="0", clinic_amount="0")  # avaliação ou reparo sem custo
         self.assertEqual(zero.total, Decimal("0"))
-        cash.cancel_entry(user=self.reception, entry_id=zero.pk, reason="Teste de valor zero")
+        cash.cancel_entry(user=self.manager, entry_id=zero.pk, reason="Teste de valor zero")
         data = cash.report(self.session)
         self.assertEqual(dict(data["kinds"]), {"Dinheiro": Decimal("100.00"), "Pix": Decimal("80.00"), "Débito/Crédito": Decimal("0")})
         self.assertEqual(data["columns"]["total"], Decimal("180.00"))
@@ -71,6 +71,9 @@ class ClinicCashSheetTests(TestCase):
         self.session.refresh_from_db()
         self.assertEqual(self.session.expected_amount, Decimal("50.00"))
         self.assertEqual(self.session.difference_amount, Decimal("100.00"))
+        self.tenant.metadata = {"reception_permissions": {"apagar_lancamento": True}}
+        self.tenant.save()
+        self.reception.refresh_from_db()
         late = self.entry(dentist_amount="0", clinic_amount="0")
         self.assertEqual(late.total, Decimal("0"))
         cash.cancel_entry(user=self.reception, entry_id=late.pk, reason="Lançado em duplicidade")

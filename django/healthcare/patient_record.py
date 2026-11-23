@@ -364,6 +364,8 @@ def _default_professional(user, patient, clinical):
 @never_cache
 def patient_record(request, pk):
     tenant, clinical = access(request.user)
+    from finance.reception_permissions import allowed, require
+    require(request.user, "prontuarios")
     patient = get_object_or_404(shared_patients(request.user), pk=pk, tenant=tenant)
     self_url = reverse("dental-patient-record", args=[patient.pk])
     cash_tenant = _cash_access(request.user) if patient.active else None
@@ -376,6 +378,8 @@ def patient_record(request, pk):
                          initial={"occurred_on": timezone.localdate(), "professional": _default_professional(request.user, patient, clinical)})
     if request.method == "POST":
         action = request.POST.get("action")
+        if action in {"note", "plan"}:
+            require(request.user, "evolucao")
         if action == "note":
             if note_form.is_valid():
                 content = {key: (note_form.cleaned_data.get(key) or "").strip() for key, _ in EVOLUTION_FIELDS}
@@ -439,6 +443,7 @@ def patient_record(request, pk):
                                    clinical=clinical),
         "can_schedule": has_capability(request.user, "agenda.manage") and request.user.role not in {"professional", "healthcare"},
         "document_kinds": DOCUMENT_KINDS,
-        "receive_form": receive_form, "cash_session": session, "note_form": note_form, "plan_form": plan_form,
+        "receive_form": receive_form if allowed(request.user, "caixa") else None, "cash_session": session,
+        "note_form": note_form, "plan_form": plan_form, "can_evolve": allowed(request.user, "evolucao"),
         "plan_rows": range(8),
     })

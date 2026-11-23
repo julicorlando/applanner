@@ -225,6 +225,10 @@ class CashSession(models.Model):
     # Clinics keep one cash sheet per professional per day; empty professional = the clinic's own sheet.
     professional=models.ForeignKey("scheduling.Professional",null=True,blank=True,on_delete=models.PROTECT,related_name="cash_sessions")
     business_date=models.DateField(null=True,blank=True,db_index=True)
+    # Deleted by the clinic's manager: kept for the audit trail, hidden from every cash list.
+    deleted_at=models.DateTimeField(null=True,blank=True)
+    deleted_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name="cash_sessions_deleted")
+    deleted_reason=models.CharField(max_length=300,blank=True)
 
     class Meta:
         indexes=[models.Index(fields=["tenant","status","opened_at"]),models.Index(fields=["tenant","unit","business_date"],name="finance_cas_tenant__bd_idx")]
