@@ -132,7 +132,7 @@ def finalize_document(*,user,document,body,title,version,confirmed,base_url=''):
     on_behalf=getattr(user,'role','')=='reception'
     if on_behalf:
         if not reception_may_emit(user):raise PermissionDenied('O gestor não liberou a emissão de documentos pela recepção.')
-        row=ClinicalIssuedDocument.objects.select_for_update().select_related('professional__user').get(
+        row=ClinicalIssuedDocument.objects.select_for_update(of=('self',)).select_related('professional__user').get(
             pk=document.pk,tenant=user.tenant,created_by=user)
         if not row.professional.active or not row.professional.user_id:raise PermissionDenied
         profile,snapshot=professional_identity(row.professional,own=False)
