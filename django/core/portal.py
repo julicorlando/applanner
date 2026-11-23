@@ -1267,6 +1267,8 @@ def operation_diagnostics(request):
 
 
 class ReceptionAccessForm(forms.Form):
+    first_name=forms.CharField(label="Nome da recepção",max_length=150,
+        help_text="Aparece nos registros do prontuário e do caixa no lugar do e-mail.")
     email=forms.EmailField(label="E-mail da recepção")
     password1=forms.CharField(label="Senha temporária",widget=forms.PasswordInput,
         help_text="A recepção deverá trocar esta senha no primeiro acesso.")
@@ -1293,6 +1295,24 @@ def reception_access(request):
         return redirect("portal-home")
     if not (request.user.is_superuser or request.user.role in {"owner","manager","tenant-admin"}):
         raise PermissionDenied("Somente a gestão pode cadastrar a recepção.")
+    User=apps.get_model("accounts","User")
+    team=User.objects.filter(tenant=tenant,deleted_at__isnull=True).exclude(role__in={"customer","professional"}).order_by("role","email")
+    if request.method=="POST" and request.POST.get("action")=="rename":
+        member=team.filter(pk=request.POST.get("user") or 0).first()
+        if member is None:
+            raise PermissionDenied
+        name=" ".join((request.POST.get("first_name") or "").split())[:150]
+        if not name:
+            messages.error(request,"Informe o nome.")
+        else:
+            before=member.get_full_name()
+            member.first_name,member.last_name=name,""
+            member.save(update_fields=["first_name","last_name"])
+            from core.audit import append_audit
+            append_audit(tenant=tenant,user=request.user,request=request,action="team.member.renamed",entity_type="User",
+                         entity_id=member.pk,before={"name":before},after={"name":name})
+            messages.success(request,f"Nome salvo: {name}.")
+        return redirect("reception-access")
     form=ReceptionAccessForm(request.POST or None)
     if request.method=="POST" and form.is_valid():
         data=form.cleaned_data
@@ -1301,10 +1321,12 @@ def reception_access(request):
             form.add_error("email","Este e-mail já pertence a uma conta.")
         else:
             user=User.objects.create_user(email=data["email"].lower(),password=data["password1"],tenant=tenant,
-                role="reception",is_active=data["active"],must_change_password=True)
-            messages.success(request,f"Acesso de recepção criado para {user.email}.")
-            return redirect("portal-home")
-    return render(request,"portal/reception_access.html",{"tenant":tenant,"form":form})
+                role="reception",is_active=data["active"],must_change_password=True,first_name=data["first_name"].strip())
+            messages.success(request,f"Acesso de recepção criado para {user.first_name} ({user.email}).")
+            return redirect("reception-access")
+    roles={"owner":"Gestor","tenant-admin":"Gestor","manager":"Gerente","reception":"Recepção"}
+    members=[{"user":m,"role":roles.get(m.role,m.role)} for m in team]
+    return render(request,"portal/reception_access.html",{"tenant":tenant,"form":form,"members":members})
 
 
 def available_modules(user,tenant):

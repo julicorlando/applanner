@@ -148,6 +148,13 @@ def _person(user):
     return (user.get_full_name() or user.email) if user else "Sistema"
 
 
+def _author(stored, user):
+    """Records saved while the user had no name show the e-mail; once the clinic registers the name, show it."""
+    if user is not None and stored in {"", user.email} and user.get_full_name():
+        return user.get_full_name()
+    return stored
+
+
 def _fill(tooth, procedure, orthodontic, notes, day, professional_id):
     """Prefill of the edit/rectify dialog (the same text the page already shows)."""
     return json.dumps({"tooth": tooth or "", "procedure": procedure or "", "orthodontic": orthodontic or "",
@@ -166,7 +173,7 @@ def evolution_view(evolution, user, can_evolve=False):
     note_link = getattr(evolution, "replaces_note", None) if evolution.previous_id is None else None
     row = {
         "id": evolution.pk, "status": evolution.status, "status_label": evolution.get_status_display(),
-        "sections": _evolution_sections(text, evolution.tooth), "author": evolution.author_name,
+        "sections": _evolution_sections(text, evolution.tooth), "author": _author(evolution.author_name, evolution.created_by),
         "professional": evolution.professional.name if evolution.professional_id else "",
         "at": evolution.created_at, "finalized_at": evolution.finalized_at, "auto": evolution.finalized_automatically,
         "from_plan": bool(evolution.plan_item_id),
@@ -191,7 +198,7 @@ def evolution_view(evolution, user, can_evolve=False):
 
 def _evolutions(tenant, patient):
     return (DentalEvolution.objects.filter(tenant=tenant, customer=patient)
-            .select_related("professional", "previous", "rectified_by", "replaces_note__note"))
+            .select_related("professional", "previous", "rectified_by", "created_by", "replaces_note__note"))
 
 
 def hidden_rectified(tenant, patient):
@@ -254,7 +261,7 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False, audit=False,
         days[evolution.clinical_date]["evolutions"].append(evolution_view(evolution, user, can_evolve))
     rectified = {r.note_id: r for r in PatientNoteRectification.objects.filter(note__tenant=tenant, note__customer=patient)
                  .select_related("rectified_by")}
-    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:500]:
+    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).select_related("author").order_by("-occurred_at", "-created_at", "-pk")[:500]:
         raw = decrypt_text(note.text_encrypted)
         if _is_plan(raw):
             continue  # the treatment plan lives in its own card, not in the history
@@ -264,7 +271,7 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False, audit=False,
         fields = note_fields(raw)
         day = _local_day(note.effective_at)
         days[day]["notes"].append({
-            "id": note.pk, "sections": note_sections(raw), "author": note.author_name,
+            "id": note.pk, "sections": note_sections(raw), "author": _author(note.author_name, note.author),
             "at": note.effective_at, "imported": bool(note.import_key),
             "rectified": {"at": link.rectified_at, "by": _person(link.rectified_by),
                           "reason": decrypt_text(link.reason_encrypted)} if link else None,
@@ -443,12 +450,12 @@ def plan_versions(tenant, patient, limit=20, user=None):
     out = []
     voided = set(PatientNoteRectification.objects.filter(note__tenant=tenant, note__customer=patient)
                  .values_list("note_id", flat=True))
-    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:300]:
+    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).select_related("author").order_by("-occurred_at", "-created_at", "-pk")[:300]:
         if note.pk in voided:
             continue
         raw = decrypt_text(note.text_encrypted)
         if _is_plan(raw):
-            out.append({"id": note.pk, "at": note.effective_at, "author": note.author_name, "text": json.loads(raw)["plan"],
+            out.append({"id": note.pk, "at": note.effective_at, "author": _author(note.author_name, note.author), "text": json.loads(raw)["plan"],
                         "can_delete": bool(user and can_rectify(user, note.author_id))})
             if len(out) >= limit:
                 break
@@ -653,6 +660,26 @@ def patient_record(request, pk):
                     total = f"{row.total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                     messages.success(request, f"Pagamento de R$ {total} ({row.method_name}) recebido e lançado no caixa de {data['paid_on']:%d/%m/%Y} de {session.label}.")
                     return redirect(self_url)
+        elif action in {"deactivate", "reactivate"}:
+            if not (request.user.role in {"owner", "tenant-admin", "manager"} or allowed(request.user, "cadastro")):
+                raise PermissionDenied("Seu perfil não altera o cadastro de pacientes.")
+            active = action == "reactivate"
+            reason = " ".join((request.POST.get("reason") or "").split())[:300]
+            if not active and len(reason) < 3:
+                messages.error(request, "Informe o motivo para inativar o paciente.")
+                return redirect(self_url)
+            with transaction.atomic():
+                locked = type(patient).objects.select_for_update().get(pk=patient.pk, tenant=tenant)
+                if locked.active != active:
+                    locked.active = active
+                    locked.save(update_fields=["active"])
+                    append_audit(tenant=tenant, user=request.user, request=request,
+                                 action="clinical.patient.reactivated" if active else "clinical.patient.deactivated",
+                                 entity_type="Customer", entity_id=patient.pk, before={"active": not active},
+                                 after={"active": active, "reason": reason})
+            messages.success(request, "Paciente reativado." if active else
+                             "Paciente inativado. Ele sai da lista de pacientes; o prontuário continua guardado.")
+            return redirect(self_url)
         elif action in {"payment-delete", "payment-ask"}:
             from finance.clinic_cash import cancel_entry, request_removal
             from finance.clinic_models import ClinicCashEntry
@@ -713,6 +740,7 @@ def patient_record(request, pk):
         "can_schedule": has_capability(request.user, "agenda.manage") and request.user.role not in {"professional", "healthcare"},
         "document_kinds": DOCUMENT_KINDS, "can_documents": patient.active and _can_documents(request.user),
         "receive_form": receive_form if allowed(request.user, "caixa") else None, "cash_session": session,
+        "can_edit_patient": request.user.role in {"owner", "tenant-admin", "manager"} or allowed(request.user, "cadastro"),
         "can_delete_payment": request.user.role in {"owner", "tenant-admin", "manager"} or allowed(request.user, "apagar_lancamento"),
         "plan_receivables": list(_plan_receivables(tenant, patient)[:50]) if cash_tenant and allowed(request.user, "caixa") else [],
         "payment_methods": _payment_methods(tenant) if cash_tenant else [],

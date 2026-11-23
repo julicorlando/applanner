@@ -151,7 +151,7 @@ def settings(request):
                     "title": "Plano e assinatura",
                     "url": reverse("billing-subscription-status"),
                 },
-                {"title": "Acesso da recepção", "url": reverse("reception-access")},
+                {"title": "Acesso da recepção e nomes da equipe", "url": reverse("reception-access")},
                 {
                     "title": "Página pública da clínica",
                     "url": reverse("tenant-branding"),

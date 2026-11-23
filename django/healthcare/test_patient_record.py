@@ -146,6 +146,31 @@ class PatientRecordPaymentTests(TestCase):
         self.assertEqual(row.status, "cancelled")
         self.assertNotContains(self.client.get(self.url()), "Pagamento recebido")
 
+    def test_reception_inactivates_and_reactivates_patient_and_list_hides_it(self):
+        self.assertContains(self.client.get(self.url()), "Inativar paciente")
+        self.client.post(self.url(), {"action": "deactivate", "reason": ""})
+        self.patient.refresh_from_db()
+        self.assertTrue(self.patient.active)
+        self.client.post(self.url(), {"action": "deactivate", "reason": "Cadastro duplicado"})
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient.active)
+        self.assertContains(self.client.get(self.url()), "Paciente inativo")
+        roster = [p.pk for p in self.client.get(reverse("dental-assessments")).context["patient_roster"]]
+        self.assertNotIn(self.patient.pk, roster)
+        roster = [p.pk for p in self.client.get(reverse("dental-assessments"), {"inativos": "1"}).context["patient_roster"]]
+        self.assertIn(self.patient.pk, roster)
+        self.client.post(self.url(), {"action": "reactivate"})
+        self.patient.refresh_from_db()
+        self.assertTrue(self.patient.active)
+
+    def test_record_shows_the_name_registered_for_the_author(self):
+        from healthcare.patient_record import _author
+        self.assertEqual(_author(self.reception.email, self.reception), self.reception.email)
+        self.reception.first_name = "Carla"
+        self.reception.save(update_fields=["first_name"])
+        self.assertEqual(_author(self.reception.email, self.reception), "Carla")
+        self.assertEqual(_author("Dra. Antiga (ficha)", self.reception), "Dra. Antiga (ficha)")
+
     def test_payment_on_an_earlier_date_goes_to_that_days_sheet(self):
         from datetime import timedelta
         from django.utils import timezone

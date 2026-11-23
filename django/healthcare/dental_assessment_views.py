@@ -57,6 +57,7 @@ def _roster(request):
     rows = shared_patients(request.user)
     if not rows.exists():
         rows = patients_for(request.user)
+    rows = rows.filter(active=request.GET.get("inativos") != "1")  # inactive patients only when asked
     query = (request.GET.get("q") or "").strip()
     if query:
         rows = rows.filter(Q(name__icontains=query) | Q(phone__icontains=query) | Q(email__icontains=query))
