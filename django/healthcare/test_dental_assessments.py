@@ -353,12 +353,13 @@ class DentalAssessmentTests(TestCase):
         self.assertTrue(response.context['form'].errors)
         self.assertEqual(response.context['totals']['amount'],0)
 
-    def test_reception_legacy_treatment_receipt_requires_open_cash_and_active_method(self):
+    def test_treatment_receipt_goes_to_the_plan_dentist_day_sheet_once(self):
         from tenants.models import Unit
         from .clinical import change_treatment_status
-        from finance.models import FinancialTransaction
-        from finance.clinic_models import ClinicPaymentMethod
+        from finance.models import FinancialTransaction,CashSession
+        from finance.clinic_models import ClinicPaymentMethod,ClinicCashEntry
         from finance import clinic_services as cash
+        from finance.clinic_cash import cancel_entry,expected_cash
         self.enable_finance()
         self.tenant.metadata={'clinical_reception_billing':True};self.tenant.save()
         unit=Unit.objects.create(tenant=self.tenant,name='Clínica',is_primary=True)
@@ -369,17 +370,25 @@ class DentalAssessmentTests(TestCase):
         self.assertEqual(tx.unit_id,unit.pk)
         self.client.force_login(self.reception)
         url=reverse('clinical-finance')
-        post={'action':'paid','transaction':tx.pk,'confirm':'yes','payment_method':'cash'}
-        self.assertEqual(self.client.post(url,post).status_code,302)
-        tx.refresh_from_db();self.assertEqual(tx.status,'pending')
-        cash.open_clinic_cash(self.reception,unit,'0')
         method=ClinicPaymentMethod.objects.create(tenant=self.tenant,name='Dinheiro',kind='cash',active=False)
+        post={'action':'paid','transaction':tx.pk,'confirm':'yes','method':method.pk}
         self.client.post(url,post)
         tx.refresh_from_db();self.assertEqual(tx.status,'pending')
+        clinic_sheet=cash.open_clinic_cash(self.reception,unit,'0')
         method.active=True;method.save()
         self.assertEqual(self.client.post(url,post).status_code,302)
-        tx.refresh_from_db();self.assertEqual(tx.status,'paid')
-        closing=cash.close_clinic_cash(user=self.reception,unit=unit,amount='180')
-        self.assertEqual(closing.expected_amount,180)
         self.assertEqual(self.client.post(url,post).status_code,302)
-        self.assertEqual(FinancialTransaction.objects.filter(tenant=self.tenant,source_type='clinical-plan',status='paid').count(),1)
+        tx.refresh_from_db();self.assertEqual(tx.status,'paid')
+        entry=ClinicCashEntry.objects.get(transaction=tx)
+        self.assertEqual(entry.session.professional_id,self.professional.pk)
+        self.assertEqual(entry.total,tx.amount)
+        self.assertEqual(CashSession.objects.filter(tenant=self.tenant,professional=self.professional).count(),1)
+        self.assertEqual(expected_cash(clinic_sheet),0)
+        self.assertEqual(expected_cash(entry.session),180)
+        self.assertEqual(FinancialTransaction.objects.filter(tenant=self.tenant,type='income',status='paid').count(),1)
+        cancel_entry(user=self.owner,entry_id=entry.pk,reason='Lançado no paciente errado')
+        reopened=FinancialTransaction.objects.get(tenant=self.tenant,source_type='clinical-plan',status='pending')
+        self.assertEqual(reopened.amount,tx.amount)
+        self.client.post(url,{**post,'transaction':reopened.pk})
+        reopened.refresh_from_db();self.assertEqual(reopened.status,'paid')
+        self.assertEqual(CashSession.objects.filter(tenant=self.tenant,professional=self.professional).count(),1)
