@@ -148,7 +148,7 @@ def _person(user):
     return (user.get_full_name() or user.email) if user else "Sistema"
 
 
-def _author(stored, user):
+def _writer(stored, user):
     """Records saved while the user had no name show the e-mail; once the clinic registers the name, show it."""
     if user is not None and stored in {"", user.email} and user.get_full_name():
         return user.get_full_name()
@@ -173,7 +173,7 @@ def evolution_view(evolution, user, can_evolve=False):
     note_link = getattr(evolution, "replaces_note", None) if evolution.previous_id is None else None
     row = {
         "id": evolution.pk, "status": evolution.status, "status_label": evolution.get_status_display(),
-        "sections": _evolution_sections(text, evolution.tooth), "author": _author(evolution.author_name, evolution.created_by),
+        "sections": _evolution_sections(text, evolution.tooth), "author": _writer(evolution.author_name, evolution.created_by),
         "professional": evolution.professional.name if evolution.professional_id else "",
         "at": evolution.created_at, "finalized_at": evolution.finalized_at, "auto": evolution.finalized_automatically,
         "from_plan": bool(evolution.plan_item_id),
@@ -271,7 +271,7 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False, audit=False,
         fields = note_fields(raw)
         day = _local_day(note.effective_at)
         days[day]["notes"].append({
-            "id": note.pk, "sections": note_sections(raw), "author": _author(note.author_name, note.author),
+            "id": note.pk, "sections": note_sections(raw), "author": _writer(note.author_name, note.author),
             "at": note.effective_at, "imported": bool(note.import_key),
             "rectified": {"at": link.rectified_at, "by": _person(link.rectified_by),
                           "reason": decrypt_text(link.reason_encrypted)} if link else None,
@@ -455,7 +455,7 @@ def plan_versions(tenant, patient, limit=20, user=None):
             continue
         raw = decrypt_text(note.text_encrypted)
         if _is_plan(raw):
-            out.append({"id": note.pk, "at": note.effective_at, "author": _author(note.author_name, note.author), "text": json.loads(raw)["plan"],
+            out.append({"id": note.pk, "at": note.effective_at, "author": _writer(note.author_name, note.author), "text": json.loads(raw)["plan"],
                         "can_delete": bool(user and can_rectify(user, note.author_id))})
             if len(out) >= limit:
                 break

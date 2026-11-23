@@ -164,7 +164,7 @@ class PatientRecordPaymentTests(TestCase):
         self.assertTrue(self.patient.active)
 
     def test_record_shows_the_name_registered_for_the_author(self):
-        from healthcare.patient_record import _author
+        from healthcare.patient_record import _writer as _author
         self.assertEqual(_author(self.reception.email, self.reception), self.reception.email)
         self.reception.first_name = "Carla"
         self.reception.save(update_fields=["first_name"])
