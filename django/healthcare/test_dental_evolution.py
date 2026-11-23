@@ -347,3 +347,33 @@ class PatientRecordDocumentTests(TestCase):
                 self.assertIn(self.patient.name, body, (user.role, kind))
         self.assertIn("CPF", self.client.get(reverse("clinical-documents") + f"?customer={self.patient.pk}&kind=report")
                       .context["form"].initial["body"])
+
+
+class LegacyPlanTests(TestCase):
+    def test_parses_both_saved_formats(self):
+        from decimal import Decimal
+        from .legacy_plan import parse
+        text = "1. Dente 11 · Restauração estética · R$ 90,00\n2. Limpeza · R$ 1.200,50\nTotal do plano: R$ 1.290,50"
+        self.assertEqual(parse(json.dumps({"plan": text})), [
+            {"tooth": "11", "procedure": "Restauração estética", "price": Decimal("90.00")},
+            {"tooth": "", "procedure": "Limpeza", "price": Decimal("1200.50")}])
+        self.assertEqual(parse(json.dumps({"plan": "x", "plan_items": [{"tooth": "21", "procedure": "Canal", "price": "400"}]})),
+                         [{"tooth": "21", "procedure": "Canal", "price": Decimal("400.00")}])
+        self.assertIsNone(parse(json.dumps({"procedure": "Canal"})))
+
+    def test_migration_moves_latest_plan_into_the_table(self):
+        import importlib
+        from django.apps import apps
+        mig = importlib.import_module("healthcare.migrations.0028_legacy_plan_to_items")
+        base = dental.DentalAssessmentTests()
+        dental.DentalAssessmentTests.setUp(base)
+        old = "1. Dente 11 · Restauração estética · R$ 90,00\nTotal do plano: R$ 90,00"
+        new = "1. Dente 12 · Restauração estética · R$ 90,00\n2. Dente 21 · Restauração estética · R$ 90,00"
+        for text, when in ((old, timezone.now() - timedelta(days=6)), (new, timezone.now())):
+            PatientNote.objects.create(tenant=base.tenant, customer=base.patient, author=base.doctor, author_name="Dra",
+                                       occurred_at=when, text_encrypted=encrypt_text(json.dumps({"plan": text})))
+        mig.forwards(apps, None)
+        mig.forwards(apps, None)  # running again changes nothing
+        items = DentalPlanItem.objects.filter(customer=base.patient).order_by("position")
+        self.assertEqual([(i.tooth, decrypt_text(i.procedure_encrypted)) for i in items],
+                         [("12", "Restauração estética"), ("21", "Restauração estética")])
