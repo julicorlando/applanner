@@ -398,11 +398,16 @@ class PostDeployFixesTests(TestCase):
 
     def test_owner_can_create_reception_access_without_finance(self):
         response=self.client.post(reverse("reception-access"),{
-            "email":"recepcao@post-deploy.test","password1":"StrongPass123!","password2":"StrongPass123!","active":"on",
+            "name":"Maria Recepção","email":"recepcao@post-deploy.test","password1":"StrongPass123!","password2":"StrongPass123!","active":"on",
         })
         self.assertRedirects(response,reverse("portal-home"))
         reception=User.objects.get(email="recepcao@post-deploy.test")
         self.assertEqual(reception.role,"reception")
+        self.assertEqual(reception.get_full_name(),"Maria Recepção")
+        self.client.post(reverse("reception-access"),{"action":"rename","user":reception.pk,"name":"Maria  Souza"})
+        reception.refresh_from_db()
+        self.assertEqual(reception.get_full_name(),"Maria Souza")
+        self.assertContains(self.client.get(reverse("reception-access")),"recepcao@post-deploy.test")
         self.assertTrue(reception.must_change_password)
         reception.must_change_password=False
         reception.save(update_fields=["must_change_password"])

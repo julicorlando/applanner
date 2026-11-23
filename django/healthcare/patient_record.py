@@ -166,7 +166,7 @@ def evolution_view(evolution, user, can_evolve=False):
     note_link = getattr(evolution, "replaces_note", None) if evolution.previous_id is None else None
     row = {
         "id": evolution.pk, "status": evolution.status, "status_label": evolution.get_status_display(),
-        "sections": _evolution_sections(text, evolution.tooth), "author": evolution.author_name,
+        "sections": _evolution_sections(text, evolution.tooth), "author": _person_name(evolution.created_by, evolution.author_name),
         "professional": evolution.professional.name if evolution.professional_id else "",
         "at": evolution.created_at, "finalized_at": evolution.finalized_at, "auto": evolution.finalized_automatically,
         "from_plan": bool(evolution.plan_item_id),
@@ -189,9 +189,17 @@ def evolution_view(evolution, user, can_evolve=False):
     return row
 
 
+def _person_name(user, stored):
+    """The name registered for the person today (e.g. the receptionist's name), else what was stored when they wrote it.
+    Imported sheets keep the name written on the sheet."""
+    if user is not None and stored and "@" in stored and stored == (user.email or ""):
+        return user.get_full_name() or stored
+    return stored
+
+
 def _evolutions(tenant, patient):
     return (DentalEvolution.objects.filter(tenant=tenant, customer=patient)
-            .select_related("professional", "previous", "rectified_by", "replaces_note__note"))
+            .select_related("professional", "previous", "rectified_by", "created_by", "replaces_note__note"))
 
 
 def hidden_rectified(tenant, patient):
@@ -254,7 +262,7 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False, audit=False,
         days[evolution.clinical_date]["evolutions"].append(evolution_view(evolution, user, can_evolve))
     rectified = {r.note_id: r for r in PatientNoteRectification.objects.filter(note__tenant=tenant, note__customer=patient)
                  .select_related("rectified_by")}
-    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:500]:
+    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).select_related("author").order_by("-occurred_at", "-created_at", "-pk")[:500]:
         raw = decrypt_text(note.text_encrypted)
         if _is_plan(raw):
             continue  # the treatment plan lives in its own card, not in the history
@@ -264,7 +272,7 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False, audit=False,
         fields = note_fields(raw)
         day = _local_day(note.effective_at)
         days[day]["notes"].append({
-            "id": note.pk, "sections": note_sections(raw), "author": note.author_name,
+            "id": note.pk, "sections": note_sections(raw), "author": _person_name(note.author, note.author_name),
             "at": note.effective_at, "imported": bool(note.import_key),
             "rectified": {"at": link.rectified_at, "by": _person(link.rectified_by),
                           "reason": decrypt_text(link.reason_encrypted)} if link else None,
@@ -443,12 +451,12 @@ def plan_versions(tenant, patient, limit=20, user=None):
     out = []
     voided = set(PatientNoteRectification.objects.filter(note__tenant=tenant, note__customer=patient)
                  .values_list("note_id", flat=True))
-    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:300]:
+    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).select_related("author").order_by("-occurred_at", "-created_at", "-pk")[:300]:
         if note.pk in voided:
             continue
         raw = decrypt_text(note.text_encrypted)
         if _is_plan(raw):
-            out.append({"id": note.pk, "at": note.effective_at, "author": note.author_name, "text": json.loads(raw)["plan"],
+            out.append({"id": note.pk, "at": note.effective_at, "author": _person_name(note.author, note.author_name), "text": json.loads(raw)["plan"],
                         "can_delete": bool(user and can_rectify(user, note.author_id))})
             if len(out) >= limit:
                 break
