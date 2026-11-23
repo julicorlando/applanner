@@ -128,6 +128,45 @@ class PatientRecordPaymentTests(TestCase):
         self.assertContains(page, "Pagamento recebido")
         self.assertContains(page, "Dra. Volante Exemplo")
 
+    def test_payment_on_an_earlier_date_goes_to_that_days_sheet(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from finance.clinic_models import ClinicCashEntry
+        yesterday = timezone.localdate() - timedelta(days=1)
+        response = self.client.post(self.url(), {
+            "action": "receive", "request_id": str(uuid.uuid4()), "professional": "", "professional_name": "Dra. Volante Exemplo",
+            "dentist_amount": "0", "clinic_amount": "0", "other_amount": "0", "method": self.pix.pk, "notes": "Avaliação",
+            "paid_on": yesterday.isoformat()})
+        self.assertRedirects(response, self.url(), fetch_redirect_response=False)
+        row = ClinicCashEntry.objects.get(customer=self.patient)
+        self.assertEqual(row.session.business_date, yesterday)
+        self.assertEqual(timezone.localtime(row.transaction.paid_at).date(), yesterday)
+        future = self.client.post(self.url(), {
+            "action": "receive", "request_id": str(uuid.uuid4()), "professional_name": "Dra. Volante Exemplo",
+            "dentist_amount": "10", "clinic_amount": "0", "other_amount": "0", "method": self.pix.pk,
+            "paid_on": (timezone.localdate() + timedelta(days=1)).isoformat()})
+        self.assertContains(future, "A data não pode ser no futuro")
+
+    def test_dated_evolution_and_treatment_plan_go_into_the_history(self):
+        from datetime import date
+        from django.utils import timezone
+        from .document_models import PatientNote
+        self.client.post(self.url(), {"action": "note", "procedure": "Restauração 16", "orthodontic": "", "text": "",
+                                      "occurred_on": "2026-10-05"})
+        note = PatientNote.objects.get(customer=self.patient)
+        self.assertEqual(timezone.localtime(note.occurred_at).date(), date(2026, 10, 5))
+        response = self.client.post(self.url(), {
+            "action": "plan", "occurred_on": "", "professional": "", "notes": "Começar pela urgência",
+            "plan_tooth": ["16", "", ""], "plan_procedure": ["Restauração", "Limpeza", ""], "plan_price": ["150,00", "120", ""]})
+        self.assertRedirects(response, self.url(), fetch_redirect_response=False)
+        page = self.client.get(self.url())
+        self.assertContains(page, "Plano de tratamento")
+        self.assertContains(page, "1. Dente 16 · Restauração · R$ 150,00")
+        self.assertContains(page, "Total do plano: R$ 270,00")
+        self.assertContains(page, "05/10/2026")
+        empty = self.client.post(self.url(), {"action": "plan", "plan_procedure": ["", ""], "plan_price": ["", ""]})
+        self.assertContains(empty, "Adicione pelo menos um procedimento")
+
     def test_payment_requires_method_and_open_cash(self):
         from finance.clinic_models import ClinicCashEntry
         response = self.client.post(self.url(), {
