@@ -224,7 +224,7 @@ class DentalEvolutionTests(TestCase):
         self.assertContains(page, "Apagar esta versão")
         self.post(action="void-note", note=note.pk, reason="Lançado errado")
         self.assertNotContains(self.client.get(self.url()), "Versões antigas do plano")
-        self.assertIn("Restauração", decrypt_text(PatientNote.objects.get(pk=note.pk).text_encrypted))
+        self.assertIn("Restauração", json.loads(decrypt_text(PatientNote.objects.get(pk=note.pk).text_encrypted))["plan"])
 
     def test_voiding_the_evolution_of_an_executed_item_returns_it_to_the_plan(self):
         self.post(action="plan", plan_id=[""], plan_tooth=["11"], plan_procedure=["Restauração"], plan_price=["90"],
