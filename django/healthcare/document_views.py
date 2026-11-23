@@ -15,7 +15,7 @@ from core.audit import append_audit
 from core.crypto import encrypt_text,decrypt_text
 from scheduling.models import Professional,Customer
 from .document_models import ClinicalDocumentTemplate,ClinicalIssuedDocument,ProfessionalSignature,KINDS
-from .document_services import own_professional,save_signature,finalize_document,text_from_template,default_body,DEFAULT_TITLES
+from .document_services import own_professional,save_signature,finalize_document,text_from_template,default_body,DEFAULT_TITLES,reception_may_emit
 from .patient_scope import patients_for
 
 
@@ -135,13 +135,16 @@ def documents(request):
         patient=patients_for(request.user,administrative=reception).filter(pk=int(request.GET['customer']),active=True).first()
     if kind in DEFAULT_TITLES and request.method=='GET':
         initial.update(kind=kind,title=DEFAULT_TITLES[kind])
-        if patient and not reception:
-            try:
-                profile=own_professional(request.user)
-            except PermissionDenied:
-                profile=None
-            if profile:
-                initial.update(professional=profile.pk,body=default_body(kind=kind,user=request.user,patient=patient,professional=profile))
+        if patient:
+            profile=None
+            if not reception:
+                try:
+                    profile=own_professional(request.user)
+                except PermissionDenied:
+                    profile=None
+            if profile:initial.update(professional=profile.pk)
+            # The front desk prepares it for a professional to review; the text already carries the patient's data.
+            initial.update(body=default_body(kind=kind,user=request.user,patient=patient,professional=profile))
     form=PrepareForm(request.POST or None,user=request.user,initial=initial)
     if request.method=='POST' and form.is_valid():
         data=form.cleaned_data;profile=data['professional'];patient=data['customer'];template=data['template']
@@ -213,7 +216,8 @@ class ReviewForm(forms.Form):
 def detail(request,pk):
     tenant=staff(request);reception=request.user.role=='reception'
     rows=ClinicalIssuedDocument.objects.filter(tenant=tenant)
-    rows=rows.filter(created_by=request.user,status='draft') if reception else rows.filter(professional__user=request.user,professional__active=True)
+    rows=rows.filter(created_by=request.user) if reception else rows.filter(professional__user=request.user,professional__active=True)
+    if reception and not reception_may_emit(request.user):rows=rows.filter(status='draft')
     row=get_object_or_404(rows,pk=pk)
     if request.method=='POST' and request.POST.get('action')=='revise':
         if reception:raise PermissionDenied
@@ -224,7 +228,7 @@ def detail(request,pk):
         try:
             data=form.cleaned_data
             if request.POST.get('action')=='finalize':
-                if reception:raise PermissionDenied
+                if reception and not reception_may_emit(request.user):raise PermissionDenied
                 finalize_document(user=request.user,document=row,base_url=request.build_absolute_uri('/'),**data)
             elif request.POST.get('action')=='draft':
                 with transaction.atomic():
@@ -237,6 +241,7 @@ def detail(request,pk):
     append_audit(tenant=tenant,user=request.user,request=request,action='clinical.document.viewed',entity_type='ClinicalIssuedDocument',entity_id=row.pk)
     from .document_services import verification_url,preview_data
     return render(request,'healthcare/document_detail.html',{'row':row,'form':form,'reception':reception,
+        'can_emit':not reception or reception_may_emit(request.user),
         'preview':preview_data(tenant=tenant,user=request.user,patient=row.customer,professional=row.professional,kind=row.kind),
         'back_url':_record_url(tenant,row.customer),
         'replaced_by':row.replaced_by if row.status=='finalized' else None,
@@ -248,8 +253,13 @@ def detail(request,pk):
 @login_required
 @never_cache
 def pdf(request,pk):
-    profile=own_professional(request.user)
-    row=get_object_or_404(ClinicalIssuedDocument,pk=pk,tenant_id=request.user.tenant_id,professional=profile,status='finalized')
+    if request.user.role=='reception':
+        staff(request)
+        if not reception_may_emit(request.user):raise PermissionDenied
+        row=get_object_or_404(ClinicalIssuedDocument,pk=pk,tenant_id=request.user.tenant_id,created_by=request.user,status='finalized')
+    else:
+        profile=own_professional(request.user)
+        row=get_object_or_404(ClinicalIssuedDocument,pk=pk,tenant_id=request.user.tenant_id,professional=profile,status='finalized')
     raw=Fernet(settings.FIELD_ENCRYPTION_KEY.encode()).decrypt(bytes(row.pdf_encrypted))
     append_audit(tenant=request.user.tenant,user=request.user,request=request,action='clinical.document.pdf.exported',entity_type='ClinicalIssuedDocument',entity_id=row.pk)
     return HttpResponse(raw,content_type='application/pdf',headers={'Content-Disposition':f'inline; filename="documento-{row.pk}.pdf"','X-Content-Type-Options':'nosniff'})

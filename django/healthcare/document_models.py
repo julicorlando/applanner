@@ -4,7 +4,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from core.models import TimeStampedModel
 
-KINDS=[('prescription','Receituário'),('certificate','Atestado'),('declaration','Declaração'),('budget','Orçamento')]
+KINDS=[('prescription','Receituário'),('certificate','Atestado'),('declaration','Declaração'),('report','Laudo'),
+       ('referral','Encaminhamento'),('exam_request','Solicitação de exames'),('budget','Orçamento')]
 
 
 class ProfessionalSignature(TimeStampedModel):

@@ -6,6 +6,7 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
 TASKS=[
     ("Backup clínico diário no Google Drive","healthcare.drive_tasks.queue_daily_clinical_drive_backups",1,"hours"),
+    ("Finalizar rascunhos de evolução odontológica","healthcare.tasks.finalize_expired_dental_evolutions",15,"minutes"),
     ("Felicitar aniversariantes das clínicas","communications.tasks.queue_customer_birthdays",1,"hours"),
     ("Conciliar Pix e cartões de desenvolvimento", "development.tasks.reconcile_development_payments", 2, "minutes"),
     ("Cobranças de clientes de desenvolvimento", "development.tasks.process_development_billing", 1, "minutes"),

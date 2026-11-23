@@ -153,6 +153,8 @@ META_PIXEL_ID=env("META_PIXEL_ID",default="")
 META_CONVERSION_ACCESS_TOKEN=env("META_CONVERSION_ACCESS_TOKEN",default="")
 
 SENTRY_DSN=env("SENTRY_DSN",default="")
+# Rascunho da evolução odontológica vira FINALIZADO (imutável) após estas horas, mesmo sem clicar em finalizar.
+DENTAL_EVOLUTION_DRAFT_HOURS=env.int("DENTAL_EVOLUTION_DRAFT_HOURS",default=12)
 if SENTRY_DSN:
     import sentry_sdk
     sentry_sdk.init(dsn=SENTRY_DSN,send_default_pii=False,traces_sample_rate=0.05)

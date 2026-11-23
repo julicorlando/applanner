@@ -81,16 +81,38 @@ class ClinicalDocumentDeliveryTests(TestCase):
                 cursor.execute('UPDATE healthcare_clinicalissueddocument SET title=%s WHERE id=%s',['Alterado',row.pk])
         row.refresh_from_db();self.assertEqual(row.status,'finalized')
 
-    def test_reception_can_prepare_only_own_draft_and_cannot_emit_or_download(self):
+    def test_reception_emits_in_the_dentists_name_unless_manager_turns_it_off(self):
+        import json
+        from core.crypto import decrypt_text
+        from core.models import AuditLog
+        from finance import reception_permissions as perms
+        from .models import MedicalRecordEntry
         row=self.document(self.reception);self.client.force_login(self.reception)
-        self.assertEqual(self.client.get(reverse('clinical-document-detail',args=[row.pk])).status_code,200)
-        response=self.client.post(reverse('clinical-document-detail',args=[row.pk]),{'action':'finalize','title':row.title,'body':'Texto preparado','version':1,'confirmed':'on'})
-        self.assertEqual(response.status_code,403);row.refresh_from_db();self.assertEqual(row.status,'draft')
+        url=reverse('clinical-document-detail',args=[row.pk])
+        page=self.client.get(url)
+        self.assertContains(page,f'Emitir em nome de {self.professional.name}')
+        post={'action':'finalize','title':row.title,'body':'Texto preparado','version':1,'confirmed':'on'}
+        # Without the dentist's signature nothing is issued.
+        self.assertContains(self.client.post(url,post),'ainda não cadastrou a assinatura')
+        row.refresh_from_db();self.assertEqual(row.status,'draft')
+        save_signature(self.doctor,self.image())
+        self.assertEqual(self.client.post(url,post).status_code,302)
+        row.refresh_from_db();self.assertEqual(row.status,'finalized')
+        entry=MedicalRecordEntry.objects.get(pk=row.entry_id)
+        self.assertEqual(entry.professional_id,self.professional.pk)
+        self.assertEqual(json.loads(decrypt_text(entry.content_encrypted))['issued_by']['user_id'],self.reception.pk)
+        log=AuditLog.objects.get(action='clinical.document.finalized',entity_id=row.pk)
+        self.assertEqual(log.user,self.reception);self.assertTrue(log.after['on_behalf_of_professional'])
+        pdf=self.client.get(reverse('clinical-document-pdf',args=[row.pk]))
+        self.assertEqual(pdf.status_code,200);self.assertTrue(pdf.content.startswith(b'%PDF-'))
+        # The manager can take it back: drafts only, no PDF.
+        values=perms.current(self.tenant);values.update(documentos=False);perms.save(self.tenant,self.owner,values)
+        other=self.document(self.reception)
+        other_url=reverse('clinical-document-detail',args=[other.pk])
+        self.assertNotContains(self.client.get(other_url),'Emitir em nome de')
+        self.assertEqual(self.client.post(other_url,{**post,'version':other.version}).status_code,403)
         self.assertEqual(self.client.get(reverse('clinical-document-pdf',args=[row.pk])).status_code,403)
-        self.client.force_login(self.doctor);save_signature(self.doctor,self.image())
-        finalize_document(user=self.doctor,document=row,body='Revisado',title=row.title,version=1,confirmed=True)
-        self.client.force_login(self.reception)
-        self.assertEqual(self.client.get(reverse('clinical-document-detail',args=[row.pk])).status_code,404)
+        self.assertEqual(self.client.get(url).status_code,404)
 
     def test_shared_template_creates_patient_draft_without_applying_signature(self):
         from .document_models import ClinicalDocumentTemplate

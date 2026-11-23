@@ -361,3 +361,4 @@ from .operation_models import WaitingRoomDisplay, WaitingRoomMedia, WaitingRoomC
 from .document_models import ProfessionalSignature, ClinicalDocumentTemplate, ClinicalIssuedDocument, ClinicalDocumentValidation, PatientNote  # noqa: F401,E402
 from .drive_models import ClinicalDriveConfiguration, PatientDriveBackup  # noqa: F401,E402
 from .implementation_models import ClinicalImplementationPeriod  # noqa: F401,E402
+from .evolution_models import DentalPlanItem, DentalEvolution, PatientNoteRectification  # noqa: F401,E402

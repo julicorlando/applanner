@@ -11,6 +11,7 @@ PERMISSIONS = [
     ("prontuarios", "Ver os prontuários dos pacientes", True),
     ("evolucao", "Registrar evolução no prontuário", True),
     ("plano", "Criar e editar o plano de tratamento do paciente", True),
+    ("documentos", "Emitir documentos do paciente (receituário, atestado, laudo...) em nome do dentista, com a assinatura cadastrada dele", True),
     ("cadastro", "Cadastrar e editar pacientes", True),
     ("agenda", "Ver a agenda e agendar atendimentos", True),
     ("caixa", "Receber pagamentos no caixa", True),
