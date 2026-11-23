@@ -668,7 +668,8 @@ def patient_record(request, pk):
             if not active and len(reason) < 3:
                 messages.error(request, "Informe o motivo para inativar o paciente.")
                 return redirect(self_url)
-            with transaction.atomic():
+            from django.db import transaction as db_tx
+            with db_tx.atomic():
                 locked = type(patient).objects.select_for_update().get(pk=patient.pk, tenant=tenant)
                 if locked.active != active:
                     locked.active = active
