@@ -180,8 +180,11 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False):
             "sections": _entry_sections(_read_entry(entry, user, ip)), "draft": False, "url": "",
         })
     for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:500]:
+        raw = decrypt_text(note.text_encrypted)
+        if _is_plan(raw):
+            continue  # the treatment plan lives in its own card, not in the history
         days[_local_day(note.effective_at)]["notes"].append({
-            "sections": note_sections(decrypt_text(note.text_encrypted)), "author": note.author_name,
+            "sections": note_sections(raw), "author": note.author_name,
             "at": note.effective_at, "imported": bool(note.import_key)})
     documents = ClinicalIssuedDocument.objects.filter(tenant=tenant, customer=patient, status="finalized")
     if clinical:
@@ -346,6 +349,26 @@ def _plan_key(item):
 PLAN_LINE = re.compile(r"^\d+\.\s+(?:Dente\s+(?P<tooth>.+?)\s+·\s+)?(?P<procedure>.+?)\s+·\s+R\$\s*(?P<price>[\d.]+,\d{2})$")
 
 
+def _is_plan(raw):
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return False
+    return isinstance(data, dict) and bool(str(data.get("plan") or "").strip())
+
+
+def plan_versions(tenant, patient, limit=20):
+    """Saved versions of the treatment plan, newest first (shown inside the plan card)."""
+    out = []
+    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:300]:
+        raw = decrypt_text(note.text_encrypted)
+        if _is_plan(raw):
+            out.append({"at": note.effective_at, "author": note.author_name, "text": json.loads(raw)["plan"]})
+            if len(out) >= limit:
+                break
+    return out
+
+
 def current_plan(tenant, patient):
     """The latest treatment plan of the patient, as editable items (newest note wins; old notes are kept)."""
     for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:300]:
@@ -469,7 +492,7 @@ def patient_record(request, pk):
                 append_audit(tenant=tenant, user=request.user, request=request, action="clinical.patient_plan.created",
                              entity_type="PatientNote", entity_id=note.pk, after={"customer": patient.pk, "items": len(plan_form.items),
                                     "replaces": plan_now["note"].pk if plan_now else None})
-                messages.success(request, "Plano de tratamento atualizado no prontuário." if plan_now else "Plano de tratamento salvo no prontuário.")
+                messages.success(request, "Plano de tratamento atualizado." if plan_now else "Plano de tratamento salvo.")
                 return redirect(self_url)
         elif action == "receive":
             if not cash_tenant:
@@ -534,4 +557,5 @@ def patient_record(request, pk):
         "note_form": note_form, "plan_form": plan_form, "can_evolve": allowed(request.user, "evolucao"),
         "plan_items": _posted_plan(request) if plan_form.is_bound else (plan_now["items"] if plan_now else []),
         "plan_existing": bool(plan_now and plan_now["items"]),
+        "plan_versions": plan_versions(tenant, patient) if plan_now else [],
     })

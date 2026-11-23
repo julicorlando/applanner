@@ -167,6 +167,10 @@ class PatientRecordPaymentTests(TestCase):
         self.assertContains(page, "Total do plano: R$ 270,00")
         self.assertContains(page, "05/10/2026")
         self.assertContains(page, 'value="Limpeza"')  # current plan comes back as editable rows
+        history = [label for day in page.context["timeline"] for note in day["notes"] for label, _ in note["sections"]]
+        self.assertIn("Procedimento clínico", history)
+        self.assertNotIn("Plano de tratamento", history)  # the plan stays in its own card
+        self.assertContains(page, "Versões salvas do plano (1)")
         self.assertContains(page, "Salvar alterações do plano")
         self.client.post(self.url(), {"action": "plan", "plan_tooth": ["16", ""], "plan_procedure": ["Restauração", "Canal"],
                                       "plan_price": ["150,00", "400"]})
