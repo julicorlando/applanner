@@ -1,0 +1,48 @@
+{
+  "files.associations": {
+    "**/templates/**/*.html": "django-html"
+  },
+  "emmet.includeLanguages": {
+    "django-html": "html"
+  },
+  "python.analysis.extraPaths": [
+    "./django"
+  ],
+  "python.testing.unittestEnabled": false,
+  "git.autofetch": true,
+  "git.pruneOnFetch": true,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  },
+  "search.exclude": {
+    "**/staticfiles": true,
+    "**/media": true,
+    "**/*.bak*": true,
+    "**/*.backup*": true
+  },
+  "pgsql.connections": [
+    {
+      "profileName": "ApPlanner produção · somente leitura (via túnel)",
+      "server": "localhost",
+      "port": 5433,
+      "database": "applanner",
+      "user": "applanner_leitura",
+      "authenticationType": "SqlLogin",
+      "savePassword": false,
+      "encrypt": "Optional",
+      "trustServerCertificate": true
+    },
+    {
+      "profileName": "ApPlanner produção · administrador (cuidado)",
+      "server": "localhost",
+      "port": 5433,
+      "database": "applanner",
+      "user": "applanner",
+      "authenticationType": "SqlLogin",
+      "savePassword": false,
+      "encrypt": "Optional",
+      "trustServerCertificate": true
+    }
+  ]
+}

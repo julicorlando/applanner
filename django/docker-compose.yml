@@ -101,6 +101,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-applanner}
       POSTGRES_USER: ${POSTGRES_USER:-applanner}
       POSTGRES_PASSWORD: ${APPLANNER_POSTGRES_PASSWORD}
+    # Somente no localhost do servidor: acesso pelo VS Code via túnel SSH (docs/VSCODE.md). Não fica exposto na internet.
+    ports:
+      - "127.0.0.1:55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
