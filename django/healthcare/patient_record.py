@@ -34,7 +34,7 @@ from .document_models import KINDS as DOCUMENT_KINDS, ClinicalIssuedDocument, Pa
 from .evolution_models import DentalEvolution, DentalPlanItem, PatientNoteRectification
 from .evolution_services import (can_rectify, clean_fields, create_draft, delete_draft, draft_hours, evolution_text,
                                  execute_plan_item, finalize_attendance, finalize_expired, plan_items, rectify,
-                                 rectify_note, save_plan, update_draft)
+                                 rectify_note, save_plan, update_draft, void, void_note)
 from .models import DentalAssessment, MedicalRecordAccessLog, MedicalRecordEntry
 from .navigation import dental_workspace, shell_context
 from .services import _ip_hash, assert_clinical_access
@@ -178,6 +178,9 @@ def evolution_view(evolution, user, can_evolve=False):
     if evolution.status == DentalEvolution.Status.RECTIFIED:
         row["rectified"] = {"at": evolution.rectified_at, "by": _person(evolution.rectified_by),
                             "reason": decrypt_text(evolution.rectification_reason_encrypted)}
+        row["voided"] = not evolution.corrections.exists()
+        if row["voided"]:
+            row["status_label"] = "Anulado"
     elif evolution.status == DentalEvolution.Status.FINALIZED:
         row["can_rectify"] = can_evolve and can_rectify(user, evolution.created_by_id)
     else:
@@ -266,6 +269,7 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False, audit=False,
             "rectified": {"at": link.rectified_at, "by": _person(link.rectified_by),
                           "reason": decrypt_text(link.reason_encrypted)} if link else None,
             "can_rectify": bool(can_evolve and not link and can_rectify(user, note.author_id)),
+            "voided": bool(link and link.replacement_id is None),
             "fill": _fill("", fields.get("procedure"), fields.get("orthodontic"), fields.get("text"), day, None),
         })
     documents = ClinicalIssuedDocument.objects.filter(tenant=tenant, customer=patient, status="finalized")
@@ -278,12 +282,15 @@ def build_timeline(*, tenant, patient, user, ip="", clinical=False, audit=False,
             "replaced": bool(doc.replaced_by) if doc.kind == "budget" else False,
             "url": reverse("clinical-document-detail", args=[doc.pk]) if doc.professional.user_id == user.pk else ""})
     if module_enabled(tenant, "finance"):
-        from finance.clinic_models import ClinicCashEntry, ClinicReceipt
+        from finance.clinic_models import ClinicCashEntry, ClinicCashEntryRemoval, ClinicReceipt
+        pending_removal = set(ClinicCashEntryRemoval.objects.filter(entry__session__tenant=tenant, entry__customer=patient,
+                                                                    status="requested").values_list("entry_id", flat=True))
         for row in (ClinicCashEntry.objects.filter(session__tenant=tenant, customer=patient)
                     .exclude(status="cancelled").select_related("session").order_by("-created_at")[:200]):
             days[_local_day(row.session.opened_at)]["payments"].append({
                 "total": row.total, "method": row.method_name or "Em aberto", "open": row.status == "open",
-                "professional": row.professional_name, "notes": row.notes, "source": "Folha do caixa"})
+                "professional": row.professional_name, "notes": row.notes, "source": "Folha do caixa",
+                "entry": row.pk, "pending_removal": row.pk in pending_removal})
         for receipt in (ClinicReceipt.objects.filter(installment__charge__tenant=tenant, installment__charge__customer=patient)
                         .select_related("installment__charge").order_by("-created_at")[:200]):
             charge = receipt.installment.charge
@@ -492,7 +499,8 @@ def _can_documents(user):
         return False
 
 
-EVOLUTION_ACTIONS = {"evolution", "evolution-edit", "evolution-delete", "finalize", "rectify", "rectify-note"}
+EVOLUTION_ACTIONS = {"evolution", "evolution-edit", "evolution-delete", "finalize", "rectify", "rectify-note",
+                     "void", "void-note"}
 
 
 def _evolution_action(request, action, tenant, patient):
@@ -519,6 +527,21 @@ def _evolution_action(request, action, tenant, patient):
         done = finalize_attendance(user=user, patient=patient, request=request)
         messages.success(request, f"Atendimento finalizado: {len(done)} lançamento(s) registrados no prontuário."
                          if done else "Não há rascunhos seus para finalizar.")
+        return None
+    if action in {"void", "void-note"}:
+        try:
+            if action == "void":
+                target = post.get("evolution") or ""
+                evolution = get_object_or_404(DentalEvolution, pk=target if target.isdigit() else 0, tenant=tenant, customer=patient)
+                void(user=user, evolution_id=evolution.pk, reason=post.get("reason"), request=request)
+            else:
+                note_id = post.get("note") or ""
+                note = get_object_or_404(PatientNote, pk=note_id if note_id.isdigit() else 0, tenant=tenant, customer=patient)
+                void_note(user=user, note=note, reason=post.get("reason"), request=request)
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+        else:
+            messages.success(request, "Lançamento anulado e retirado do histórico. O original fica guardado no modo auditoria.")
         return None
     target = post.get("evolution") or ""
     if not target.isdigit() and action != "rectify-note":
@@ -624,6 +647,28 @@ def patient_record(request, pk):
                     total = f"{row.total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                     messages.success(request, f"Pagamento de R$ {total} ({row.method_name}) recebido e lançado no caixa de {data['paid_on']:%d/%m/%Y} de {session.label}.")
                     return redirect(self_url)
+        elif action in {"payment-delete", "payment-ask"}:
+            from finance.clinic_cash import cancel_entry, request_removal
+            from finance.clinic_models import ClinicCashEntry
+            entry_id = request.POST.get("entry") or ""
+            row = get_object_or_404(ClinicCashEntry, pk=entry_id if entry_id.isdigit() else 0, session__tenant=tenant,
+                                    customer=patient)
+            reason = " ".join((request.POST.get("reason") or "").split())[:300]
+            try:
+                if action == "payment-delete":
+                    from finance.clinic_cash import decide_removal
+                    ask = row.removal_requests.filter(status="requested").first()
+                    if ask and request.user.role in {"owner", "tenant-admin", "manager"}:
+                        decide_removal(user=request.user, removal_id=ask.pk, approve=True, note=reason)
+                    else:
+                        cancel_entry(user=request.user, entry_id=row.pk, reason=reason)
+                    messages.success(request, "Pagamento apagado. Ele saiu do histórico e da folha do caixa.")
+                else:
+                    request_removal(user=request.user, entry_id=row.pk, reason=reason)
+                    messages.success(request, "Pedido enviado. O gestor aprova ou recusa na folha do caixa.")
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
+            return redirect(self_url)
         elif action == "receive-plan":
             if not cash_tenant:
                 raise PermissionDenied("Seu perfil não registra recebimentos no caixa.")
@@ -662,6 +707,7 @@ def patient_record(request, pk):
         "can_schedule": has_capability(request.user, "agenda.manage") and request.user.role not in {"professional", "healthcare"},
         "document_kinds": DOCUMENT_KINDS, "can_documents": patient.active and _can_documents(request.user),
         "receive_form": receive_form if allowed(request.user, "caixa") else None, "cash_session": session,
+        "can_delete_payment": request.user.role in {"owner", "tenant-admin", "manager"} or allowed(request.user, "apagar_lancamento"),
         "plan_receivables": list(_plan_receivables(tenant, patient)[:50]) if cash_tenant and allowed(request.user, "caixa") else [],
         "payment_methods": _payment_methods(tenant) if cash_tenant else [],
         "evolution_form": evolution_form, "can_evolve": can_evolve,

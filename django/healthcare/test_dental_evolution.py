@@ -191,6 +191,36 @@ class DentalEvolutionTests(TestCase):
         with self.assertRaises(ValidationError):
             link.save()
 
+    def test_wrong_entries_are_voided_out_of_history_and_kept_for_audit(self):
+        original = self.finalized()
+        note = PatientNote.objects.create(tenant=self.tenant, customer=self.patient, author=self.doctor, author_name="Dra. Ana",
+                                          text_encrypted=encrypt_text(json.dumps({"procedure": "Canal no 11", "text": ""})))
+        page = self.client.get(self.url())
+        self.assertContains(page, "Anular (lançado por engano)")
+        self.post(action="void", evolution=original.pk, reason="")  # reason is required
+        original.refresh_from_db()
+        self.assertEqual(original.status, "finalized")
+        self.post(action="void", evolution=original.pk, reason="Lançado no paciente errado")
+        self.post(action="void-note", note=note.pk, reason="Lançado no paciente errado")
+        original.refresh_from_db()
+        self.assertEqual(original.status, "rectified")
+        self.assertFalse(DentalEvolution.objects.filter(previous=original).exists())
+        self.assertIsNone(PatientNoteRectification.objects.get(note=note).replacement)
+        page = self.client.get(self.url())
+        self.assertEqual(self.history(page), [])
+        self.assertEqual([n for day in page.context["timeline"] for n in day["notes"]], [])
+        audit = self.client.get(self.url(auditoria=1))
+        self.assertContains(audit, "Anulado em")
+        self.assertContains(audit, "Canal no 11")
+        self.assertTrue(AuditLog.objects.filter(action="clinical.dental.evolution.voided").exists())
+        self.assertTrue(AuditLog.objects.filter(action="clinical.dental.patient_note.voided").exists())
+
+    def test_reception_cannot_void_a_dentist_record(self):
+        original = self.finalized()
+        self.client.force_login(self.reception)
+        self.assertNotContains(self.client.get(self.url()), "Anular (lançado por engano)")
+        self.assertEqual(self.post(action="void", evolution=original.pk, reason="Lançado errado").status_code, 403)
+
     # ------------------------------------------------------------ auditoria
 
     def test_audit_log_has_user_ip_and_states_without_clinical_text(self):

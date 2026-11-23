@@ -297,6 +297,48 @@ def rectify_note(*, user, note, reason, data, request=None):
     return correction
 
 
+@transaction.atomic
+def void(*, user, evolution_id, reason, request=None):
+    """Anula um lançamento feito por engano (paciente errado, duplicado): sai do histórico, sem substituto.
+    O registro original continua guardado e aparece no modo auditoria."""
+    original = _lock(DentalEvolution, evolution_id, user)
+    if original.status != DentalEvolution.Status.FINALIZED:
+        raise ValidationError("Somente lançamentos finalizados são anulados; rascunhos se excluem direto.")
+    if not can_rectify(user, original.created_by_id):
+        raise PermissionDenied("Somente quem lançou ou a gestão da clínica anula este lançamento.")
+    reason = _clean_reason(reason)
+    before = audit_state(original)
+    original.status = DentalEvolution.Status.RECTIFIED
+    original.rectified_at = timezone.now()
+    original.rectified_by = user
+    original.rectification_reason_encrypted = encrypt_text(reason)
+    original.save()
+    _audit(tenant=user.tenant, user=user, request=request, action="clinical.dental.evolution.voided",
+           entity=original, before=before, after={**audit_state(original),
+                                                  "reason_sha256": hashlib.sha256(reason.encode()).hexdigest()})
+    return original
+
+
+@transaction.atomic
+def void_note(*, user, note, reason, request=None):
+    from .document_models import PatientNote
+    note = PatientNote.objects.select_for_update().get(pk=note.pk, tenant_id=user.tenant_id)
+    if PatientNoteRectification.objects.filter(note=note).exists():
+        raise ValidationError("Este lançamento já foi retificado ou anulado.")
+    if not can_rectify(user, note.author_id):
+        raise PermissionDenied("Somente quem lançou ou a gestão da clínica anula este lançamento.")
+    reason = _clean_reason(reason)
+    link = PatientNoteRectification.objects.create(note=note, replacement=None, reason_encrypted=encrypt_text(reason),
+                                                   rectified_by=user)
+    raw = decrypt_text(note.text_encrypted)
+    append_audit(tenant=user.tenant, user=user, request=request, action="clinical.dental.patient_note.voided",
+                 entity_type="PatientNote", entity_id=note.pk,
+                 before={"status": "finalized", "content_sha256": hashlib.sha256(raw.encode()).hexdigest()},
+                 after={"status": "voided", "rectification_id": link.pk,
+                        "reason_sha256": hashlib.sha256(reason.encode()).hexdigest()})
+    return link
+
+
 # ---------------------------------------------------------------- plano de tratamento
 
 def plan_items(tenant, patient):

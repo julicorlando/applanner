@@ -130,6 +130,22 @@ class PatientRecordPaymentTests(TestCase):
         self.assertContains(page, "Pagamento recebido")
         self.assertContains(page, "Dra. Volante Exemplo")
 
+    def test_wrong_payment_is_asked_by_reception_and_deleted_by_manager_from_the_record(self):
+        from finance.clinic_models import ClinicCashEntry, ClinicCashEntryRemoval
+        self.client.post(self.url(), {
+            "action": "receive", "request_id": str(uuid.uuid4()), "professional": "", "professional_name": "Dra. X",
+            "dentist_amount": "10.00", "clinic_amount": "0", "other_amount": "0", "method": self.pix.pk, "notes": ""})
+        row = ClinicCashEntry.objects.get(customer=self.patient)
+        self.assertContains(self.client.get(self.url()), "Pedir para apagar")
+        self.client.post(self.url(), {"action": "payment-ask", "entry": row.pk, "reason": "Paciente errado"})
+        self.assertTrue(ClinicCashEntryRemoval.objects.filter(entry=row, status="requested").exists())
+        self.assertContains(self.client.get(self.url()), "aguardando o gestor")
+        self.client.force_login(self.owner)
+        self.client.post(self.url(), {"action": "payment-delete", "entry": row.pk, "reason": "Paciente errado"})
+        row.refresh_from_db()
+        self.assertEqual(row.status, "cancelled")
+        self.assertNotContains(self.client.get(self.url()), "Pagamento recebido")
+
     def test_payment_on_an_earlier_date_goes_to_that_days_sheet(self):
         from datetime import timedelta
         from django.utils import timezone
