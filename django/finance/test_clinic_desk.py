@@ -289,6 +289,6 @@ class ClinicDeskTests(TestCase):
         response=self.client.get(reverse('clinic-finance-desk'))
         parser=Controls();parser.feed(response.content.decode())
         self.assertEqual(len(parser.ids),len(set(parser.ids)))
-        self.assertContains(response,'id="cash_amount"')
+        self.assertContains(response,reverse('clinic-cash-panel'))  # opening/closing moved to the cash panel
         self.assertContains(response,'id="charge_amount"')
         self.assertContains(response,'id="expense_amount"')
