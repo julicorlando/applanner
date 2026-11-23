@@ -1,0 +1,72 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "sshUser",
+      "type": "promptString",
+      "description": "Usuário SSH do servidor do Coolify",
+      "default": "root"
+    },
+    {
+      "id": "sshHost",
+      "type": "promptString",
+      "description": "Endereço do servidor do Coolify",
+      "default": "coolify.axionwebdigital.com.br"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "ApPlanner: atualizar código (git pull)",
+      "type": "shell",
+      "command": "git pull --ff-only",
+      "problemMatcher": []
+    },
+    {
+      "label": "ApPlanner: abrir túnel do banco de produção",
+      "type": "shell",
+      "command": "ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 5433:127.0.0.1:55432 ${input:sshUser}@${input:sshHost}",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "Deixe aberto enquanto usa o banco. Depois conecte em localhost:5433 pela extensão PostgreSQL."
+    },
+    {
+      "label": "ApPlanner: terminal no servidor (SSH)",
+      "type": "shell",
+      "command": "ssh ${input:sshUser}@${input:sshHost}",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "ApPlanner: subir ambiente local (Docker)",
+      "type": "shell",
+      "command": "docker compose -f docker-compose.yml -f docker-compose.local.yml up --build",
+      "options": {
+        "cwd": "${workspaceFolder}/django"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "ApPlanner: rodar testes (Docker local)",
+      "type": "shell",
+      "command": "docker compose -f docker-compose.yml -f docker-compose.local.yml run --rm web python manage.py test",
+      "options": {
+        "cwd": "${workspaceFolder}/django"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ApPlanner: verificar código (ruff)",
+      "type": "shell",
+      "command": "ruff check --select F django",
+      "problemMatcher": []
+    }
+  ]
+}
