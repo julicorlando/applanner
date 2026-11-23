@@ -240,6 +240,15 @@ class DentalEvolutionTests(TestCase):
         item.refresh_from_db()
         self.assertEqual(item.status, "planned")
 
+    def test_record_shows_the_registered_name_instead_of_the_email(self):
+        PatientNote.objects.create(tenant=self.tenant, customer=self.patient, author=self.reception,
+                                   author_name=self.reception.email,
+                                   text_encrypted=encrypt_text(json.dumps({"procedure": "", "text": "Paciente remarcou"})))
+        self.reception.first_name = "Maria Recepção"
+        self.reception.save(update_fields=["first_name"])
+        page = self.client.get(self.url())
+        self.assertContains(page, "Maria Recepção")
+
     def test_reception_cannot_void_a_dentist_record(self):
         original = self.finalized()
         self.client.force_login(self.reception)
