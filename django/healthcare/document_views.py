@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied,ValidationError
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import Http404,HttpResponse
 from django.shortcuts import get_object_or_404,render,redirect
 from django.views.decorators.cache import never_cache
 from cryptography.fernet import Fernet
@@ -15,7 +15,8 @@ from core.audit import append_audit
 from core.crypto import encrypt_text,decrypt_text
 from scheduling.models import Professional,Customer
 from .document_models import ClinicalDocumentTemplate,ClinicalIssuedDocument,ProfessionalSignature,KINDS
-from .document_services import own_professional,save_signature,finalize_document,text_from_template,default_body,DEFAULT_TITLES,reception_may_emit
+from .document_services import (own_professional,save_signature,finalize_document,text_from_template,default_body,DEFAULT_TITLES,
+                                acts_for_team,may_emit_for_others)
 from .patient_scope import patients_for
 
 
@@ -113,10 +114,11 @@ class PrepareForm(forms.Form):
     request_id=forms.UUIDField(widget=forms.HiddenInput)
     def __init__(self,*args,user,**kwargs):
         super().__init__(*args,**kwargs)
-        reception=user.role=='reception'
-        self.fields['customer'].queryset=patients_for(user,administrative=reception).filter(active=True)
-        self.fields['professional'].queryset=Professional.objects.filter(tenant_id=user.tenant_id,active=True,user__isnull=False)
-        if not reception:self.fields['professional'].queryset=self.fields['professional'].queryset.filter(user=user)
+        team=acts_for_team(user)
+        # Gestão e recepção veem todos os pacientes e escolhem o dentista; o dentista emite os próprios.
+        self.fields['customer'].queryset=patients_for(user,administrative=team).filter(active=True).order_by('name')
+        self.fields['professional'].queryset=Professional.objects.filter(tenant_id=user.tenant_id,active=True,user__isnull=False).order_by('name')
+        if not team:self.fields['professional'].queryset=self.fields['professional'].queryset.filter(user=user)
         self.fields['template'].queryset=available_templates(user)
         self.fields['title'].widget.attrs['data-preview-title']=''
         self.fields['body'].widget.attrs.update({'data-preview-body':'','rows':16})
@@ -124,24 +126,38 @@ class PrepareForm(forms.Form):
         self.fields['customer'].widget.attrs.update({'data-preview-patient':'','data-initial':str(self.initial.get('customer') or '')})
 
 
+def _own_profile(user):
+    if user.role=='reception':
+        return None
+    try:
+        return own_professional(user)
+    except PermissionDenied:
+        return None
+
+
+def _suggested_professional(tenant,patient):
+    """Who most likely signs for this patient: today's/latest appointment, or the clinic's only dentist."""
+    from scheduling.models import Appointment
+    latest=(Appointment.objects.filter(tenant=tenant,customer=patient,professional__active=True,professional__user__isnull=False)
+            .exclude(status__in=['cancelled','canceled','no_show']).order_by('-starts_at').select_related('professional').first())
+    if latest:return latest.professional
+    dentists=list(Professional.objects.filter(tenant=tenant,active=True,user__isnull=False)[:2])
+    return dentists[0] if len(dentists)==1 else None
+
+
 @login_required
 @never_cache
 def documents(request):
-    tenant=staff(request);reception=request.user.role=='reception'
+    tenant=staff(request);team=acts_for_team(request.user)
     initial={'request_id':uuid.uuid4(),'customer':request.GET.get('customer')}
     kind=request.GET.get('kind')
     patient=None
     if str(request.GET.get('customer') or '').isdigit():
-        patient=patients_for(request.user,administrative=reception).filter(pk=int(request.GET['customer']),active=True).first()
+        patient=patients_for(request.user,administrative=team).filter(pk=int(request.GET['customer']),active=True).first()
     if kind in DEFAULT_TITLES and request.method=='GET':
         initial.update(kind=kind,title=DEFAULT_TITLES[kind])
         if patient:
-            profile=None
-            if not reception:
-                try:
-                    profile=own_professional(request.user)
-                except PermissionDenied:
-                    profile=None
+            profile=_own_profile(request.user) or (_suggested_professional(tenant,patient) if team else None)
             if profile:initial.update(professional=profile.pk)
             # The front desk prepares it for a professional to review; the text already carries the patient's data.
             initial.update(body=default_body(kind=kind,user=request.user,patient=patient,professional=profile))
@@ -165,14 +181,12 @@ def documents(request):
                     append_audit(tenant=tenant,user=request.user,request=request,action='clinical.document.prepared',entity_type='ClinicalIssuedDocument',entity_id=row.pk)
             return redirect('clinical-document-detail',pk=row.pk)
     rows=ClinicalIssuedDocument.objects.filter(tenant=tenant)
-    rows=rows.filter(created_by=request.user) if reception else rows.filter(professional__user=request.user,professional__active=True)
+    rows=(rows.filter(Q(created_by=request.user)|Q(professional__user=request.user)) if team
+          else rows.filter(professional__user=request.user,professional__active=True))
     if patient:rows=rows.filter(customer=patient)
-    own=None
-    if not reception:
-        try:own=own_professional(request.user)
-        except PermissionDenied:own=None
+    own=_own_profile(request.user)
     from .document_services import preview_data
-    return render(request,'healthcare/documents.html',{'form':form,'rows':rows.order_by('-created_at')[:100],'reception':reception,
+    return render(request,'healthcare/documents.html',{'form':form,'rows':rows.order_by('-created_at')[:100],'reception':own is None,
         'patient':patient,'kinds':KINDS,'selected_kind':kind if kind in DEFAULT_TITLES else '','back_url':_record_url(tenant,patient) if patient else '',
         'preview':preview_data(tenant=tenant,user=request.user,patient=patient,professional=own,kind=kind if kind in DEFAULT_TITLES else 'prescription')})
 
@@ -214,13 +228,17 @@ class ReviewForm(forms.Form):
 @login_required
 @never_cache
 def detail(request,pk):
-    tenant=staff(request);reception=request.user.role=='reception'
+    tenant=staff(request);team=acts_for_team(request.user)
     rows=ClinicalIssuedDocument.objects.filter(tenant=tenant)
-    rows=rows.filter(created_by=request.user) if reception else rows.filter(professional__user=request.user,professional__active=True)
-    if reception and not reception_may_emit(request.user):rows=rows.filter(status='draft')
-    row=get_object_or_404(rows,pk=pk)
+    rows=(rows.filter(Q(created_by=request.user)|Q(professional__user=request.user)) if team
+          else rows.filter(professional__user=request.user,professional__active=True))
+    row=get_object_or_404(rows.select_related('professional'),pk=pk)
+    # Prepared for another dentist: issued in their name only when allowed (managers; reception if released).
+    on_behalf=row.professional.user_id!=request.user.pk
+    can_emit=not on_behalf or may_emit_for_others(request.user)
+    if on_behalf and not can_emit and row.status!='draft':raise Http404
     if request.method=='POST' and request.POST.get('action')=='revise':
-        if reception:raise PermissionDenied
+        if on_behalf:raise PermissionDenied
         return redirect('clinical-document-detail',pk=revise_budget(user=request.user,document=row,request=request).pk)
     if request.method=='POST' and row.status!='draft':return HttpResponse('O documento emitido foi preservado. Emita outro para corrigir.',status=409)
     form=ReviewForm(request.POST or None,initial={'title':row.title,'body':decrypt_text(row.body_encrypted),'version':row.version})
@@ -228,7 +246,7 @@ def detail(request,pk):
         try:
             data=form.cleaned_data
             if request.POST.get('action')=='finalize':
-                if reception and not reception_may_emit(request.user):raise PermissionDenied
+                if not can_emit:raise PermissionDenied
                 finalize_document(user=request.user,document=row,base_url=request.build_absolute_uri('/'),**data)
             elif request.POST.get('action')=='draft':
                 with transaction.atomic():
@@ -240,23 +258,24 @@ def detail(request,pk):
         except ValidationError as exc:form.add_error(None,exc)
     append_audit(tenant=tenant,user=request.user,request=request,action='clinical.document.viewed',entity_type='ClinicalIssuedDocument',entity_id=row.pk)
     from .document_services import verification_url,preview_data
-    return render(request,'healthcare/document_detail.html',{'row':row,'form':form,'reception':reception,
-        'can_emit':not reception or reception_may_emit(request.user),
+    return render(request,'healthcare/document_detail.html',{'row':row,'form':form,'reception':on_behalf,
+        'can_emit':can_emit,
         'preview':preview_data(tenant=tenant,user=request.user,patient=row.customer,professional=row.professional,kind=row.kind),
         'back_url':_record_url(tenant,row.customer),
         'replaced_by':row.replaced_by if row.status=='finalized' else None,
         'pending_revision':row.revisions.filter(status='draft').first() if row.status=='finalized' else None,
         'validation_url':verification_url(row.verification_code,request.build_absolute_uri('/')) if row.verification_code else '',
-        'validations':row.validations.all()[:50] if not reception else []})
+        'validations':row.validations.all()[:50] if not on_behalf else []})
 
 
 @login_required
 @never_cache
 def pdf(request,pk):
-    if request.user.role=='reception':
+    if acts_for_team(request.user):
         staff(request)
-        if not reception_may_emit(request.user):raise PermissionDenied
-        row=get_object_or_404(ClinicalIssuedDocument,pk=pk,tenant_id=request.user.tenant_id,created_by=request.user,status='finalized')
+        row=get_object_or_404(ClinicalIssuedDocument.objects.filter(Q(created_by=request.user)|Q(professional__user=request.user)),
+                              pk=pk,tenant_id=request.user.tenant_id,status='finalized')
+        if row.professional.user_id!=request.user.pk and not may_emit_for_others(request.user):raise PermissionDenied
     else:
         profile=own_professional(request.user)
         row=get_object_or_404(ClinicalIssuedDocument,pk=pk,tenant_id=request.user.tenant_id,professional=profile,status='finalized')

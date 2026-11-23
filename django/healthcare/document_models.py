@@ -24,6 +24,9 @@ class ClinicalDocumentTemplate(TimeStampedModel):
     active=models.BooleanField(default=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
 
+    def __str__(self):
+        return f'{self.name} · {self.get_kind_display()}'
+
 
 class IssuedDocumentQuerySet(models.QuerySet):
     def update(self,**kwargs):
