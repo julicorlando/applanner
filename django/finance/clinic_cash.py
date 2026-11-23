@@ -109,7 +109,9 @@ def _amounts(dentist, clinic, other):
 
 @transaction.atomic
 def add_entry(*, user, session_id, customer, professional, professional_name, dentist_amount, clinic_amount,
-              other_amount, method, notes, request_id):
+              other_amount, method, notes, request_id, receivable=None):
+    """One line on a cash sheet. `receivable` is a pending treatment-plan income that this line pays: the line
+    reuses that transaction instead of creating another one, so the money is counted once."""
     tenant = lock_company(user)
     existing = ClinicCashEntry.objects.filter(request_id=request_id).first()
     if existing:
@@ -133,7 +135,19 @@ def add_entry(*, user, session_id, customer, professional, professional_name, de
     now = _entry_time(session)
     from .clinic_services import session_day
     day = session_day(session)
-    tx = FinancialTransaction.objects.create(
+    if receivable is not None:
+        tx = FinancialTransaction.objects.select_for_update().get(pk=receivable.pk, tenant=tenant, type="income")
+        if tx.status != "pending" or ClinicCashEntry.objects.filter(transaction=tx).exists():
+            raise ValidationError("Este recebível já foi baixado. Atualize a página.")
+        if total != tx.amount:
+            raise ValidationError("O valor lançado precisa ser igual ao valor do recebível.")
+        if not method:
+            raise ValidationError("Escolha a forma de pagamento.")
+        tx.unit, tx.status, tx.paid_at, tx.payment_method = session.unit, "paid", now, method.kind
+        tx.save(update_fields=["unit", "status", "paid_at", "payment_method", "updated_at"])
+    else:
+        tx = None
+    tx = tx or FinancialTransaction.objects.create(
         tenant=tenant, unit=session.unit, type="income", source_type="clinic-cash-entry",
         status="paid" if method else "pending", paid_at=now if method else None,
         payment_method=method.kind if method else "", amount=total,
@@ -148,8 +162,9 @@ def add_entry(*, user, session_id, customer, professional, professional_name, de
         method_name=method.name if method else "", status="paid" if method else "open", notes=(notes or "")[:300],
         transaction=tx, created_by=user, request_id=request_id,
     )
-    tx.source_id = row.pk
-    tx.save(update_fields=["source_id", "updated_at"])
+    if receivable is None:
+        tx.source_id = row.pk
+        tx.save(update_fields=["source_id", "updated_at"])
     append_audit(tenant=tenant, user=user, action="clinic.cash_entry.created", entity_type="ClinicCashEntry", entity_id=row.pk,
                  after={"session": session.pk, "total": str(total), "method": method.kind if method else "open",
                         "late": session.status != CashSession.Status.OPEN})
@@ -199,6 +214,16 @@ def update_entry(*, user, entry_id, customer, professional, professional_name, d
     return row
 
 
+def reopen_receivable(tx):
+    """A cancelled line that paid a treatment-plan receivable gives the patient's debt back as a new pending row."""
+    if tx.source_type != "clinical-plan":
+        return None
+    return FinancialTransaction.objects.create(
+        tenant_id=tx.tenant_id, unit_id=tx.unit_id, type="income", status="pending", source_type="clinical-plan",
+        source_id=tx.source_id, description=tx.description, amount=tx.amount, competence_at=tx.competence_at,
+        due_at=tx.due_at, idempotency_key=f"clinical-plan-reopen:{tx.pk}"[:100])
+
+
 @transaction.atomic
 def cancel_entry(*, user, entry_id, reason, approved_removal=False):
     from .reception_permissions import allowed
@@ -221,6 +246,7 @@ def cancel_entry(*, user, entry_id, reason, approved_removal=False):
     tx = FinancialTransaction.objects.select_for_update().get(pk=row.transaction_id, tenant=tenant)
     tx.status = "cancelled"
     tx.save(update_fields=["status", "updated_at"])
+    reopen_receivable(tx)
     append_audit(tenant=tenant, user=user, action="clinic.cash_entry.cancelled", entity_type="ClinicCashEntry", entity_id=row.pk,
                  before=before, after={"status": "cancelled", "reason": reason})
     refresh_closed(session, user)
@@ -277,7 +303,7 @@ def expected_cash(session):
         # Treatment-plan receivables paid in cash at the desk are not linked to a sheet line.
         legacy = FinancialTransaction.objects.filter(
             tenant=session.tenant, unit=session.unit, status="paid", payment_method__in=["cash", "dinheiro"],
-            source_type="clinical-plan", paid_at__gte=session.opened_at,
+            source_type="clinical-plan", clinic_cash_entry__isnull=True, paid_at__gte=session.opened_at,
             paid_at__lte=session.closed_at or timezone.now()).aggregate(v=Sum("amount"))["v"] or Decimal(0)
     return session.opening_amount + entries + receipts - spent + legacy
 
@@ -568,6 +594,7 @@ def delete_sheet(*, user, session_id, reason):
         row.save(update_fields=["status", "notes", "updated_at"])
         tx.status = "cancelled"
         tx.save(update_fields=["status", "updated_at"])
+        reopen_receivable(tx)
         cancelled += 1
     before = {"status": session.status, "label": session.label, "day": str(session.business_date or "")}
     session.deleted_at, session.deleted_by, session.deleted_reason = timezone.now(), user, reason[:300]

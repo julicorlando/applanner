@@ -155,6 +155,8 @@ class PatientRecordPaymentTests(TestCase):
                                       "occurred_on": "2026-10-05"})
         note = PatientNote.objects.get(customer=self.patient)
         self.assertEqual(timezone.localtime(note.occurred_at).date(), date(2026, 10, 5))
+        empty = self.client.post(self.url(), {"action": "plan", "plan_procedure": ["", ""], "plan_price": ["", ""]})
+        self.assertContains(empty, "Adicione pelo menos um procedimento")
         response = self.client.post(self.url(), {
             "action": "plan", "occurred_on": "", "professional": "", "notes": "Começar pela urgência",
             "plan_tooth": ["16", "", ""], "plan_procedure": ["Restauração", "Limpeza", ""], "plan_price": ["150,00", "120", ""]})
@@ -164,8 +166,20 @@ class PatientRecordPaymentTests(TestCase):
         self.assertContains(page, "1. Dente 16 · Restauração · R$ 150,00")
         self.assertContains(page, "Total do plano: R$ 270,00")
         self.assertContains(page, "05/10/2026")
-        empty = self.client.post(self.url(), {"action": "plan", "plan_procedure": ["", ""], "plan_price": ["", ""]})
-        self.assertContains(empty, "Adicione pelo menos um procedimento")
+        self.assertContains(page, 'value="Limpeza"')  # current plan comes back as editable rows
+        self.assertContains(page, "Salvar alterações do plano")
+        self.client.post(self.url(), {"action": "plan", "plan_tooth": ["16", ""], "plan_procedure": ["Restauração", "Canal"],
+                                      "plan_price": ["150,00", "400"]})
+        page = self.client.get(self.url())
+        self.assertContains(page, "Removido: Limpeza · R$ 120,00")
+        self.assertContains(page, "Total do plano: R$ 550,00")
+        self.assertNotContains(page, 'value="Limpeza"')
+        self.assertContains(page, 'value="Canal"')
+        self.client.post(self.url(), {"action": "plan", "plan_procedure": [""], "plan_price": [""]})
+        page = self.client.get(self.url())
+        self.assertContains(page, "Todos os itens do plano foram removidos.")
+        self.assertNotContains(page, 'value="Canal"')
+        self.assertEqual(PatientNote.objects.filter(customer=self.patient).count(), 4)  # history is kept
 
     def test_payment_requires_method_and_open_cash(self):
         from finance.clinic_models import ClinicCashEntry

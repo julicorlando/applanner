@@ -6,6 +6,7 @@ Every read of clinical content is logged (MedicalRecordAccessLog / audit trail).
 Clinical records themselves stay immutable: new content comes as new evolutions
 (dentists) or team observations (anyone with access, reception included)."""
 import json
+import re
 import uuid
 from collections import defaultdict
 from datetime import datetime, time, timedelta
@@ -286,10 +287,11 @@ class PlanForm(forms.Form):
     notes = forms.CharField(label="Observação do plano (opcional)", required=False, max_length=2000,
                             widget=forms.Textarea(attrs={"rows": 2}))
 
-    def __init__(self, *args, tenant, **kwargs):
+    def __init__(self, *args, tenant, previous=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["professional"].queryset = Professional.objects.filter(tenant=tenant, active=True).order_by("name")
         self.items = []
+        self.previous = previous or []
 
     def clean(self):
         data = super().clean()
@@ -311,7 +313,7 @@ class PlanForm(forms.Form):
             if not price.is_finite() or price < 0 or price > Decimal("999999.99"):
                 raise forms.ValidationError(f"Item {index + 1}: valor inválido.")
             items.append({"tooth": tooth, "procedure": procedure, "price": price})
-        if not items:
+        if not items and not self.previous:
             raise forms.ValidationError("Adicione pelo menos um procedimento ao plano de tratamento.")
         self.items = items
         return data
@@ -324,10 +326,51 @@ class PlanForm(forms.Form):
         for number, item in enumerate(self.items, start=1):
             tooth = f"Dente {item['tooth']} · " if item["tooth"] else ""
             lines.append(f"{number}. {tooth}{item['procedure']} · {_brl(item['price'])}")
+        if not self.items:
+            lines.append("Todos os itens do plano foram removidos.")
+        kept = {_plan_key(item) for item in self.items}
+        removed = [item for item in self.previous if _plan_key(item) not in kept]
+        for item in removed:
+            tooth = f"Dente {item['tooth']} · " if item["tooth"] else ""
+            lines.append(f"Removido: {tooth}{item['procedure']} · {_brl(item['price'])}")
         lines.append(f"Total do plano: {_brl(sum((i['price'] for i in self.items), Decimal('0')))}")
         if (self.cleaned_data.get("notes") or "").strip():
             lines.append(f"Observação: {self.cleaned_data['notes'].strip()}")
         return "\n".join(lines)
+
+
+def _plan_key(item):
+    return (item["tooth"], item["procedure"], Decimal(item["price"]))
+
+
+PLAN_LINE = re.compile(r"^\d+\.\s+(?:Dente\s+(?P<tooth>.+?)\s+·\s+)?(?P<procedure>.+?)\s+·\s+R\$\s*(?P<price>[\d.]+,\d{2})$")
+
+
+def current_plan(tenant, patient):
+    """The latest treatment plan of the patient, as editable items (newest note wins; old notes are kept)."""
+    for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:300]:
+        try:
+            data = json.loads(decrypt_text(note.text_encrypted))
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(data, dict) or not str(data.get("plan") or "").strip():
+            continue
+        items = []
+        if isinstance(data.get("plan_items"), list):
+            for raw in data["plan_items"][:PLAN_ROWS]:
+                try:
+                    items.append({"tooth": str(raw.get("tooth", ""))[:20], "procedure": str(raw["procedure"])[:200],
+                                  "price": Decimal(str(raw.get("price", "0"))).quantize(Decimal("0.01"))})
+                except (KeyError, TypeError, AttributeError, InvalidOperation):
+                    continue
+        else:
+            for line in str(data["plan"]).splitlines():
+                match = PLAN_LINE.match(line.strip())
+                if match:
+                    price = Decimal(match["price"].replace(".", "").replace(",", "."))
+                    items.append({"tooth": (match["tooth"] or "").strip(), "procedure": match["procedure"].strip(), "price": price})
+        return {"note": note, "items": items}
+    return None
 
 
 def _brl(value):
@@ -360,6 +403,27 @@ def _default_professional(user, patient, clinical):
             .values_list("professional_id", flat=True).first())
 
 
+def _plan_receivables(tenant, patient):
+    """Pending amounts of this patient's approved treatment plans (paid from here into the dentist's day sheet)."""
+    from finance.models import FinancialTransaction
+    from .models import ClinicalTreatmentPlan
+    plans = ClinicalTreatmentPlan.objects.filter(entry__tenant=tenant, entry__customer=patient).values("pk")
+    return FinancialTransaction.objects.filter(tenant=tenant, source_type="clinical-plan", type="income", status="pending",
+                                               source_id__in=plans).order_by("created_at")
+
+
+def _payment_methods(tenant):
+    from finance.clinic_models import ClinicPaymentMethod
+    return list(ClinicPaymentMethod.objects.filter(tenant=tenant, active=True).order_by("kind", "name"))
+
+
+def _posted_plan(request):
+    """Rows the user typed, shown again when the plan form has an error."""
+    post = request.POST
+    rows = zip(post.getlist("plan_tooth"), post.getlist("plan_procedure"), post.getlist("plan_price"))
+    return [{"tooth": a, "procedure": b, "price": c} for a, b, c in list(rows)[:PLAN_ROWS] if a or b or c]
+
+
 @login_required
 @never_cache
 def patient_record(request, pk):
@@ -374,7 +438,9 @@ def patient_record(request, pk):
                                initial={"request_id": uuid.uuid4(), "paid_on": timezone.localdate(),
                                         "professional": _default_professional(request.user, patient, clinical)}) if cash_tenant else None
     note_form = NoteForm(request.POST if request.POST.get("action") == "note" else None, initial={"occurred_on": timezone.localdate()})
+    plan_now = current_plan(tenant, patient)
     plan_form = PlanForm(request.POST if request.POST.get("action") == "plan" else None, tenant=tenant,
+                         previous=plan_now["items"] if plan_now else None,
                          initial={"occurred_on": timezone.localdate(), "professional": _default_professional(request.user, patient, clinical)})
     if request.method == "POST":
         action = request.POST.get("action")
@@ -395,12 +461,15 @@ def patient_record(request, pk):
             if plan_form.is_valid():
                 note = PatientNote.objects.create(
                     tenant=tenant, customer=patient,
-                    text_encrypted=encrypt_text(json.dumps({"plan": plan_form.text()}, ensure_ascii=False)),
+                    text_encrypted=encrypt_text(json.dumps({"plan": plan_form.text(), "plan_items": [
+                        {"tooth": i["tooth"], "procedure": i["procedure"], "price": str(i["price"])} for i in plan_form.items]},
+                        ensure_ascii=False)),
                     author=request.user, author_name=(request.user.get_full_name() or request.user.email)[:160],
                     occurred_at=_at_day(plan_form.cleaned_data["occurred_on"]))
                 append_audit(tenant=tenant, user=request.user, request=request, action="clinical.patient_plan.created",
-                             entity_type="PatientNote", entity_id=note.pk, after={"customer": patient.pk, "items": len(plan_form.items)})
-                messages.success(request, "Plano de tratamento salvo no prontuário.")
+                             entity_type="PatientNote", entity_id=note.pk, after={"customer": patient.pk, "items": len(plan_form.items),
+                                    "replaces": plan_now["note"].pk if plan_now else None})
+                messages.success(request, "Plano de tratamento atualizado no prontuário." if plan_now else "Plano de tratamento salvo no prontuário.")
                 return redirect(self_url)
         elif action == "receive":
             if not cash_tenant:
@@ -413,19 +482,35 @@ def patient_record(request, pk):
                 data = receive_form.cleaned_data
                 try:
                     # Each professional has their own cash sheet per day, opened on the first receipt.
+                    # Sheet and line in one step: a refused line never leaves an empty extra sheet behind.
                     with transaction.atomic():
                         session = day_sheet(tenant, selected_unit(request, tenant), data["professional"], request.user,
                                             day=data["paid_on"])
-                    row = add_entry(user=request.user, session_id=session.pk, customer=patient, notes=data["notes"],
-                                    professional=data["professional"], professional_name=data["professional_name"],
-                                    dentist_amount=data["dentist_amount"], clinic_amount=data["clinic_amount"],
-                                    other_amount=data["other_amount"], method=data["method"], request_id=data["request_id"])
+                        row = add_entry(user=request.user, session_id=session.pk, customer=patient, notes=data["notes"],
+                                        professional=data["professional"], professional_name=data["professional_name"],
+                                        dentist_amount=data["dentist_amount"], clinic_amount=data["clinic_amount"],
+                                        other_amount=data["other_amount"], method=data["method"], request_id=data["request_id"])
                 except ValidationError as exc:
                     receive_form.add_error(None, exc)
                 else:
                     total = f"{row.total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                     messages.success(request, f"Pagamento de R$ {total} ({row.method_name}) recebido e lançado no caixa de {data['paid_on']:%d/%m/%Y} de {session.label}.")
                     return redirect(self_url)
+        elif action == "receive-plan":
+            if not cash_tenant:
+                raise PermissionDenied("Seu perfil não registra recebimentos no caixa.")
+            from .finance_views import receive_plan
+            pending = _plan_receivables(tenant, patient).filter(pk=request.POST.get("transaction") or 0).first()
+            if pending is None:
+                messages.error(request, "Este recebível não está mais pendente.")
+                return redirect(self_url)
+            try:
+                entry = receive_plan(request, pending.pk, request.POST.get("method", ""), request.POST.get("paid_on", ""))
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
+            else:
+                messages.success(request, f"Recebimento lançado na folha do caixa de {entry.session.label}.")
+            return redirect(self_url)
         else:
             raise PermissionDenied
     append_audit(tenant=tenant, user=request.user, request=request, action="clinical.dental.patient_record.viewed",
@@ -444,6 +529,9 @@ def patient_record(request, pk):
         "can_schedule": has_capability(request.user, "agenda.manage") and request.user.role not in {"professional", "healthcare"},
         "document_kinds": DOCUMENT_KINDS,
         "receive_form": receive_form if allowed(request.user, "caixa") else None, "cash_session": session,
+        "plan_receivables": list(_plan_receivables(tenant, patient)[:50]) if cash_tenant and allowed(request.user, "caixa") else [],
+        "payment_methods": _payment_methods(tenant) if cash_tenant else [],
         "note_form": note_form, "plan_form": plan_form, "can_evolve": allowed(request.user, "evolucao"),
-        "plan_rows": range(8),
+        "plan_items": _posted_plan(request) if plan_form.is_bound else (plan_now["items"] if plan_now else []),
+        "plan_existing": bool(plan_now and plan_now["items"]),
     })
