@@ -316,6 +316,15 @@ def void(*, user, evolution_id, reason, request=None):
     _audit(tenant=user.tenant, user=user, request=request, action="clinical.dental.evolution.voided",
            entity=original, before=before, after={**audit_state(original),
                                                   "reason_sha256": hashlib.sha256(reason.encode()).hexdigest()})
+    # A plan item executed only by this (now voided) record goes back to the plan.
+    item = original.plan_item
+    if item and not item.evolutions.exclude(status=DentalEvolution.Status.RECTIFIED).exists():
+        item = DentalPlanItem._base_manager.select_for_update().get(pk=item.pk)
+        item_before = plan_state(item)
+        item.status, item.executed_at, item.executed_by = DentalPlanItem.Status.PLANNED, None, None
+        item.save()
+        _audit(tenant=user.tenant, user=user, request=request, action="clinical.dental.plan_item.reopened",
+               entity=item, before=item_before, after=plan_state(item))
     return original
 
 
