@@ -69,6 +69,19 @@ def reception_may_emit(user):
     return getattr(user,'role','')=='reception' and allowed(user,'documentos')
 
 
+# Gestão e recepção preparam (e, quando liberado, emitem) documentos em nome do dentista.
+TEAM_ROLES={'owner','tenant-admin','manager','reception'}
+MANAGER_ROLES={'owner','tenant-admin','manager'}
+
+
+def acts_for_team(user):
+    return getattr(user,'role','') in TEAM_ROLES
+
+
+def may_emit_for_others(user):
+    return getattr(user,'role','') in MANAGER_ROLES or reception_may_emit(user)
+
+
 def _read_image(field):
     if not field:
         return b''
@@ -129,17 +142,18 @@ def document_pdf(*,tenant,patient,title,body,professional,signature_image=b'',is
 def finalize_document(*,user,document,body,title,version,confirmed,base_url=''):
     """Emite o documento. A recepção (se o gestor liberou) emite em nome do dentista escolhido no documento,
     com a identificação e a assinatura cadastradas dele; quem emitiu fica no registro e no log de auditoria."""
-    on_behalf=getattr(user,'role','')=='reception'
+    row=ClinicalIssuedDocument.objects.select_for_update(of=('self',)).select_related('professional__user').get(
+        pk=document.pk,tenant=user.tenant)
+    on_behalf=acts_for_team(user) and row.professional.user_id!=user.pk
     if on_behalf:
-        if not reception_may_emit(user):raise PermissionDenied('O gestor não liberou a emissão de documentos pela recepção.')
-        row=ClinicalIssuedDocument.objects.select_for_update(of=('self',)).select_related('professional__user').get(
-            pk=document.pk,tenant=user.tenant,created_by=user)
+        if not may_emit_for_others(user):raise PermissionDenied('O gestor não liberou a emissão de documentos pela recepção.')
+        if row.created_by_id!=user.pk:raise PermissionDenied
         if not row.professional.active or not row.professional.user_id:raise PermissionDenied
         profile,snapshot=professional_identity(row.professional,own=False)
         author=row.professional.user
     else:
         profile,snapshot=identity(user)
-        row=ClinicalIssuedDocument.objects.select_for_update().get(pk=document.pk,tenant=user.tenant,professional=profile)
+        if row.professional_id!=profile.pk:raise PermissionDenied
         author=user
     if row.status=='finalized':return row
     if row.version!=version:raise ValidationError('Outro acesso alterou o rascunho. Atualize a página antes de emitir.')

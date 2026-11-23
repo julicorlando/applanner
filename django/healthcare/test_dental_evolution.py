@@ -1,5 +1,6 @@
 """Plano de tratamento x evolução clínica: rascunho, finalização, retificação e auditoria."""
 import json
+import uuid
 from datetime import timedelta
 from unittest import skipUnless
 
@@ -347,3 +348,33 @@ class PatientRecordDocumentTests(TestCase):
                 self.assertIn(self.patient.name, body, (user.role, kind))
         self.assertIn("CPF", self.client.get(reverse("clinical-documents") + f"?customer={self.patient.pk}&kind=report")
                       .context["form"].initial["body"])
+
+    def test_manager_sees_patient_dentist_and_named_templates_and_emits_for_the_dentist(self):
+        from .document_models import ClinicalDocumentTemplate, ClinicalIssuedDocument
+        from .document_services import save_signature
+        from . import test_document_delivery as delivery
+        ClinicalDocumentTemplate.objects.create(tenant=self.tenant, name="Atestado padrão", kind="certificate",
+                                                text_encrypted=encrypt_text("Atesto {nome_paciente}."), created_by=self.owner)
+        self.client.force_login(self.owner)
+        page = self.client.get(reverse("clinical-documents") + f"?customer={self.patient.pk}&kind=certificate")
+        self.assertEqual(page.status_code, 200)
+        form = page.context["form"]
+        self.assertIn(self.patient, form.fields["customer"].queryset)
+        self.assertEqual(str(form.initial["customer"]), str(self.patient.pk))
+        self.assertIn(self.professional, form.fields["professional"].queryset)
+        self.assertEqual(form.initial["professional"], self.professional.pk)
+        self.assertIn(self.patient.name, form.initial["body"])
+        self.assertContains(page, "Atestado padrão · Atestado")
+        self.assertNotContains(page, "ClinicalDocumentTemplate object")
+        self.client.post(reverse("clinical-documents"), {
+            "customer": self.patient.pk, "professional": self.professional.pk, "template": "", "kind": "certificate",
+            "title": "Atestado", "body": form.initial["body"], "request_id": str(uuid.uuid4())})
+        row = ClinicalIssuedDocument.objects.get(customer=self.patient)
+        detail = reverse("clinical-document-detail", args=[row.pk])
+        self.assertContains(self.client.get(detail), f"Emitir em nome de {self.professional.name}")
+        save_signature(self.doctor, delivery.ClinicalDocumentDeliveryTests.image(self))
+        self.client.post(detail, {"action": "finalize", "title": "Atestado", "body": form.initial["body"], "version": row.version,
+                                  "confirmed": "on"})
+        row.refresh_from_db()
+        self.assertEqual(row.status, "finalized")
+        self.assertEqual(self.client.get(reverse("clinical-document-pdf", args=[row.pk])).status_code, 200)
