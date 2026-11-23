@@ -216,6 +216,30 @@ class DentalEvolutionTests(TestCase):
         self.assertTrue(AuditLog.objects.filter(action="clinical.dental.evolution.voided").exists())
         self.assertTrue(AuditLog.objects.filter(action="clinical.dental.patient_note.voided").exists())
 
+    def test_old_plan_version_can_be_deleted_from_the_plan_card(self):
+        note = PatientNote.objects.create(tenant=self.tenant, customer=self.patient, author=self.doctor, author_name="Dra. Ana",
+                                          text_encrypted=encrypt_text(json.dumps({"plan": "1. Dente 11 · Restauração · R$ 90,00"})))
+        page = self.client.get(self.url())
+        self.assertContains(page, "Versões antigas do plano (1)")
+        self.assertContains(page, "Apagar esta versão")
+        self.post(action="void-note", note=note.pk, reason="Lançado errado")
+        self.assertNotContains(self.client.get(self.url()), "Versões antigas do plano")
+        self.assertIn("Restauração", json.loads(decrypt_text(PatientNote.objects.get(pk=note.pk).text_encrypted))["plan"])
+
+    def test_voiding_the_evolution_of_an_executed_item_returns_it_to_the_plan(self):
+        self.post(action="plan", plan_id=[""], plan_tooth=["11"], plan_procedure=["Restauração"], plan_price=["90"],
+                  plan_status=["planned"])
+        item = DentalPlanItem.objects.get(customer=self.patient)
+        self.post(action="plan", plan_id=[str(item.pk)], plan_tooth=["11"], plan_procedure=["Restauração"], plan_price=["90"],
+                  plan_status=["planned"], execute=str(item.pk))
+        item.refresh_from_db()
+        self.assertEqual(item.status, "executed")
+        self.post(action="finalize")
+        evolution = DentalEvolution.objects.get(plan_item=item)
+        self.post(action="void", evolution=evolution.pk, reason="Executado por engano")
+        item.refresh_from_db()
+        self.assertEqual(item.status, "planned")
+
     def test_reception_cannot_void_a_dentist_record(self):
         original = self.finalized()
         self.client.force_login(self.reception)

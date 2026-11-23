@@ -437,13 +437,19 @@ def _is_plan(raw):
     return isinstance(data, dict) and bool(str(data.get("plan") or "").strip())
 
 
-def plan_versions(tenant, patient, limit=20):
-    """Versions of the plan saved before plan items existed (read-only history inside the plan card)."""
+def plan_versions(tenant, patient, limit=20, user=None):
+    """Versions of the plan saved before plan items existed, shown inside the plan card.
+    A version removed by mistake-cleanup ("Apagar esta versão") is hidden; the original stays for audit."""
     out = []
+    voided = set(PatientNoteRectification.objects.filter(note__tenant=tenant, note__customer=patient)
+                 .values_list("note_id", flat=True))
     for note in PatientNote.objects.filter(tenant=tenant, customer=patient).order_by("-occurred_at", "-created_at", "-pk")[:300]:
+        if note.pk in voided:
+            continue
         raw = decrypt_text(note.text_encrypted)
         if _is_plan(raw):
-            out.append({"at": note.effective_at, "author": note.author_name, "text": json.loads(raw)["plan"]})
+            out.append({"id": note.pk, "at": note.effective_at, "author": note.author_name, "text": json.loads(raw)["plan"],
+                        "can_delete": bool(user and can_rectify(user, note.author_id))})
             if len(out) >= limit:
                 break
     return out
@@ -715,7 +721,7 @@ def patient_record(request, pk):
         "professionals": list(Professional.objects.filter(tenant=tenant, active=True).order_by("name").values("pk", "name")),
         "can_plan": allowed(request.user, "plano"), "plan": plan,
         "plan_professional": plan["professional"] or _default_professional(request.user, patient, clinical),
-        "plan_versions": plan_versions(tenant, patient),
+        "plan_versions": plan_versions(tenant, patient, user=request.user),
         "reasons": RECTIFY_REASONS,
     })
 
