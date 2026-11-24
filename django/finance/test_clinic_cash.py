@@ -146,3 +146,22 @@ class DailyCashByProfessionalTests(TestCase):
         self.assertEqual(timezone.localtime(row.transaction.paid_at).date(), yesterday)
         closed = s.close_clinic_cash(user=self.reception, unit=self.unit, amount="150", session_id=self.session.pk)
         self.assertEqual(closed.status, "closed")
+
+
+class CashSheetExpensesTests(TestCase):
+    def setUp(self):
+        desk.ClinicDeskTests.setUp(self)
+        self.session = s.open_clinic_cash(self.reception, self.unit, "50")
+
+    def test_sheet_lists_expenses_and_the_result(self):
+        s.expense(user=self.reception, unit=self.unit, description="Luvas e máscaras", amount="18.40", method=self.cash,
+                  invoice="NF 123", items="2 caixas", image=None, request_id=uuid.uuid4())
+        page = self.client.get(reverse("clinic-cash-sheet-detail", args=[self.session.pk]))
+        self.assertContains(page, "Despesas pagas neste caixa")
+        self.assertContains(page, "Luvas e máscaras")
+        self.assertContains(page, "NF 123")
+        self.assertContains(page, "Resultado do caixa")
+        self.assertEqual(page.context["expenses_total"], Decimal("18.40"))
+        self.assertEqual(page.context["net_total"], Decimal("-18.40"))
+        self.assertTrue(page.context["can_expense"])
+        self.assertContains(page, "Lançar despesa")
