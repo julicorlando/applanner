@@ -14,7 +14,7 @@ from billing.models import Module,TenantModule
 from tenants.models import Tenant,Unit
 from scheduling.models import Customer
 from .models import CashSession,FinancialTransaction
-from .clinic_models import ClinicPaymentMethod,ClinicCharge,ClinicReceipt,ClinicCashClosing
+from .clinic_models import ClinicPaymentMethod,ClinicCharge,ClinicReceipt,ClinicCashClosing,ClinicExpense
 from .clinic_forms import ExpenseForm
 from . import clinic_services as s
 
@@ -167,6 +167,28 @@ class ClinicDeskTests(TestCase):
         first=s.expense(**data);self.assertEqual(s.expense(**data).pk,first.pk)
         with self.assertRaises(ValidationError):s.expense(**{**data,'amount':'6'})
         self.assertEqual(FinancialTransaction.objects.filter(source_type='clinic-expense').count(),1)
+
+    def test_expense_can_go_out_of_a_professional_sheet(self):
+        from scheduling.models import Professional
+        from finance.clinic_cash import expected_cash
+        dentist=Professional.objects.create(tenant=self.tenant,name='Dra. Despesa',unit=self.unit)
+        url=reverse('clinic-finance-desk')
+        page=self.client.get(url,{'profissional':dentist.pk})
+        self.assertContains(page,'Lançar no caixa de')
+        self.assertEqual(page.context['expense_form'].initial['professional'],dentist.pk)
+        response=self.client.post(url,{'action':'expense','request_id':str(uuid.uuid4()),'professional':dentist.pk,
+            'description':'Material do dentista','amount':'12.50','method':self.cash.pk,'confirmed':'on'})
+        self.assertEqual(response.status_code,302)
+        row=ClinicExpense.objects.get(transaction__description='Material do dentista')
+        self.assertEqual(row.session.professional_id,dentist.pk)
+        self.assertEqual(expected_cash(row.session),Decimal('-12.50'))
+        general=s.expense(user=self.reception,unit=self.unit,description='Água',amount='3',method=self.cash,invoice='',items='',
+                          image=None,request_id=uuid.uuid4())
+        self.assertIsNone(general.session.professional_id)
+        other=Professional.objects.create(tenant=Tenant.objects.create(name='Outra',slug='outra-despesa'),name='Fora')
+        with self.assertRaises(PermissionDenied):
+            s.expense(user=self.reception,unit=self.unit,description='X',amount='1',method=self.cash,invoice='',items='',
+                      image=None,request_id=uuid.uuid4(),professional=other)
 
     def test_arrival_is_idempotent_and_daily_counts_are_visible(self):
         from scheduling.models import Appointment,Professional,Service

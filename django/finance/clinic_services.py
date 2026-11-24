@@ -193,16 +193,20 @@ def receive(*,user,unit,installment,amount,method,request_id):
 
 
 @transaction.atomic
-def expense(*,user,unit,description,amount,method,invoice,items,image,request_id):
+def expense(*,user,unit,description,amount,method,invoice,items,image,request_id,professional=None):
+    """A paid expense. With a professional it goes out of that professional's sheet of the day; without, the clinic's."""
     from .reception_permissions import require
     require(user,'despesas')
     tenant=lock_company(user);amount=money(amount)
+    if professional is not None and (professional.tenant_id!=tenant.pk or not professional.active):
+        raise PermissionDenied('Profissional inválido para esta empresa.')
     existing=ClinicExpense.objects.filter(request_id=request_id).select_related('transaction','session').first()
     if existing:
         tx=existing.transaction
         if (existing.session.tenant_id!=tenant.pk or existing.recorded_by_id!=user.pk or existing.session.unit_id!=(unit.pk if unit else None)
             or tx.amount!=amount or tx.description!=description.strip() or existing.method_id!=method.pk
-            or existing.invoice_number!=invoice or existing.items!=items):
+            or existing.invoice_number!=invoice or existing.items!=items
+            or existing.session.professional_id!=(professional.pk if professional else None)):
             raise ValidationError('Esta despesa já foi registrada com outros dados.')
         from cryptography.fernet import Fernet
         from django.conf import settings
@@ -211,7 +215,7 @@ def expense(*,user,unit,description,amount,method,invoice,items,image,request_id
         supplied=cipher.decrypt(image[0]) if image else b''
         if previous!=supplied:raise ValidationError('O comprovante desta operação é diferente do original.')
         return existing
-    session=day_sheet(tenant,unit,None,user)
+    session=day_sheet(tenant,unit,professional,user)
     method=ClinicPaymentMethod.objects.select_for_update().filter(pk=method.pk,tenant=tenant,active=True).first()
     if method is None:raise PermissionDenied
     tx=FinancialTransaction.objects.create(tenant=tenant,unit=unit,type='expense',status='paid',paid_at=timezone.now(),
@@ -220,7 +224,7 @@ def expense(*,user,unit,description,amount,method,invoice,items,image,request_id
     encrypted,mime=image or (b'','')
     row=ClinicExpense.objects.create(session=session,transaction=tx,recorded_by=user,invoice_number=invoice,items=items,method=method,method_name=method.name,
         receipt_encrypted=encrypted,receipt_mime=mime,request_id=request_id)
-    append_audit(tenant=tenant,user=user,action='clinic.expense.recorded',entity_type='ClinicExpense',entity_id=row.pk,after={'transaction_id':tx.pk,'amount':str(amount)})
+    append_audit(tenant=tenant,user=user,action='clinic.expense.recorded',entity_type='ClinicExpense',entity_id=row.pk,after={'transaction_id':tx.pk,'amount':str(amount),'sheet':session.pk,'professional':professional.pk if professional else None})
     return row
 
 

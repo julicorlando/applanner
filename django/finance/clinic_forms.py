@@ -34,13 +34,18 @@ class ReceiptForm(forms.Form):
 
 
 class ExpenseForm(ReceiptForm):
+    professional=forms.ModelChoiceField(label='Lançar no caixa de',queryset=Professional.objects.none(),required=False,
+        empty_label='Caixa da clínica (despesa geral)',
+        help_text='Escolha o dentista quando a despesa for dele: ela sai do caixa do dia desse profissional.')
     description=forms.CharField(label='Descrição da despesa',max_length=190)
     invoice=forms.CharField(label='Número da nota/cupom fiscal (opcional)',max_length=80,required=False)
     items=forms.CharField(label='Itens comprados (opcional)',max_length=3000,required=False,widget=forms.Textarea(attrs={'rows':3}))
     photo=forms.FileField(label='Foto do comprovante (opcional, JPEG/PNG até 10 MB)',required=False)
     def __init__(self,*args,**kwargs):
+        tenant=kwargs.get('tenant')
         super().__init__(*args,**kwargs)
         self.fields['amount'].label='Valor pago da despesa (R$)'
+        self.fields['professional'].queryset=Professional.objects.filter(tenant=tenant,active=True).order_by('name')
         self.fields['confirmed'].label='Confirmo que esta despesa foi efetivamente paga'
     def clean_photo(self):
         file=self.cleaned_data.get('photo')
