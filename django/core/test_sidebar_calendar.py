@@ -161,7 +161,7 @@ class AgendaGridAndRemindersTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="ag-ev is-pending"')
         self.assertContains(response, 'Corte · 10:00–10:30')
-        self.assertContains(response, f'?professional={self.pro.pk}&amp;starts_at=2030-02-04T')
+        self.assertContains(response, f'?professional={self.pro.pk}&starts_at=2030-02-04T')
         self.assertContains(response, 'Horários disponíveis')
         create = self.client.get(reverse('portal-resource-create', args=['agenda', 'agendamentos']),
                                  {'professional': self.pro.pk, 'starts_at': '2030-02-04T14:00'})
