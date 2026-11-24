@@ -185,6 +185,12 @@ def calendar(request):
         first_hour, last_hour = calendar_grid.hour_range(columns, tz)
         grid = {"labels": calendar_grid.build(columns, tz, first_hour, last_hour), "first_hour": first_hour,
                 "slots": (last_hour - first_hour) * 4, "now": calendar_grid.now_line(tz, first_hour, last_hour)}
+        # A day with appointments side by side gets a wider column, so each one stays readable.
+        widths = []
+        for column in columns:
+            lanes = min(max([ev["lanes"] for ev in column.get("events", [])] or [1]), 4)
+            widths.append(f"minmax({130 * lanes}px,{lanes}fr)")
+        grid["template"] = "58px " + " ".join(widths)
     services = {}
     for row in rows:
         if not arena and row.service_id and row.service_id not in services:
