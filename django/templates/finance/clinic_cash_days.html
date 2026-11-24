@@ -1,15 +1,42 @@
-{% extends 'base.html' %}{% load display_pt %}{% load static %}{% block title %}Caixas por data{% endblock %}{% block content %}<link rel="stylesheet" href="{% static 'healthcare/operations.css' %}"><link rel="stylesheet" href="{% static 'finance/clinic-desk.css' %}">
-<main class="co-page co-shell clinic-desk">
-<header class="co-header"><a href="{% url 'clinic-finance-desk' %}">← Financeiro</a></header>
-<h1>Caixas por data</h1>
-<p>Cada dia mostra o caixa de cada profissional e o caixa da clínica. Clique para abrir a folha.{% if gestor %} Como gestor, você aprova pedidos da recepção e pode apagar um caixa.{% endif %}</p>
-<form method="get" class="cd-filter"><label>Período<select name="dias" onchange="this.form.submit()"><option value="7"{% if days == 7 %} selected{% endif %}>Últimos 7 dias</option><option value="30"{% if days == 30 %} selected{% endif %}>Últimos 30 dias</option><option value="90"{% if days == 90 %} selected{% endif %}>Últimos 90 dias</option><option value="365"{% if days == 365 %} selected{% endif %}>Últimos 12 meses</option></select></label><noscript><button>Ver</button></noscript>{% if gestor %} <a href="{% url 'clinic-reception-permissions' %}">Permissões da recepção</a>{% endif %}</form>
-{% if removals %}<section class="co-card cd-requests"><h2>Pedidos para apagar lançamento</h2>{% for item in removals %}<div class="cd-request"><div><strong>{{ item.entry.customer.name }}</strong> · R$ {{ item.entry.total|money_pt }} · {{ item.entry.session.label }} de {{ item.entry.session.business_date|date:'d/m/Y' }}<br><small>Pedido por {{ item.requested_by.get_full_name|default:item.requested_by.email }} em {{ item.created_at|date:'d/m/Y H:i' }}: “{{ item.reason }}”</small></div>{% if gestor %}<form method="post">{% csrf_token %}<input type="hidden" name="removal" value="{{ item.pk }}"><button name="action" value="approve-removal">Aprovar e apagar</button> <button name="action" value="reject-removal">Recusar</button></form>{% else %}<small>Aguardando o gestor</small>{% endif %}</div>{% endfor %}</section>{% endif %}
-{% for group in groups %}<section class="co-card cd-day"><h2>{{ group.day|date:'d/m/Y' }} <small>{{ group.day|date:'l' }}{% if group.day == today %} · hoje{% endif %}</small></h2>
-<p class="cd-sum">Recebido no dia: <strong>R$ {{ group.total|money_pt }}</strong>{% if group.open %} · {{ group.open }} caixa(s) ainda aberto(s){% endif %}</p>
-<table><thead><tr><th>Caixa</th><th>Situação</th><th>Lançamentos</th><th>Recebido</th><th></th></tr></thead><tbody>{% for sheet in group.sheets %}<tr><td><a href="{% url 'clinic-cash-sheet-detail' sheet.pk %}">{{ sheet.label }}</a></td><td>{% if sheet.status == 'open' %}Aberto{% else %}Fechado{% if sheet.difference_amount %} · diferença R$ {{ sheet.difference_amount|money_pt }}{% endif %}{% endif %}</td><td>{{ sheet.lines }}</td><td>R$ {{ sheet.received|default:0|money_pt }}</td>
-<td>{% if gestor %}<details><summary>Apagar caixa</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete-sheet"><input type="hidden" name="session" value="{{ sheet.pk }}"><label>Motivo<input name="reason" required minlength="3" maxlength="300"></label><button>Apagar este caixa</button><small>Os lançamentos são cancelados; fica na auditoria.</small></form></details>{% endif %}</td></tr>{% endfor %}</tbody></table></section>
-{% empty %}<section class="co-card"><p>Nenhum caixa neste período.</p></section>{% endfor %}
+{% extends 'base.html' %}{% load display_pt %}{% load static %}{% block title %}Caixas por data{% endblock %}{% block content %}<link rel="stylesheet" href="{% static 'finance/cash-panel.css' %}">
+<main class="cp" aria-labelledby="cd-title">
+<header class="cp-head">
+  <div><p class="cp-eyebrow"><a href="{% url 'clinic-finance-desk' %}">Financeiro</a> · Caixa</p>
+    <h1 id="cd-title">Caixas por data</h1>
+    <p>Cada dia mostra o caixa de cada profissional e o caixa da clínica.{% if gestor %} Como gestor, você aprova pedidos da recepção e pode apagar um caixa.{% endif %}</p></div>
+  <div class="cp-actions">
+    <a class="cp-btn is-primary" href="{% url 'clinic-cash-panel' %}">Caixa do dia</a>
+    <a class="cp-btn" href="{% url 'clinic-cash-report' %}">Relatório do caixa</a>
+    {% if gestor %}<a class="cp-btn is-quiet" href="{% url 'clinic-reception-permissions' %}">Permissões da recepção</a>{% endif %}
+  </div>
+</header>
+
+<nav class="cp-presets" aria-label="Período">{% for value, label in periods %}<a href="?dias={{ value }}" class="{% if days == value %}is-on{% endif %}"{% if days == value %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+
+{% if removals %}<section class="cp-panel cd-requests" aria-labelledby="cd-req"><header><h2 id="cd-req">Pedidos para apagar lançamento</h2><span class="cp-badge s-overdue">{{ removals|length }} aguardando</span></header>
+{% for item in removals %}<div class="cd-request"><div><strong>{{ item.entry.customer.name }}</strong> · R$ {{ item.entry.total|money_pt }} · {{ item.entry.session.label }} de {{ item.entry.session.business_date|date:'d/m/Y' }}<br><small class="cp-hint">Pedido por {{ item.requested_by.get_full_name|default:item.requested_by.email }} em {{ item.created_at|date:'d/m/Y H:i' }}: “{{ item.reason }}”</small></div>
+{% if gestor %}<form method="post" class="cd-actions">{% csrf_token %}<input type="hidden" name="removal" value="{{ item.pk }}"><button class="cp-btn is-primary" name="action" value="approve-removal">Aprovar e apagar</button><button class="cp-btn" name="action" value="reject-removal">Recusar</button></form>{% else %}<span class="cp-badge s-overdue">Aguardando o gestor</span>{% endif %}</div>{% endfor %}</section>{% endif %}
+
+{% for group in groups %}<section class="cp-panel cd-day" aria-labelledby="cd-{{ group.day|date:'Ymd' }}">
+<header><h2 id="cd-{{ group.day|date:'Ymd' }}"><a href="{% url 'clinic-cash-panel' %}?dia={{ group.day|date:'Y-m-d' }}">{{ group.day|date:'d/m/Y' }}</a> <small>{{ group.day|date:'l' }}{% if group.day == today %} · hoje{% endif %}</small></h2>
+<span class="cd-sum">Recebido <strong>R$ {{ group.total|money_pt }}</strong>{% if group.open %} <span class="cp-badge s-overdue">{{ group.open }} aberto(s)</span>{% endif %}</span></header>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Caixa</th><th class="is-left">Situação</th><th>Lançamentos</th><th>Recebido</th><th></th></tr></thead><tbody>{% for sheet in group.sheets %}
+<tr><td><a href="{% url 'clinic-cash-sheet-detail' sheet.pk %}"><strong>{{ sheet.label }}</strong></a></td>
+<td class="is-left">{% if sheet.status == 'open' %}<span class="cp-badge s-open">Aberto</span>{% elif sheet.difference_amount %}<span class="cp-badge s-divergent">Fechado · diferença R$ {{ sheet.difference_amount|money_pt }}</span>{% else %}<span class="cp-badge s-closed">Fechado</span>{% endif %}</td>
+<td>{{ sheet.lines }}</td><td>R$ {{ sheet.received|default:0|money_pt }}</td>
+<td>{% if gestor %}<details class="cd-del"><summary>Apagar caixa</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete-sheet"><input type="hidden" name="session" value="{{ sheet.pk }}"><label>Motivo<input name="reason" required minlength="3" maxlength="300"></label><button class="cp-btn is-danger">Apagar este caixa</button><small class="cp-hint">Os lançamentos são cancelados; fica na auditoria.</small></form></details>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% empty %}<div class="cp-empty"><strong>Nenhum caixa neste período</strong>Escolha um período maior acima.</div>{% endfor %}
 </main>
-<style>.cd-filter{display:flex;gap:12px;align-items:flex-end;margin:0 0 14px}.cd-filter select{padding:8px 10px;border-radius:10px}.cd-day h2 small{font-weight:400;opacity:.7}.cd-day table{width:100%}.cd-sum{margin:0 0 8px}.cd-requests{border-left:4px solid #f59e0b}.cd-request{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border,#e5e7eb)}.cd-day details form{display:flex;flex-direction:column;gap:6px;margin-top:6px}</style>
+<style>
+.cd-day h2 small{font-weight:400;color:var(--cp-muted);font-size:13px;margin-left:4px}
+.cd-day h2 a{text-decoration:none}.cd-day h2 a:hover{text-decoration:underline}
+.cd-sum{font-size:14px;color:var(--cp-muted)}.cd-sum strong{color:var(--cp-ink)}
+.cd-requests{border-color:#fcd34d}
+.cd-request{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--cp-line);font-size:14px}
+.cd-actions{display:flex;gap:8px}
+.cd-del summary{cursor:pointer;color:var(--cp-err);font-size:13px;font-weight:600}
+.cd-del form{display:flex;flex-direction:column;gap:6px;margin-top:6px;text-align:left;white-space:normal;min-width:220px}
+.cd-del label{font-size:12px;font-weight:600}.cd-del input{display:block;width:100%;margin-top:4px;min-height:38px;padding:6px 10px;border:1px solid var(--cp-line);border-radius:9px;background:var(--cp-surface);color:inherit;font:inherit}
+</style>
 {% endblock %}
