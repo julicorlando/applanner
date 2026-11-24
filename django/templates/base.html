@@ -122,7 +122,33 @@
   </footer>{% endblock %}
   {% include "healthcare/room_picker.html" %}
   {% include "mobile_workspace_nav.html" %}
-  <script src="{% static 'js/app-install.js' %}" defer></script>
+  {% if request.user.is_authenticated %}<aside class="app-install-strip" data-app-install-strip hidden aria-label="Instalar o aplicativo">
+    <span class="app-install-icon" aria-hidden="true">📲</span>
+    <span class="app-install-text"><strong>Baixe o app do ApPlanner</strong><small>Abra direto pelo ícone, em tela cheia, no celular (Android ou iPhone) ou no computador.</small></span>
+    <button type="button" class="app-install-go" data-app-install>Baixar o app</button>
+    <button type="button" class="app-install-close" data-app-install-dismiss aria-label="Agora não">×</button>
+  </aside>
+  <dialog class="app-install-dialog" data-app-install-dialog aria-labelledby="app-install-title">
+    <h2 id="app-install-title">Instalar o ApPlanner</h2>
+    <p data-app-install-instructions></p>
+    <form method="dialog"><button class="app-install-go">Entendi</button></form>
+  </dialog>
+  <style>
+  .app-install-strip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));z-index:60;width:min(560px,calc(100% - 24px));
+    display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--paper,#fff);color:var(--ink,#0f172a);
+    border:1px solid var(--line,#e2e8f0);box-shadow:0 12px 32px rgb(0 0 0/22%)}
+  .app-install-strip[hidden]{display:none}
+  .app-install-icon{font-size:26px}
+  .app-install-text{display:flex;flex-direction:column;flex:1;min-width:0;line-height:1.3}
+  .app-install-text small{color:var(--muted,#64748b);font-size:12.5px}
+  .app-install-go{min-height:40px;padding:8px 16px;border-radius:10px;border:0;background:var(--action,#1678ff);color:#fff;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+  .app-install-close{border:0;background:none;color:var(--muted,#64748b);font-size:22px;line-height:1;cursor:pointer;padding:4px 6px}
+  .app-install-dialog{max-width:420px;border:1px solid var(--line,#e2e8f0);border-radius:14px;padding:20px;background:var(--paper,#fff);color:var(--ink,#0f172a)}
+  .app-install-dialog::backdrop{background:rgb(0 0 0/45%)}.app-install-dialog h2{margin:0 0 8px;font-size:18px}
+  @media(max-width:760px){.app-install-strip{bottom:calc(76px + env(safe-area-inset-bottom))}.app-install-text small{display:none}}
+  @media print{.app-install-strip{display:none!important}}
+  </style>{% endif %}
+  <script src="{% static 'js/app-install.js' %}?v=20261124" defer></script>
   {% block trial_prompt %}{% include "billing/trial_prompt.html" %}{% endblock %}
   <script src="{% static 'js/app-worker-registration.js' %}" data-app-worker-url="{% url 'web-app-worker' %}" defer></script>
 </body>
