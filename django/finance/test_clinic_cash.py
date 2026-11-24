@@ -1,6 +1,6 @@
 import uuid
 from decimal import Decimal
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from scheduling.models import Professional
@@ -165,3 +165,89 @@ class CashSheetExpensesTests(TestCase):
         self.assertEqual(page.context["net_total"], Decimal("-18.40"))
         self.assertTrue(page.context["can_expense"])
         self.assertContains(page, "Lançar despesa")
+
+
+class CashWithdrawalTests(TestCase):
+    """Retirada (sangria): sai da gaveta, não é despesa nem entra no resultado."""
+    def setUp(self):
+        desk.ClinicDeskTests.setUp(self)
+        self.session = s.open_clinic_cash(self.reception, self.unit, "0")
+        self.dentist = Professional.objects.create(tenant=self.tenant, name="Dr. Gaveta")
+        cash.add_entry(user=self.reception, session_id=self.session.pk, customer=self.patient, professional=None,
+                       professional_name="Avulso", dentist_amount="0", clinic_amount="1790", other_amount="0",
+                       method=self.cash, notes="", request_id=uuid.uuid4())
+
+    def expense(self, amount, method=None):
+        return s.expense(user=self.reception, unit=self.unit, description="Caixa do consultório", amount=amount,
+                         method=method or self.cash, invoice="", items="", image=None, request_id=uuid.uuid4())
+
+    def withdraw(self, amount, user=None):
+        return s.withdraw(user=user or self.reception, unit=self.unit, amount=amount, method=self.cash, withdrawn_by="Dr. Jairo",
+                          destination="partner", notes="", request_id=uuid.uuid4())
+
+    def test_drawer_counts_expense_and_withdrawal_but_result_ignores_withdrawal(self):
+        self.expense("20")
+        self.withdraw("1600")
+        self.assertEqual(cash.expected_cash(self.session), Decimal("170"))
+        data = cash.report(self.session)
+        self.assertEqual(data["expenses_total"], Decimal("20"))
+        self.assertEqual(data["withdrawals_total"], Decimal("1600"))
+        self.assertEqual(data["columns"]["total"] - data["expenses_total"], Decimal("1770"))
+        self.assertFalse(FinancialTransaction.objects.filter(type="expense", amount=Decimal("1600")).exists())
+        with self.assertRaises(ValidationError):
+            self.withdraw("999")  # more than what is left in the drawer
+
+    def test_manager_converts_expense_keeping_drawer_and_fixing_result(self):
+        self.expense("20")
+        wrong = self.expense("1600")
+        before = cash.expected_cash(self.session)
+        with self.assertRaises(PermissionDenied):
+            cash.convert_expense(user=self.reception, expense_id=wrong.pk, reason="Dinheiro levado no fechamento")
+        s.close_clinic_cash(user=self.owner, unit=self.unit, amount="170", session_id=self.session.pk, notes="Conferido")
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.status, "closed")
+        row = cash.convert_expense(user=self.owner, expense_id=wrong.pk, reason="Dinheiro levado no fechamento")
+        self.session.refresh_from_db()
+        self.assertEqual(cash.expected_cash(self.session), before)
+        self.assertEqual(self.session.expected_amount, before)
+        self.assertEqual(self.session.status, "closed")
+        self.assertEqual((row.amount, row.recorded_by_id, row.occurred_at), (Decimal("1600"), wrong.recorded_by_id, wrong.created_at))
+        data = cash.report(self.session)
+        self.assertEqual(data["expenses_total"], Decimal("20"))
+        self.assertEqual(data["columns"]["total"] - data["expenses_total"], Decimal("1770"))
+        summary = self.session.clinical_closing.summary
+        self.assertEqual((summary["expenses"], summary["net"], summary["withdrawals"]), ("20.00", "1770.00", "1600.00"))
+        from core.models import AuditLog
+        self.assertTrue(AuditLog.objects.filter(action="clinic.expense.converted_to_withdrawal").exists())
+        with self.assertRaises(ValidationError):
+            cash.convert_expense(user=self.owner, expense_id=wrong.pk, reason="De novo, por engano")
+        pix = self.expense("5", method=self.pix)
+        with self.assertRaises(ValidationError):
+            cash.convert_expense(user=self.owner, expense_id=pix.pk, reason="Pix não sai da gaveta")
+
+    def test_only_manager_with_correction_cancels_withdrawal_on_closed_sheet(self):
+        row = self.withdraw("100")
+        s.close_clinic_cash(user=self.owner, unit=self.unit, amount="1690", session_id=self.session.pk, notes="ok")
+        with self.assertRaises(PermissionDenied):
+            cash.cancel_withdrawal(user=self.reception, withdrawal_id=row.pk, reason="Errado")
+        with self.assertRaises(PermissionDenied):
+            cash.cancel_withdrawal(user=self.owner, withdrawal_id=row.pk, reason="Errado")  # no correction open
+        correction = cash.request_correction(user=self.owner, session_id=self.session.pk, reason="Retirada lançada errada")
+        if correction.status != "approved":
+            cash.decide_correction(user=self.owner, correction_id=correction.pk, approve=True, note="")
+        cash.cancel_withdrawal(user=self.owner, withdrawal_id=row.pk, reason="Lançada errada")
+        self.assertEqual(cash.expected_cash(self.session), Decimal("1790"))
+
+    def test_sheet_and_desk_show_withdrawals(self):
+        self.withdraw("1600")
+        page = self.client.get(reverse("clinic-cash-sheet-detail", args=[self.session.pk]))
+        self.assertContains(page, "Retiradas do caixa (sangria)")
+        self.assertContains(page, "Retiradas em dinheiro: R$ 1.600,00 (já descontadas do valor em caixa)")
+        self.assertContains(page, "Dr. Jairo")
+        desk_page = self.client.get(reverse("clinic-finance-desk"))
+        self.assertContains(desk_page, "Registrar retirada (sangria)")
+        self.assertContains(desk_page, "Retirada não é gasto:")
+        response = self.client.post(reverse("clinic-finance-desk"), {
+            "action": "withdrawal", "request_id": str(uuid.uuid4()), "professional": "", "amount": "10", "method": self.cash.pk,
+            "withdrawn_by": "Banco", "destination": "bank", "notes": "", "confirmed": "on"})
+        self.assertEqual(response.status_code, 302)

@@ -12,7 +12,7 @@ from django.db.models import Count, Q, Sum
 from scheduling.models import Professional
 
 from .clinic_cash import KIND_LABEL, active_correction, report
-from .clinic_models import ClinicCashEntry, ClinicCashEntryRemoval, ClinicExpense, ClinicReceipt
+from .clinic_models import ClinicCashEntry, ClinicCashEntryRemoval, ClinicCashWithdrawal, ClinicExpense, ClinicReceipt
 from .models import CashSession
 
 ZERO = Decimal("0")
@@ -55,6 +55,7 @@ def sheet_card(session, today):
         "received": data["columns"]["total"], "dentist": data["columns"]["dentist"], "clinic": data["columns"]["clinic"],
         "other": data["columns"]["other"], "open_total": data["open_total"], "open_count": len(data["open_rows"]),
         "expenses": data["expenses_total"], "net": data["columns"]["total"] - data["expenses_total"],
+        "withdrawals": data["withdrawals_total"],
         "drawer_expected": data["drawer_expected"], "kinds": kinds, "lines": lines,
         "conference": conference(session),
         "initials": "".join(word[0] for word in session.label.split()[:2]).upper() or "C",
@@ -95,6 +96,7 @@ def day_overview(*, tenant, unit, day, today):
         "day": day, "today": today, "is_today": day == today, "cards": cards,
         "kpis": {
             "received": received, "expenses": expenses, "net": received - expenses,
+            "withdrawals": sum((c["withdrawals"] for c in cards), ZERO),
             "open_total": sum((c["open_total"] for c in cards), ZERO),
             "drawer": sum((c["drawer_expected"] for c in cards if c["session"].status == "open"), ZERO),
             "sheets": len(cards), "open": sum(c["session"].status == "open" for c in cards),
@@ -148,7 +150,7 @@ def period_report(*, tenant, unit, start, end, today, professional="", status=""
             continue
         rows[session.pk] = {"session": session, "day": session.business_date, "label": session.label,
                             "status": state, "status_label": STATUS_LABELS[state], "received": ZERO, "dentist": ZERO,
-                            "clinic": ZERO, "other": ZERO, "open_total": ZERO, "expenses": ZERO, "lines": 0,
+                            "clinic": ZERO, "other": ZERO, "open_total": ZERO, "expenses": ZERO, "withdrawals": ZERO, "lines": 0,
                             "kinds": {k: ZERO for k in KINDS}}
     ids = list(rows)
     entries = ClinicCashEntry.objects.filter(session_id__in=ids).exclude(status=ClinicCashEntry.Status.CANCELLED)
@@ -177,6 +179,10 @@ def period_report(*, tenant, unit, start, end, today, professional="", status=""
         row["kinds"][item["method__kind"]] = row["kinds"].get(item["method__kind"], ZERO) + (item["total"] or ZERO)
     for item in expenses.values("session_id").annotate(total=Sum("transaction__amount")):
         rows[item["session_id"]]["expenses"] += item["total"] or ZERO
+    if kind in ("", None, "cash") or kind not in KINDS:
+        for item in (ClinicCashWithdrawal.objects.filter(session_id__in=ids, cancelled_at__isnull=True)
+                     .values("session_id").annotate(total=Sum("amount"))):
+            rows[item["session_id"]]["withdrawals"] += item["total"] or ZERO
     sheets = list(rows.values())
     for row in sheets:
         row["net"] = row["received"] - row["expenses"]
@@ -212,6 +218,7 @@ def period_report(*, tenant, unit, start, end, today, professional="", status=""
         "methods": [{"kind": k, "label": KIND_LABEL[k], "amount": kinds[k],
                      "share": int(round(kinds[k] * 100 / grand)) if grand else 0} for k in KINDS],
         "kpis": {"received": received, "expenses": spent, "net": received - spent,
+                 "withdrawals": sum((r["withdrawals"] for r in sheets), ZERO),
                  "open_total": sum((r["open_total"] for r in sheets), ZERO), "sheets": len(sheets),
                  "lines": sum(r["lines"] for r in sheets), "open": sum(r["session"].status == "open" for r in sheets),
                  "divergent": sum(r["status"] == "divergent" for r in sheets),

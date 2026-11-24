@@ -59,3 +59,23 @@ class ExpenseForm(ReceiptForm):
                 return Fernet(settings.FIELD_ENCRYPTION_KEY.encode()).encrypt(buffer.getvalue()),'image/jpeg'
         except (OSError,ValueError,UnidentifiedImageError,Image.DecompressionBombError):
             raise ValidationError('Envie uma foto JPEG ou PNG válida.') from None
+
+
+class WithdrawalForm(forms.Form):
+    request_id=forms.UUIDField(widget=forms.HiddenInput)
+    professional=forms.ModelChoiceField(label='Retirar do caixa de',queryset=Professional.objects.none(),required=False,
+        empty_label='Caixa da clínica')
+    amount=forms.DecimalField(label='Valor retirado (R$)',max_digits=12,decimal_places=2,min_value=Decimal('.01'))
+    method=forms.ModelChoiceField(label='Forma',queryset=ClinicPaymentMethod.objects.none())
+    withdrawn_by=forms.CharField(label='Retirado por',max_length=120,help_text='Quem levou o dinheiro (ex.: Dr. Jairo, sócio, banco).')
+    destination=forms.ChoiceField(label='Destino',choices=[])
+    notes=forms.CharField(label='Observação (opcional)',max_length=500,required=False)
+    confirmed=forms.BooleanField(label='Confirmo que este dinheiro saiu da gaveta e não é um gasto',required=True)
+    def __init__(self,*args,tenant,**kwargs):
+        super().__init__(*args,**kwargs)
+        from .clinic_models import ClinicCashWithdrawal
+        self.fields['professional'].queryset=Professional.objects.filter(tenant=tenant,active=True).order_by('name')
+        cash=ClinicPaymentMethod.objects.filter(tenant=tenant,active=True,kind='cash').order_by('name')
+        self.fields['method'].queryset=cash
+        self.fields['method'].empty_label=None
+        self.fields['destination'].choices=ClinicCashWithdrawal.Destination.choices

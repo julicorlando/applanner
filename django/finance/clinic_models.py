@@ -147,3 +147,30 @@ class ClinicCashEntryRemoval(models.Model):
     class Meta:
         ordering=['-created_at','-pk']
         constraints=[models.UniqueConstraint(fields=['entry'],condition=models.Q(status='requested'),name='uq_clinic_cash_removal_pending')]
+
+
+class ClinicCashWithdrawal(models.Model):
+    """Retirada de caixa (sangria): dinheiro que só sai da gaveta (levado, depositado). Não é gasto: não gera
+    lançamento financeiro, não entra em despesas nem no resultado, mas sai do dinheiro esperado na gaveta."""
+    class Destination(models.TextChoices):
+        BANK="bank","Depósito no banco"
+        PARTNER="partner","Retirada do profissional ou sócio"
+        OTHER="other","Outro"
+    session=models.ForeignKey('finance.CashSession',on_delete=models.PROTECT,related_name='clinical_withdrawals')
+    amount=models.DecimalField(max_digits=12,decimal_places=2)
+    method=models.ForeignKey(ClinicPaymentMethod,on_delete=models.PROTECT)
+    method_name=models.CharField(max_length=60)
+    withdrawn_by=models.CharField(max_length=120)
+    destination=models.CharField(max_length=12,choices=Destination.choices)
+    notes=models.CharField(max_length=500,blank=True)
+    recorded_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='clinic_withdrawals')
+    occurred_at=models.DateTimeField()
+    created_at=models.DateTimeField(auto_now_add=True)
+    request_id=models.UUIDField(unique=True)
+    converted_from=models.OneToOneField(ClinicExpense,null=True,blank=True,on_delete=models.PROTECT,related_name='converted_to')
+    cancelled_at=models.DateTimeField(null=True,blank=True)
+    cancelled_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.PROTECT,related_name='+')
+    cancel_reason=models.CharField(max_length=300,blank=True)
+
+    class Meta:
+        indexes=[models.Index(fields=['session','cancelled_at'],name='finance_withdraw_session_idx')]
