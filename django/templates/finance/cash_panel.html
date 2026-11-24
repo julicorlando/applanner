@@ -39,7 +39,7 @@
   <ul class="cp-legend">{% for m in methods %}<li><span class="cp-dot k-{{ m.kind }}"></span>{{ m.label }} <strong>R$ {{ m.amount|money_pt }}</strong> <span class="cp-hint" style="margin:0">{{ m.share }}%</span></li>{% endfor %}</ul>
 </section>
 
-<div class="cp-section-title"><h2>Caixas por profissional</h2><span>Cada profissional tem o seu caixa no dia; despesas e lançamentos sem profissional ficam no caixa da clínica.</span></div>
+<div class="cp-section-title"><h2>Caixas por profissional</h2><span>Cada profissional tem o seu caixa no dia; despesas gerais e lançamentos sem profissional ficam no caixa da clínica.</span></div>
 {% if cards %}<div class="cp-grid">{% for c in cards %}
 <article class="cp-card is-{{ c.status }}" aria-labelledby="card-{{ c.session.pk }}">
   <div class="cp-card-head"><span class="cp-avatar" aria-hidden="true">{{ c.initials }}</span>
@@ -59,6 +59,7 @@
     </tbody></table>{% endif %}
   </div>
   <div class="cp-card-foot"><a class="cp-btn" href="{% url 'clinic-cash-sheet-detail' c.session.pk %}">{% if c.session.status == 'open' %}Abrir folha e lançar{% else %}Ver folha{% endif %}</a>
+    {% if is_today and c.session.status == 'open' and can_expense %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}?profissional={{ c.session.professional_id|default:'' }}#gastos">Lançar despesa</a>{% endif %}
     {% if c.session.status == 'open' and can_open_close %}<button type="button" class="cp-btn is-primary" data-close-cash data-session="{{ c.session.pk }}" data-label="{{ c.label }}"
       data-cash="{{ c.expected.cash|stringformat:'.2f' }}" data-pix="{{ c.expected.pix|stringformat:'.2f' }}" data-card="{{ c.expected.card|stringformat:'.2f' }}" data-open="{{ c.open_count }}">Conferir e fechar</button>{% endif %}</div>
 </article>{% endfor %}</div>

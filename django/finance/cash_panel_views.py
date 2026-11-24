@@ -83,6 +83,7 @@ def cash_panel(request):
     return render(request, "finance/cash_panel.html", {
         **data, "unit": unit, "today_url": reverse("clinic-cash-panel"),
         "can_open_close": allowed(request.user, "abrir_fechar"),
+        "can_expense": allowed(request.user, "despesas"),
         # Opening on an earlier day follows the front desk's "dias anteriores" switch.
         "can_open_here": allowed(request.user, "abrir_fechar") and (data["is_today"] or allowed(request.user, "dias_anteriores")),
         "can_past": allowed(request.user, "dias_anteriores"),

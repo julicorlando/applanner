@@ -69,7 +69,7 @@
   <p class="cp-hint" style="margin-top:0">Informe o total contratado e o parcelamento. O cadastro não é um recebimento. Pagamento misto: registre cada valor na sua forma.</p>
   <form method="post">{% csrf_token %}<input type="hidden" name="action" value="charge">{{ charge_form.as_p }}<button class="cp-btn is-primary">Cadastrar cobrança e parcelas</button></form></section>
 <section class="cp-panel fd-form" id="gastos"><header><h2>Lançar gasto do dia</h2></header>
-  <p class="cp-hint" style="margin-top:0">Somente valores já pagos. A saída entra no fechamento e aguarda a validação da gestão.</p>
+  <p class="cp-hint" style="margin-top:0">Somente valores já pagos. Escolha o dentista quando a despesa for dele, ou deixe no caixa da clínica. A saída entra no fechamento daquele caixa e aguarda a validação da gestão.</p>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="expense">{{ expense_form.as_p }}<button class="cp-btn is-primary">Registrar gasto pago</button></form></section>
 </div>
 
@@ -86,7 +86,7 @@
   {% for tx in transactions %}<tr><td>{{ tx.paid_at|date:'H:i' }}</td><td class="is-left">{% if tx.type == 'income' %}Recebido{% else %}<span class="cp-neg">Despesa</span>{% endif %}</td><td class="is-left">{{ tx.description }}</td><td class="is-left">{{ tx.payment_method_label }}</td><td>R$ {{ tx.amount|money_pt }}</td></tr>{% endfor %}
   </tbody></table></div>{% else %}<p class="cp-hint">Nenhuma movimentação paga.</p>{% endif %}
   <h3 class="fd-sub">Comprovantes das despesas</h3>
-  {% for row in expenses %}<div class="fd-expense"><p><strong>{{ row.transaction.description }}</strong> · R$ {{ row.transaction.amount|money_pt }} · Nota/cupom: {{ row.invoice_number|default:'Não informado' }}{% if row.receipt_encrypted %} · <a href="{% url 'clinic-finance-photo' row.pk %}" target="_blank" rel="noreferrer">Ver foto do comprovante</a>{% endif %}</p>
+  {% for row in expenses %}<div class="fd-expense"><p><strong>{{ row.transaction.description }}</strong> · R$ {{ row.transaction.amount|money_pt }} · {{ row.session.label }} · Nota/cupom: {{ row.invoice_number|default:'Não informado' }}{% if row.receipt_encrypted %} · <a href="{% url 'clinic-finance-photo' row.pk %}" target="_blank" rel="noreferrer">Ver foto do comprovante</a>{% endif %}</p>
     <p><span class="cp-badge {% if row.review_status == 'approved' %}s-open{% elif row.review_status == 'questioned' %}s-overdue{% else %}s-closed{% endif %}">{{ row.get_review_status_display }}</span>{% if row.reviewed_at %} {{ row.reviewed_at|date:'d/m/Y H:i' }}{% endif %} {{ row.review_note }}</p>
     {% if row.items %}<p class="cp-hint">{{ row.items|linebreaksbr }}</p>{% endif %}
     {% if birthday_admin %}<form method="post" class="fd-inline">{% csrf_token %}<input type="hidden" name="action" value="review-expense"><input type="hidden" name="expense" value="{{ row.pk }}"><label>Observação da conferência<input name="note" maxlength="500"></label><button class="cp-btn" name="decision" value="approved">Validar despesa</button><button class="cp-btn is-quiet" name="decision" value="questioned">Solicitar esclarecimento</button></form>{% endif %}</div>

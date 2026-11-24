@@ -53,7 +53,9 @@ def desk(request):
     action=request.POST.get('action') if request.method=='POST' else ''
     initial={'request_id':uuid.uuid4()}
     charge_form=ChargeForm(request.POST if action=='charge' else None,tenant=tenant,initial=initial,auto_id='charge_%s')
-    expense_form=ExpenseForm(request.POST if action=='expense' else None,request.FILES if action=='expense' else None,tenant=tenant,initial={'request_id':uuid.uuid4()},auto_id='expense_%s')
+    chosen=request.GET.get('profissional') or ''
+    expense_form=ExpenseForm(request.POST if action=='expense' else None,request.FILES if action=='expense' else None,tenant=tenant,
+        initial={'request_id':uuid.uuid4(),'professional':int(chosen) if chosen.isdigit() else None},auto_id='expense_%s')
     payment_form=PaymentForm(request.POST if action=='method' else None,auto_id='method_%s')
     cash_form=CashForm(request.POST if action in {'open','close'} else None,tenant=tenant,auto_id='cash_%s')
     if request.method=='POST':
@@ -128,7 +130,7 @@ def desk(request):
         'charge_form':charge_form,'expense_form':expense_form,'payment_form':payment_form,'pending':pending,
         'methods':ClinicPaymentMethod.objects.filter(tenant=tenant).order_by('kind','name'),
         'transactions':FinancialTransaction.objects.filter(tenant=tenant,unit=unit,status='paid',paid_at__gte=start,paid_at__lte=end).order_by('paid_at')[:300],
-        'expenses':ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,created_at__gte=start,created_at__lte=end).select_related('transaction')[:200],
+        'expenses':ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,created_at__gte=start,created_at__lte=end).select_related('transaction','session__professional')[:200],
         'closings':ClinicCashClosing.objects.filter(session__tenant=tenant,session__unit=unit).select_related('session').order_by('-session__closed_at')[:30]})
 
 
