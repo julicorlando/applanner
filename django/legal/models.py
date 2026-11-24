@@ -11,6 +11,7 @@ class LegalDocument(TimeStampedModel):
         PRIVACY="privacy","Política de privacidade"
         CANCELLATION_COMPANY="cancellation_company","Política de cancelamento · Empresas"
         CANCELLATION_CUSTOMER="cancellation_customer","Política de cancelamento · Clientes"
+        USE_POLICY="use_policy","Política de Uso e Responsabilidade"
 
     class Status(models.TextChoices):
         DRAFT="draft","Rascunho"
@@ -38,6 +39,9 @@ class LegalAcceptance(models.Model):
     ip_address=models.GenericIPAddressField(null=True,blank=True)
     user_agent=models.CharField(max_length=500,blank=True)
     accepted_at=models.DateTimeField(auto_now_add=True)
+    # Política de Uso: perfil em que a pessoa aceitou e as declarações que marcou, com o texto exato da tela.
+    role=models.CharField(max_length=30,blank=True,default="")
+    statements=models.JSONField(default=list,blank=True)
 
     class Meta:
         constraints=[models.UniqueConstraint(fields=["user","document"],name="uq_legal_acceptance")]

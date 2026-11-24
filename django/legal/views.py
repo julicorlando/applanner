@@ -22,23 +22,35 @@ def _client_ip(request):
 
 @login_required
 def accept(request):
-    docs=current_documents()
+    from .models import LegalDocument
+    from .use_policy import blocks_for
+    docs=current_documents(request.user)
     accepted=set(LegalAcceptance.objects.filter(
         user=request.user,document_id__in=[d.pk for d in docs]
     ).values_list("document_id",flat=True))
     pending=[doc for doc in docs if doc.pk not in accepted]
     if not pending:
         return redirect("/")
+    policy=next((doc for doc in pending if doc.type==LegalDocument.Type.USE_POLICY),None)
+    blocks=blocks_for(request.user,policy) if policy else []
+    boxes=[(f"{b['role']}-{i}",text) for b in blocks for i,text in enumerate(b["items"])]
+    context={"documents":pending,"blocks":[{**b,"keys":[(f"{b['role']}-{i}",text) for i,text in enumerate(b["items"])]} for b in blocks]}
     if request.method=="POST":
-        if request.POST.get("accept")!="yes":
-            return render(request,"legal/accept.html",{"documents":pending,"error":"É necessário aceitar os documentos para continuar."},status=400)
+        ticked=set(request.POST.getlist("statement"))
+        if request.POST.get("accept")!="yes" or any(key not in ticked for key,_ in boxes):
+            return render(request,"legal/accept.html",{**context,"error":"Marque todas as declarações e o aceite para continuar."},status=400)
+        statements=[{"intro":b["intro"],"items":b["items"]} for b in blocks]
+        roles=",".join(b["role"] for b in blocks)
         for doc in pending:
+            is_policy=doc.type==LegalDocument.Type.USE_POLICY
             LegalAcceptance.objects.get_or_create(
                 user=request.user,document=doc,
                 defaults={
                     "tenant":getattr(request.user,"tenant",None),
                     "ip_address":_client_ip(request),
                     "user_agent":(request.META.get("HTTP_USER_AGENT") or "")[:500],
+                    "role":roles if is_policy else "",
+                    "statements":statements if is_policy else [],
                 },
             )
         destination=request.GET.get("next") or "/"
@@ -47,7 +59,7 @@ def accept(request):
         ):
             destination="/"
         return redirect(destination)
-    return render(request,"legal/accept.html",{"documents":pending})
+    return render(request,"legal/accept.html",context)
 
 
 PUBLIC_TYPES={
@@ -56,6 +68,7 @@ PUBLIC_TYPES={
     "termos-clientes":"terms_customer",
     "cancelamento-empresas":"cancellation_company",
     "cancelamento-clientes":"cancellation_customer",
+    "politica-de-uso":"use_policy",
 }
 
 

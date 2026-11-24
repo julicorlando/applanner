@@ -69,3 +69,45 @@ class PrivacyAccountSecurityTests(TestCase):
         self.assertNotContains(response,other.email)
         self.assertIn("no-store",response["Cache-Control"])
         self.assertIn("private",response["Cache-Control"])
+
+
+class UsePolicyAcceptanceTests(TestCase):
+    def setUp(self):
+        from tenants.models import Tenant
+        self.tenant=Tenant.objects.create(name="Clínica Política",slug="clinica-politica",category="odontologia",document="12.345.678/0001-90")
+        self.owner=User.objects.create_user(email="dono@politica.test",password="StrongPassword123!",tenant=self.tenant,role="owner",first_name="Ana")
+        self.reception=User.objects.create_user(email="rec@politica.test",password="StrongPassword123!",tenant=self.tenant,role="reception")
+        self.policy=LegalDocument.objects.get(type=LegalDocument.Type.USE_POLICY,version="1.0")
+
+    def test_draft_from_migration_asks_nobody(self):
+        self.assertEqual(self.policy.status,LegalDocument.Status.DRAFT)
+        self.client.force_login(self.owner)
+        response=self.client.get("/app/")
+        self.assertNotEqual(getattr(response,"url",""),reverse("legal-accept"))
+
+    def test_published_policy_needs_every_statement_of_the_profile(self):
+        self.policy.status=LegalDocument.Status.PUBLISHED;self.policy.published_at=timezone.now();self.policy.save()
+        self.client.force_login(self.owner)
+        self.assertRedirects(self.client.get("/app/"),reverse("legal-accept"),fetch_redirect_response=False)
+        page=self.client.get(reverse("legal-accept"))
+        self.assertContains(page,"Aceite da empresa")
+        self.assertContains(page,"12.345.678/0001-90")
+        self.assertEqual(self.client.post(reverse("legal-accept"),{"accept":"yes","statement":["empresa-0"]}).status_code,400)
+        self.client.post(reverse("legal-accept"),{"accept":"yes","statement":[f"empresa-{i}" for i in range(4)]})
+        row=LegalAcceptance.objects.get(user=self.owner,document=self.policy)
+        self.assertEqual(row.role,"empresa")
+        self.assertIn("Clínica Política",row.statements[0]["intro"])
+        self.assertEqual(row.tenant,self.tenant)
+        self.client.force_login(self.reception)
+        page=self.client.get(reverse("legal-accept"))
+        self.assertContains(page,"Aceite do usuário")
+        self.client.post(reverse("legal-accept"),{"accept":"yes","statement":[f"usuario-{i}" for i in range(3)]})
+        self.assertEqual(LegalAcceptance.objects.get(user=self.reception,document=self.policy).role,"usuario")
+
+    def test_patients_and_people_without_company_are_not_asked(self):
+        from legal.use_policy import applies_to
+        self.policy.status=LegalDocument.Status.PUBLISHED;self.policy.published_at=timezone.now();self.policy.save()
+        customer=User.objects.create_user(email="paciente@politica.test",password="StrongPassword123!",tenant=self.tenant,role="customer")
+        self.assertFalse(applies_to(customer))
+        self.assertTrue(applies_to(self.reception))
+        self.assertEqual(self.client.get(reverse("legal-public-document",args=["politica-de-uso"])).status_code,200)
