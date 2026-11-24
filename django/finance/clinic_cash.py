@@ -51,6 +51,11 @@ def can_edit(session, user):
     return bool(correction and (is_manager(user) or correction.requested_by_id == user.pk))
 
 
+def _is_today_open(session, tenant):
+    from .clinic_services import business_today, session_day
+    return session.status == CashSession.Status.OPEN and session_day(session) == business_today(tenant)
+
+
 def _earlier_day(session):
     from .clinic_services import business_today, session_day
     return session_day(session) < business_today(session.tenant)
@@ -382,14 +387,18 @@ def report(session):
     for receipt in receipts:
         columns["total"] += receipt.amount
         by_kind[receipt.method.kind] = by_kind.get(receipt.method.kind, Decimal(0)) + receipt.amount
-    expenses = ClinicExpense.objects.filter(session=session).exclude(transaction__status="cancelled").select_related("transaction")
+    expenses = list(ClinicExpense.objects.filter(session=session).exclude(transaction__status="cancelled")
+                    .select_related("transaction", "recorded_by", "method").order_by("created_at", "pk"))
     opened = timezone.localtime(session.opened_at)
     return {
         "session": session, "entries": entries, "receipts": receipts, "columns": columns,
         "kinds": [(KIND_LABEL[k], by_kind.get(k, Decimal(0))) for k in ("cash", "pix", "card")],
         "kinds_total": sum(by_kind.values(), Decimal(0)),
         "open_rows": open_rows, "open_total": sum((r.total for r in open_rows), Decimal(0)),
+        "expenses": expenses,
         "expenses_total": sum((e.transaction.amount for e in expenses), Decimal(0)),
+        "expenses_cash": sum((e.transaction.amount for e in expenses if e.method and e.method.kind == "cash"), Decimal(0)),
+        "net_total": columns["total"] - sum((e.transaction.amount for e in expenses), Decimal(0)),
         "drawer_expected": expected_cash(session),
         "date": opened.date(), "weekday": WEEKDAYS[opened.weekday()],
         "professionals": by_professional(session), "previous_day_open": opened_before_today(session),
@@ -535,6 +544,8 @@ def cash_sheet(request, pk=None):
         "manager": is_manager(request.user), "gestor": gestor(request.user),
         "can_delete_line": allowed(request.user, "apagar_lancamento"), "pending_removals": list(pending.values()),
         "history": sessions.filter(unit=session.unit).order_by("-opened_at")[:15],
+        # Expenses are always recorded on today's sheet, so the shortcut only shows on an open sheet of today.
+        "can_expense": _is_today_open(session, tenant) and allowed(request.user, "despesas"),
     })
     return render(request, "finance/clinic_cash_sheet.html", context)
 
