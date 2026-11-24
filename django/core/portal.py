@@ -1578,6 +1578,18 @@ def resource_create(request,module_slug,resource_slug):
         if (request.method=="GET" and model._meta.label_lower=="scheduling.appointment" and request.GET.get("customer","").isdigit()
                 and "customer" in form.fields and form.fields["customer"].queryset.filter(pk=int(request.GET["customer"])).exists()):
             form.initial["customer"]=int(request.GET["customer"])
+        if request.method=="GET" and model._meta.label_lower=="scheduling.appointment":
+            # From a free slot of the agenda: professional and time come filled in; everything is validated on save.
+            pro=request.GET.get("professional","")
+            if pro.isdigit() and "professional" in form.fields and form.fields["professional"].queryset.filter(pk=int(pro)).exists():
+                form.initial["professional"]=int(pro)
+            when=request.GET.get("starts_at","")
+            if when and "starts_at" in form.fields:
+                try:
+                    from datetime import datetime as _dt
+                    form.initial["starts_at"]=_dt.fromisoformat(when[:16])
+                except ValueError:
+                    pass
         if request.user.role=="reception" and model._meta.label_lower=="finance.product":
             form.fields.pop("commission_type",None)
             form.fields.pop("commission_value",None)

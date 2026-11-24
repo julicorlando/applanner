@@ -48,6 +48,51 @@ def access(request):
     return tenant, selected_unit(request, tenant), arena
 
 
+def _safe_reverse(name, args):
+    from django.urls import NoReverseMatch, reverse
+    try:
+        return reverse(name, args=args)
+    except NoReverseMatch:
+        return ""
+
+
+def _whatsapp(phone):
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    if len(digits) < 10:
+        return ""
+    return "https://wa.me/" + (digits if digits.startswith("55") and len(digits) >= 12 else "55" + digits)
+
+
+def _reception_reminders(request, tenant, unit, tz, today, raw):
+    """What the reception must not forget: who arrives in the next hour and who still has to confirm tomorrow."""
+    if request.user.role in {"professional", "healthcare"}:
+        return {}
+    now = timezone.now()
+    base = Appointment.objects.filter(tenant=tenant, unit=unit).select_related("customer", "professional", "service")
+    if raw.isdigit():
+        base = base.filter(professional_id=int(raw))
+    day_end = datetime.combine(today + timedelta(days=1), time.min, tz)
+    coming = list(base.filter(status__in=["pending", "confirmed"], starts_at__gte=now - timedelta(minutes=10),
+                              starts_at__lt=day_end).order_by("starts_at")[:60])
+    tomorrow = datetime.combine(today + timedelta(days=1), time.min, tz)
+    to_confirm = list(base.filter(status="pending", starts_at__gte=tomorrow, starts_at__lt=tomorrow + timedelta(days=1))
+                      .order_by("starts_at")[:40])
+
+    def item(row):
+        start = row.starts_at.astimezone(tz)
+        return {"id": row.pk, "start": start, "minutes": int((row.starts_at - now).total_seconds() // 60),
+                "patient": row.customer_display_name, "professional": row.professional.name if row.professional_id else "",
+                "service": row.service.name, "status": row.status, "status_label": row.get_status_display(),
+                "whatsapp": _whatsapp(getattr(row.customer, "phone", "")),
+                "url": _safe_reverse("portal-resource-edit", ["agenda", "agendamentos", row.pk])}
+
+    soon = [item(row) for row in coming if row.starts_at <= now + timedelta(minutes=60)]
+    alarms = [{"id": row.pk, "at": row.starts_at.isoformat(), "patient": row.customer_display_name,
+               "professional": row.professional.name if row.professional_id else "", "service": row.service.name,
+               "time": row.starts_at.astimezone(tz).strftime("%H:%M"), "status": row.get_status_display()} for row in coming]
+    return {"soon": soon, "confirm": [item(row) for row in to_confirm], "alarms": alarms}
+
+
 @login_required
 @require_safe
 def calendar(request):
@@ -131,10 +176,59 @@ def calendar(request):
                 ],
             }
         )
+    grid = None
+    if mode != 'month':
+        from . import calendar_grid
+        if mode == 'week':
+            # Saturday and Sunday only appear when something happens or can be booked on them.
+            columns = [c for c in columns if c["day"].weekday() < 5 or c["rows"] or c["blocks"] or c["windows"] or c["today"]]
+        first_hour, last_hour = calendar_grid.hour_range(columns, tz)
+        grid = {"labels": calendar_grid.build(columns, tz, first_hour, last_hour), "first_hour": first_hour,
+                "slots": (last_hour - first_hour) * 4, "now": calendar_grid.now_line(tz, first_hour, last_hour)}
+    services = {}
+    for row in rows:
+        if not arena and row.service_id and row.service_id not in services:
+            from .calendar_grid import colour
+            services[row.service_id] = {"name": row.service.name, "colour": colour(row.service_id)}
+    focus = [row for row in rows if row.starts_at.astimezone(tz).date() == day]
+    stats = {
+        "scheduled": sum(1 for row in focus if row.status not in {"cancelled", "no_show"}),
+        "done": sum(1 for row in focus if row.status == "completed"),
+        "cancelled": sum(1 for row in focus if row.status == "cancelled"),
+        "missed": sum(1 for row in focus if row.status == "no_show"),
+    }
+    waiting = []
+    if not arena:
+        now_start = datetime.combine(today, time.min, tz)
+        waiting_rows = Appointment.objects.filter(
+            tenant=tenant, unit=unit, starts_at__gte=now_start, starts_at__lt=now_start + timedelta(days=1),
+            status__in=["waiting", "in_progress"],
+        ).select_related("customer", "professional", "service").order_by("starts_at")
+        if request.user.role in {'professional', 'healthcare'}:
+            waiting_rows = waiting_rows.filter(professional__user=request.user)
+        elif raw.isdigit():
+            waiting_rows = waiting_rows.filter(professional_id=int(raw))
+        waiting = list(waiting_rows[:20])
+    reminders = _reception_reminders(request, tenant, unit, tz, today, raw) if not arena else {}
+    selected = next((r for r in all_resources if str(r.pk) == raw), None)
     return render(
         request,
         "portal/calendar.html",
         {
+            "grid": grid,
+            "reminders": reminders,
+            "modes": [("day", "Dia"), ("week", "Semana"), ("month", "Mês")],
+            "weekday_names": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"],
+            "services": list(services.values()),
+            "stats": stats,
+            "waiting": waiting,
+            "selected_resource": selected,
+            "day_windows": windows.get(day, []),
+            "waitlist_url": _safe_reverse("portal-resource-list", ["relacionamento", "espera"])
+            if not arena and request.user.role not in {'professional', 'healthcare'} and ("relacionamento", "espera") in {
+                (m["slug"], r["slug"]) for m in available_modules(request.user, tenant) for r in m["resources"]} else "",
+            "report_url": _safe_reverse("operation-performance", [])
+            if request.user.role in {"owner", "tenant-admin", "manager"} else "",
             "tenant": tenant,
             "unit": unit,
             "arena": arena,
