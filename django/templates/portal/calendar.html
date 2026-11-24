@@ -1,6 +1,6 @@
 {% extends 'base.html' %}{% load static tz %}
 {% block title %}Agenda · {{ tenant.name }}{% endblock %}
-{% block content %}{% timezone tenant.timezone %}<link rel="stylesheet" href="{% static 'css/agenda-grid.css' %}?v=20261124">
+{% block content %}{% timezone tenant.timezone %}<link rel="stylesheet" href="{% static 'css/agenda-grid.css' %}?v=20261124b">
 <main class="ag" aria-labelledby="ag-title">
 <header class="ag-head">
   <div><h1 id="ag-title">Agenda</h1><p>{% if arena %}Quadras{% else %}Equipe{% endif %} · {{ unit.name|default:"Selecione uma unidade" }}</p></div>
@@ -59,7 +59,7 @@
 
   {% if grid %}
   <div class="ag-scroll" role="region" aria-label="Agenda {{ columns.0.day|date:'d/m' }}" tabindex="0">
-  <div class="ag-grid calendar-board calendar-board--{{ mode }}" style="--days:{{ columns|length }};--slots:{{ grid.slots }}">
+  <div class="ag-grid calendar-board calendar-board--{{ mode }}" style="--days:{{ columns|length }};--slots:{{ grid.slots }};grid-template-columns:{{ grid.template }}">
     <div class="ag-corner"></div>
     {% for column in columns %}<div class="ag-dayhead{% if column.today %} is-today{% endif %}"><a href="?mode=day&date={{ column.day|date:'Y-m-d' }}&unit={{ unit.pk|default:'' }}&resource={{ resource }}"{% if column.today %} aria-current="date"{% endif %}><span>{{ column.day|date:'D' }}</span> {{ column.day|date:'d/m' }}</a></div>{% endfor %}
     <div class="ag-times" aria-hidden="true">{% for label in grid.labels %}<span class="{% if label.full %}is-hour{% endif %}">{{ label.text }}</span>{% endfor %}</div>
