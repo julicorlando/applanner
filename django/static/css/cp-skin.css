@@ -10,7 +10,7 @@ body.has-workspace #conteudo :is(.portal-heading,.co-header,.pa-heading){display
 body.has-workspace #conteudo :is(.portal-heading,.co-header,.pa-heading)>:first-child{flex:1 1 320px}
 body.has-workspace #conteudo :is(.portal-heading,.co-header,.pa-heading) h1{margin:4px 0 2px;font-size:clamp(1.5rem,2.6vw,2rem);line-height:1.15}
 body.has-workspace #conteudo :is(.portal-heading,.co-header,.pa-heading) p{margin:0;color:var(--sk-muted)}
-body.has-workspace #conteudo :is(.portal-page,.co-page,.pa-wrap) .eyebrow{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--sk-muted)!important;font-weight:700;margin:0}
+body.has-workspace.dental-workspace #conteudo :is(.eyebrow,.desk-eyebrow),body.has-workspace #conteudo :is(.portal-page,.co-page,.pa-wrap) .eyebrow{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--sk-muted)!important;font-weight:700;margin:0}
 body.has-workspace #conteudo .back-link{display:inline-block;font-size:13px;color:var(--sk-muted);text-decoration:none;margin-bottom:4px}
 body.has-workspace #conteudo .back-link:hover{color:var(--sk-action)}
 
@@ -50,6 +50,10 @@ body.has-workspace #conteudo :is(.portal-table,.table-card table,.co-card table,
 /* cabeçalho de tabela igual ao do caixa (o tema odontológico pintava o fundo) */
 body.has-workspace #conteudo :is(table thead,table th):not(.paper *){background:transparent!important}
 body.has-workspace #conteudo table th:not(.paper *){color:var(--sk-muted)!important}
+
+/* telefone, datas e valores não quebram no meio; a tabela rola para o lado em telas estreitas */
+body.has-workspace #conteudo :is(.portal-table,.table-card table) td:not(:first-child){white-space:nowrap}
+body.has-workspace #conteudo :is(.portal-table,.table-card table) td:first-child{min-width:180px}
 
 /* formulários e filtros */
 body.has-workspace #conteudo .portal-search{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}

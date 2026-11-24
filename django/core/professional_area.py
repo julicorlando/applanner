@@ -363,8 +363,8 @@ def professional_appointment(request,pk):
 
 @login_required
 def reception_appointment(request,pk):
-    if request.user.role!="reception" or not request.user.tenant_id:
-        raise PermissionDenied("Área exclusiva da recepção.")
+    if request.user.role not in {"reception","owner","tenant-admin","manager"} or not request.user.tenant_id:
+        raise PermissionDenied("Área da recepção e da gestão.")
     appointment=get_object_or_404(
         Appointment.objects.select_related("customer","service","professional")
         .prefetch_related("product_reservations__product"),

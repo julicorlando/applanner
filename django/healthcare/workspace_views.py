@@ -135,11 +135,19 @@ def settings(request):
                 )
         if links:
             groups.append({"title": PORTAL_MODULES[slug]["title"], "links": links})
+    from billing.entitlements import module_enabled
+    from .document_services import own_professional
+
+    try:
+        own_professional(request.user)
+        signs = True
+    except PermissionDenied:
+        signs = False  # only a professional linked to this login has a signature to register
     account = [
         {"title":"Documentos, receituários e declarações","url":reverse("clinical-documents")},
-        {"title":"Minha assinatura profissional","url":reverse("clinical-signature")},
+        *([{"title":"Minha assinatura profissional","url":reverse("clinical-signature")}] if signs else []),
         {"title": "Operação offline neste dispositivo", "url": reverse("clinical-offline-shell")},
-        {"title": "Chamar na TV (módulo opcional)", "url": reverse("waiting-room-console")},
+        *([{"title": "Chamar na TV", "url": reverse("waiting-room-console")}] if module_enabled(tenant, "waiting-room-tv") else []),
         {"title": "Segurança da conta", "url": "/account/2fa/setup/"},
         {"title": "Meus dados e privacidade", "url": reverse("legal-privacy-center")},
         {"title": "Documentação e API", "url": reverse("accounts:documentation")},
