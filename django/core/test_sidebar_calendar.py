@@ -146,3 +146,43 @@ class SidebarCalendarTests(TestCase):
         block = CourtBlock.objects.create(tenant=self.tenant, court=court, starts_at=datetime(2030, 2, 4, 12, tzinfo=self.tz), ends_at=datetime(2030, 2, 4, 14, tzinfo=self.tz))
         windows = open_windows(self.tenant, self.unit, [court], [self.day], [], [block], self.tz, arena=True)[self.day]
         self.assertEqual([(item['start'].hour, item['end'].hour) for item in windows], [(9, 12), (14, 18)])
+
+
+class AgendaGridAndRemindersTests(TestCase):
+    setUp = SidebarCalendarTests.setUp
+
+    def test_week_grid_places_events_and_free_slots_open_a_booking(self):
+        start = datetime(2030, 2, 4, 10, tzinfo=self.tz)
+        Appointment.objects.create(tenant=self.tenant, unit=self.unit, professional=self.pro, service=self.service, customer=self.customer,
+            starts_at=start, ends_at=start + timedelta(minutes=30), status='pending')
+        self.client.force_login(self.owner)
+        with patch('core.calendar_view.access', return_value=(self.tenant, self.unit, False)):
+            response = self.client.get(reverse('operation-calendar'), {'date': '2030-02-04', 'mode': 'week'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="ag-ev is-pending"')
+        self.assertContains(response, 'Corte · 10:00–10:30')
+        self.assertContains(response, f'?professional={self.pro.pk}&starts_at=2030-02-04T')
+        self.assertContains(response, 'Horários disponíveis')
+        create = self.client.get(reverse('portal-resource-create', args=['agenda', 'agendamentos']),
+                                 {'professional': self.pro.pk, 'starts_at': '2030-02-04T14:00'})
+        self.assertEqual(create.context['form'].initial.get('professional'), self.pro.pk)
+
+    def test_reception_sees_who_arrives_soon_and_who_to_confirm_tomorrow(self):
+        from django.utils import timezone
+        now = timezone.now()
+        soon = Appointment.objects.create(tenant=self.tenant, unit=self.unit, professional=self.pro, service=self.service, customer=self.customer,
+            starts_at=now + timedelta(minutes=20), ends_at=now + timedelta(minutes=50), status='confirmed')
+        local_tomorrow = now.astimezone(self.tz).date() + timedelta(days=1)
+        tomorrow_start = datetime.combine(local_tomorrow, time(10), self.tz)
+        Appointment.objects.create(tenant=self.tenant, unit=self.unit, professional=self.pro, service=self.service, customer=self.customer,
+            starts_at=tomorrow_start, ends_at=tomorrow_start + timedelta(minutes=30), status='pending')
+        reception = User.objects.create_user(email='agenda-remind@example.test', role='reception', tenant=self.tenant)
+        self.client.force_login(reception)
+        with patch('core.calendar_view.access', return_value=(self.tenant, self.unit, False)):
+            response = self.client.get(reverse('operation-calendar'))
+        reminders = response.context['reminders']
+        self.assertEqual([r['id'] for r in reminders['soon']], [soon.pk])
+        self.assertEqual(len(reminders['confirm']), 1)
+        self.assertEqual(reminders['confirm'][0]['whatsapp'], 'https://wa.me/5581900001111')
+        self.assertContains(response, 'Lembretes da recepção')
+        self.assertContains(response, 'id="ag-alarms-data"')
