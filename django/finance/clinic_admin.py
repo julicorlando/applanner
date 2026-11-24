@@ -60,7 +60,8 @@ def cash_days(request):
     removals = ClinicCashEntryRemoval.objects.filter(entry__session__tenant=tenant, status="requested").select_related(
         "entry__session__professional", "entry__customer", "requested_by")
     return render(request, "finance/clinic_cash_days.html", {
-        "groups": list(grouped.values()), "days": days, "gestor": gestor, "removals": removals, "today": today})
+        "groups": list(grouped.values()), "days": days, "gestor": gestor, "removals": removals, "today": today,
+        "periods": [(7, "Últimos 7 dias"), (30, "Últimos 30 dias"), (90, "Últimos 90 dias"), (365, "Últimos 12 meses")]})
 
 
 @login_required

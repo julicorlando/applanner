@@ -1,0 +1,64 @@
+/* Mesma aparência do "Caixa do dia" (finance/cash-panel.css) para as demais telas do app.
+   Só aparência: cartões, títulos, botões, tabelas e formulários comuns. Usa os tokens do tema. */
+body.has-workspace #conteudo{--sk-ink:var(--ink,#0f172a);--sk-muted:var(--muted,#64748b);--sk-line:var(--line,#e2e8f0);
+  --sk-surface:var(--paper,#fff);--sk-soft:var(--soft,#f1f5f9);--sk-action:var(--action,#1678ff);--sk-radius:14px}
+
+/* página e cabeçalho */
+body.has-workspace #conteudo :is(.portal-page,.co-page,.pa-wrap){max-width:1280px;margin-inline:auto;font-variant-numeric:tabular-nums}
+body.has-workspace #conteudo :is(.portal-heading,.co-header,.pa-heading){display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;
+  margin:0 0 20px;padding:0;border:0;background:none;box-shadow:none}
+body.has-workspace #conteudo :is(.portal-heading,.co-header,.pa-heading) h1{margin:4px 0 2px;font-size:clamp(1.5rem,2.6vw,2rem);line-height:1.15}
+body.has-workspace #conteudo :is(.portal-heading,.co-header,.pa-heading) p{margin:0;color:var(--sk-muted)}
+body.has-workspace #conteudo :is(.portal-page,.co-page,.pa-wrap) .eyebrow{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--sk-muted);font-weight:700;margin:0}
+body.has-workspace #conteudo .back-link{display:inline-block;font-size:13px;color:var(--sk-muted);text-decoration:none;margin-bottom:4px}
+body.has-workspace #conteudo .back-link:hover{color:var(--sk-action)}
+
+/* cartões e painéis */
+body.has-workspace #conteudo :is(.panel,.co-card,.table-card,.portal-search){border:1px solid var(--sk-line);border-radius:var(--sk-radius);
+  background:var(--sk-surface);box-shadow:none;padding:16px 18px;margin:0 0 16px}
+body.has-workspace #conteudo .pa-card{border:1px solid var(--sk-line);border-radius:var(--sk-radius);background:var(--sk-surface);box-shadow:none}
+body.has-workspace #conteudo .table-card{padding:0;overflow-x:auto}
+body.has-workspace #conteudo :is(.panel,.co-card,.pa-card)>h2:first-child,body.has-workspace #conteudo :is(.panel,.co-card,.pa-card)>header h2{margin:0 0 10px;font-size:16px}
+body.has-workspace #conteudo :is(.panel,.co-card,.pa-card) h3{font-size:15px}
+body.has-workspace #conteudo :is(.co-grid,.dashboard-grid,.dd-sales-metrics){display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:0 0 16px}
+body.has-workspace #conteudo :is(.co-grid,.dashboard-grid,.dd-sales-metrics)>*{margin:0}
+/* número grande dos cartões de resumo (como os indicadores do caixa) */
+body.has-workspace #conteudo .co-grid>.co-card>strong,body.has-workspace #conteudo .physio-stat-value{display:block;margin:6px 0 0;font-size:1.55rem;font-weight:700;letter-spacing:-.01em}
+body.has-workspace #conteudo .co-grid>.co-card>:is(h2,h3):first-child{font-size:13px;color:var(--sk-muted);font-weight:600;margin:0}
+body.has-workspace #conteudo .co-grid>.co-card>p{font-size:12px;color:var(--sk-muted);margin:4px 0 0}
+
+/* botões */
+body.has-workspace #conteudo :is(.button,.co-button,.pa-button,.rp-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;
+  border-radius:10px;border:1px solid var(--sk-line);background:var(--sk-surface);color:var(--sk-ink);font:inherit;font-weight:600;font-size:14px;
+  text-decoration:none;cursor:pointer;box-shadow:none}
+body.has-workspace #conteudo :is(.button,.co-button,.pa-button,.rp-btn):hover{border-color:var(--sk-action)}
+body.has-workspace #conteudo :is(.button.primary,.co-button,.pa-primary,.rp-btn.is-primary){background:var(--sk-action);border-color:var(--sk-action);color:#fff}
+body.has-workspace #conteudo :is(.button.primary,.co-button,.pa-primary):hover{filter:brightness(1.07)}
+body.has-workspace #conteudo .button.ghost{background:none;border-color:transparent}
+body.has-workspace #conteudo :is(.portal-page,.co-page) form button:not([class]){min-height:40px;padding:8px 14px;border-radius:10px;border:1px solid var(--sk-line);
+  background:var(--sk-surface);color:var(--sk-ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+body.has-workspace #conteudo :is(.portal-page,.co-page) form button:not([class]):hover{border-color:var(--sk-action)}
+
+/* tabelas */
+body.has-workspace #conteudo :is(.portal-table,.table-card table,.co-card table,.panel table){width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+body.has-workspace #conteudo :is(.portal-table,.table-card table,.co-card table,.panel table) th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--sk-muted);
+  text-align:left;padding:8px 10px;border-bottom:1px solid var(--sk-line);white-space:nowrap;background:none;font-weight:700}
+body.has-workspace #conteudo :is(.portal-table,.table-card table,.co-card table,.panel table) td{padding:9px 10px;border-bottom:1px solid var(--sk-line);vertical-align:middle}
+body.has-workspace #conteudo :is(.portal-table,.table-card table,.co-card table,.panel table) tr:hover td{background:var(--sk-soft)}
+
+/* formulários e filtros */
+body.has-workspace #conteudo .portal-search{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+body.has-workspace #conteudo .portal-search label{display:flex;flex-direction:column;font-size:12px;font-weight:700;color:var(--sk-muted)}
+body.has-workspace #conteudo :is(.portal-form,.portal-search,.co-card form,.panel form,.pa-card form) label{font-size:13px;font-weight:600}
+body.has-workspace #conteudo :is(.portal-form,.portal-search,.co-card,.panel,.pa-card) :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]):not([type=color]),select,textarea){
+  min-height:40px;padding:7px 10px;border:1px solid var(--sk-line);border-radius:9px;background:var(--sk-surface);color:inherit;font:inherit;font-weight:400;max-width:100%}
+body.has-workspace #conteudo :is(input,select,textarea,button,a):focus-visible{outline:3px solid var(--ring,#93c5fd);outline-offset:2px}
+body.has-workspace #conteudo .form-field{margin:0 0 12px}
+
+/* selos de situação */
+body.has-workspace #conteudo .status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;background:var(--sk-soft);white-space:nowrap}
+body.has-workspace #conteudo details>summary{cursor:pointer;font-weight:700}
+
+@media(max-width:600px){body.has-workspace #conteudo :is(.portal-heading,.co-header,.pa-heading){align-items:flex-start}
+  body.has-workspace #conteudo :is(.co-grid,.dashboard-grid,.dd-sales-metrics){grid-template-columns:1fr 1fr}}
+@media print{body.has-workspace #conteudo :is(.panel,.co-card,.pa-card){break-inside:avoid}}
