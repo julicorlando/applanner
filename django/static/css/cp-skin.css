@@ -48,8 +48,8 @@ body.has-workspace #conteudo :is(.portal-table,.table-card table,.co-card table,
 body.has-workspace #conteudo :is(.portal-table,.table-card table,.co-card table,.panel table) tr:hover td{background:var(--sk-soft)}
 
 /* cabeçalho de tabela igual ao do caixa (o tema odontológico pintava o fundo) */
-body.has-workspace #conteudo :is(table thead,table th){background:transparent!important}
-body.has-workspace #conteudo :is(table th){color:var(--sk-muted)!important}
+body.has-workspace #conteudo :is(table thead,table th):not(.paper *){background:transparent!important}
+body.has-workspace #conteudo table th:not(.paper *){color:var(--sk-muted)!important}
 
 /* formulários e filtros */
 body.has-workspace #conteudo .portal-search{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
