@@ -177,7 +177,8 @@ class PatientRecordPaymentTests(TestCase):
         post = {"action": "receive", "request_id": key, "professional": "", "professional_name": "Dra. Dividida",
                 "dentist_amount": "150.00", "clinic_amount": "50.00", "other_amount": "0", "method": self.cash.pk,
                 "second_method": self.pix.pk, "second_amount": "50.00", "notes": ""}
-        self.assertRedirects(self.client.post(self.url(), post), self.url(), fetch_redirect_response=False)
+        first = self.client.post(self.url(), post)
+        self.assertEqual(first.status_code, 302, first.context and first.context["receive_form"].errors)
         self.client.post(self.url(), post)  # double click does not duplicate
         rows = list(ClinicCashEntry.objects.filter(customer=self.patient).order_by("pk"))
         self.assertEqual(len(rows), 2)
