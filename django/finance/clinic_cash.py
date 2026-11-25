@@ -486,7 +486,7 @@ def add_split_entry(*, user, session_id, second_method=None, second_amount=None,
     if not second_method or not second_amount:
         return [add_entry(user=user, session_id=session_id, **data)]
     keys = ("dentist_amount", "clinic_amount", "other_amount")
-    amounts = {k: money(data.get(k) or 0) for k in keys}
+    amounts = {k: money(data.get(k) or 0, allow_zero=True) for k in keys}
     total = sum(amounts.values(), Decimal(0))
     second_amount = money(second_amount)
     if second_amount <= 0 or second_amount >= total:
