@@ -438,12 +438,73 @@ class EntryForm(forms.Form):
         self.fields["customer"].queryset = Customer.objects.filter(tenant=tenant, active=True).order_by("name")
         self.fields["professional"].queryset = Professional.objects.filter(tenant=tenant, active=True).order_by("name")
         self.fields["method"].queryset = ClinicPaymentMethod.objects.filter(tenant=tenant, active=True).order_by("kind", "name")
+        split_fields(self, tenant=tenant)
 
     def clean(self):
         data = super().clean()
         if not data.get("professional") and not (data.get("professional_name") or "").strip():
             self.add_error("professional_name", "Selecione o profissional ou digite o nome de quem atendeu.")
+        if not data.get("entry_id"):
+            clean_split(self, data)
         return data
+
+
+def split_fields(form, *, tenant):
+    """Optional second payment method for a mixed payment (e.g. part cash, part Pix)."""
+    form.fields["second_method"] = forms.ModelChoiceField(
+        queryset=ClinicPaymentMethod.objects.filter(tenant=tenant, active=True).order_by("kind", "name"),
+        label="Segunda forma (opcional)", required=False, empty_label="Só uma forma de pagamento")
+    form.fields["second_amount"] = forms.DecimalField(label="Valor pago na segunda forma (R$)", max_digits=12, decimal_places=2,
+                                                      min_value=Decimal("0.01"), required=False)
+
+
+def clean_split(form, data):
+    second, value = data.get("second_method"), data.get("second_amount")
+    if not second and not value:
+        return
+    total = sum((data.get(k) or Decimal(0) for k in ("dentist_amount", "clinic_amount", "other_amount")), Decimal(0))
+    if not second:
+        form.add_error("second_method", "Escolha a segunda forma de pagamento.")
+    elif not value:
+        form.add_error("second_amount", "Informe quanto foi pago na segunda forma.")
+    elif not data.get("method"):
+        form.add_error("method", "Escolha a primeira forma de pagamento.")
+    elif second == data.get("method"):
+        form.add_error("second_method", "A segunda forma precisa ser diferente da primeira.")
+    elif value >= total:
+        form.add_error("second_amount", "O valor da segunda forma precisa ser menor que o total do atendimento.")
+
+
+def _part(value, ratio):
+    return (value * ratio).quantize(Decimal("0.01"))
+
+
+@transaction.atomic
+def add_split_entry(*, user, session_id, second_method=None, second_amount=None, **data):
+    """One payment in two methods becomes two lines of the same sheet. The dentist/clinic/other split is kept
+    in the same proportion in both lines; both lines note the whole payment."""
+    if not second_method or not second_amount:
+        return [add_entry(user=user, session_id=session_id, **data)]
+    keys = ("dentist_amount", "clinic_amount", "other_amount")
+    amounts = {k: money(data.get(k) or 0) for k in keys}
+    total = sum(amounts.values(), Decimal(0))
+    second_amount = money(second_amount)
+    if second_amount <= 0 or second_amount >= total:
+        raise ValidationError("O valor da segunda forma precisa ser maior que zero e menor que o total.")
+    ratio = second_amount / total
+    second = {k: _part(v, ratio) for k, v in amounts.items()}
+    biggest = max(keys, key=lambda k: amounts[k])
+    second[biggest] += second_amount - sum(second.values(), Decimal(0))  # rounding goes to the largest column
+    first = {k: amounts[k] - second[k] for k in keys}
+    first_method = data["method"]
+    note = (f"Pago em 2 formas: {first_method.name} R$ {total - second_amount:.2f} + {second_method.name} R$ {second_amount:.2f}"
+            .replace(".", ","))
+    notes = (f"{data.get('notes') or ''} · {note}" if data.get("notes") else note)[:300]
+    request_id = data["request_id"]
+    one = add_entry(user=user, session_id=session_id, **{**data, **first, "notes": notes})
+    two = add_entry(user=user, session_id=session_id, **{**data, **second, "notes": notes, "method": second_method,
+                                                          "request_id": uuid.uuid5(request_id, "segunda-forma")})
+    return [one, two]
 
 
 CLOSED_CONFIRMATION = ("Este caixa já foi fechado. Marque a confirmação para lançar ou alterar nele: "
@@ -459,6 +520,13 @@ def _require_closed_confirmation(request, session):
 def _payload(form):
     data = dict(form.cleaned_data)
     data.pop("entry_id", None)
+    return data
+
+
+def _entry_payload(form):
+    data = _payload(form)
+    data.pop("second_method", None)
+    data.pop("second_amount", None)
     return data
 
 
@@ -504,10 +572,10 @@ def cash_sheet(request, pk=None):
                         target = day_sheet(tenant, session.unit, chosen, request.user, day=session_day(session))
                     messages.info(request, f"Lançado no caixa de {target.label} do mesmo dia.")
                 _require_closed_confirmation(request, target)
-                add_entry(user=request.user, session_id=target.pk, **_payload(form))
+                add_split_entry(user=request.user, session_id=target.pk, **_payload(form))
             elif action == "update" and form.is_valid() and form.cleaned_data.get("entry_id"):
                 _require_closed_confirmation(request, session)
-                payload = _payload(form)
+                payload = _entry_payload(form)
                 payload.pop("request_id")
                 update_entry(user=request.user, entry_id=form.cleaned_data["entry_id"], **payload)
             elif action == "cancel" and request.POST.get("entry", "").isdigit():
