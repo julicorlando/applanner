@@ -171,6 +171,25 @@ class PatientRecordPaymentTests(TestCase):
         self.assertEqual(_author(self.reception.email, self.reception), "Carla")
         self.assertEqual(_author("Dra. Antiga (ficha)", self.reception), "Dra. Antiga (ficha)")
 
+    def test_payment_in_two_methods_becomes_two_lines_keeping_the_split(self):
+        from finance.clinic_models import ClinicCashEntry
+        key = str(uuid.uuid4())
+        post = {"action": "receive", "request_id": key, "professional": "", "professional_name": "Dra. Dividida",
+                "dentist_amount": "150.00", "clinic_amount": "50.00", "other_amount": "0", "method": self.cash.pk,
+                "second_method": self.pix.pk, "second_amount": "50.00", "notes": ""}
+        first = self.client.post(self.url(), post)
+        self.assertEqual(first.status_code, 302, first.context and first.context["receive_form"].errors)
+        self.client.post(self.url(), post)  # double click does not duplicate
+        rows = list(ClinicCashEntry.objects.filter(customer=self.patient).order_by("pk"))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([r.total for r in rows], [Decimal("150.00"), Decimal("50.00")])
+        self.assertEqual([r.method_id for r in rows], [self.cash.pk, self.pix.pk])
+        self.assertEqual(rows[1].dentist_amount + rows[1].clinic_amount, Decimal("50.00"))
+        self.assertEqual(rows[0].dentist_amount + rows[1].dentist_amount, Decimal("150.00"))
+        self.assertIn("Pago em 2 formas", rows[0].notes)
+        bad = self.client.post(self.url(), {**post, "request_id": str(uuid.uuid4()), "second_amount": "200.00"})
+        self.assertContains(bad, "menor que o total")
+
     def test_payment_on_an_earlier_date_goes_to_that_days_sheet(self):
         from datetime import timedelta
         from django.utils import timezone

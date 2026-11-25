@@ -324,12 +324,16 @@ class ReceiveForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["professional"].queryset = Professional.objects.filter(tenant=tenant, active=True).order_by("name")
         self.fields["method"].queryset = ClinicPaymentMethod.objects.filter(tenant=tenant, active=True).order_by("kind", "name")
+        from finance.clinic_cash import split_fields
+        split_fields(self, tenant=tenant)
 
     def clean(self):
+        from finance.clinic_cash import clean_split
         data = super().clean()
         if not data.get("professional") and not (data.get("professional_name") or "").strip():
             self.add_error("professional_name", "Selecione o profissional ou digite o nome de quem atendeu.")
         _not_future(self, data, "paid_on")
+        clean_split(self, data)
         return data
 
 
@@ -641,7 +645,7 @@ def patient_record(request, pk):
             if receive_form.is_valid():
                 from django.db import transaction
                 from core.unit_scope import selected_unit
-                from finance.clinic_cash import add_entry
+                from finance.clinic_cash import add_split_entry
                 from finance.clinic_services import day_sheet
                 data = receive_form.cleaned_data
                 try:
@@ -650,15 +654,17 @@ def patient_record(request, pk):
                     with transaction.atomic():
                         session = day_sheet(tenant, selected_unit(request, tenant), data["professional"], request.user,
                                             day=data["paid_on"])
-                        row = add_entry(user=request.user, session_id=session.pk, customer=patient, notes=data["notes"],
-                                        professional=data["professional"], professional_name=data["professional_name"],
-                                        dentist_amount=data["dentist_amount"], clinic_amount=data["clinic_amount"],
-                                        other_amount=data["other_amount"], method=data["method"], request_id=data["request_id"])
+                        rows = add_split_entry(user=request.user, session_id=session.pk, customer=patient, notes=data["notes"],
+                                               professional=data["professional"], professional_name=data["professional_name"],
+                                               dentist_amount=data["dentist_amount"], clinic_amount=data["clinic_amount"],
+                                               other_amount=data["other_amount"], method=data["method"], request_id=data["request_id"],
+                                               second_method=data.get("second_method"), second_amount=data.get("second_amount"))
                 except ValidationError as exc:
                     receive_form.add_error(None, exc)
                 else:
-                    total = f"{row.total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    messages.success(request, f"Pagamento de R$ {total} ({row.method_name}) recebido e lançado no caixa de {data['paid_on']:%d/%m/%Y} de {session.label}.")
+                    total = f"{sum(r.total for r in rows):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    how = " + ".join(r.method_name for r in rows)
+                    messages.success(request, f"Pagamento de R$ {total} ({how}) recebido e lançado no caixa de {data['paid_on']:%d/%m/%Y} de {session.label}.")
                     return redirect(self_url)
         elif action in {"deactivate", "reactivate"}:
             if not (request.user.role in {"owner", "tenant-admin", "manager"} or allowed(request.user, "cadastro")):

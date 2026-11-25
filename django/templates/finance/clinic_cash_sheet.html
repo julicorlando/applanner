@@ -44,6 +44,7 @@
 .cash-sheet .sh-title{font-size:.95rem;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.04em}
 .cash-sheet .paper tbody tr:nth-child(even):not(.total):not(.sum):not(.open):not(.cancelled) td{background:#fafafa}
 .sh-convert{margin-top:4px}.sh-convert summary{cursor:pointer;color:#1d4ed8;font-size:.8rem}.sh-convert form{display:flex;flex-direction:column;gap:4px;margin-top:4px;max-width:320px}.sh-convert input{min-height:30px;padding:3px 6px;border:1px solid #bbb;border-radius:6px;width:100%}
+.sh-split{margin:4px 0 10px}.sh-split summary{cursor:pointer;font-weight:600;font-size:14px}
 .sh-requests{border-color:#fcd34d}.sh-request{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--cp-line)}
 .sh-actions{display:flex;gap:8px}
 .sh-form h2{font-size:16px;margin:0 0 6px}.sh-form p{color:var(--cp-muted);font-size:14px}
@@ -121,6 +122,7 @@ RECEPCIONISTA: {{ session.opened_by.get_full_name|default:session.opened_by.emai
 <form method="post">{% csrf_token %}<input type="hidden" name="action" value="{% if editing %}update{% else %}add{% endif %}">{{ form.request_id }}{{ form.entry_id }}{{ form.non_field_errors }}
 <div class="grid"><label>{{ form.customer.label }}{{ form.customer }}{{ form.customer.errors }}</label><label>{{ form.professional.label }}{{ form.professional }}</label><label>{{ form.professional_name.label }}{{ form.professional_name }}{{ form.professional_name.errors }}</label></div>
 <div class="grid"><label>{{ form.dentist_amount.label }}{{ form.dentist_amount }}</label><label>{{ form.clinic_amount.label }}{{ form.clinic_amount }}</label><label>{{ form.other_amount.label }}{{ form.other_amount }}</label><label>{{ form.method.label }}{{ form.method }}</label></div>
+{% if not editing %}<details class="sh-split"{% if form.second_method.value or form.second_amount.errors or form.second_method.errors %} open{% endif %}><summary>Pagou em duas formas? (ex.: parte em dinheiro, parte no Pix)</summary><div class="grid"><label>{{ form.second_method.label }}{{ form.second_method }}{{ form.second_method.errors }}</label><label>{{ form.second_amount.label }}{{ form.second_amount }}{{ form.second_amount.errors }}</label></div><p>O restante do total fica na primeira forma. Entram duas linhas, uma por forma.</p></details>{% endif %}
 <label>{{ form.notes.label }}{{ form.notes }}</label>
 {% if session.status == 'closed' %}<label class="closed-confirm"><input type="checkbox" name="confirm_closed" value="1" required> Confirmo que estou {% if editing %}alterando{% else %}lançando{% endif %} em um caixa já fechado em {{ session.closed_at|date:'d/m/Y H:i' }}. A conferência será recalculada e a alteração ficará na auditoria.</label>{% endif %}
 <p><button type="submit" class="cp-btn is-primary">{% if editing %}Salvar alteração{% else %}Lançar no caixa{% endif %}</button>{% if editing %} <a href="?">Cancelar edição</a>{% endif %} · <a href="{% url 'portal-resource-create' 'agenda' 'clientes' %}" target="_blank" rel="noreferrer">Cadastrar paciente</a></p></form></section>{% endif %}
