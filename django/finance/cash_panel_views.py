@@ -138,11 +138,12 @@ def _csv(data, filters):
     response.write("﻿")  # Excel opens UTF-8 with the BOM
     writer = csv.writer(response, delimiter=";")
     writer.writerow(["Data", "Caixa", "Situação", "Lançamentos", "Recebido", "Dentista", "Consultório", "Outros",
-                     "Dinheiro", "Pix", "Débito/Crédito", "Despesas", "Resultado", "Em aberto", "Diferença na gaveta"])
+                     "Dinheiro", "Pix", "Débito/Crédito", "Despesas", "Resultado", "Retiradas (sangria)", "Em aberto",
+                     "Diferença na gaveta"])
     brl = lambda value: "" if value is None else f"{value:.2f}".replace(".", ",")
     for row in data["sheets"]:
         writer.writerow([f"{row['day']:%d/%m/%Y}", row["label"], row["status_label"], row["lines"], brl(row["received"]),
                          brl(row["dentist"]), brl(row["clinic"]), brl(row["other"]), brl(row["kinds"]["cash"]),
                          brl(row["kinds"]["pix"]), brl(row["kinds"]["card"]), brl(row["expenses"]), brl(row["net"]),
-                         brl(row["open_total"]), brl(row["difference"])])
+                         brl(row["withdrawals"]), brl(row["open_total"]), brl(row["difference"])])
     return response

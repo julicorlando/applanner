@@ -17,7 +17,7 @@ from core.unit_scope import selected_unit
 from .models import CashSession,FinancialTransaction
 from scheduling.models import Appointment
 from .clinic_models import ClinicPaymentMethod,ClinicInstallment,ClinicCharge,ClinicExpense,ClinicCashClosing
-from .clinic_forms import ChargeForm,ReceiptForm,ExpenseForm
+from .clinic_forms import ChargeForm,ReceiptForm,ExpenseForm,WithdrawalForm
 from . import clinic_services as services
 
 
@@ -56,6 +56,8 @@ def desk(request):
     chosen=request.GET.get('profissional') or ''
     expense_form=ExpenseForm(request.POST if action=='expense' else None,request.FILES if action=='expense' else None,tenant=tenant,
         initial={'request_id':uuid.uuid4(),'professional':int(chosen) if chosen.isdigit() else None},auto_id='expense_%s')
+    withdrawal_form=WithdrawalForm(request.POST if action=='withdrawal' else None,tenant=tenant,
+        initial={'request_id':uuid.uuid4(),'professional':int(chosen) if chosen.isdigit() else None},auto_id='withdrawal_%s')
     payment_form=PaymentForm(request.POST if action=='method' else None,auto_id='method_%s')
     cash_form=CashForm(request.POST if action in {'open','close'} else None,tenant=tenant,auto_id='cash_%s')
     if request.method=='POST':
@@ -82,6 +84,9 @@ def desk(request):
             elif action=='expense' and expense_form.is_valid():
                 data=expense_form.cleaned_data;data.pop('confirmed');data['image']=data.pop('photo')
                 services.expense(user=request.user,unit=unit,**data)
+            elif action=='withdrawal' and withdrawal_form.is_valid():
+                data=withdrawal_form.cleaned_data;data.pop('confirmed')
+                services.withdraw(user=request.user,unit=unit,**data)
             elif action in {'open','close'} and cash_form.is_valid():
                 data=cash_form.cleaned_data
                 if action=='open':services.open_clinic_cash(request.user,unit,data['amount'],data['notes'],professional=data['professional'])
@@ -97,7 +102,7 @@ def desk(request):
                 row=get_object_or_404(ClinicPaymentMethod,tenant=tenant,pk=pk)
                 row.active=not row.active;row.save(update_fields=['active','updated_at'])
                 append_audit(tenant=tenant,user=request.user,request=request,action='clinic.payment_method.toggled',entity_type='ClinicPaymentMethod',entity_id=row.pk,after={'active':row.active})
-            elif action not in {'charge','expense','open','close','method'}:
+            elif action not in {'charge','expense','withdrawal','open','close','method'}:
                 raise PermissionDenied
             else:raise ValidationError('Revise os campos indicados antes de salvar.')
             messages.success(request,'Operação registrada com sucesso.')
@@ -127,10 +132,10 @@ def desk(request):
          'next_day':day+timedelta(days=1) if day<today else None}
     return render(request,'finance/clinic_desk.html',{**nav,'unit':unit,'day':day,'charges':charges,'legacy_receivables_allowed':legacy_receivables_allowed(request.user),'visits':visits.select_related('customer','professional').order_by('starts_at')[:200],'waiting_count':visits.filter(status='waiting').count(),'attending_count':visits.filter(status='in_progress').count(),'completed_count':visits.filter(status='completed').count(),'summary':services.period_summary(tenant,unit,start,end),
         'birthday_admin':request.user.role in {'owner','tenant-admin','manager'},'session':session,'sheets':sheets,'is_gestor':request.user.role in {'owner','tenant-admin','manager'},'pending_days':pending_days,'previous_day_open':False,'cash_balance':session.expected_now if session else None,'cash_form':cash_form,
-        'charge_form':charge_form,'expense_form':expense_form,'payment_form':payment_form,'pending':pending,
+        'charge_form':charge_form,'expense_form':expense_form,'withdrawal_form':withdrawal_form,'payment_form':payment_form,'pending':pending,
         'methods':ClinicPaymentMethod.objects.filter(tenant=tenant).order_by('kind','name'),
         'transactions':FinancialTransaction.objects.filter(tenant=tenant,unit=unit,status='paid',paid_at__gte=start,paid_at__lte=end).order_by('paid_at')[:300],
-        'expenses':ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,created_at__gte=start,created_at__lte=end).select_related('transaction','session__professional')[:200],
+        'expenses':ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,created_at__gte=start,created_at__lte=end).exclude(transaction__status='cancelled').select_related('transaction','session__professional')[:200],
         'closings':ClinicCashClosing.objects.filter(session__tenant=tenant,session__unit=unit).select_related('session').order_by('-session__closed_at')[:30]})
 
 

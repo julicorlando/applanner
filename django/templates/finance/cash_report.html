@@ -24,6 +24,7 @@
 <dl class="cp-kpis" aria-label="Resumo do período">
   <div class="cp-kpi is-lead"><dt>Recebido</dt><dd>R$ {{ kpis.received|money_pt }}</dd><small>Média de R$ {{ kpis.average|money_pt }} por dia</small></div>
   <div class="cp-kpi"><dt>Despesas</dt><dd>R$ {{ kpis.expenses|money_pt }}</dd><small>Pagas no caixa</small></div>
+  <div class="cp-kpi"><dt>Retiradas</dt><dd>R$ {{ kpis.withdrawals|money_pt }}</dd><small>Sangria · não é despesa</small></div>
   <div class="cp-kpi {% if kpis.net < 0 %}is-err{% else %}is-ok{% endif %}"><dt>Resultado</dt><dd>R$ {{ kpis.net|money_pt }}</dd><small>Recebido − despesas</small></div>
   <div class="cp-kpi"><dt>Em aberto</dt><dd>R$ {{ kpis.open_total|money_pt }}</dd><small>Atendimentos não pagos</small></div>
   <div class="cp-kpi"><dt>Caixas</dt><dd>{{ kpis.sheets }}</dd><small>{{ kpis.lines }} lançamento(s) · {% if kpis.open %}{{ kpis.open }} aberto(s){% else %}todos fechados{% endif %}{% if kpis.divergent %} · <span class="cp-neg">{{ kpis.divergent }} com divergência</span>{% endif %}</small></div>

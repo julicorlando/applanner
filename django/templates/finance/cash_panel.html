@@ -28,7 +28,8 @@
 
 <dl class="cp-kpis" aria-label="Resumo do dia">
   <div class="cp-kpi is-lead"><dt>Recebido no dia</dt><dd>R$ {{ kpis.received|money_pt }}</dd><small>{{ kpis.sheets }} caixa(s) no dia</small></div>
-  <div class="cp-kpi"><dt>Despesas pagas</dt><dd>R$ {{ kpis.expenses|money_pt }}</dd><small>Saídas lançadas no caixa da clínica</small></div>
+  <div class="cp-kpi"><dt>Despesas pagas</dt><dd>R$ {{ kpis.expenses|money_pt }}</dd><small>Gastos lançados nos caixas</small></div>
+  {% if kpis.withdrawals %}<div class="cp-kpi"><dt>Retiradas</dt><dd>R$ {{ kpis.withdrawals|money_pt }}</dd><small>Sangria · não é despesa</small></div>{% endif %}
   <div class="cp-kpi {% if kpis.net < 0 %}is-err{% else %}is-ok{% endif %}"><dt>Resultado</dt><dd>R$ {{ kpis.net|money_pt }}</dd><small>Recebido − despesas</small></div>
   <div class="cp-kpi"><dt>Em aberto</dt><dd>R$ {{ kpis.open_total|money_pt }}</dd><small>Atendimentos ainda não pagos</small></div>
   <div class="cp-kpi"><dt>Situação dos caixas</dt><dd>{{ kpis.open }} <small style="display:inline">abertos</small> · {{ kpis.closed }} <small style="display:inline">fechados</small></dd><small>{% if kpis.divergent %}<span class="cp-neg">{{ kpis.divergent }} com divergência</span>{% else %}Sem divergências{% endif %}</small></div>
@@ -49,7 +50,7 @@
     <p class="cp-total">R$ {{ c.received|money_pt }}<small>recebido</small></p>
     <dl class="cp-split"><div><dt>Dentista</dt><dd>R$ {{ c.dentist|money_pt }}</dd></div><div><dt>Consultório</dt><dd>R$ {{ c.clinic|money_pt }}</dd></div><div><dt>Outros</dt><dd>R$ {{ c.other|money_pt }}</dd></div></dl>
     <ul class="cp-chips" aria-label="Formas de pagamento">{% for kind, label, value in c.kind_rows %}<li><span class="cp-dot k-{{ kind }}"></span>{{ label }} R$ {{ value|money_pt }}</li>{% empty %}<li>Nenhum recebimento ainda</li>{% endfor %}</ul>
-    <p class="cp-meta">{% if c.open_total %}<span class="is-warn">Em aberto: R$ {{ c.open_total|money_pt }} ({{ c.open_count }})</span>{% endif %}{% if c.expenses %}<span>Despesas: <strong>R$ {{ c.expenses|money_pt }}</strong></span>{% endif %}
+    <p class="cp-meta">{% if c.open_total %}<span class="is-warn">Em aberto: R$ {{ c.open_total|money_pt }} ({{ c.open_count }})</span>{% endif %}{% if c.expenses %}<span>Despesas: <strong>R$ {{ c.expenses|money_pt }}</strong></span>{% endif %}{% if c.withdrawals %}<span>Retiradas: <strong>R$ {{ c.withdrawals|money_pt }}</strong></span>{% endif %}
       <span>Fundo: R$ {{ c.session.opening_amount|money_pt }}</span>
       {% if c.session.status == 'open' %}<span>Gaveta esperada: <strong>R$ {{ c.drawer_expected|money_pt }}</strong></span><span>Aberto às {{ c.session.opened_at|date:'H:i' }} por {{ c.session.opened_by.get_full_name|default:c.session.opened_by.email }}</span>
       {% else %}<span>Fechado {{ c.session.closed_at|date:'d/m H:i' }} por {{ c.session.closed_by.get_full_name|default:c.session.closed_by.email|default:'—' }}</span>{% endif %}</p>
@@ -60,6 +61,7 @@
   </div>
   <div class="cp-card-foot"><a class="cp-btn" href="{% url 'clinic-cash-sheet-detail' c.session.pk %}">{% if c.session.status == 'open' %}Abrir folha e lançar{% else %}Ver folha{% endif %}</a>
     {% if is_today and c.session.status == 'open' and can_expense %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}?profissional={{ c.session.professional_id|default:'' }}#gastos">Lançar despesa</a>{% endif %}
+    {% if is_today and c.session.status == 'open' and can_expense %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}?profissional={{ c.session.professional_id|default:'' }}#retirada">Retirada (sangria)</a>{% endif %}
     {% if c.session.status == 'open' and can_open_close %}<button type="button" class="cp-btn is-primary" data-close-cash data-session="{{ c.session.pk }}" data-label="{{ c.label }}"
       data-cash="{{ c.expected.cash|stringformat:'.2f' }}" data-pix="{{ c.expected.pix|stringformat:'.2f' }}" data-card="{{ c.expected.card|stringformat:'.2f' }}" data-open="{{ c.open_count }}">Conferir e fechar</button>{% endif %}</div>
 </article>{% endfor %}</div>

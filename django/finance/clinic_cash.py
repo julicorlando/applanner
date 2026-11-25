@@ -18,7 +18,7 @@ from core.audit import append_audit
 from core.unit_scope import selected_unit
 from scheduling.models import Customer, Professional
 from .clinic_models import (ClinicCashCorrection, ClinicCashEntry, ClinicExpense, ClinicPaymentMethod,
-                            ClinicReceipt, ClinicCashClosing)
+                            ClinicReceipt, ClinicCashClosing, ClinicCashWithdrawal)
 from .clinic_services import access, lock_company, money
 from .models import CashSession, FinancialTransaction
 
@@ -83,7 +83,10 @@ def refresh_closed(session, user):
     closing = ClinicCashClosing.objects.filter(session=session).first()
     if closing:
         summary = dict(closing.summary or {})
+        data = report(session)
         summary.update({"cash_expected": str(session.expected_amount), "difference": str(session.difference_amount),
+                        "expenses": format(data["expenses_total"], ".2f"), "withdrawals": format(data["withdrawals_total"], ".2f"),
+                        "net": format(data["columns"]["total"] - data["expenses_total"], ".2f"),
                         "edited_after_close": summary.get("edited_after_close", 0) + 1,
                         "professionals": [{k: (format(v, ".2f") if isinstance(v, Decimal) else v) for k, v in r.items()}
                                           for r in by_professional(session)]})
@@ -298,11 +301,14 @@ def decide_correction(*, user, correction_id, approve, note=""):
 
 
 def expected_cash(session):
-    """Cash drawer for this sheet: opening + cash received in it - cash expenses in it."""
+    """Cash drawer for this sheet: opening + cash received - cash expenses - withdrawals (sangria)."""
     entries = session.clinical_entries.filter(status="paid", method__kind="cash").aggregate(v=Sum("total"))["v"] or Decimal(0)
     receipts = ClinicReceipt.objects.filter(session=session, method__kind="cash").aggregate(v=Sum("amount"))["v"] or Decimal(0)
     spent = ClinicExpense.objects.filter(session=session, method__kind="cash").exclude(transaction__status="cancelled").aggregate(
         v=Sum("transaction__amount"))["v"] or Decimal(0)
+    # Retiradas (sangria) leave the drawer too, but are not expenses.
+    spent += ClinicCashWithdrawal.objects.filter(session=session, cancelled_at__isnull=True).aggregate(
+        v=Sum("amount"))["v"] or Decimal(0)
     legacy = Decimal(0)
     if not session.professional_id:
         # Treatment-plan receivables paid in cash at the desk are not linked to a sheet line.
@@ -389,6 +395,8 @@ def report(session):
         by_kind[receipt.method.kind] = by_kind.get(receipt.method.kind, Decimal(0)) + receipt.amount
     expenses = list(ClinicExpense.objects.filter(session=session).exclude(transaction__status="cancelled")
                     .select_related("transaction", "recorded_by", "method").order_by("created_at", "pk"))
+    withdrawals = list(ClinicCashWithdrawal.objects.filter(session=session, cancelled_at__isnull=True)
+                       .select_related("recorded_by", "converted_from__transaction").order_by("occurred_at", "pk"))
     opened = timezone.localtime(session.opened_at)
     return {
         "session": session, "entries": entries, "receipts": receipts, "columns": columns,
@@ -396,6 +404,8 @@ def report(session):
         "kinds_total": sum(by_kind.values(), Decimal(0)),
         "open_rows": open_rows, "open_total": sum((r.total for r in open_rows), Decimal(0)),
         "expenses": expenses,
+        "withdrawals": withdrawals,
+        "withdrawals_total": sum((w.amount for w in withdrawals), Decimal(0)),
         "expenses_total": sum((e.transaction.amount for e in expenses), Decimal(0)),
         "expenses_cash": sum((e.transaction.amount for e in expenses if e.method and e.method.kind == "cash"), Decimal(0)),
         "net_total": columns["total"] - sum((e.transaction.amount for e in expenses), Decimal(0)),
@@ -513,6 +523,16 @@ def cash_sheet(request, pk=None):
                 delete_sheet(user=request.user, session_id=session.pk, reason=request.POST.get("reason", ""))
                 messages.success(request, "Caixa apagado. Os lançamentos foram cancelados e tudo ficou registrado na auditoria.")
                 return redirect("clinic-cash-days")
+            elif action == "convert-expense" and request.POST.get("expense", "").isdigit():
+                if not ClinicExpense.objects.filter(pk=int(request.POST["expense"]), session=session).exists():
+                    raise PermissionDenied
+                convert_expense(user=request.user, expense_id=int(request.POST["expense"]), reason=request.POST.get("reason", ""))
+                messages.success(request, "Despesa convertida em retirada de caixa. A gaveta esperada não mudou.")
+                return redirect(reverse("clinic-cash-sheet-detail", args=[session.pk]))
+            elif action == "cancel-withdrawal" and request.POST.get("withdrawal", "").isdigit():
+                if not ClinicCashWithdrawal.objects.filter(pk=int(request.POST["withdrawal"]), session=session).exists():
+                    raise PermissionDenied
+                cancel_withdrawal(user=request.user, withdrawal_id=int(request.POST["withdrawal"]), reason=request.POST.get("reason", ""))
             elif action == "request-correction":
                 request_correction(user=request.user, session_id=session.pk, reason=request.POST.get("reason", ""))
             elif action in {"approve", "reject"} and request.POST.get("correction", "").isdigit():
@@ -546,6 +566,9 @@ def cash_sheet(request, pk=None):
         "history": sessions.filter(unit=session.unit).order_by("-opened_at")[:15],
         # Expenses are always recorded on today's sheet, so the shortcut only shows on an open sheet of today.
         "can_expense": _is_today_open(session, tenant) and allowed(request.user, "despesas"),
+        "can_cancel_withdrawal": (gestor(request.user) and bool(context.get("correction"))) if session.status == CashSession.Status.CLOSED
+        else True,
+        "me": request.user.pk,
     })
     return render(request, "finance/clinic_cash_sheet.html", context)
 
@@ -607,6 +630,8 @@ def delete_sheet(*, user, session_id, reason):
         raise ValidationError("Informe o motivo para apagar o caixa.")
     if ClinicReceipt.objects.filter(session=session).exists():
         raise ValidationError("Este caixa tem recebimentos de parcelas. Estorne esses recebimentos antes de apagar o caixa.")
+    if ClinicCashWithdrawal.objects.filter(session=session, cancelled_at__isnull=True).exists():
+        raise ValidationError("Este caixa tem retirada (sangria). Exclua a retirada antes de apagar o caixa.")
     if ClinicExpense.objects.filter(session=session).exclude(transaction__status="cancelled").exists():
         raise ValidationError("Este caixa tem despesas lançadas. Cancele as despesas antes de apagar o caixa.")
     cancelled = 0
@@ -627,3 +652,66 @@ def delete_sheet(*, user, session_id, reason):
     append_audit(tenant=tenant, user=user, action="clinic.cash.deleted", entity_type="CashSession", entity_id=session.pk,
                  before=before, after={"reason": reason[:300], "cancelled_lines": cancelled})
     return session
+
+
+
+@transaction.atomic
+def cancel_withdrawal(*, user, withdrawal_id, reason):
+    """Excluir uma retirada: caixa aberto = quem lançou ou o gestor; caixa fechado = só o gestor, com correção liberada."""
+    from .reception_permissions import is_manager as manager
+    tenant = lock_company(user)
+    row = ClinicCashWithdrawal.objects.select_for_update().select_related("session").get(pk=withdrawal_id, session__tenant=tenant)
+    session = _lock_session(tenant, row.session_id)
+    reason = " ".join((reason or "").split())[:300]
+    if len(reason) < 3:
+        raise ValidationError("Informe o motivo para excluir a retirada.")
+    if row.cancelled_at:
+        return row
+    if session.status == CashSession.Status.CLOSED:
+        if not (manager(user) and active_correction(session)):
+            raise PermissionDenied("Com o caixa fechado, só o gestor exclui uma retirada, pela “Correção do caixa fechado”.")
+    elif not (manager(user) or row.recorded_by_id == user.pk):
+        raise PermissionDenied("Só quem lançou a retirada ou o gestor pode excluí-la.")
+    row.cancelled_at, row.cancelled_by, row.cancel_reason = timezone.now(), user, reason
+    row.save(update_fields=["cancelled_at", "cancelled_by", "cancel_reason"])
+    append_audit(tenant=tenant, user=user, action="clinic.cash_withdrawal.cancelled", entity_type="ClinicCashWithdrawal",
+                 entity_id=row.pk, before={"amount": str(row.amount)}, after={"reason": reason, "session": session.pk})
+    refresh_closed(session, user)
+    return row
+
+
+@transaction.atomic
+def convert_expense(*, user, expense_id, reason):
+    """Gestor corrige uma despesa em dinheiro que era, na verdade, uma retirada. Mantém valor, hora e autor;
+    a despesa sai de despesas e do resultado, e a gaveta esperada não muda."""
+    from .reception_permissions import is_manager as manager
+    if not manager(user):
+        raise PermissionDenied("Só o gestor converte despesa em retirada.")
+    tenant = lock_company(user)
+    expense = ClinicExpense.objects.select_for_update().select_related("transaction", "method").get(pk=expense_id, session__tenant=tenant)
+    session = _lock_session(tenant, expense.session_id)
+    reason = " ".join((reason or "").split())[:300]
+    if len(reason) < 5:
+        raise ValidationError("Informe o motivo da conversão.")
+    if expense.method.kind != "cash":
+        raise ValidationError("Só despesas pagas em dinheiro podem virar retirada de caixa.")
+    if ClinicCashWithdrawal.objects.filter(converted_from=expense).exists():
+        raise ValidationError("Esta despesa já foi convertida em retirada.")
+    tx = FinancialTransaction.objects.select_for_update().get(pk=expense.transaction_id, tenant=tenant)
+    if tx.status == "cancelled":
+        raise ValidationError("Esta despesa está cancelada.")
+    drawer_before = expected_cash(session)
+    tx.status = "cancelled"
+    tx.save(update_fields=["status", "updated_at"])
+    row = ClinicCashWithdrawal.objects.create(
+        session=session, amount=tx.amount, method=expense.method, method_name=expense.method_name,
+        withdrawn_by="Não informado (convertida de despesa)", destination=ClinicCashWithdrawal.Destination.OTHER,
+        notes=f"Convertida da despesa “{tx.description}”: {reason}"[:500], recorded_by=expense.recorded_by,
+        occurred_at=expense.created_at, request_id=uuid.uuid4(), converted_from=expense)
+    if expected_cash(session) != drawer_before:
+        raise ValidationError("A conversão mudaria o dinheiro esperado na gaveta. Nada foi alterado.")
+    append_audit(tenant=tenant, user=user, action="clinic.expense.converted_to_withdrawal", entity_type="ClinicExpense",
+                 entity_id=expense.pk, before={"expense": expense.pk, "amount": str(tx.amount), "transaction": tx.pk},
+                 after={"withdrawal": row.pk, "reason": reason, "session": session.pk})
+    refresh_closed(session, user)
+    return row

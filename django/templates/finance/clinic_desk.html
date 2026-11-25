@@ -70,8 +70,14 @@
   <form method="post">{% csrf_token %}<input type="hidden" name="action" value="charge">{{ charge_form.as_p }}<button class="cp-btn is-primary">Cadastrar cobrança e parcelas</button></form></section>
 <section class="cp-panel fd-form" id="gastos"><header><h2>Lançar gasto do dia</h2></header>
   <p class="cp-hint" style="margin-top:0">Somente valores já pagos. Escolha o dentista quando a despesa for dele, ou deixe no caixa da clínica. A saída entra no fechamento daquele caixa e aguarda a validação da gestão.</p>
-  <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="expense">{{ expense_form.as_p }}<button class="cp-btn is-primary">Registrar gasto pago</button></form></section>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="expense">{{ expense_form.as_p }}<div class="fd-row"><button class="cp-btn is-primary">Registrar gasto pago</button><a class="cp-btn" href="#retirada">Registrar retirada (sangria)</a></div></form></section>
 </div>
+<section class="cp-panel fd-form fd-withdraw" id="retirada"><header><h2>Registrar retirada (sangria)</h2><span class="cp-badge s-overdue">Não é gasto</span></header>
+  <div class="cp-alert is-warn"><span aria-hidden="true">ℹ</span><div><strong>Retirada não é gasto:</strong> use quando o dinheiro só sai da gaveta (levado, depositado). Ela desconta do dinheiro esperado na gaveta, mas não entra em despesas nem no resultado do dia.</div></div>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="withdrawal">{{ withdrawal_form.non_field_errors }}{{ withdrawal_form.request_id }}
+  <div class="fd-grid">{% for field in withdrawal_form %}{% if field.name != 'request_id' and field.name != 'confirmed' %}<p><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}{{ field.errors }}</p>{% endif %}{% endfor %}</div>
+  <p><label class="fd-check">{{ withdrawal_form.confirmed }} {{ withdrawal_form.confirmed.label }}</label>{{ withdrawal_form.confirmed.errors }}</p>
+  <button class="cp-btn is-primary">Registrar retirada</button></form></section>
 
 <details class="cp-panel fd-more"><summary>Valores por paciente e plano de pagamento</summary>
   <p class="cp-hint">Últimas 100 cobranças, com as parcelas e os recebimentos.</p>
@@ -128,6 +134,10 @@
 .fd-inline{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}.fd-inline label{flex:1;min-width:200px;font-size:13px;font-weight:600}
 .fd-methods{margin-bottom:14px}.fd-methods form{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .fd-sheets .cp-card-body{padding-bottom:10px}
+.fd-row{display:flex;flex-wrap:wrap;gap:8px}
+.fd-withdraw{border-color:#fcd34d}.fd-withdraw .cp-alert{margin:0 0 12px}
+.fd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 14px}
+.fd-check{display:flex!important;gap:8px;align-items:flex-start;font-weight:600}.fd-check input{width:auto!important;min-height:0!important;margin-top:3px}
 .fd-foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:8px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style>

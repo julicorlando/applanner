@@ -11,7 +11,7 @@ from accounts.permissions import has_capability
 from core.audit import append_audit
 from tenants.models import Tenant
 from .models import FinancialTransaction, CashSession
-from .clinic_models import ClinicCharge, ClinicInstallment, ClinicReceipt, ClinicExpense, ClinicCashClosing, ClinicPaymentMethod
+from .clinic_models import ClinicCharge, ClinicInstallment, ClinicReceipt, ClinicExpense, ClinicCashClosing, ClinicPaymentMethod, ClinicCashWithdrawal
 
 
 def access(user):
@@ -228,6 +228,36 @@ def expense(*,user,unit,description,amount,method,invoice,items,image,request_id
     return row
 
 
+def withdraw(*,user,unit,amount,method,withdrawn_by,destination,notes,request_id,professional=None):
+    """Retirada de caixa (sangria): dinheiro que só sai da gaveta. Não gera lançamento financeiro."""
+    from .reception_permissions import require
+    require(user,'despesas')
+    tenant=lock_company(user);amount=money(amount)
+    if amount<=0:raise ValidationError('Informe um valor maior que zero.')
+    if professional is not None and (professional.tenant_id!=tenant.pk or not professional.active):
+        raise PermissionDenied('Profissional inválido para esta empresa.')
+    withdrawn_by=' '.join((withdrawn_by or '').split())[:120]
+    if not withdrawn_by:raise ValidationError('Informe quem retirou o dinheiro.')
+    if destination not in ClinicCashWithdrawal.Destination.values:raise ValidationError('Escolha o destino da retirada.')
+    existing=ClinicCashWithdrawal.objects.filter(request_id=request_id).select_related('session').first()
+    if existing:
+        if existing.session.tenant_id!=tenant.pk or existing.amount!=amount or existing.recorded_by_id!=user.pk:
+            raise ValidationError('Esta retirada já foi registrada com outros dados.')
+        return existing
+    method=ClinicPaymentMethod.objects.select_for_update().filter(pk=method.pk,tenant=tenant,active=True,kind='cash').first()
+    if method is None:raise ValidationError('A retirada é sempre em dinheiro: escolha uma forma do tipo Dinheiro.')
+    session=day_sheet(tenant,unit,professional,user)
+    from .clinic_cash import expected_cash
+    if amount>expected_cash(session):
+        raise ValidationError('A retirada é maior que o dinheiro esperado na gaveta deste caixa. Confira o valor.')
+    row=ClinicCashWithdrawal.objects.create(session=session,amount=amount,method=method,method_name=method.name,
+        withdrawn_by=withdrawn_by,destination=destination,notes=(notes or '').strip()[:500],recorded_by=user,
+        occurred_at=timezone.now(),request_id=request_id)
+    append_audit(tenant=tenant,user=user,action='clinic.cash_withdrawal.recorded',entity_type='ClinicCashWithdrawal',entity_id=row.pk,
+        after={'amount':str(amount),'sheet':session.pk,'destination':destination,'withdrawn_by':withdrawn_by})
+    return row
+
+
 def period_summary(tenant,unit,start,end,*,all_units=False):
     scope={'tenant':tenant} if all_units else {'tenant':tenant,'unit':unit}
     rows=FinancialTransaction.objects.filter(**scope,status='paid',paid_at__gte=start,paid_at__lte=end)
@@ -293,6 +323,7 @@ def close_clinic_cash(*,user,unit,amount,notes='',session_id=None,counted=None):
     window=period_summary(tenant,session.unit,session.opened_at,session.closed_at)
     summary={'professional':session.label,'day':session_day(session).isoformat(),'charged':window['charged'],
         'received':format(data['columns']['total'],'.2f'),'expenses':format(data['expenses_total'],'.2f'),
+        'withdrawals':format(data['withdrawals_total'],'.2f'),
         'net':format(data['columns']['total']-data['expenses_total'],'.2f'),'pending':format(data['open_total'],'.2f'),
         'methods':[{'method':label,'type':'income','amount':format(value,'.2f')} for label,value in data['kinds']],
         'opening':str(session.opening_amount),'cash_expected':str(session.expected_amount),
