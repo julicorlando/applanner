@@ -1,0 +1,136 @@
+import re
+from django.core.exceptions import PermissionDenied
+
+from .permissions import has_capability
+
+
+
+
+RECEPTION_MUTATION_PREFIXES=(
+    "/app/hoje/",
+    "/app/recepcao/painel/",
+    "/app/cliente/",
+    "/app/agenda/",
+    "/app/financeiro/pdv/",
+    "/app/barbearia/fila/",
+    "/app/arena/espera-arena/",
+    "/app/relacionamento/inteligencia/",
+    "/app/relacionamento/espera/",
+    "/app/recepcao/agendamento/",
+)
+
+
+CLINIC_OPERATION_PATHS = {
+    "/app/clinica/operacao/snapshot/", "/app/clinica/operacao/sincronizar/",
+    "/app/clinica/tv/", "/app/clinica/tv/chamar/", "/app/clinica/tv/sala/", "/app/clinica/tv/salas/",
+}
+
+
+# Shared dental patient record: the views enforce clinic, module and role checks.
+DENTAL_PATIENT_PATH = re.compile(r"/app/odontologia/prontuarios/paciente/(?:novo|[0-9]+(?:/cadastro)?)/")
+
+
+def _reception_mutation_allowed(path):
+    if re.fullmatch(r"/app/clinica/documentos/(?:[0-9]+/)?",path):
+        return True
+    if DENTAL_PATIENT_PATH.fullmatch(path):
+        return True
+    if path.startswith("/app/clinica/financeiro/"):
+        return True  # Scoped clinical finance views enforce administrative permissions.
+    if path in {"/app/clinica/operacao/sincronizar/", "/app/clinica/tv/chamar/", "/app/clinica/tv/sala/"}:
+        return True  # Views still enforce module, tenant and clinical/financial permissions per operation.
+    return bool(re.fullmatch(r"/app/barbearia/comandas/[0-9]+/vale/",path)) or any(path.startswith(prefix) for prefix in RECEPTION_MUTATION_PREFIXES)
+
+
+PREFIX_CAPABILITIES={
+    "/app/agenda/":"agenda.manage",
+    "/app/financeiro/":"finance.manage",
+    "/app/barbearia/":"barber.manage",
+    "/app/arena/":"arena.manage",
+    "/app/auto/":"auto.manage",
+    "/app/relacionamento/":"engagement.manage",
+    "/app/saude/":"healthcare.manage",
+    "/app/odontologia/":"healthcare.manage",
+    "/app/clinica/":"healthcare.manage",
+    "/app/suporte/":"support.manage",
+}
+
+
+MASTER_RECORD_PATIENT = re.compile(r"/app/odontologia/prontuarios/paciente/([0-9]+)/")
+MASTER_RECORD_ENTRIES = {"/app/clinica/", "/app/odontologia/prontuarios/"}
+
+
+def _master_records_target(request):
+    """Only while the Master operates a company, and only for the record entry pages."""
+    tenant_id=request.session.get("portal_tenant_id")
+    if not tenant_id:
+        return None
+    from django.urls import reverse
+    path=request.path
+    patient=MASTER_RECORD_PATIENT.fullmatch(path)
+    if patient:
+        return reverse("master-patient-record",args=[tenant_id,int(patient.group(1))])
+    if path=="/app/odontologia/prontuarios/importar-fichas/":
+        return reverse("master-record-import",args=[tenant_id])
+    if path in MASTER_RECORD_ENTRIES:
+        return reverse("master-patient-records",args=[tenant_id])
+    return None
+
+
+class CapabilityRouteMiddleware:
+    """
+    Enforces RBAC after a user has explicit UserRole links.
+    Legacy users without UserRole keep their pre-migration access until classified.
+    """
+    def __init__(self,get_response):
+        self.get_response=get_response
+
+    def __call__(self,request):
+        user=getattr(request,"user",None)
+        if user and user.is_authenticated and user.is_superuser and request.method in {"GET","HEAD"}:
+            # Clinical records are closed to the operation view; the Master reads them in the
+            # audited Master pages of the company being operated.
+            target=_master_records_target(request)
+            if target:
+                from django.shortcuts import redirect
+                return redirect(target)
+        if user and user.is_authenticated and user.role in {"professional","healthcare"} and not user.is_superuser:
+            own_calendar_read = request.method in {'GET', 'HEAD'} and request.path in {'/app/calendario/', '/app/identidade/logo/'}
+            from healthcare.navigation import workspace_enabled
+            own_physio_read=(request.method in {'GET','HEAD'} and request.path in {'/app/','/app/fisioterapia/dashboard/','/app/fisioterapia/configuracoes/','/app/odontologia/dashboard/','/app/odontologia/configuracoes/'} and workspace_enabled(request))
+            # The reception desktop app opens for every user; each keeps their own scope.
+            own_physio_read=own_physio_read or (request.method in {'GET','HEAD'} and request.path in {'/app/recepcao/painel/','/app/recepcao/instalar/','/app/recepcao/instalar/windows/'})
+            if request.path.startswith("/app/") and not request.path.startswith("/app/profissional/") and not own_physio_read and not own_calendar_read and not request.path.startswith(("/app/saude/", "/app/odontologia/", "/app/clinica/")):
+                raise PermissionDenied("A conta profissional acessa apenas sua própria área.")
+        if (
+            user and user.is_authenticated and not user.is_superuser
+            and user.role=="reception" and request.method not in {"GET","HEAD","OPTIONS"}
+            and request.path.startswith("/app/")
+            and not _reception_mutation_allowed(request.path)
+        ):
+            raise PermissionDenied(
+                "A recepção possui acesso de consulta nesta área, sem permissão para alterar."
+            )
+        if user and user.is_authenticated and not user.is_superuser and user.role_links.exists():
+            path=request.path
+            required=("agenda.manage" if user.role=="reception" else "healthcare.manage" if user.role in {"professional","healthcare"} else "finance.manage") if path.startswith('/app/clinica/financeiro/') else ("agenda.manage" if path in CLINIC_OPERATION_PATHS else None)
+            if user.role=='reception' and (path=='/app/odontologia/prontuarios/' or DENTAL_PATIENT_PATH.fullmatch(path)):
+                required='agenda.manage'
+            if user.role=='reception' and re.fullmatch(r'/app/clinica/documentos/(?:[0-9]+/)?',path):
+                required='agenda.manage'
+            for prefix,capability in (() if required else PREFIX_CAPABILITIES.items()):
+                if path.startswith(prefix):
+                    required=capability
+                    break
+            if required is None and path.startswith("/app/"):
+                parts=[p for p in path.split("/") if p]
+                if len(parts)>=2:
+                    required={
+                        "agenda":"agenda.manage","financeiro":"finance.manage",
+                        "barbearia":"barber.manage","arena":"arena.manage","auto":"auto.manage",
+                        "relacionamento":"engagement.manage","saude":"healthcare.manage",
+                        "suporte":"support.manage",
+                    }.get(parts[1])
+            if required and not has_capability(user,required):
+                raise PermissionDenied(f"Permissão necessária: {required}")
+        return self.get_response(request)

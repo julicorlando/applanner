@@ -1,0 +1,145 @@
+{% extends 'base.html' %}{% load display_pt %}{% load static %}
+{% block title %}Financeiro · {{ day|date:'d/m/Y' }}{% endblock %}
+{% block content %}<link rel="stylesheet" href="{% static 'finance/cash-panel.css' %}">
+<main class="cp fd" aria-labelledby="fd-title">
+<header class="cp-head">
+  <div><p class="cp-eyebrow">Recepção · Operação diária</p>
+    <h1 id="fd-title">Financeiro</h1>
+    <p>{{ day|date:'l, d \d\e F \d\e Y' }}{% if is_today %} · hoje{% endif %} · {{ unit.name|default:'Empresa' }}</p></div>
+  <div class="cp-actions">
+    <a class="cp-btn is-primary" href="{% url 'clinic-cash-panel' %}?dia={{ day|date:'Y-m-d' }}">Caixa do dia</a>
+    <a class="cp-btn" href="{% url 'clinic-cash-report' %}">Relatório do caixa</a>
+    <a class="cp-btn is-quiet" href="{% url 'clinic-cash-days' %}">Caixas por data</a>
+    {% if is_gestor %}<a class="cp-btn is-quiet" href="{% url 'clinic-reception-permissions' %}">Permissões da recepção</a>{% endif %}
+  </div>
+</header>
+
+<nav class="cp-daynav" aria-label="Escolher o dia">
+  <a href="?day={{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior" title="Dia anterior">‹</a>
+  <a href="{% url 'clinic-finance-desk' %}" class="{% if is_today %}is-on{% endif %}"{% if is_today %} aria-current="date"{% endif %}>Hoje</a>
+  <a href="?day={{ yesterday|date:'Y-m-d' }}" class="{% if day == yesterday %}is-on{% endif %}">Ontem</a>
+  <form method="get" data-day-form><label class="sr-only" for="fd-day">Data</label><input id="fd-day" type="date" name="day" value="{{ day|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}"><noscript><button class="cp-btn">Ver</button></noscript></form>
+  {% if next_day %}<a href="?day={{ next_day|date:'Y-m-d' }}" aria-label="Próximo dia" title="Próximo dia">›</a>{% else %}<span class="is-off" aria-hidden="true">›</span>{% endif %}
+</nav>
+<div style="height:14px"></div>
+
+{% if pending_days %}<div class="cp-alert is-warn" role="status"><span aria-hidden="true">⚠</span><div><strong>Caixas de dias anteriores ainda abertos.</strong> Confira e feche no caixa do dia:
+<ul>{% for row in pending_days %}<li><a href="{% url 'clinic-cash-panel' %}?dia={{ row.business_date|date:'Y-m-d' }}">{{ row.label }} · {{ row.business_date|date:'d/m/Y' }}</a></li>{% endfor %}</ul></div></div>{% endif %}
+
+<dl class="cp-kpis" aria-label="Resumo do dia">
+  <div class="cp-kpi is-lead"><dt>Valor recebido no dia</dt><dd>R$ {{ summary.received|money_pt }}</dd><small>Entradas registradas no dia, inclusive parcelas antigas</small></div>
+  <div class="cp-kpi"><dt>Valor cobrado no dia</dt><dd>R$ {{ summary.charged|money_pt }}</dd><small>Cobranças cadastradas nesta data</small></div>
+  <div class="cp-kpi"><dt>Despesas pagas</dt><dd>R$ {{ summary.expenses|money_pt }}</dd><small>Saídas do dia</small></div>
+  <div class="cp-kpi {% if summary.net|slice:':1' == '-' %}is-err{% else %}is-ok{% endif %}"><dt>Resultado do dia</dt><dd>R$ {{ summary.net|money_pt }}</dd><small>Recebido − despesas</small></div>
+  <div class="cp-kpi"><dt>Saldo a receber</dt><dd>R$ {{ summary.pending|money_pt }}</dd><small>Todas as parcelas pendentes, inclusive futuras</small></div>
+</dl>
+
+<section class="cp-panel" aria-labelledby="fd-methods"><header><h2 id="fd-methods">Por forma de pagamento</h2><span class="cp-hint" style="margin:0">Pix e cartão não são dinheiro na gaveta</span></header>
+{% if summary.methods %}<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Forma</th><th class="is-left">Tipo</th><th>Valor</th></tr></thead><tbody>
+{% for row in summary.methods %}<tr><td>{{ row.method }}</td><td class="is-left">{% if row.type == 'income' %}Recebimento{% else %}<span class="cp-neg">Despesa</span>{% endif %}</td><td>R$ {{ row.amount|money_pt }}</td></tr>{% endfor %}
+</tbody></table></div>{% else %}<p class="cp-hint" style="margin:0">Nenhum recebimento ou despesa paga nesta data.</p>{% endif %}
+</section>
+
+<div class="cp-section-title" id="caixa"><h2>Caixa do dia</h2><span>Um caixa só, da clínica. Cada recebimento fica ligado ao profissional que atendeu, e o fechamento mostra quanto foi de cada um.</span></div>
+{% if sheets %}<div class="cp-grid fd-sheets">{% for sheet in sheets %}
+<article class="cp-card is-{{ sheet.status }}">
+  <div class="cp-card-head"><span class="cp-avatar" aria-hidden="true">{{ sheet.label|slice:':1'|upper }}</span>
+    <div><h3>{{ sheet.label }}</h3><small>{{ sheet.business_date|date:'d/m/Y' }}</small></div>
+    <span class="cp-badge {% if sheet.status == 'open' %}s-open{% else %}s-closed{% endif %}">{% if sheet.status == 'open' %}Aberto{% else %}Fechado{% endif %}</span></div>
+  <div class="cp-card-body"><p class="cp-total">R$ {{ sheet.expected_now|money_pt }}<small>dinheiro na gaveta</small></p></div>
+  <div class="cp-card-foot"><a class="cp-btn" href="{% url 'clinic-cash-sheet-detail' sheet.pk %}">{% if sheet.status == 'open' %}Abrir folha e lançar{% else %}Ver folha{% endif %}</a></div>
+</article>{% endfor %}</div>
+{% else %}<div class="cp-empty"><strong>{% if is_today %}Nenhum caixa aberto hoje{% else %}Nenhum caixa aberto neste dia{% endif %}</strong>O caixa da clínica é criado sozinho no primeiro recebimento do dia, ou abra com fundo de troco no caixa do dia.
+<p style="margin-top:14px"><a class="cp-btn is-primary" href="{% url 'clinic-cash-panel' %}?dia={{ day|date:'Y-m-d' }}">Ir para o caixa do dia</a></p></div>{% endif %}
+
+<div class="cp-section-title"><h2>Atendimentos do dia</h2><span>Aguardando: <strong>{{ waiting_count }}</strong> · Em atendimento: <strong>{{ attending_count }}</strong> · Atendidos: <strong>{{ completed_count }}</strong></span></div>
+<section class="cp-panel">{% if visits %}<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Paciente</th><th class="is-left">Horário</th><th class="is-left">Profissional</th><th class="is-left">Situação</th><th></th></tr></thead><tbody>
+{% for visit in visits %}<tr><td>{{ visit.customer.name }}</td><td class="is-left">{{ visit.starts_at|date:'H:i' }}</td><td class="is-left">{{ visit.professional.name }}</td><td class="is-left">{{ visit.get_status_display }}</td>
+<td>{% if visit.status == 'pending' or visit.status == 'confirmed' %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="arrived"><input type="hidden" name="appointment" value="{{ visit.pk }}"><button class="cp-btn">Paciente chegou</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>{% else %}<p class="cp-hint" style="margin:0">Nenhum atendimento agendado neste dia.</p>{% endif %}</section>
+
+<div class="cp-section-title" id="receber"><h2>Receber dos pacientes</h2><span>Até 200 parcelas pendentes, por vencimento</span></div>
+<section class="cp-panel">{% if pending %}<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Paciente</th><th class="is-left">Cobrança</th><th>Parcela</th><th>Vencimento</th><th>Cobrado</th><th>A receber</th><th></th></tr></thead><tbody>
+{% for row in pending %}<tr><td>{{ row.charge.customer.name }}</td><td class="is-left">{{ row.charge.description }}</td><td>{{ row.number }}</td><td>{{ row.due_at|date:'d/m/Y' }}</td><td>R$ {{ row.amount|money_pt }}</td><td><strong>R$ {{ row.remaining|money_pt }}</strong></td><td><a class="cp-btn is-primary" href="{% url 'clinic-finance-receive' row.pk %}">Receber</a></td></tr>{% endfor %}
+</tbody></table></div>{% else %}<p class="cp-hint" style="margin:0">Nenhuma parcela pendente cadastrada.</p>{% endif %}
+{% if legacy_receivables_allowed %}<p class="cp-hint"><a href="{% url 'clinical-finance' %}">Recebíveis dos planos de tratamento já aprovados</a></p>{% endif %}</section>
+
+<div class="cp-two fd-forms">
+<section class="cp-panel fd-form"><header><h2>Cadastrar conta a receber</h2></header>
+  <p class="cp-hint" style="margin-top:0">Informe o total contratado e o parcelamento. O cadastro não é um recebimento. Pagamento misto: registre cada valor na sua forma.</p>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="charge">{{ charge_form.as_p }}<button class="cp-btn is-primary">Cadastrar cobrança e parcelas</button></form></section>
+<section class="cp-panel fd-form" id="gastos"><header><h2>Lançar despesa</h2></header>
+  <p class="cp-hint" style="margin-top:0">Somente valores já pagos. Escolha a data (hoje ou um dia anterior) e, se a despesa for de um dentista, marque o nome dele. Ela sai do caixa da clínica daquele dia e aguarda a validação da gestão.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="expense">{{ expense_form.as_p }}<div class="fd-row"><button class="cp-btn is-primary">Registrar gasto pago</button><a class="cp-btn" href="#retirada">Registrar retirada (sangria)</a></div></form></section>
+</div>
+<section class="cp-panel fd-form fd-withdraw" id="retirada"><header><h2>Registrar retirada (sangria)</h2><span class="cp-badge s-overdue">Não é gasto</span></header>
+  <div class="cp-alert is-warn"><span aria-hidden="true">ℹ</span><div><strong>Retirada não é gasto:</strong> use quando o dinheiro só sai da gaveta (levado, depositado). Ela desconta do dinheiro esperado na gaveta, mas não entra em despesas nem no resultado do dia.</div></div>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="withdrawal">{{ withdrawal_form.non_field_errors }}{{ withdrawal_form.request_id }}
+  <div class="fd-grid">{% for field in withdrawal_form %}{% if field.name != 'request_id' and field.name != 'confirmed' %}<p><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}{{ field.errors }}</p>{% endif %}{% endfor %}</div>
+  <p><label class="fd-check">{{ withdrawal_form.confirmed }} {{ withdrawal_form.confirmed.label }}</label>{{ withdrawal_form.confirmed.errors }}</p>
+  <button class="cp-btn is-primary">Registrar retirada</button></form></section>
+
+<details class="cp-panel fd-more"><summary>Valores por paciente e plano de pagamento</summary>
+  <p class="cp-hint">Últimas 100 cobranças, com as parcelas e os recebimentos.</p>
+  {% for charge in charges %}<details class="fd-charge"><summary><strong>{{ charge.customer.name }}</strong> · {{ charge.professional.name|default:"Profissional não informado" }} · {{ charge.description }} <span>Cobrado R$ {{ charge.amount|money_pt }} · Recebido R$ {{ charge.received_total|money_pt }} · Saldo <strong>R$ {{ charge.balance|money_pt }}</strong></span></summary>
+    <table class="cp-table"><tbody>{% for installment in charge.installments.all %}<tr><td>Parcela {{ installment.number }}</td><td>Vence {{ installment.due_at|date:'d/m/Y' }}</td><td>Cobrado R$ {{ installment.amount|money_pt }}</td><td>Saldo R$ {{ installment.remaining|money_pt }}</td></tr>
+    {% for receipt in installment.receipts.all %}<tr><td class="cp-hint">↳ Recebido</td><td>{{ receipt.created_at|date:'d/m/Y H:i' }}</td><td>{{ receipt.method_name }}</td><td>R$ {{ receipt.amount|money_pt }}</td></tr>{% endfor %}{% endfor %}</tbody></table></details>
+  {% empty %}<p class="cp-hint">Nenhuma cobrança cadastrada.</p>{% endfor %}
+</details>
+
+<details class="cp-panel fd-more"><summary>Movimentação financeira do dia</summary>
+  {% if transactions %}<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Hora</th><th class="is-left">Tipo</th><th class="is-left">Descrição</th><th class="is-left">Forma</th><th>Valor</th></tr></thead><tbody>
+  {% for tx in transactions %}<tr><td>{{ tx.paid_at|date:'H:i' }}</td><td class="is-left">{% if tx.type == 'income' %}Recebido{% else %}<span class="cp-neg">Despesa</span>{% endif %}</td><td class="is-left">{{ tx.description }}</td><td class="is-left">{{ tx.payment_method_label }}</td><td>R$ {{ tx.amount|money_pt }}</td></tr>{% endfor %}
+  </tbody></table></div>{% else %}<p class="cp-hint">Nenhuma movimentação paga.</p>{% endif %}
+  <h3 class="fd-sub">Comprovantes das despesas</h3>
+  {% for row in expenses %}<div class="fd-expense"><p><strong>{{ row.transaction.description }}</strong> · R$ {{ row.transaction.amount|money_pt }} · {% if row.professional %}Despesa de {{ row.professional.name }}{% else %}Despesa da clínica{% endif %} · Nota/cupom: {{ row.invoice_number|default:'Não informado' }}{% if row.receipt_encrypted %} · <a href="{% url 'clinic-finance-photo' row.pk %}" target="_blank" rel="noreferrer">Ver foto do comprovante</a>{% endif %}</p>
+    <p><span class="cp-badge {% if row.review_status == 'approved' %}s-open{% elif row.review_status == 'questioned' %}s-overdue{% else %}s-closed{% endif %}">{{ row.get_review_status_display }}</span>{% if row.reviewed_at %} {{ row.reviewed_at|date:'d/m/Y H:i' }}{% endif %} {{ row.review_note }}</p>
+    {% if row.items %}<p class="cp-hint">{{ row.items|linebreaksbr }}</p>{% endif %}
+    {% if birthday_admin %}<form method="post" class="fd-inline">{% csrf_token %}<input type="hidden" name="action" value="review-expense"><input type="hidden" name="expense" value="{{ row.pk }}"><label>Observação da conferência<input name="note" maxlength="500"></label><button class="cp-btn" name="decision" value="approved">Validar despesa</button><button class="cp-btn is-quiet" name="decision" value="questioned">Solicitar esclarecimento</button></form>{% endif %}</div>
+  {% empty %}<p class="cp-hint">Nenhuma despesa neste dia.</p>{% endfor %}
+</details>
+
+{% if birthday_admin %}<details class="cp-panel fd-more"><summary>Modalidades de pagamento</summary>
+  <p class="cp-hint">O tipo define se o recebimento entra na gaveta. Para crédito e débito, escolha o tipo Cartão.</p>
+  <ul class="cp-missing fd-methods">{% for row in methods %}<li><form method="post">{% csrf_token %}<input type="hidden" name="action" value="toggle-method"><input type="hidden" name="method" value="{{ row.pk }}"><span class="cp-dot k-{{ row.kind }}"></span> {{ row.name }} <span class="cp-hint" style="margin:0">{{ row.get_kind_display }} · {{ row.active|yesno:'Ativa,Inativa' }}</span> <button class="cp-btn is-quiet">{{ row.active|yesno:'Desativar,Ativar' }}</button></form></li>{% endfor %}</ul>
+  <form method="post" class="fd-form">{% csrf_token %}<input type="hidden" name="action" value="method">{{ payment_form.as_p }}<button class="cp-btn is-primary">Cadastrar modalidade</button></form>
+</details>{% endif %}
+
+<details class="cp-panel fd-more"><summary>Fechamentos conferidos</summary>
+  <p class="cp-hint">Histórico congelado no momento do fechamento.</p>
+  {% for row in closings %}<details class="fd-charge"><summary><strong>{{ row.session.opened_at|date:'d/m/Y H:i' }} até {{ row.session.closed_at|date:'d/m/Y H:i' }}</strong> · {{ row.session.closed_by }}</summary>
+    <p>Cobrado R$ {{ row.summary.charged|money_pt }} · Recebido R$ {{ row.summary.received|money_pt }} · Despesas R$ {{ row.summary.expenses|money_pt }} · Resultado R$ {{ row.summary.net|money_pt }}</p>
+    <p>Fundo R$ {{ row.summary.opening|money_pt }} · Dinheiro esperado R$ {{ row.summary.cash_expected|money_pt }} · Contado R$ {{ row.summary.cash_counted|money_pt }} · Diferença R$ {{ row.summary.difference|money_pt }}</p>
+    {% for item in row.summary.methods %}<p class="cp-hint">{{ item.method }} · {% if item.type == 'income' %}Recebimento{% else %}Despesa{% endif %} R$ {{ item.amount|money_pt }}</p>{% endfor %}{% if row.session.notes %}<p>{{ row.session.notes }}</p>{% endif %}</details>
+  {% empty %}<p class="cp-hint">Nenhum fechamento realizado.</p>{% endfor %}
+</details>
+
+<p class="fd-foot no-print">{% if birthday_admin %}<a class="cp-btn is-quiet" href="{% url 'clinic-birthday-settings' %}">Mensagens automáticas de aniversário</a>{% endif %}<button type="button" class="cp-btn" onclick="window.print()">Imprimir relatório / salvar PDF</button></p>
+</main>
+<style>
+.fd .cp-two{margin:0 0 16px}
+.fd-form p{margin:0 0 10px}
+.fd-form label{display:block;font-size:13px;font-weight:600}
+.fd-form input:not([type=checkbox]):not([type=radio]),.fd-form select,.fd-form textarea,.fd-inline input{display:block;width:100%;margin-top:4px;min-height:42px;padding:8px 10px;border:1px solid var(--cp-line);border-radius:9px;background:var(--cp-surface);color:inherit;font:inherit;font-weight:400}
+.fd-form .helptext{display:block;font-size:12px;color:var(--cp-muted);margin-top:2px}
+.fd-form .errorlist{color:var(--cp-err);margin:4px 0;padding-left:18px;font-size:13px}
+.fd-more>summary{cursor:pointer;font-weight:700;font-size:16px}
+.fd-more[open]>summary{margin-bottom:10px}
+.fd-charge{border-top:1px solid var(--cp-line);padding:8px 0}
+.fd-charge>summary{cursor:pointer;font-size:14px}
+.fd-charge>summary span{color:var(--cp-muted)}
+.fd-charge .cp-table td{text-align:left;font-size:13px}
+.fd-sub{font-size:15px;margin:16px 0 8px}
+.fd-expense{border-top:1px solid var(--cp-line);padding:8px 0;font-size:14px}.fd-expense p{margin:4px 0}
+.fd-inline{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}.fd-inline label{flex:1;min-width:200px;font-size:13px;font-weight:600}
+.fd-methods{margin-bottom:14px}.fd-methods form{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fd-sheets .cp-card-body{padding-bottom:10px}
+.fd-row{display:flex;flex-wrap:wrap;gap:8px}
+.fd-withdraw{border-color:#fcd34d}.fd-withdraw .cp-alert{margin:0 0 12px}
+.fd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 14px}
+.fd-check{display:flex!important;gap:8px;align-items:flex-start;font-weight:600}.fd-check input{width:auto!important;min-height:0!important;margin-top:3px}
+.fd-foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:8px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+<script>(()=>{const d=document.querySelector('[data-day-form] input');if(d)d.addEventListener('change',()=>d.form.submit())})();</script>
+{% endblock %}

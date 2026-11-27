@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Novo lead · Comercial{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow"><div class="portal-heading"><div><a class="back-link" href="{% url 'commercial-dashboard' %}">← Funil comercial</a><span class="eyebrow">PROSPECÇÃO</span><h1>Novo lead</h1><p>Cadastre o contato, a origem e a próxima ação. Marque consentimento apenas quando tiver autorização.</p></div></div>
+<form method="post" class="portal-form panel">{% csrf_token %}{% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<span class="field-error">{{ field.errors }}</span>{% endif %}</div>{% endfor %}<div class="form-actions"><button class="button primary">Salvar lead</button><a class="button ghost" href="{% url 'commercial-dashboard' %}">Cancelar</a></div></form></section>
+{% endblock %}

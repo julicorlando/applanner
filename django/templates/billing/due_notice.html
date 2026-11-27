@@ -1,0 +1,6 @@
+{% if billing_due_notice %}
+<aside class="shell billing-due-notice{% if billing_due_notice.overdue %} overdue{% endif %}" role="status" aria-label="Vencimento da assinatura">
+  <div><strong>{{ billing_due_notice.title }}</strong><p>{{ billing_due_notice.message }}</p></div>
+  <a class="button" href="{{ billing_due_notice.action_url }}">{% if billing_due_notice.overdue %}Regularizar pagamento{% else %}Ver plano e pagamento{% endif %}</a>
+</aside>
+{% endif %}

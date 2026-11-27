@@ -1,0 +1,118 @@
+{% extends 'base.html' %}{% load display_pt %}{% load static %}
+{% block title %}Caixa do dia · {{ day|date:'d/m/Y' }}{% endblock %}
+{% block content %}<link rel="stylesheet" href="{% static 'finance/cash-panel.css' %}">
+<main class="cp" aria-labelledby="cp-title">
+<header class="cp-head">
+  <div><p class="cp-eyebrow"><a href="{% url 'clinic-finance-desk' %}">Financeiro</a> · Caixa</p>
+    <h1 id="cp-title">Caixa do dia</h1>
+    <p>{{ day|date:'l, d \d\e F \d\e Y' }}{% if is_today %} · hoje{% endif %}{% if unit %} · {{ unit.name }}{% endif %}</p></div>
+  <div class="cp-actions">
+    {% if can_open_here and clinic_sheet_missing %}<button type="button" class="cp-btn is-primary" data-open-cash>+ Abrir caixa</button>{% endif %}
+    <a class="cp-btn" href="{% url 'clinic-cash-report' %}">Relatório do caixa</a>
+    <a class="cp-btn is-quiet" href="{% url 'clinic-cash-days' %}">Caixas por data</a>
+  </div>
+</header>
+
+<nav class="cp-daynav" aria-label="Escolher o dia">
+  <a href="?dia={{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior" title="Dia anterior">‹</a>
+  <a href="{{ today_url }}" class="{% if is_today %}is-on{% endif %}"{% if is_today %} aria-current="date"{% endif %}>Hoje</a>
+  <a href="?dia={{ yesterday|date:'Y-m-d' }}" class="{% if day == yesterday %}is-on{% endif %}">Ontem</a>
+  <form method="get" data-day-form><label class="sr-only" for="cp-day">Data</label><input id="cp-day" type="date" name="dia" value="{{ day|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}"><noscript><button class="cp-btn">Ver</button></noscript></form>
+  {% if next_day %}<a href="?dia={{ next_day|date:'Y-m-d' }}" aria-label="Próximo dia" title="Próximo dia">›</a>{% else %}<span class="is-off" aria-hidden="true">›</span>{% endif %}
+</nav>
+<div style="height:14px"></div>
+
+{% if overdue %}<div class="cp-alert is-warn" role="status"><span aria-hidden="true">⚠</span><div><strong>Caixas de dias anteriores ainda abertos.</strong> Confira e feche para o relatório ficar correto:
+<ul>{% for row in overdue %}<li><a href="?dia={{ row.business_date|date:'Y-m-d' }}">{{ row.label }} · {{ row.business_date|date:'d/m/Y' }}</a></li>{% endfor %}</ul></div></div>{% endif %}
+{% if removals %}<div class="cp-alert is-err" role="status"><span aria-hidden="true">✋</span><div><strong>{{ removals|length }} pedido(s) para apagar lançamento aguardando o gestor.</strong> <a href="{% url 'clinic-cash-days' %}">{% if gestor %}Revisar pedidos{% else %}Ver pedidos{% endif %}</a></div></div>{% endif %}
+
+<dl class="cp-kpis" aria-label="Resumo do dia">
+  <div class="cp-kpi is-lead"><dt>Recebido no dia</dt><dd>R$ {{ kpis.received|money_pt }}</dd><small>{{ kpis.sheets }} caixa(s) no dia</small></div>
+  <div class="cp-kpi"><dt>Despesas pagas</dt><dd>R$ {{ kpis.expenses|money_pt }}</dd><small>Gastos lançados nos caixas</small></div>
+  {% if kpis.withdrawals %}<div class="cp-kpi"><dt>Retiradas</dt><dd>R$ {{ kpis.withdrawals|money_pt }}</dd><small>Sangria · não é despesa</small></div>{% endif %}
+  <div class="cp-kpi {% if kpis.net < 0 %}is-err{% else %}is-ok{% endif %}"><dt>Resultado</dt><dd>R$ {{ kpis.net|money_pt }}</dd><small>Recebido − despesas</small></div>
+  <div class="cp-kpi"><dt>Em aberto</dt><dd>R$ {{ kpis.open_total|money_pt }}</dd><small>Atendimentos ainda não pagos</small></div>
+  <div class="cp-kpi"><dt>Situação dos caixas</dt><dd>{{ kpis.open }} <small style="display:inline">abertos</small> · {{ kpis.closed }} <small style="display:inline">fechados</small></dd><small>{% if kpis.divergent %}<span class="cp-neg">{{ kpis.divergent }} com divergência</span>{% else %}Sem divergências{% endif %}</small></div>
+</dl>
+
+<section class="cp-panel" aria-labelledby="cp-methods"><header><h2 id="cp-methods">Por forma de pagamento</h2><span class="cp-hint" style="margin:0">Dinheiro esperado nas gavetas abertas: <strong>R$ {{ kpis.drawer|money_pt }}</strong></span></header>
+  <div class="cp-bar" role="img" aria-label="{% for m in methods %}{{ m.label }} {{ m.share }}%{% if not forloop.last %}, {% endif %}{% endfor %}">{% for m in methods %}{% if m.share %}<span class="k-{{ m.kind }}" style="width:{{ m.share }}%"></span>{% endif %}{% endfor %}</div>
+  <ul class="cp-legend">{% for m in methods %}<li><span class="cp-dot k-{{ m.kind }}"></span>{{ m.label }} <strong>R$ {{ m.amount|money_pt }}</strong> <span class="cp-hint" style="margin:0">{{ m.share }}%</span></li>{% endfor %}</ul>
+</section>
+
+{% if day_professionals %}<section class="cp-panel" aria-labelledby="cp-pros"><header><h2 id="cp-pros">Quanto foi para cada profissional</h2><span class="cp-hint" style="margin:0">Tudo no caixa da clínica; cada recebimento fica ligado a quem atendeu</span></header>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Profissional</th><th>Pacientes</th><th>Dentista</th><th>Clínica</th><th>Outros</th><th>Recebido</th><th>Despesas dele</th><th>Líquido do dentista</th><th>Em aberto</th></tr></thead><tbody>
+{% for p in day_professionals %}<tr><td>{{ p.professional }}</td><td>{{ p.patients }}</td><td>R$ {{ p.dentist|money_pt }}</td><td>R$ {{ p.clinic|money_pt }}</td><td>R$ {{ p.other|money_pt }}</td><td><strong>R$ {{ p.total|money_pt }}</strong></td><td>{% if p.expenses %}R$ {{ p.expenses|money_pt }}{% else %}—{% endif %}</td><td>R$ {{ p.dentist_net|money_pt }}</td><td>{% if p.open %}R$ {{ p.open|money_pt }}{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></section>{% endif %}
+
+<div class="cp-section-title"><h2>{% if cards|length > 1 %}Caixas do dia{% else %}Caixa da clínica{% endif %}</h2><span>{% if cards|length > 1 %}Este dia ainda tem caixas separados por profissional{% if gestor %}: unifique em <a href="{% url 'clinic-cash-days' %}">Caixas por data</a>{% endif %}.{% else %}Um caixa só por dia: abra, lance e feche aqui.{% endif %}</span></div>
+{% if cards %}<div class="cp-grid">{% for c in cards %}
+<article class="cp-card is-{{ c.status }}" aria-labelledby="card-{{ c.session.pk }}">
+  <div class="cp-card-head"><span class="cp-avatar" aria-hidden="true">{{ c.initials }}</span>
+    <div><h3 id="card-{{ c.session.pk }}">{{ c.label }}</h3><small>{{ c.lines }} lançamento(s)</small></div>
+    <span class="cp-badge s-{{ c.status }}">{{ c.status_label }}</span></div>
+  <div class="cp-card-body">
+    <p class="cp-total">R$ {{ c.received|money_pt }}<small>recebido</small></p>
+    <dl class="cp-split"><div><dt>Dentista</dt><dd>R$ {{ c.dentist|money_pt }}</dd></div><div><dt>Consultório</dt><dd>R$ {{ c.clinic|money_pt }}</dd></div><div><dt>Outros</dt><dd>R$ {{ c.other|money_pt }}</dd></div></dl>
+    <ul class="cp-chips" aria-label="Formas de pagamento">{% for kind, label, value in c.kind_rows %}<li><span class="cp-dot k-{{ kind }}"></span>{{ label }} R$ {{ value|money_pt }}</li>{% empty %}<li>Nenhum recebimento ainda</li>{% endfor %}</ul>
+    <p class="cp-meta">{% if c.open_total %}<span class="is-warn">Em aberto: R$ {{ c.open_total|money_pt }} ({{ c.open_count }})</span>{% endif %}{% if c.expenses %}<span>Despesas: <strong>R$ {{ c.expenses|money_pt }}</strong></span>{% endif %}{% if c.withdrawals %}<span>Retiradas: <strong>R$ {{ c.withdrawals|money_pt }}</strong></span>{% endif %}
+      <span>Fundo: R$ {{ c.session.opening_amount|money_pt }}</span>
+      {% if c.session.status == 'open' %}<span>Gaveta esperada: <strong>R$ {{ c.drawer_expected|money_pt }}</strong></span><span>Aberto às {{ c.session.opened_at|date:'H:i' }} por {{ c.session.opened_by.get_full_name|default:c.session.opened_by.email }}</span>
+      {% else %}<span>Fechado {{ c.session.closed_at|date:'d/m H:i' }} por {{ c.session.closed_by.get_full_name|default:c.session.closed_by.email|default:'—' }}</span>{% endif %}</p>
+    {% if c.session.status == 'closed' %}<table class="cp-conf"><caption class="sr-only">Conferência do fechamento</caption><thead><tr><th>Conferência</th><th>Esperado</th><th>Informado</th><th>Diferença</th></tr></thead><tbody>
+      {% if c.conference_rows %}{% for label, row in c.conference_rows %}<tr><td>{{ label }}</td><td>R$ {{ row.expected|money_pt }}</td><td>R$ {{ row.informed|money_pt }}</td><td class="{% if row.difference == '0.00' %}is-ok{% else %}is-diff{% endif %}">R$ {{ row.difference|money_pt }}</td></tr>{% endfor %}
+      {% else %}<tr><td>Dinheiro</td><td>R$ {{ c.session.expected_amount|default:0|money_pt }}</td><td>R$ {{ c.session.closing_amount|default:0|money_pt }}</td><td class="{% if c.session.difference_amount %}is-diff{% else %}is-ok{% endif %}">R$ {{ c.session.difference_amount|default:0|money_pt }}</td></tr>{% endif %}
+    </tbody></table>{% endif %}
+  </div>
+  <div class="cp-card-foot"><a class="cp-btn" href="{% url 'clinic-cash-sheet-detail' c.session.pk %}">{% if c.session.status == 'open' %}Abrir folha e lançar{% else %}Ver folha{% endif %}</a>
+    {% if can_expense and c.session.status == 'open' or can_expense and can_past %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}?day={{ day|date:'Y-m-d' }}#gastos">Lançar despesa</a>{% endif %}
+    {% if is_today and c.session.status == 'open' and can_expense %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}#retirada">Retirada (sangria)</a>{% endif %}
+    {% if c.session.status == 'open' and can_open_close %}<button type="button" class="cp-btn is-primary" data-close-cash data-session="{{ c.session.pk }}" data-label="{{ c.label }}"
+      data-cash="{{ c.expected.cash|stringformat:'.2f' }}" data-pix="{{ c.expected.pix|stringformat:'.2f' }}" data-card="{{ c.expected.card|stringformat:'.2f' }}" data-open="{{ c.open_count }}">Conferir e fechar</button>{% endif %}</div>
+</article>{% endfor %}</div>
+{% else %}<div class="cp-empty"><strong>{% if is_today %}Nenhum caixa aberto hoje{% else %}Nenhum caixa neste dia{% endif %}</strong>O caixa da clínica é criado sozinho no primeiro recebimento do dia{% if can_open_close %}, ou abra agora com fundo de troco{% endif %}.
+{% if can_open_here %}<p style="margin-top:14px"><button type="button" class="cp-btn is-primary" data-open-cash>+ Abrir caixa</button></p>{% endif %}</div>{% endif %}
+
+
+{% if can_open_close %}{% if can_open_here %}
+<dialog class="cp-dialog" id="cp-open" aria-labelledby="cp-open-title"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="open"><input type="hidden" name="dia" value="{{ day|date:'Y-m-d' }}">
+  <header><div><h2 id="cp-open-title">Abrir o caixa da clínica</h2><p>Dia {{ day|date:'d/m/Y' }}{% if not is_today %} · dia anterior (fica registrado na auditoria){% endif %}</p></div><button type="button" class="cp-x" data-close aria-label="Fechar">×</button></header>
+  <label>Fundo de troco em dinheiro (R$)<input name="opening" type="number" min="0" step="0.01" value="0" inputmode="decimal" required></label>
+  <label>Observação (opcional)<textarea name="notes" rows="2" maxlength="500"></textarea></label>
+  <footer><button type="button" class="cp-btn" data-close>Cancelar</button><button class="cp-btn is-primary">Abrir caixa</button></footer>
+</form></dialog>{% endif %}
+<dialog class="cp-dialog" id="cp-close" aria-labelledby="cp-close-title"><form method="post" data-close-form>{% csrf_token %}<input type="hidden" name="action" value="close"><input type="hidden" name="dia" value="{{ day|date:'Y-m-d' }}"><input type="hidden" name="session">
+  <header><div><h2 id="cp-close-title">Conferir e fechar caixa</h2><p data-close-label></p></div><button type="button" class="cp-x" data-close aria-label="Fechar">×</button></header>
+  <p class="cp-hint" style="margin-top:0">Informe o que você conferiu. Depois de fechado, mudanças só com confirmação e ficam na auditoria.</p>
+  <table class="cp-confgrid"><thead><tr><th>Forma</th><th>Esperado</th><th>Conferido</th><th>Diferença</th></tr></thead><tbody>
+    <tr data-row="cash"><td>Dinheiro na gaveta</td><td data-expected></td><td><input name="counted_cash" type="number" min="0" step="0.01" inputmode="decimal" required aria-label="Dinheiro contado"></td><td data-diff></td></tr>
+    <tr data-row="pix"><td>Pix</td><td data-expected></td><td><input name="counted_pix" type="number" min="0" step="0.01" inputmode="decimal" required aria-label="Pix conferido"></td><td data-diff></td></tr>
+    <tr data-row="card"><td>Débito/Crédito</td><td data-expected></td><td><input name="counted_card" type="number" min="0" step="0.01" inputmode="decimal" required aria-label="Cartão conferido"></td><td data-diff></td></tr>
+  </tbody></table>
+  <p class="cp-hint" data-open-warning hidden>Há atendimentos em aberto neste caixa: eles continuam pendentes depois do fechamento.</p>
+  <div class="cp-divergence" data-divergence role="alert">Há diferença entre o esperado e o conferido. Explique na observação: ela fica registrada no fechamento.</div>
+  <label>Observação<textarea name="notes" rows="2" maxlength="500" data-close-notes></textarea></label>
+  <footer><button type="button" class="cp-btn" data-close>Cancelar</button><button class="cp-btn is-primary">Fechar caixa</button></footer>
+</form></dialog>
+{% endif %}
+</main>
+<script>(()=>{
+const day=document.querySelector('[data-day-form] input');if(day)day.addEventListener('change',()=>day.form.submit());
+const brl=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const open=document.getElementById('cp-open'),close=document.getElementById('cp-close');
+document.addEventListener('click',e=>{
+  const o=e.target.closest('[data-open-cash]');
+  if(o&&open){open.showModal();open.querySelector('[name=opening]').focus();return}
+  const c=e.target.closest('[data-close-cash]');
+  if(c&&close){const f=close.querySelector('form');f.elements.session.value=c.dataset.session;close.querySelector('[data-close-label]').textContent=c.dataset.label;
+    ['cash','pix','card'].forEach(k=>{const row=close.querySelector(`[data-row=${k}]`),exp=parseFloat(c.dataset[k])||0;row.dataset.value=exp;row.querySelector('[data-expected]').textContent=brl(exp);
+      const input=row.querySelector('input');input.value=exp.toFixed(2)});
+    close.querySelector('[data-open-warning]').hidden=!(+c.dataset.open);f.elements.notes.value='';check();close.showModal();f.elements.counted_cash.select();return}
+  if(e.target.closest('[data-close]'))e.target.closest('dialog').close();
+});
+const check=()=>{if(!close)return;let diverge=false;close.querySelectorAll('[data-row]').forEach(row=>{const v=parseFloat(row.querySelector('input').value||'0'),d=Math.round((v-(+row.dataset.value||0))*100)/100,cell=row.querySelector('[data-diff]');
+  cell.textContent=brl(d);cell.className=d?'is-diff':'is-ok';if(d)diverge=true});
+  close.querySelector('[data-divergence]').classList.toggle('is-on',diverge);close.querySelector('[data-close-notes]').required=diverge};
+if(close)close.addEventListener('input',check);
+})();</script>
+{% endblock %}

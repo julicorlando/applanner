@@ -1,0 +1,139 @@
+{% extends 'base.html' %}{% load display_pt %}{% load static %}{% block title %}Caixa {{ date|date:'d/m/Y' }}{% endblock %}{% block content %}<link rel="stylesheet" href="{% static 'finance/cash-panel.css' %}">
+<style>
+.cash-sheet{max-width:1050px;margin:0 auto;padding:16px}
+.cash-sheet .paper{background:#fff;color:#000;padding:28px 26px;border-radius:8px;font-family:Arial,Helvetica,sans-serif}
+.cash-sheet h1{text-align:center;font-size:1.5rem;margin:0 0 18px}
+.cash-sheet table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:.85rem}
+.cash-sheet th,.cash-sheet td{border:1px solid #000;padding:4px 6px;text-align:center}
+.cash-sheet td.name,.cash-sheet th.name{text-align:left}
+.cash-sheet .dr{color:#c00;display:block;font-weight:600}
+.cash-sheet tr.total td{background:#c0c0c0;font-weight:700}
+.cash-sheet tr.sum td{background:#f4b183;font-weight:700}
+.cash-sheet tr.cancelled td{text-decoration:line-through;color:#777}
+.cash-sheet tr.open td{background:#fff4e5}
+.cash-sheet .box{border:1px solid #000;padding:8px 10px;line-height:1.6}
+.cash-sheet .red{color:#c00}
+.cash-sheet .lock{padding:10px 12px;border-radius:8px;margin:12px 0;background:#fef3c7;color:#7c2d12}
+.cash-sheet form.inline{display:inline}
+.cash-sheet .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 12px}
+.cash-sheet .panel{margin-top:16px}
+/* The sheet is paper: keep black ink on white in both themes. */
+.dental-workspace .cash-sheet .paper{background:#fff!important;color:#111!important;box-shadow:0 12px 32px rgba(15,30,60,.18)}
+.dental-workspace .cash-sheet .paper :is(h1,th,td,strong,span,small,div,b){color:#111!important}
+.dental-workspace .cash-sheet .paper table{border-collapse:collapse!important;color:#111}
+.dental-workspace .cash-sheet .paper :is(thead,th){background:#fff!important;font-size:.8rem;text-transform:none;letter-spacing:0}
+.dental-workspace .cash-sheet .paper :is(th,td){border:1px solid #111!important}
+.dental-workspace .cash-sheet .paper td{background:#fff!important}
+.dental-workspace .cash-sheet .paper tr.total td{background:#d9d9d9!important}
+.dental-workspace .cash-sheet .paper tr.sum td{background:#f4b183!important}
+.dental-workspace .cash-sheet .paper tr.open td{background:#fff4e5!important}
+.dental-workspace .cash-sheet .paper tr.cancelled td{color:#777!important}
+.dental-workspace .cash-sheet .paper :is(.red,.dr){color:#c00!important}
+.dental-workspace .cash-sheet .paper .box{border-color:#111}
+.cash-sheet .sheet-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.cash-sheet .sheet-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:700;background:#64748b25}
+.cash-sheet .sheet-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.cash-sheet .sheet-badge.is-open{background:#16a34a25;color:#15803d}.cash-sheet .sheet-badge.is-diff{background:#dc262620;color:#b91c1c}
+.cash-sheet .closed-confirm{display:flex;gap:8px;align-items:flex-start;margin:10px 0;padding:10px 12px;border-radius:10px;background:#fef3c7;color:#78350f;font-weight:600}
+.cash-sheet .closed-confirm input{width:auto;min-height:0;margin-top:3px}
+.cash-sheet.cp{max-width:1100px}
+.cash-sheet .paper{margin:6px 0 18px;box-shadow:0 1px 2px rgb(0 0 0/6%),0 10px 30px rgb(15 30 60/10%)}
+.sh-paper-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}
+.sh-paper-head div{display:flex;flex-direction:column;font-size:.85rem}.sh-paper-head h1{margin:0!important}
+.sh-stamp{justify-self:end;border:1.5px solid #111;border-radius:6px;padding:3px 10px;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.cash-sheet .sh-title{font-size:.95rem;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+.cash-sheet .paper tbody tr:nth-child(even):not(.total):not(.sum):not(.open):not(.cancelled) td{background:#fafafa}
+.sh-convert{margin-top:4px}.sh-convert summary{cursor:pointer;color:#1d4ed8;font-size:.8rem}.sh-convert form{display:flex;flex-direction:column;gap:4px;margin-top:4px;max-width:320px}.sh-convert input{min-height:30px;padding:3px 6px;border:1px solid #bbb;border-radius:6px;width:100%}
+.sh-split{margin:4px 0 10px}.sh-split summary{cursor:pointer;font-weight:600;font-size:14px}
+.sh-requests{border-color:#fcd34d}.sh-request{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--cp-line)}
+.sh-actions{display:flex;gap:8px}
+.sh-form h2{font-size:16px;margin:0 0 6px}.sh-form p{color:var(--cp-muted);font-size:14px}
+.sh-form .grid label,.sh-form>form>label{display:block;font-size:13px;font-weight:600;color:var(--cp-ink)}
+.sh-form :is(input:not([type=checkbox]):not([type=hidden]),select){display:block;width:100%;margin-top:4px;min-height:40px;padding:7px 10px;border:1px solid var(--cp-line);border-radius:9px;background:var(--cp-surface);color:inherit;font:inherit;font-weight:400}
+.sh-form .grid{margin-bottom:10px}.sh-form button:not(.cp-btn){min-height:38px;padding:7px 14px;border-radius:10px;border:1px solid var(--cp-line);background:var(--cp-surface);color:inherit;font:inherit;font-weight:600;cursor:pointer}
+.cash-sheet td form.inline input{min-height:30px;padding:3px 6px;border:1px solid #bbb;border-radius:6px}
+@media print{.cash-sheet .paper{box-shadow:none}.no-print,nav,header,.pa-sidebar,#pa-sidebar,.pa-topbar{display:none!important}.cash-sheet{padding:0}.cash-sheet .paper{padding:0}}
+</style>
+<main class="cash-sheet cp">
+<header class="cp-head no-print">
+  <div><p class="cp-eyebrow"><a href="{% url 'clinic-finance-desk' %}">Financeiro</a> · Caixa</p>
+    <h1>Folha do caixa</h1>
+    <p>{{ session.label }} · {{ date|date:'d/m/Y' }} ({{ weekday }}) · <span class="cp-badge {% if session.status == 'open' %}s-open{% elif session.difference_amount %}s-divergent{% else %}s-closed{% endif %}">{% if session.status == 'open' %}Aberto{% elif correction %}Em correção{% elif session.difference_amount %}Fechado com divergência{% else %}Fechado{% endif %}</span></p></div>
+  <div class="cp-actions">
+    <a class="cp-btn is-quiet" href="{% url 'clinic-cash-panel' %}?dia={{ date|date:'Y-m-d' }}">← Caixa do dia {{ date|date:'d/m' }}</a>
+    {% if can_expense %}<a class="cp-btn" href="{% url 'clinic-finance-desk' %}?day={{ sheet_day|date:'Y-m-d' }}#gastos">Lançar despesa neste dia</a>{% endif %}
+    {% if session.status == 'open' %}<a class="cp-btn is-primary" href="{% url 'clinic-cash-panel' %}?dia={{ date|date:'Y-m-d' }}#card-{{ session.pk }}">Conferir e fechar</a>{% endif %}
+    <a class="cp-btn is-quiet" href="{% url 'clinic-cash-report' %}">Relatório do caixa</a>
+    <button type="button" class="cp-btn" onclick="window.print()">Imprimir / salvar PDF</button>
+  </div>
+</header>
+{% if day_sheets|length > 1 %}<nav class="cp-presets no-print" aria-label="Caixas do dia">{% for sheet in day_sheets %}<a href="{% url 'clinic-cash-sheet-detail' sheet.pk %}"{% if sheet.pk == session.pk %} class="is-on" aria-current="page"{% endif %}>{{ sheet.label }}{% if sheet.status == 'closed' %} · fechado{% endif %}</a>{% endfor %}</nav>{% endif %}
+<dl class="cp-kpis no-print" aria-label="Resumo deste caixa">
+  <div class="cp-kpi is-lead"><dt>Recebido</dt><dd>R$ {{ columns.total|money_pt }}</dd><small>{{ entries|length }} lançamento(s)</small></div>
+  <div class="cp-kpi {% if open_total %}is-warn{% endif %}"><dt>Em aberto</dt><dd>R$ {{ open_total|money_pt }}</dd><small>{{ open_rows|length }} paciente(s)</small></div>
+  <div class="cp-kpi"><dt>Despesas</dt><dd>R$ {{ expenses_total|money_pt }}</dd><small>{{ expenses|length }} lançamento(s)</small></div>
+  <div class="cp-kpi {% if net_total < 0 %}is-err{% else %}is-ok{% endif %}"><dt>Resultado</dt><dd>R$ {{ net_total|money_pt }}</dd><small>Recebido − despesas</small></div>
+  <div class="cp-kpi"><dt>Retiradas</dt><dd>R$ {{ withdrawals_total|money_pt }}</dd><small>Sangria · não é despesa</small></div>
+  <div class="cp-kpi"><dt>Dinheiro na gaveta</dt><dd>R$ {{ drawer_expected|money_pt }}</dd><small>{% if session.status == 'closed' %}Esperado no fechamento{% else %}Parcial{% endif %}</small></div>
+</dl>
+{% if locked and not can_edit %}<div class="cp-alert is-warn no-print"><span aria-hidden="true">🔒</span><div>Caixa fechado em {{ session.closed_at|date:'d/m/Y H:i' }}. Alterações só com autorização do gestor.</div></div>{% elif locked %}<div class="cp-alert is-warn no-print"><span aria-hidden="true">🔒</span><div>Caixa fechado em {{ session.closed_at|date:'d/m/Y H:i' }}. Você ainda pode corrigir este dia: cada alteração fica na auditoria e a conferência é recalculada.</div></div>{% elif correction %}<div class="cp-alert is-warn no-print"><span aria-hidden="true">✎</span><div>Correção liberada por {{ correction.decided_by.get_full_name|default:correction.decided_by.email }}: {{ correction.reason }}. Todas as mudanças ficam na auditoria.</div></div>{% endif %}
+{% if previous_day_open %}<div class="cp-alert is-err no-print" role="alert"><span aria-hidden="true">⚠</span><div>Este caixa é de {{ date|date:"d/m/Y" }} e ainda não foi fechado. Confira e feche no Caixa do dia.</div></div>{% endif %}
+{% if pending_removals %}<section class="cp-panel no-print sh-requests"><header><h2>Pedidos para apagar lançamento</h2><span class="cp-badge s-overdue">{{ pending_removals|length }} aguardando</span></header>{% for item in pending_removals %}<div class="sh-request"><div>Nº {{ item.entry.number }} · <strong>{{ item.entry.customer.name }}</strong> · R$ {{ item.entry.total|money_pt }}<br><small class="cp-hint">Pedido por {{ item.requested_by.get_full_name|default:item.requested_by.email }}: “{{ item.reason }}”</small></div>{% if gestor %}<form method="post" class="sh-actions">{% csrf_token %}<input type="hidden" name="removal" value="{{ item.pk }}"><button class="cp-btn is-primary" name="action" value="approve-removal">Aprovar e apagar</button><button class="cp-btn" name="action" value="reject-removal">Recusar</button></form>{% else %}<span class="cp-badge s-overdue">Aguardando o gestor</span>{% endif %}</div>{% endfor %}</section>{% endif %}
+<section class="paper">
+<div class="sh-paper-head"><div><strong>{{ session.tenant.name }}</strong><span>Folha do caixa</span></div><h1>{{ session.label }} · {{ date|date:'d/m/Y' }} ({{ weekday }})</h1><span class="sh-stamp">{% if session.status == 'open' %}Aberto{% elif session.difference_amount %}Fechado com divergência{% else %}Fechado{% endif %}</span></div>
+<h2 class="sh-title">Atendimentos e recebimentos</h2>
+<table aria-label="Atendimentos do dia">
+<thead><tr><th>Nº</th><th class="name">Nome do Paciente</th><th>Dentista<span class="dr">Dr.</span></th><th>Consultório</th><th>Outros</th><th>Total</th><th>Forma de pagamento</th>{% if can_edit %}<th class="no-print">Ações</th>{% endif %}</tr></thead>
+<tbody>
+{% for row in entries %}<tr class="{% if row.status == 'cancelled' %}cancelled{% elif row.status == 'open' %}open{% endif %}"><td>{{ row.number }}</td><td class="name">{{ row.customer.name }}{% if row.notes %}<br><small>{{ row.notes }}</small>{% endif %}</td><td><small>{{ row.professional_name }}</small><br>{{ row.dentist_amount|money_pt }}</td><td>{{ row.clinic_amount|money_pt }}</td><td>{{ row.other_amount|money_pt }}</td><td>{{ row.total|money_pt }}</td><td>{% if row.status == 'open' %}<span class="red">Em aberto</span>{% else %}{{ row.method_name }}{% endif %}</td>{% if can_edit %}<td class="no-print">{% if row.status != 'cancelled' %}<a href="?editar={{ row.pk }}#lancar">Editar</a>{% if row.pending_removal %}<br><small class="red">Pedido para apagar aguardando o gestor</small>{% elif can_delete_line %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="cancel"><input type="hidden" name="entry" value="{{ row.pk }}"><input name="reason" placeholder="Motivo" required minlength="3" maxlength="300" size="10"><button>Apagar</button></form>{% else %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="request-removal"><input type="hidden" name="entry" value="{{ row.pk }}"><input name="reason" placeholder="Motivo" required minlength="3" maxlength="300" size="10"><button>Pedir para apagar</button></form>{% endif %}{% endif %}</td>{% endif %}</tr>
+{% endfor %}
+{% for receipt in receipts %}<tr><td>—</td><td class="name">{{ receipt.installment.charge.customer.name }}<br><small>Parcela {{ receipt.installment.number }} · {{ receipt.installment.charge.description }}</small></td><td><small>{{ receipt.installment.charge.professional.name|default:'' }}</small></td><td></td><td></td><td>{{ receipt.amount }}</td><td>{{ receipt.method_name }}</td>{% if can_edit %}<td class="no-print"></td>{% endif %}</tr>{% endfor %}
+{% if not entries and not receipts %}<tr><td colspan="{% if can_edit %}8{% else %}7{% endif %}">Nenhum atendimento lançado.</td></tr>{% endif %}
+<tr class="total"><td></td><td class="name">Totais recebidos</td><td>{{ columns.dentist|money_pt }}</td><td>{{ columns.clinic|money_pt }}</td><td>{{ columns.other|money_pt }}</td><td>{{ columns.total|money_pt }}</td><td></td>{% if can_edit %}<td class="no-print"></td>{% endif %}</tr>
+</tbody></table>
+<h2 class="sh-title">Totais por forma de pagamento</h2>
+<table aria-label="Totais por forma de pagamento"><thead><tr>{% for label, value in kinds %}<th>{{ label }}</th>{% endfor %}<th>Total</th></tr></thead><tbody><tr class="total">{% for label, value in kinds %}<td>R$ {{ value|money_pt }}</td>{% endfor %}<td>R$ {{ kinds_total|money_pt }}</td></tr></tbody></table>
+{% if professionals %}<h2 class="sh-title">Fechamento do dia por profissional</h2>
+<table aria-label="Fechamento por profissional"><thead><tr><th>Profissional</th><th>Pacientes</th><th>Dentista</th><th>Clínica</th><th>Outros</th><th>Recebido</th><th>Despesas dele</th><th>Líquido do dentista</th><th>Em aberto</th></tr></thead><tbody>{% for p in professionals %}<tr><td class="name">{{ p.professional }}</td><td>{{ p.patients }}</td><td>{{ p.dentist|money_pt }}</td><td>{{ p.clinic|money_pt }}</td><td>{{ p.other|money_pt }}</td><td>{{ p.total|money_pt }}</td><td>{% if p.expenses %}{{ p.expenses|money_pt }}{% else %}—{% endif %}</td><td>{{ p.dentist_net|money_pt }}</td><td>{% if p.open %}{{ p.open|money_pt }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table>{% endif %}
+<h2 class="sh-title">Despesas pagas neste caixa</h2>
+<table aria-label="Despesas do caixa"><thead><tr><th>Hora</th><th class="name">Descrição</th><th>Nota/cupom</th><th>Forma</th><th>Lançado por</th><th>Conferência</th><th>Valor</th></tr></thead><tbody>
+{% for e in expenses %}<tr><td>{{ e.created_at|date:'H:i' }}</td><td class="name">{{ e.transaction.description }}{% if e.professional %}<br><small>Despesa de {{ e.professional.name }}</small>{% endif %}{% if e.items %}<br><small>{{ e.items|truncatechars:120 }}</small>{% endif %}{% if e.receipt_encrypted %}<br><a class="no-print" href="{% url 'clinic-finance-photo' e.pk %}" target="_blank" rel="noreferrer">Ver comprovante</a>{% endif %}{% if gestor and e.method.kind == 'cash' %}<details class="no-print sh-convert"><summary>Converter em retirada de caixa</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="convert-expense"><input type="hidden" name="expense" value="{{ e.pk }}"><label>Motivo<input name="reason" required minlength="5" maxlength="300" placeholder="Ex.: dinheiro levado no fechamento"></label><button class="cp-btn is-primary">Converter</button><small>Mantém valor, hora e autor. Sai de despesas e do resultado; a gaveta esperada não muda.</small></form></details>{% endif %}</td><td>{{ e.invoice_number|default:'—' }}</td><td>{{ e.method_name }}</td><td>{{ e.recorded_by.get_full_name|default:e.recorded_by.email }}</td><td>{{ e.get_review_status_display }}</td><td>{{ e.transaction.amount|money_pt }}</td></tr>
+{% empty %}<tr><td colspan="7">Nenhuma despesa lançada neste caixa.</td></tr>{% endfor %}
+<tr class="total"><td></td><td class="name">Total de despesas</td><td></td><td></td><td></td><td></td><td>{{ expenses_total|money_pt }}</td></tr>
+<tr class="sum"><td></td><td class="name">Resultado do caixa (recebido − despesas)</td><td></td><td></td><td></td><td></td><td>{{ net_total|money_pt }}</td></tr>
+</tbody></table>
+<h2 class="sh-title">Retiradas do caixa (sangria)</h2>
+<table aria-label="Retiradas do caixa"><thead><tr><th>Hora</th><th class="name">Retirado por</th><th>Destino</th><th>Forma</th><th>Lançado por</th><th>Valor</th>{% if can_edit %}<th class="no-print">Ações</th>{% endif %}</tr></thead><tbody>
+{% for w in withdrawals %}<tr><td>{{ w.occurred_at|date:'H:i' }}</td><td class="name">{{ w.withdrawn_by }}{% if w.notes %}<br><small>{{ w.notes }}</small>{% endif %}</td><td>{{ w.get_destination_display }}</td><td>{{ w.method_name }}</td><td>{{ w.recorded_by.get_full_name|default:w.recorded_by.email }}</td><td>{{ w.amount|money_pt }}</td>{% if can_edit %}<td class="no-print">{% if can_cancel_withdrawal and gestor or can_cancel_withdrawal and w.recorded_by_id == me and session.status == 'open' %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="cancel-withdrawal"><input type="hidden" name="withdrawal" value="{{ w.pk }}"><input name="reason" placeholder="Motivo" required minlength="3" maxlength="300" size="10"><button>Excluir</button></form>{% elif session.status == 'closed' %}<small>Caixa fechado: só o gestor, pela correção</small>{% endif %}</td>{% endif %}</tr>
+{% empty %}<tr><td colspan="{% if can_edit %}7{% else %}6{% endif %}">Nenhuma retirada neste caixa.</td></tr>{% endfor %}
+<tr class="total"><td></td><td class="name">Total de retiradas (não é despesa)</td><td></td><td></td><td></td><td>{{ withdrawals_total|money_pt }}</td>{% if can_edit %}<td class="no-print"></td>{% endif %}</tr>
+</tbody></table>
+<div class="box">
+Horário que abriu: {{ session.opened_at|date:'H\hi' }}<br>
+Horário que fechou: {% if session.closed_at %}{{ session.closed_at|date:'H\hi' }}{% else %}caixa aberto{% endif %}<br><br>
+Observações do dia: {{ session.notes|linebreaksbr }}<br><br>
+<span class="red">Valores em aberto do dia: R$ {{ open_total|money_pt }}{% for row in open_rows %}{% if forloop.first %} — {% endif %}{{ row.customer.name }} (R$ {{ row.total|money_pt }}){% if not forloop.last %}; {% endif %}{% endfor %}</span><br><br>
+{% if expenses_cash %}Despesas pagas em dinheiro: R$ {{ expenses_cash|money_pt }} (já descontadas do valor em caixa)<br><br>{% endif %}{% if withdrawals_total %}Retiradas em dinheiro: R$ {{ withdrawals_total|money_pt }} (já descontadas do valor em caixa)<br><br>{% endif %}<span class="red">Valor em caixa: R$ {% if session.status == 'closed' %}{{ session.closing_amount|money_pt }} (esperado R$ {{ drawer_expected|money_pt }}{% if session.difference_amount %}, diferença R$ {{ session.difference_amount|money_pt }}{% endif %}){% else %}{{ drawer_expected|money_pt }} (parcial){% endif %}</span><br><br>
+RECEPCIONISTA: {{ session.opened_by.get_full_name|default:session.opened_by.email }}{% if session.closed_by and session.closed_by != session.opened_by %} · fechamento: {{ session.closed_by.get_full_name|default:session.closed_by.email }}{% endif %}
+</div>
+</section>
+
+{% if can_edit %}<section class="cp-panel sh-form no-print" id="lancar"><h2>{% if editing %}Editar linha {{ editing.number }}{% else %}Lançar atendimento / recebimento{% endif %}</h2><p>Escolha o paciente e quem atendeu. Se o profissional não estiver na lista, digite o nome. Deixe a forma de pagamento "Em aberto" quando o paciente ainda não pagou.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="{% if editing %}update{% else %}add{% endif %}">{{ form.request_id }}{{ form.entry_id }}{{ form.non_field_errors }}
+<div class="grid"><label>{{ form.customer.label }}{{ form.customer }}{{ form.customer.errors }}</label><label>{{ form.professional.label }}{{ form.professional }}</label><label>{{ form.professional_name.label }}{{ form.professional_name }}{{ form.professional_name.errors }}</label></div>
+<div class="grid"><label>{{ form.dentist_amount.label }}{{ form.dentist_amount }}</label><label>{{ form.clinic_amount.label }}{{ form.clinic_amount }}</label><label>{{ form.other_amount.label }}{{ form.other_amount }}</label><label>{{ form.method.label }}{{ form.method }}</label></div>
+{% if not editing %}<details class="sh-split"{% if form.second_method.value or form.second_amount.errors or form.second_method.errors %} open{% endif %}><summary>Pagou em duas formas? (ex.: parte em dinheiro, parte no Pix)</summary><div class="grid"><label>{{ form.second_method.label }}{{ form.second_method }}{{ form.second_method.errors }}</label><label>{{ form.second_amount.label }}{{ form.second_amount }}{{ form.second_amount.errors }}</label></div><p>O restante do total fica na primeira forma. Entram duas linhas, uma por forma.</p></details>{% endif %}
+<label>{{ form.notes.label }}{{ form.notes }}</label>
+{% if session.status == 'closed' %}<label class="closed-confirm"><input type="checkbox" name="confirm_closed" value="1" required> Confirmo que estou {% if editing %}alterando{% else %}lançando{% endif %} em um caixa já fechado em {{ session.closed_at|date:'d/m/Y H:i' }}. A conferência será recalculada e a alteração ficará na auditoria.</label>{% endif %}
+<p><button type="submit" class="cp-btn is-primary">{% if editing %}Salvar alteração{% else %}Lançar no caixa{% endif %}</button>{% if editing %} <a href="?">Cancelar edição</a>{% endif %} · <a href="{% url 'portal-resource-create' 'agenda' 'clientes' %}" target="_blank" rel="noreferrer">Cadastrar paciente</a></p></form></section>{% endif %}
+
+{% if session.status == 'closed' %}<section class="cp-panel sh-form no-print"><h2>Correção do caixa fechado</h2>
+{% if correction %}<p>Correção liberada. Quando terminar, conclua para recalcular o valor esperado e bloquear de novo.</p><form method="post">{% csrf_token %}<input type="hidden" name="action" value="finish"><input type="hidden" name="correction" value="{{ correction.pk }}"><button>Concluir correção e bloquear</button></form>
+{% elif pending_correction %}<p>Solicitação de {{ pending_correction.requested_by.get_full_name|default:pending_correction.requested_by.email }} aguardando o gestor: {{ pending_correction.reason }}</p>{% if manager %}<form method="post">{% csrf_token %}<input type="hidden" name="correction" value="{{ pending_correction.pk }}"><input name="note" placeholder="Observação (opcional)" maxlength="500"><button name="action" value="approve">Autorizar correção</button><button name="action" value="reject">Recusar</button></form>{% endif %}
+{% else %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="request-correction"><label>Motivo da correção<input name="reason" required minlength="5" maxlength="500"></label><button>{% if manager %}Abrir correção (gestor){% else %}Solicitar autorização ao gestor{% endif %}</button></form>{% endif %}
+{% if corrections %}<h3>Histórico de correções</h3><ul>{% for item in corrections %}<li>{{ item.created_at|date:'d/m/Y H:i' }} · {{ item.requested_by.get_full_name|default:item.requested_by.email }} · {{ item.get_status_display }}{% if item.decided_by %} por {{ item.decided_by.get_full_name|default:item.decided_by.email }}{% endif %} — {{ item.reason }}</li>{% endfor %}</ul>{% endif %}
+</section>{% endif %}
+
+<section class="cp-panel sh-form no-print"><h2>Outros dias</h2><ul>{% for item in history %}<li><a href="{% url 'clinic-cash-sheet-detail' item.pk %}">{{ item.opened_at|date:'d/m/Y H:i' }}</a> · {{ item.get_status_display }}</li>{% endfor %}</ul></section>
+{% if gestor %}<details class="no-print" style="margin:18px 0;border:1px solid #fca5a5;border-radius:10px;padding:10px 14px"><summary style="color:#b91c1c;font-weight:650">Apagar este caixa (somente gestor)</summary><p>Todos os lançamentos deste caixa serão cancelados e ele sai das listas. Fica registrado na auditoria. Caixas com recebimentos de parcelas ou despesas precisam ter esses itens estornados antes.</p><form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete-sheet"><label>Motivo<input name="reason" required minlength="3" maxlength="300" size="40"></label> <button style="color:#b91c1c">Apagar caixa</button></form></details>{% endif %}
+</main>{% endblock %}

@@ -1,0 +1,159 @@
+{% extends 'healthcare/physio_shell.html' %}{% load display_pt %}
+{% block title %}Prontuário · {{ patient.name }}{% endblock %}
+{% block content %}
+<main class="pa-wrap dpr">
+<header class="pa-heading"><div class="dpr-identity"><span class="dd-avatar is-large" aria-hidden="true">{{ initials }}</span><div><h1>{{ patient.name }}</h1><p>Prontuário do paciente{% if age != None %} · {{ age }} anos{% endif %}{% if patient.phone %} · {{ patient.phone }}{% endif %}{% if not patient.active %} · cadastro inativo{% endif %}</p></div></div>
+<nav class="dpr-actions" aria-label="Ações do paciente">{% if can_schedule %}<a class="pa-button" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}?customer={{ patient.pk }}">Agendar</a>{% endif %}<a class="pa-button" href="{% url 'dental-patient-edit' patient.pk %}?next={{ request.path|urlencode }}">Editar cadastro</a>{% if clinical %}<a class="pa-button" href="{% url 'dental-assessment-create' %}?customer={{ patient.pk }}">Atendimento completo</a>{% endif %}{% if can_edit_patient and patient.active %}<details class="dpr-void dpr-deactivate"><summary>Inativar paciente</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="deactivate"><label>Motivo<input name="reason" required minlength="3" maxlength="300" placeholder="Ex.: cadastro duplicado, não é mais paciente"></label><button class="pa-button dpr-danger" type="submit">Inativar</button><p class="dpr-muted">Sai da lista de pacientes e das buscas de cadastro. O prontuário continua guardado e pode ser reativado.</p></form></details>{% endif %}</nav></header>
+{% if not patient.active %}<p class="dpr-warning"><strong>Paciente inativo.</strong> Não aparece na lista de pacientes.{% if can_edit_patient %} <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="reactivate"><button class="pa-button" type="submit">Reativar paciente</button></form>{% endif %}</p>{% endif %}
+
+<section class="pa-card dpr-patient"><h2>Cadastro</h2>
+{% if missing %}<p class="dpr-warning"><strong>Cadastro incompleto.</strong> Faltam: {{ missing|join:", " }}. <a href="{% url 'dental-patient-edit' patient.pk %}?next={{ request.path|urlencode }}">Completar agora</a></p>{% endif %}
+<dl class="dpr-grid"><div><dt>Telefone</dt><dd>{{ patient.phone|default:"—" }}</dd></div><div><dt>E-mail</dt><dd>{{ patient.email|default:"—" }}</dd></div><div><dt>Nascimento</dt><dd>{{ patient.birth_date|date:"d/m/Y"|default:"—" }}</dd></div><div><dt>CPF</dt><dd>{% if patient.cpf %}{{ patient.cpf }}{% else %}—{% endif %}</dd></div><div class="dpr-wide"><dt>Endereço</dt><dd>{{ patient.full_address|default:"—" }}</dd></div></dl>
+</section>
+
+<div class="dpr-columns">
+{% if can_evolve %}<section class="pa-card dpr-evo" id="evolucao" aria-labelledby="evo-title">
+<header class="dpr-card-head"><h2 id="evo-title">Evolução clínica</h2><span class="dpr-muted">Atendimento atual</span></header>
+{% if drafts %}<ol class="dpr-drafts" aria-label="Lançamentos em rascunho">{% for d in drafts %}<li class="dpr-draft-item">
+<div class="dpr-draft-main"><span class="dpr-chip is-draft">Rascunho</span>{% if d.from_plan %}<span class="dpr-chip">Do plano</span>{% endif %}
+<div class="dpr-draft-text">{% for label, text in d.sections %}<p><b>{{ label }}:</b> {{ text|linebreaksbr }}</p>{% endfor %}</div>
+<small class="dpr-muted">{{ d.author }}{% if d.professional %} · {{ d.professional }}{% endif %} · finaliza sozinho em {{ d.expires_at|date:"d/m H:i" }}</small></div>
+{% if d.can_edit %}<div class="dpr-draft-actions"><button type="button" class="pa-button dpr-small" data-edit="{{ d.id }}" data-fill="{{ d.fill }}">Editar</button>
+<form method="post" data-confirm="Excluir este rascunho? Ele não fica no prontuário.">{% csrf_token %}<input type="hidden" name="action" value="evolution-delete"><input type="hidden" name="evolution" value="{{ d.id }}"><button type="submit" class="dpr-link-danger">Excluir</button></form></div>{% endif %}
+</li>{% endfor %}</ol>{% endif %}
+<form method="post" class="dpr-evo-form">{% csrf_token %}<input type="hidden" name="action" value="evolution">{{ evolution_form.non_field_errors }}
+<div class="dpr-evo-row"><label class="dpr-tooth">{{ evolution_form.tooth.label }}{{ evolution_form.tooth }}</label><label>{{ evolution_form.clinical_date.label }}{{ evolution_form.clinical_date }}</label><label>{{ evolution_form.professional.label }}{{ evolution_form.professional }}</label></div>
+<label>{{ evolution_form.procedure.label }}{{ evolution_form.procedure }}</label>
+<label>{{ evolution_form.notes.label }}{{ evolution_form.notes }}</label>
+<details class="dpr-more"{% if evolution_form.orthodontic.value %} open{% endif %}><summary>Tratamento ortodôntico</summary><label><span class="sr-only">{{ evolution_form.orthodontic.label }}</span>{{ evolution_form.orthodontic }}</label></details>
+<div class="dpr-evo-buttons"><button class="pa-button" type="submit">Adicionar ao atendimento</button><button class="pa-primary" type="submit" name="finish" value="1">Salvar e finalizar atendimento</button></div>
+<p class="dpr-hint">Rascunhos podem ser editados ou excluídos durante o atendimento. Ao finalizar — ou {{ draft_hours }} h após o lançamento — o registro fica imutável e só pode ser retificado.</p>
+</form></section>{% endif %}
+{% if receive_form %}<section class="pa-card dpr-receive" id="receber"><h2>Receber pagamento</h2>
+<p>O valor entra no caixa de hoje do profissional escolhido como <strong>pago</strong>, ligado a este paciente, e aparece no dia abaixo. Pode ser R$ 0 (avaliação ou reparo).</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="receive">{{ receive_form.request_id }}{{ receive_form.non_field_errors }}
+<div class="da-two"><label>{{ receive_form.professional.label }}{{ receive_form.professional }}</label><label>{{ receive_form.professional_name.label }}{{ receive_form.professional_name }}{{ receive_form.professional_name.errors }}</label></div>
+<div class="dpr-three"><label>{{ receive_form.dentist_amount.label }}{{ receive_form.dentist_amount }}</label><label>{{ receive_form.clinic_amount.label }}{{ receive_form.clinic_amount }}</label><label>{{ receive_form.other_amount.label }}{{ receive_form.other_amount }}</label></div>
+<div class="da-two"><label>{{ receive_form.method.label }}{{ receive_form.method }}{{ receive_form.method.errors }}</label><label>{{ receive_form.notes.label }}{{ receive_form.notes }}</label></div>
+<details class="dpr-split"{% if receive_form.second_method.value or receive_form.second_amount.errors or receive_form.second_method.errors %} open{% endif %}><summary>Pagou em duas formas? (ex.: parte em dinheiro, parte no Pix)</summary><div class="da-two"><label>{{ receive_form.second_method.label }}{{ receive_form.second_method }}{{ receive_form.second_method.errors }}</label><label>{{ receive_form.second_amount.label }}{{ receive_form.second_amount }}{{ receive_form.second_amount.errors }}</label></div><p class="dpr-muted">O restante do total fica na primeira forma. No caixa entram duas linhas, uma por forma.</p></details><div class="da-two"><label>{{ receive_form.paid_on.label }}{{ receive_form.paid_on }}{{ receive_form.paid_on.errors }}</label></div>
+<button class="pa-primary" type="submit">Confirmar recebimento</button></form>
+{% if plan_receivables %}<h3>Planos aprovados a receber</h3><p>O valor entra na folha do caixa do dia do dentista do plano, sem abrir outro caixa.</p>{% for tx in plan_receivables %}<form method="post" class="dpr-plan-pay">{% csrf_token %}<input type="hidden" name="action" value="receive-plan"><input type="hidden" name="transaction" value="{{ tx.pk }}"><strong>{{ tx.description }} · R$ {{ tx.amount }}</strong><label>Data do recebimento<input type="date" name="paid_on" value="{% now 'Y-m-d' %}" max="{% now 'Y-m-d' %}"></label><label>Forma<select name="method" required>{% for m in payment_methods %}<option value="{{ m.pk }}">{{ m.name }}</option>{% endfor %}</select></label><button class="pa-button" type="submit">Confirmar recebimento</button></form>{% endfor %}{% endif %}
+</section>{% endif %}
+</div>
+
+{% if can_plan %}<section class="pa-card dpr-plan" id="plano"><header class="dpr-card-head"><h2>Plano de tratamento</h2><span class="dpr-muted">Avaliação e orçamento · não entra no histórico clínico</span></header>
+<p class="dpr-hint">Edite ou remova à vontade enquanto o item estiver <b>planejado</b> ou <b>em orçamento</b>. Ao clicar em <b>Executar</b>, o procedimento vai para a evolução clínica como rascunho.</p>
+<form method="post" data-plan-form>{% csrf_token %}<input type="hidden" name="action" value="plan">
+<div class="da-two"><label>Dentista responsável<select name="plan_professional"><option value="">Não informado</option>{% for p in professionals %}<option value="{{ p.pk }}"{% if p.pk == plan_professional %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label></div>
+<div class="dpr-table-scroll"><table class="dpr-plan-table"><thead><tr><th>Dente</th><th>Procedimento</th><th>Valor (R$)</th><th>Situação</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody data-plan-rows>
+{% for item in plan.open %}<tr><td><input type="hidden" name="plan_id" value="{{ item.id }}"><input name="plan_tooth" maxlength="20" inputmode="numeric" value="{{ item.tooth }}" aria-label="Dente"></td><td><input name="plan_procedure" maxlength="200" value="{{ item.procedure }}" aria-label="Procedimento"></td><td><input name="plan_price" inputmode="decimal" placeholder="0,00" value="{{ item.price }}" aria-label="Valor"></td><td><select name="plan_status" aria-label="Situação"><option value="planned"{% if item.status == "planned" %} selected{% endif %}>Planejado</option><option value="quoted"{% if item.status == "quoted" %} selected{% endif %}>Em orçamento</option></select></td><td class="dpr-row-actions">{% if can_evolve %}<button type="submit" name="execute" value="{{ item.id }}" class="dpr-plan-exec" data-plan-exec title="Marcar como executado e lançar na evolução">Executar</button>{% endif %}<button type="button" class="dpr-plan-del" data-plan-del title="Remover este item" aria-label="Remover este item">×</button></td></tr>{% endfor %}
+<tr><td><input type="hidden" name="plan_id" value=""><input name="plan_tooth" maxlength="20" inputmode="numeric" aria-label="Dente"></td><td><input name="plan_procedure" maxlength="200" aria-label="Procedimento"></td><td><input name="plan_price" inputmode="decimal" placeholder="0,00" aria-label="Valor"></td><td><select name="plan_status" aria-label="Situação"><option value="planned">Planejado</option><option value="quoted">Em orçamento</option></select></td><td class="dpr-row-actions"><button type="button" class="dpr-plan-del" data-plan-del title="Remover este item" aria-label="Remover este item">×</button></td></tr></tbody>
+<tfoot><tr><td colspan="2"></td><td colspan="3"><strong data-plan-total>Total: R$ 0,00</strong></td></tr></tfoot></table></div>
+<button class="pa-primary" type="submit">Salvar plano de tratamento</button></form>
+{% if plan.done %}<h3 class="dpr-subtitle">Executados</h3><ul class="dpr-done">{% for item in plan.done %}<li><span class="dpr-chip is-final">Executado</span> {% if item.tooth %}Dente {{ item.tooth }} · {% endif %}{{ item.procedure }} · R$ {{ item.price|money_pt }} <small class="dpr-muted">em {{ item.executed_at|date:"d/m/Y" }}</small></li>{% endfor %}</ul>{% endif %}
+{% if plan_versions %}<details class="dpr-plan-versions"><summary>Versões antigas do plano ({{ plan_versions|length }})</summary>{% for v in plan_versions %}<div><strong>{{ v.at|date:"d/m/Y H:i" }} · {{ v.author }}</strong><p>{{ v.text|linebreaksbr }}</p>{% if v.can_delete %}<details class="dpr-void"><summary>Apagar esta versão</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="void-note"><input type="hidden" name="note" value="{{ v.id }}"><label>Motivo<input name="reason" required minlength="5" maxlength="300" placeholder="Ex.: lançado errado"></label><button class="pa-button dpr-danger" type="submit">Apagar esta versão</button></form></details>{% endif %}</div>{% endfor %}</details>{% endif %}
+</section>{% endif %}
+
+{% if can_documents %}<section class="pa-card dpr-docs" id="documentos" aria-labelledby="docs-title"><header class="dpr-card-head"><h2 id="docs-title">Emitir documento</h2><a class="dpr-muted" href="{% url 'clinical-documents' %}?customer={{ patient.pk }}">Ver documentos deste paciente</a></header>
+<p class="dpr-hint">O documento abre já com os dados de {{ patient.name }} e o texto padrão da clínica. Revise, assine e emita{% if not clinical %} — o profissional escolhido revisa e emite{% endif %}.</p>
+<nav class="dpr-doc-grid" aria-label="Tipos de documento">{% for value, label in document_kinds %}<a class="dpr-doc" href="{% url 'clinical-documents' %}?customer={{ patient.pk }}&amp;kind={{ value }}"><span class="dpr-doc-icon" aria-hidden="true">{% if value == "prescription" %}℞{% elif value == "certificate" %}✚{% elif value == "declaration" %}✎{% elif value == "report" %}☰{% elif value == "referral" %}➜{% elif value == "exam_request" %}◎{% else %}${% endif %}</span><span>{{ label }}</span></a>{% endfor %}</nav></section>{% endif %}
+
+<div class="dpr-history-head"><h2 class="dpr-history-title">Histórico do paciente</h2>
+<form method="get" class="dpr-audit" data-audit-toggle><label class="dpr-switch"><input type="checkbox" name="auditoria" value="1"{% if audit %} checked{% endif %}><span>Exibir registros retificados (Auditoria){% if hidden_rectified %} · {{ hidden_rectified }}{% endif %}</span></label><noscript><button class="pa-button dpr-small" type="submit">Aplicar</button></noscript></form></div>
+{% if audit %}<p class="dpr-audit-banner">Modo auditoria: registros retificados aparecem riscados, com motivo, autor e data. Esta consulta fica registrada.</p>{% endif %}
+{% for day in timeline %}<section class="pa-card dpr-day"><h3>{{ day.day|date:"d/m/Y" }} <small>{{ day.day|date:"l" }}</small></h3>
+{% for e in day.evolutions %}<article class="dpr-item dpr-evolution{% if e.rectified %} is-rectified{% endif %}"><header><strong>Evolução</strong><span class="dpr-chip {% if e.rectified %}is-rectified{% else %}is-final{% endif %}">{{ e.status_label }}</span>{% if e.corrects %}<span class="dpr-chip is-fix">Retificação do lançamento de {{ e.corrects|date:"d/m/Y" }}</span>{% endif %}<span>{{ e.author }}{% if e.professional %} · {{ e.professional }}{% endif %} · {{ e.finalized_at|date:"d/m H:i" }}{% if e.auto %} (finalizado automaticamente){% endif %}</span>
+{% if e.can_rectify %}<button type="button" class="dpr-link" data-rectify="{{ e.id }}" data-kind="evolution" data-fill="{{ e.fill }}">Retificar lançamento</button>{% endif %}</header>
+{% if e.can_rectify %}<details class="dpr-void"><summary>Anular (lançado por engano)</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="void"><input type="hidden" name="evolution" value="{{ e.id }}"><label>Motivo<input name="reason" required minlength="5" maxlength="300" placeholder="Ex.: lançado no paciente errado"></label><button class="pa-button dpr-danger" type="submit">Anular este lançamento</button><p class="dpr-muted">Sai do histórico. O original fica guardado e aparece em “Exibir registros retificados”.</p></form></details>{% endif %}
+<div class="dpr-body">{% for label, text in e.sections %}<p><b>{{ label }}:</b> {{ text|linebreaksbr }}</p>{% endfor %}</div>
+{% if e.rectified %}<p class="dpr-rectified-note">{% if e.voided %}Anulado{% else %}Retificado{% endif %} em {{ e.rectified.at|date:"d/m/Y H:i" }} por {{ e.rectified.by }}. Motivo: {{ e.rectified.reason }}</p>{% endif %}</article>{% endfor %}
+{% for record in day.records %}<article class="dpr-item dpr-record{% if record.draft %} dpr-draft{% endif %}"><header><strong>{{ record.kind }}{% if record.title %} · {{ record.title }}{% endif %}</strong><span>{{ record.author }}</span>{% if record.url %}<a href="{{ record.url }}">Abrir</a>{% endif %}</header>
+{% for label, text in record.sections %}<p><b>{{ label }}:</b> {{ text|linebreaksbr }}</p>{% empty %}<p class="dpr-muted">Sem texto registrado.</p>{% endfor %}</article>{% endfor %}
+{% for note in day.notes %}<article class="dpr-item dpr-note-item{% if note.rectified %} is-rectified{% endif %}"><header><strong>{% if note.imported %}Ficha antiga{% else %}Evolução{% endif %}</strong>{% if note.rectified %}<span class="dpr-chip is-rectified">{% if note.voided %}Anulado{% else %}Retificado{% endif %}</span>{% endif %}<span>{{ note.author }}{% if not note.imported %} · {{ note.at|date:"H:i" }}{% endif %}</span>
+{% if note.can_rectify %}<button type="button" class="dpr-link" data-rectify="{{ note.id }}" data-kind="note" data-fill="{{ note.fill }}">Retificar lançamento</button>{% endif %}</header>
+{% if note.can_rectify %}<details class="dpr-void"><summary>Anular (lançado por engano)</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="void-note"><input type="hidden" name="note" value="{{ note.id }}"><label>Motivo<input name="reason" required minlength="5" maxlength="300" placeholder="Ex.: lançado no paciente errado"></label><button class="pa-button dpr-danger" type="submit">Anular este lançamento</button><p class="dpr-muted">Sai do histórico. O original fica guardado e aparece em “Exibir registros retificados”.</p></form></details>{% endif %}
+<div class="dpr-body">{% for label, text in note.sections %}<p><b>{{ label }}:</b> {{ text|linebreaksbr }}</p>{% endfor %}</div>
+{% if note.rectified %}<p class="dpr-rectified-note">{% if note.voided %}Anulado{% else %}Retificado{% endif %} em {{ note.rectified.at|date:"d/m/Y H:i" }} por {{ note.rectified.by }}. Motivo: {{ note.rectified.reason }}</p>{% endif %}</article>{% endfor %}
+{% for doc in day.documents %}<article class="dpr-item"><header><strong>{{ doc.kind }} emitido · {{ doc.title }}</strong><span>{{ doc.author }}{% if doc.replaced %} · substituído por versão revisada{% endif %}</span>{% if doc.url %}<a href="{{ doc.url }}">Abrir</a>{% endif %}</header></article>{% endfor %}
+{% for pay in day.payments %}<article class="dpr-item dpr-payment{% if pay.open %} dpr-open{% endif %}"><header><strong>{% if pay.open %}Em aberto{% else %}Pagamento recebido{% endif %} · R$ {{ pay.total|money_pt }}</strong><span>{{ pay.method }}{% if pay.professional %} · {{ pay.professional }}{% endif %} · {{ pay.source }}</span></header>{% if pay.notes %}<p>{{ pay.notes }}</p>{% endif %}{% if pay.entry and receive_form %}{% if pay.pending_removal and not can_delete_payment %}<p class="dpr-muted">Pedido para apagar aguardando o gestor.</p>{% else %}<details class="dpr-void"><summary>{% if can_delete_payment %}Apagar pagamento{% else %}Pedir para apagar{% endif %}</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="{% if can_delete_payment %}payment-delete{% else %}payment-ask{% endif %}"><input type="hidden" name="entry" value="{{ pay.entry }}"><label>Motivo<input name="reason" required minlength="3" maxlength="300" placeholder="Ex.: lançado no paciente errado"></label><button class="pa-button dpr-danger" type="submit">{% if can_delete_payment %}Apagar este pagamento{% else %}Enviar pedido ao gestor{% endif %}</button></form></details>{% endif %}{% endif %}</article>{% endfor %}
+</section>{% empty %}<section class="pa-card"><p>Nenhum registro ainda. As evoluções finalizadas, documentos e pagamentos deste paciente aparecem aqui, organizados por dia.</p></section>{% endfor %}
+
+{% if can_evolve %}
+<dialog class="dpr-dialog" id="evo-dialog" aria-labelledby="evo-dialog-title">
+<form method="post" class="dpr-dialog-form">{% csrf_token %}<input type="hidden" name="action" value=""><input type="hidden" name="evolution" value=""><input type="hidden" name="note" value="">
+<header><h2 id="evo-dialog-title" data-title>Editar rascunho</h2><button type="button" class="dpr-dialog-close" data-close aria-label="Fechar">×</button></header>
+<fieldset class="dpr-reason" data-reason-box><legend>Motivo da retificação <span class="dpr-req">obrigatório</span></legend>
+<div class="dpr-reason-chips">{% for r in reasons %}<button type="button" class="dpr-reason-chip" data-reason="{{ r }}">{{ r }}</button>{% endfor %}</div>
+<input name="reason" maxlength="300" minlength="5" placeholder="Ex.: Dente incorreto — era o 36" aria-label="Motivo da retificação"></fieldset>
+<p class="dpr-hint" data-rectify-hint>O lançamento original fica guardado (marcado como retificado) e um novo registro corrigido é criado e ligado a ele.</p>
+<div class="dpr-evo-row"><label class="dpr-tooth">Dente<input name="tooth" maxlength="20" inputmode="numeric" autocomplete="off"></label><label>Data do atendimento<input type="date" name="clinical_date" max="{% now 'Y-m-d' %}"></label><label>Dentista responsável<select name="professional"><option value="">Não informado</option>{% for p in professionals %}<option value="{{ p.pk }}">{{ p.name }}</option>{% endfor %}</select></label></div>
+<label>Procedimento clínico<textarea name="procedure" rows="2" maxlength="4000"></textarea></label>
+<label>Observação<textarea name="notes" rows="2" maxlength="4000"></textarea></label>
+<label>Tratamento ortodôntico<textarea name="orthodontic" rows="2" maxlength="4000"></textarea></label>
+<footer><button type="button" class="pa-button" data-close>Cancelar</button><button type="submit" class="pa-primary" data-submit>Salvar rascunho</button></footer>
+</form></dialog>
+{% endif %}
+</main>
+<script>(()=>{
+document.querySelectorAll('form[data-confirm]').forEach(f=>f.addEventListener('submit',e=>{if(!confirm(f.dataset.confirm))e.preventDefault()}));
+const audit=document.querySelector('[data-audit-toggle]');if(audit){audit.querySelector('input').addEventListener('change',()=>audit.submit())}
+const dlg=document.getElementById('evo-dialog');
+if(dlg){const f=dlg.querySelector('form'),reasonBox=dlg.querySelector('[data-reason-box]'),hint=dlg.querySelector('[data-rectify-hint]'),reason=f.elements.reason;
+const open=(mode,id,fill)=>{const data=JSON.parse(fill||'{}');const rect=mode!=='edit';
+f.elements.action.value=mode==='edit'?'evolution-edit':(mode==='note'?'rectify-note':'rectify');
+f.elements.evolution.value=mode==='note'?'':id;f.elements.note.value=mode==='note'?id:'';
+['tooth','procedure','orthodontic','notes','clinical_date','professional'].forEach(k=>{f.elements[k].value=data[k]||''});
+reasonBox.hidden=!rect;hint.hidden=!rect;reason.required=rect;reason.value='';
+dlg.querySelector('[data-title]').textContent=rect?'Retificar lançamento':'Editar rascunho';
+dlg.querySelector('[data-submit]').textContent=rect?'Salvar retificação':'Salvar rascunho';
+dlg.showModal();(rect?reason:f.elements.procedure).focus()};
+document.addEventListener('click',e=>{const ed=e.target.closest('[data-edit]');if(ed){open('edit',ed.dataset.edit,ed.dataset.fill);return}
+const rc=e.target.closest('[data-rectify]');if(rc){open(rc.dataset.kind==='note'?'note':'rectify',rc.dataset.rectify,rc.dataset.fill);return}
+const chip=e.target.closest('[data-reason]');if(chip){reason.value=chip.dataset.reason+' — ';reason.focus()}
+if(e.target.closest('[data-close]'))dlg.close()});}
+const pf=document.querySelector('[data-plan-form]');if(!pf)return;const body=pf.querySelector('[data-plan-rows]'),out=pf.querySelector('[data-plan-total]');
+const num=v=>{v=(v||'').replace(/R\$|\s/g,'');if(v.includes(','))v=v.replace(/\./g,'').replace(',','.');const n=parseFloat(v);return isFinite(n)?n:0};
+const sum=()=>{let t=0;body.querySelectorAll('[name=plan_price]').forEach(i=>t+=num(i.value));out.textContent='Total: '+t.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})};
+const filled=r=>[...r.querySelectorAll('input:not([type=hidden])')].some(i=>i.value.trim());
+const blank=()=>{const r=body.rows[body.rows.length-1].cloneNode(true);r.querySelectorAll('input').forEach(i=>i.value='');r.querySelector('select').value='planned';r.querySelectorAll('[data-plan-exec]').forEach(b=>b.remove());body.appendChild(r);return r};
+const grow=()=>{const last=body.rows[body.rows.length-1];if(filled(last)&&body.rows.length<30)blank()};
+pf.addEventListener('input',e=>{if(e.target.name==='plan_price')sum();grow()});
+body.addEventListener('click',e=>{const b=e.target.closest('[data-plan-del]');if(!b)return;const r=b.closest('tr');
+if(body.rows.length===1){r.querySelectorAll('input').forEach(i=>i.value='')}else{r.remove()}
+const last=body.rows[body.rows.length-1];if(filled(last))blank();sum()});
+sum();})();</script>
+<style>
+.dpr-actions{display:flex;gap:8px;flex-wrap:wrap}.dpr-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0}.dpr-grid dt{font-size:12px;opacity:.75}.dpr-grid dd{margin:2px 0 0;overflow-wrap:anywhere}.dpr-wide{grid-column:1/-1}
+.dpr-warning{border-left:4px solid #e59b1a;padding:8px 12px;background:rgba(229,155,26,.12)}.dpr-columns{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin:16px 0}.dpr-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dpr .pa-card label{display:block;margin:6px 0}.dpr .pa-card input:not([type=hidden]):not([type=checkbox]),.dpr .pa-card select,.dpr .pa-card textarea,.dpr-dialog input:not([type=hidden]),.dpr-dialog select,.dpr-dialog textarea{width:100%;box-sizing:border-box}
+.dpr-card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;justify-content:space-between}.dpr-card-head h2{margin:0}
+.dpr-muted{opacity:.7;font-size:13px}.dpr-hint{font-size:13px;opacity:.8;margin:8px 0}
+.dpr-chip{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;padding:2px 8px;border-radius:999px;background:rgba(127,127,127,.15);white-space:nowrap}
+.dpr-chip.is-draft{background:rgba(229,155,26,.18);color:#9a5b00}.dpr-chip.is-final{background:rgba(22,163,74,.15);color:#15803d}.dpr-chip.is-rectified{background:rgba(220,38,38,.12);color:#b91c1c}.dpr-chip.is-fix{background:rgba(47,140,255,.14);color:#1d5fbf}
+.dpr-drafts{list-style:none;margin:12px 0;padding:0;display:grid;gap:8px}.dpr-draft-item{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;border:1px dashed rgba(229,155,26,.7);border-radius:8px;padding:8px 12px}
+.dpr-draft-main{min-width:0}.dpr-draft-text p{margin:4px 0}.dpr-draft-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.dpr-evo-row{display:grid;grid-template-columns:110px 160px 1fr;gap:10px}.dpr-evo-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.dpr-more summary{cursor:pointer;font-size:14px;margin:6px 0}
+.dpr-small{padding:4px 10px;font-size:13px}.dpr-link,.dpr-link-danger{border:0;background:none;padding:2px 4px;cursor:pointer;font:inherit;font-size:13px;text-decoration:underline}.dpr-link{color:#2563eb;margin-left:auto}.dpr-link-danger{color:#b91c1c}
+.dpr-link:focus-visible,.dpr-link-danger:focus-visible,.dpr-reason-chip:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.dpr-plan{margin-top:16px}.dpr-table-scroll{overflow-x:auto}.dpr-plan-table{width:100%;border-collapse:collapse;margin:10px 0;min-width:560px}.dpr-plan-table th{text-align:left;font-size:13px;padding:4px}.dpr-plan-table td{padding:4px}.dpr-plan-table td:first-child{width:90px}.dpr-plan-table td:nth-child(3){width:130px}.dpr-plan-table td:nth-child(4){width:150px}.dpr-row-actions{white-space:nowrap;width:1%}
+.dpr-plan-exec{border:1px solid #16a34a;color:#15803d;background:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px}.dpr-plan-del{border:0;background:none;font-size:20px;line-height:1;cursor:pointer;color:#a33;padding:4px 8px}.dpr-plan-del:focus-visible,.dpr-plan-exec:focus-visible{outline:2px solid currentColor}
+.dpr-subtitle{margin:16px 0 6px;font-size:15px}.dpr-done{list-style:none;padding:0;margin:0}.dpr-done li{padding:4px 0}.dpr-plan-versions{margin-top:12px}.dpr-plan-versions div{border-top:1px solid #ddd;padding:6px 0}
+.dpr-docs{margin-top:16px}.dpr-doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+.dpr-doc{display:flex;gap:8px;align-items:center;padding:10px 12px;border:1px solid rgba(127,127,127,.3);border-radius:8px;text-decoration:none;color:inherit;font-weight:500}
+.dpr-doc:hover,.dpr-doc:focus-visible{border-color:#2f8cff;background:rgba(47,140,255,.08);outline:none}.dpr-doc-icon{width:24px;text-align:center;font-size:16px;color:#2f8cff}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.dpr-history-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:20px 0 10px}.dpr-history-title{margin:0}
+.dpr-switch{display:inline-flex;gap:8px;align-items:center;font-size:13px;opacity:.85;cursor:pointer}.dpr-switch input{width:16px;height:16px}
+.dpr-audit-banner{font-size:13px;border-left:4px solid #b91c1c;background:rgba(220,38,38,.08);padding:6px 12px}
+.dpr-day h3{margin:0 0 10px}.dpr-day h3 small{font-weight:400;opacity:.7}.dpr-item{border-left:3px solid #2f8cff;padding:6px 12px;margin:10px 0}.dpr-item header{display:flex;gap:8px 10px;flex-wrap:wrap;align-items:center}.dpr-item header span:not(.dpr-chip){opacity:.75;font-size:13px}.dpr-item p{margin:6px 0}
+.dpr-evolution{border-left-color:#16a34a}.dpr-item.is-rectified{border-left-color:#dc2626;opacity:.75}.dpr-item.is-rectified .dpr-body{text-decoration:line-through;text-decoration-color:rgba(220,38,38,.6)}.dpr-rectified-note{font-size:13px;color:#b91c1c}
+.dpr-split{margin:6px 0 10px}.dpr-split summary{cursor:pointer;font-weight:600;font-size:14px}.dpr-void{margin:6px 0}.dpr-void summary{cursor:pointer;color:#b42318;font-size:13px}.dpr-void form{margin-top:6px}.dpr-danger{color:#b42318;border-color:#b42318}.dpr-draft{border-left-color:#9aa7b8}.dpr-note-item{border-left-color:#8b5cf6}.dpr-payment{border-left-color:#16a34a}.dpr-open{border-left-color:#dc2626}
+.dpr-dialog{border:0;border-radius:12px;padding:0;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 32px);box-shadow:0 20px 60px rgba(0,0,0,.3);background:var(--pa-card-bg,#fff);color:inherit}.dpr-dialog::backdrop{background:rgba(15,23,42,.45)}
+.dpr-dialog-form{padding:16px 20px;display:block}.dpr-dialog-form header{display:flex;justify-content:space-between;align-items:center}.dpr-dialog-form h2{margin:0;font-size:18px}.dpr-dialog-form label{display:block;margin:6px 0}
+.dpr-dialog-close{border:0;background:none;font-size:24px;cursor:pointer;line-height:1}.dpr-dialog-form footer{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.dpr-reason{border:1px solid rgba(220,38,38,.35);border-radius:8px;padding:8px 12px;margin:10px 0}.dpr-reason legend{font-weight:600;font-size:14px;padding:0 4px}.dpr-req{font-weight:400;font-size:12px;color:#b91c1c}
+.dpr-reason-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}.dpr-reason-chip{border:1px solid rgba(127,127,127,.4);background:none;border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;color:inherit}
+@media(max-width:900px){.dpr-columns,.dpr-grid{grid-template-columns:1fr}.dpr-three{grid-template-columns:1fr}.dpr-evo-row{grid-template-columns:1fr 1fr}.dpr-evo-row label:last-child{grid-column:1/-1}.dpr-draft-item{flex-direction:column}}
+@media(prefers-color-scheme:dark){.dpr-chip.is-draft{color:#fbbf24}.dpr-chip.is-final{color:#4ade80}.dpr-chip.is-rectified,.dpr-rectified-note,.dpr-link-danger,.dpr-req{color:#f87171}.dpr-chip.is-fix,.dpr-link{color:#60a5fa}.dpr-dialog{background:var(--pa-card-bg,#1e293b)}}
+</style>
+{% endblock %}

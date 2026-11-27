@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Master — ApPlanner<style>
+.mh-search{margin:0 0 18px}.mh-search label{display:block;font-weight:650;margin-bottom:6px}.mh-search div{display:flex;gap:8px}.mh-search input{flex:1;min-width:0;padding:12px 14px;border-radius:12px;border:1px solid var(--border,#cfd8e3);font-size:16px}
+.mh-attention{margin:0 0 22px}.mh-attention h2{margin:0 0 10px}.mh-attention ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.mh-attention a{display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid var(--border,#dbe3ee);text-decoration:none;color:inherit}
+.mh-attention a:hover,.mh-attention a:focus-visible{border-color:currentColor}
+.mh-attention strong{font-size:22px;font-variant-numeric:tabular-nums;text-align:center}.mh-attention span{display:flex;flex-direction:column;font-weight:600}.mh-attention small{font-weight:400;opacity:.75}
+.mh-attention em{font-style:normal;font-weight:650;font-size:14px}
+.mh-danger a{border-left:5px solid #dc2626}.mh-warning a{border-left:5px solid #d97706}.mh-ok{margin:0;opacity:.8}
+@media(max-width:640px){.mh-attention a{grid-template-columns:44px 1fr}.mh-attention em{display:none}.mh-search div{flex-direction:column}}
+</style>
+{% endblock %}
+{% block content %}
+<section class="shell portal-page master-console">
+  <div class="portal-heading"><div><span class="eyebrow">VISÃO GERAL · MASTER</span><h1>Central da plataforma</h1><p>Planos, empresas, comunicação e operação em um único lugar.</p></div><a class="button primary" href="{% url 'master-resource-list' 'planos' %}">Gerenciar planos <span aria-hidden="true">↗</span></a></div>
+  <form class="mh-search" method="get" action="{% url 'master-global-search' %}" role="search"><label for="mh-q">Buscar na plataforma</label><div><input id="mh-q" name="q" type="search" minlength="2" placeholder="Empresa, e-mail, usuário, telefone, CNPJ ou protocolo de chamado" autocomplete="off"><button class="button primary">Buscar</button></div></form>
+  <section class="mh-attention panel" aria-labelledby="mh-attention-title"><h2 id="mh-attention-title">Pede sua atenção agora</h2>
+  {% if attention %}<ul>{% for item in attention %}<li class="mh-{{ item.level }}"><a href="{{ item.url }}"><strong>{{ item.count }}</strong><span>{{ item.title }}{% if item.detail %}<small>{{ item.detail }}</small>{% endif %}</span><em>Resolver</em></a></li>{% endfor %}</ul>
+  {% else %}<p class="mh-ok">Tudo em dia: nenhum pagamento travado, chamado aberto, teste vencendo ou falha de processamento.</p>{% endif %}</section>
+  {% include "master/console_summary.html" %}
+  <section class="master-shortcuts" aria-labelledby="master-shortcuts-title">
+    <div class="section-heading"><div><span class="eyebrow">ACESSO RÁPIDO</span><h2 id="master-shortcuts-title">O que você quer fazer?</h2></div></div>
+    <div class="shortcut-grid">
+      <a href="{% url 'master-companies' %}"><strong>Empresas</strong><small>Situação, uso, cobrança e chamados de cada empresa</small></a>
+      <a href="{% url 'master-access-release' %}"><strong>Liberar acesso empresa</strong><small>Boas-vindas e criação de senha por usuário</small></a>
+      <a href="{% url 'master-finance-dashboard' %}"><strong>Financeiro</strong><small>Recebimentos, despesas e previsão</small></a>
+      <a href="{% url 'master-whatsapp' %}"><strong>Atendimento</strong><small>Conversas no WhatsApp Master</small></a>
+      <a href="{% url 'master-runtime-monitor' %}"><strong>Monitoramento</strong><small>Erros, lentidão e filas</small></a>
+    </div>
+  </section>
+
+
+  <section class="master-catalog" aria-labelledby="master-catalog-title">
+    <div class="master-catalog-heading"><div><span class="eyebrow">TODAS AS FUNÇÕES</span><h2 id="master-catalog-title">Encontre o que precisa</h2><p>Busque pelo nome da função ou navegue pelas áreas da plataforma.</p></div></div>
+    <div class="master-search"><label for="master-function-search">Buscar funções</label><div class="master-search-field"><span aria-hidden="true">⌕</span><input id="master-function-search" type="search" placeholder="Ex.: planos, empresas, WhatsApp, pagamentos" autocomplete="off" aria-controls="master-function-groups"><button type="button" id="master-search-clear" hidden>Limpar busca</button></div><p id="master-search-status" role="status" aria-live="polite"></p></div>
+    <nav class="master-area-links" id="master-category-grid" aria-label="Categorias de funções"><a href="#master-group-quick">Configurações da plataforma</a>{% for group in groups %}<a href="#master-group-{{ forloop.counter }}">{{ group.title }}</a>{% endfor %}</nav>
+    <div id="master-function-groups">
+      <details class="master-function-group panel" id="master-group-quick" data-master-group>
+        <summary class="master-function-heading"><div><span class="eyebrow">PLATAFORMA</span><h3>Configurações da plataforma</h3></div><span>17 funções</span></summary>
+        <div class="shortcut-grid master-function-grid"><a href="{% url 'master-resource-list' 'planos' %}" data-master-function><strong>Configurar planos</strong><small>Preços, teste grátis e visibilidade pública</small></a><a href="{% url 'master-resource-list' 'modulos' %}" data-master-function><strong>Revisar módulos</strong><small>Funções disponíveis em cada plano</small></a><a href="{% url 'master-resource-list' 'conexoes-pagamento' %}" data-master-function><strong>Conexões de pagamento</strong><small>Integrações das empresas</small></a><a href="{% url 'billing-plans' %}" target="_blank" rel="noopener" data-master-function><strong>Ver página de vendas</strong><small>Abre em nova aba</small></a><a href="{% url 'master-fiscal-settings' %}" data-master-function><strong>Configuração fiscal</strong><small>Dados para notas</small></a><a href="{% url 'master-customer-import' %}" data-master-function><strong>Importar base de clientes</strong><small>Planilhas de clientes das empresas</small></a><a href="{% url 'master-nfse-center' %}" data-master-function><strong>NFS-e MEI</strong><small>Notas e pendências fiscais</small></a><a href="{% url 'master-company-health' %}" data-master-function><strong>Saúde das empresas</strong><small>Ativação e uso recente</small></a><a href="{% url 'master-platform-payment' %}" data-master-function><strong>Receber assinaturas</strong><small>Cadastro bancário da plataforma</small></a><a href="{% url 'master-delivery-providers' %}" data-master-function><strong>Provedores Push / SMS</strong><small>Configuração de notificações</small></a>
+          <a href="{% url 'master-homepage' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">✦</span><strong>Editar página inicial</strong><small>Logo e textos do site</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-smtp-settings' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">✉</span><strong>Configurar e-mail SMTP</strong><small>Envio e teste de e-mail</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-email-templates' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">✎</span><strong>Modelos de e-mail</strong><small>Personalizar mensagens</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-whatsapp' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">◌</span><strong>WhatsApp Master</strong><small>Conversas e QR code</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-whatsapp-flow' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">◇</span><strong>Fluxo do WhatsApp</strong><small>Automação do atendimento</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-marketing' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">◎</span><strong>Campanhas de e-mail</strong><small>Captação e envios</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+          <a href="{% url 'master-chatbot' %}" data-master-function><span class="shortcut-icon" aria-hidden="true">◈</span><strong>Fluxo do chatbot</strong><small>Atendimento automatizado</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>
+        </div>
+      </details>
+      {% for group in groups %}<details class="master-function-group panel" id="master-group-{{ forloop.counter }}" data-master-group>
+        <summary class="master-function-heading"><div><span class="eyebrow">ÁREA {{ forloop.counter|stringformat:"02d" }}</span><h3>{{ group.title }}</h3></div><span>{{ group.cards|length }} {{ group.cards|length|pluralize:"função,funções" }}</span></summary>
+        <div class="shortcut-grid master-function-grid">{% for item in group.cards %}<a class="master-function-card" href="{% url 'master-resource-list' item.slug %}" data-master-function><span class="shortcut-icon" aria-hidden="true">↗</span><strong>{{ item.title }}</strong><small>{{ item.count }} registros</small><span class="shortcut-arrow" aria-hidden="true">↗</span></a>{% endfor %}</div>
+      </details>{% endfor %}
+    </div>
+    <p id="master-search-empty" class="panel master-search-empty" hidden>Nenhuma função encontrada. Tente outro termo ou limpe a busca.</p>
+  </section>
+</section>
+<script src="{% static 'js/master-functions.js' %}" defer></script>
+{% endblock %}

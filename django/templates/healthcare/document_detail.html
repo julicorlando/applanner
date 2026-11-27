@@ -1,0 +1,42 @@
+{% extends 'base.html' %}{% load static %}
+{% block title %}{{ row.title }} · {{ row.customer.name }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'healthcare/documents.css' %}">{% endblock %}
+{% block content %}
+<main class="doc-page">
+  <header class="doc-topbar">
+    <div><a class="doc-back" href="{{ back_url }}">← Voltar ao prontuário</a>
+      <h1>{{ row.title }}</h1>
+      <p>{{ row.customer.name }} · {{ row.get_kind_display }} · {{ row.professional.name }}</p></div>
+    <span class="doc-status {% if row.status == 'finalized' %}is-final{% else %}is-draft{% endif %}">{% if row.status == 'finalized' %}Emitido em {{ row.finalized_at|date:'d/m/Y H:i' }}{% else %}Rascunho{% endif %}</span>
+  </header>
+  {% if row.replaces_id %}<p class="doc-tips">Revisão do orçamento emitido em {{ row.replaces.finalized_at|date:'d/m/Y H:i' }} (código {{ row.replaces.display_code }}). Ao emitir, o anterior passa a constar como substituído na validação pelo QR code.</p>{% endif %}
+  {% if replaced_by %}<p class="doc-tips"><strong>Substituído</strong> pela versão revisada emitida em {{ replaced_by.finalized_at|date:'d/m/Y H:i' }}. <a href="{% url 'clinical-document-detail' replaced_by.pk %}">Abrir versão atual</a></p>{% endif %}
+  {% if row.status == 'draft' %}
+  <div class="doc-editor">
+    <form method="post" class="doc-form">{% csrf_token %}{{ form.version }}
+      <input type="hidden" value="{{ row.kind }}" data-preview-kind>
+      {% if form.non_field_errors %}<ul class="doc-errors">{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+      <div class="doc-field"><label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>{{ form.title }}{{ form.title.errors }}</div>
+      <div class="doc-field"><label for="{{ form.body.id_for_label }}">{{ form.body.label }}</label>{{ form.body }}{{ form.body.errors }}</div>
+      <p class="doc-tips">Dicas: <code>Rótulo: valor</code> sai com o rótulo em negrito. Comece a linha com <code>##</code> para um subtítulo.</p>
+      {% if can_emit %}<label class="doc-check">{{ form.confirmed }}<span>{% if reception %}Revisei o conteúdo e confirmo a emissão em nome de {{ row.professional.name }}, com a identificação e a assinatura cadastradas por ele(a){% else %}{{ form.confirmed.label }}{% endif %}</span></label>{{ form.confirmed.errors }}{% endif %}
+      <div class="doc-actions"><button class="doc-btn" name="action" value="draft">Salvar rascunho</button>{% if can_emit %}<button class="doc-btn is-primary" name="action" value="finalize">{% if reception %}Emitir em nome de {{ row.professional.name }}{% else %}Emitir com minha assinatura{% endif %}</button>{% endif %}</div>
+      {% if can_emit %}<p class="doc-note">Ao emitir, o documento fica salvo no prontuário e não pode mais ser alterado.{% if row.kind == 'budget' %} Orçamentos podem ser revisados depois, gerando uma nova versão.{% endif %}</p>{% if not reception %}<div class="doc-links"><a href="{% url 'clinical-signature' %}">Minha assinatura</a></div>{% endif %}{% endif %}
+    </form>
+    <aside class="doc-side" aria-label="Prévia">{% include 'healthcare/_document_preview.html' %}</aside>
+  </div>
+  <script src="{% static 'healthcare/document-preview.js' %}" defer></script>
+  {% else %}
+  <div class="doc-editor">
+    <section class="doc-form"><h2>Documento emitido</h2>
+      <p>Preservado no prontuário. Integridade (SHA-256): <small>{{ row.sha256 }}</small></p>
+      <div class="doc-actions"><a class="doc-btn is-primary" href="{% url 'clinical-document-pdf' row.pk %}" target="_blank" rel="noreferrer">Abrir PDF para imprimir</a>{% if row.entry_id and not reception %}<a class="doc-btn" href="{% url 'clinical-record' row.entry_id %}">Registro no prontuário</a>{% endif %}</div>
+      {% if row.kind == 'budget' and not reception and not replaced_by %}<div class="doc-actions" style="margin-top:14px">{% if pending_revision %}<a class="doc-btn" href="{% url 'clinical-document-detail' pending_revision.pk %}">Continuar revisão do orçamento</a>{% else %}<form method="post">{% csrf_token %}<button class="doc-btn" name="action" value="revise">Editar orçamento (gera versão revisada)</button></form>{% endif %}</div><p class="doc-note">O orçamento emitido continua preservado. A versão revisada recebe novo QR code, e a validação do anterior passa a avisar que ele foi substituído.</p>{% endif %}
+      {% if validation_url %}<h2 style="margin-top:24px">Validação pelo QR code</h2><p>Código {{ row.display_code }} · <a href="{{ validation_url }}" target="_blank" rel="noreferrer">Abrir página de validação</a></p>
+      {% if not reception %}<h3>Validado por</h3><ul>{% for item in validations %}<li>{{ item.validator_name }}{% if item.validator_role %} · {{ item.validator_role }}{% endif %} — {{ item.created_at|date:'d/m/Y H:i' }}</li>{% empty %}<li>Ninguém registrou validação ainda.</li>{% endfor %}</ul>{% endif %}{% endif %}
+    </section>
+    <aside class="doc-side"><h2>Arquivo emitido</h2><p>O PDF oficial, com assinatura e QR code, abre em nova aba.</p><a class="doc-btn is-primary" href="{% url 'clinical-document-pdf' row.pk %}" target="_blank" rel="noreferrer">Ver PDF</a></aside>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

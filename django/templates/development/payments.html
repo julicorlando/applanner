@@ -1,0 +1,4 @@
+{% extends 'development/customer_base.html' %}
+{% block content %}<h1>Seus pagamentos</h1><p>{{ customer.name }} · {{ customer.user.email }}</p><p>Consulte suas cobranças e os dados para pagamento. A confirmação ocorre após a conferência do recebimento.</p>
+<section class="dev-grid">{% for row in page %}<article class="dev-panel"><span class="dev-badge">{% if row.overdue %}Em atraso{% else %}{{ row.get_status_display }}{% endif %}</span><h2>{{ row.description }}</h2><p class="dev-amount">R$ {{ row.amount }}</p><p>Vencimento: {{ row.due_date|date:'d/m/Y' }}</p><a class="dev-button" href="{% url 'development-charge' row.pk %}">Ver pagamento</a></article>{% empty %}<p class="dev-panel">Você ainda não possui cobranças cadastradas.</p>{% endfor %}</section>{% include 'development/pagination.html' %}
+{% endblock %}

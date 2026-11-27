@@ -1,0 +1,98 @@
+{% extends 'base.html' %}{% load static tz %}
+{% block title %}Agenda · {{ tenant.name }}{% endblock %}
+{% block content %}{% timezone tenant.timezone %}<link rel="stylesheet" href="{% static 'css/agenda-grid.css' %}?v=20261124b">
+<main class="ag" aria-labelledby="ag-title">
+<header class="ag-head">
+  <div><h1 id="ag-title">Agenda</h1><p>{% if arena %}Quadras{% else %}Equipe{% endif %} · {{ unit.name|default:"Selecione uma unidade" }}</p></div>
+  <span class="ag-unit">{{ tenant.name }}</span>
+</header>
+<div class="ag-layout">
+<aside class="ag-side" aria-label="Painel da agenda">
+  <section class="ag-card">
+    <form method="get" class="ag-pro"><input type="hidden" name="unit" value="{{ unit.pk|default:'' }}"><input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}"><input type="hidden" name="mode" value="{{ mode }}">
+      <span class="ag-avatar" aria-hidden="true">{% if selected_resource %}{{ selected_resource.name|slice:':1'|upper }}{% else %}★{% endif %}</span>
+      <label class="sr-only" for="ag-resource">{% if arena %}Quadra{% else %}Profissional{% endif %}</label>
+      <select id="ag-resource" name="resource" onchange="this.form.submit()"><option value="">{% if arena %}Todas as quadras{% else %}Todos os profissionais{% endif %}</option>{% for row in resources %}<option value="{{ row.pk }}"{% if resource == row.pk|stringformat:'s' %} selected{% endif %}>{{ row.name }}</option>{% endfor %}</select>
+      <noscript><button class="ag-btn">Ver</button></noscript></form>
+    <dl class="ag-stats" aria-label="Resumo de {{ day|date:'d/m' }}">
+      <div><dt>Agendados</dt><dd>{{ stats.scheduled }}</dd></div><div><dt>Finalizados</dt><dd>{{ stats.done }}</dd></div>
+      <div><dt>Cancelados</dt><dd>{{ stats.cancelled }}</dd></div><div><dt>Faltas</dt><dd>{{ stats.missed }}</dd></div>
+    </dl>
+    <p class="ag-hint">Resumo de {{ day|date:'d/m/Y' }}</p>
+    <div class="ag-side-links">{% if waitlist_url %}<a class="ag-btn" href="{{ waitlist_url }}">Lista de espera</a>{% endif %}<a class="ag-btn" href="{% url 'operation-today' %}">Atendimentos de hoje</a>{% if report_url %}<a class="ag-btn" href="{{ report_url }}">Relatório de agendamentos</a>{% endif %}</div>
+  </section>
+
+  {% if reminders %}<section class="ag-card ag-remind" aria-labelledby="ag-remind-title" data-live-agenda="reminders">
+    <header><h2 id="ag-remind-title">Lembretes da recepção</h2>{% if reminders.soon %}<span class="ag-pill is-warn">{{ reminders.soon|length }}</span>{% endif %}</header>
+    <h3>Chegam na próxima hora</h3>
+    {% for r in reminders.soon %}<a class="ag-remind-row" href="{{ r.url }}"><time>{{ r.start|date:'H:i' }}</time><span><strong>{{ r.patient }}</strong><small>{{ r.service }}{% if r.professional %} · {{ r.professional }}{% endif %}</small></span><em class="ag-pill {% if r.status == 'pending' %}is-warn{% else %}is-ok{% endif %}">{% if r.minutes <= 0 %}agora{% else %}{{ r.minutes }} min{% endif %}</em></a>
+    {% empty %}<p class="ag-hint">Ninguém marcado para a próxima hora.</p>{% endfor %}
+    <h3>Confirmar amanhã</h3>
+    {% for r in reminders.confirm %}<div class="ag-remind-row"><time>{{ r.start|date:'H:i' }}</time><span><strong>{{ r.patient }}</strong><small>{{ r.service }}{% if r.professional %} · {{ r.professional }}{% endif %}</small></span>{% if r.whatsapp %}<a class="ag-pill is-wa" href="{{ r.whatsapp }}" target="_blank" rel="noopener" title="Confirmar pelo WhatsApp">WhatsApp</a>{% else %}<a class="ag-pill" href="{{ r.url }}">Abrir</a>{% endif %}</div>
+    {% empty %}<p class="ag-hint">Todos os agendamentos de amanhã já estão confirmados.</p>{% endfor %}
+    <button type="button" class="ag-btn ag-bell" data-reminder-toggle aria-pressed="false">Avisar 15 min antes de cada horário</button>
+    <p class="ag-hint" data-reminder-help>Com o aviso ligado, esta tela mostra um alerta (e uma notificação do computador, se você permitir) 15 minutos antes de cada paciente.</p>
+  </section>
+  {{ reminders.alarms|json_script:"ag-alarms-data" }}{% endif %}
+
+  {% if not arena %}<details class="ag-card ag-fold"{% if mode == 'day' %} open{% endif %}><summary>Horários disponíveis <small>{{ day|date:'d/m' }}</small></summary>
+    <div data-live-agenda="free">{% for window in day_windows %}<a class="ag-free-row" href="{% if can_create_appointment %}{% url 'portal-resource-create' 'agenda' 'agendamentos' %}?professional={{ window.resource }}&starts_at={{ window.start|date:'Y-m-d' }}T{{ window.start|date:'H:i' }}{% else %}?mode=day&date={{ day|date:'Y-m-d' }}&resource={{ window.resource }}{% endif %}"><strong>{{ window.start|date:'H:i' }}–{{ window.end|date:'H:i' }}</strong><span>{{ window.name }} · {{ window.minutes }} min</span></a>
+    {% empty %}<p class="ag-hint">Sem horário livre neste dia.</p>{% endfor %}</div></details>
+  <details class="ag-card ag-fold" open><summary>Sala de espera {% if waiting %}<span class="ag-pill">{{ waiting|length }}</span>{% endif %}</summary>
+    <div data-live-agenda="waiting">{% for row in waiting %}<div class="ag-wait"><span class="ag-avatar is-sm" aria-hidden="true">{{ row.customer_display_name|slice:':1'|upper }}</span><span><strong>{{ row.customer_display_name }}</strong><small>{{ row.professional.name|default:'Sem profissional' }}</small></span><span class="ag-wait-meta"><time>{{ row.starts_at|date:'H:i' }}</time><em class="ag-pill {% if row.status == 'in_progress' %}is-info{% else %}is-warn{% endif %}">{{ row.get_status_display }}</em></span></div>
+    {% empty %}<p class="ag-hint">Ninguém aguardando agora.</p>{% endfor %}</div></details>{% endif %}
+</aside>
+
+<section class="ag-main" aria-label="Calendário">
+  <div class="ag-toolbar">
+    <div class="ag-tools-left"><a class="ag-btn" href="?date={{ today|date:'Y-m-d' }}&mode={{ mode }}&unit={{ unit.pk|default:'' }}&resource={{ resource }}">Hoje</a>
+      <nav class="ag-modes" aria-label="Visualização">{% for value, label in modes %}<a href="?mode={{ value }}&date={{ day|date:'Y-m-d' }}&unit={{ unit.pk|default:'' }}&resource={{ resource }}"{% if mode == value %} class="is-on" aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav></div>
+    <div class="ag-period"><a href="?date={{ previous|date:'Y-m-d' }}&mode={{ mode }}&unit={{ unit.pk|default:'' }}&resource={{ resource }}" aria-label="Período anterior">‹</a>
+      <div><strong>{% if mode == 'month' %}Mês{% elif mode == 'week' %}Semana{% else %}Dia{% endif %}</strong><span>{% if mode == 'month' %}{{ day|date:'F \d\e Y' }}{% elif mode == 'week' %}{{ columns.0.day|date:'d/m' }} – {% with last=columns|last %}{{ last.day|date:'d/m/Y' }}{% endwith %}{% else %}{{ day|date:'l, d/m/Y' }}{% endif %}</span></div>
+      <a href="?date={{ next|date:'Y-m-d' }}&mode={{ mode }}&unit={{ unit.pk|default:'' }}&resource={{ resource }}" aria-label="Próximo período">›</a></div>
+    <div class="ag-tools-right"><form method="get" class="ag-jump"><input type="hidden" name="mode" value="{{ mode }}"><input type="hidden" name="unit" value="{{ unit.pk|default:'' }}"><input type="hidden" name="resource" value="{{ resource }}"><label class="sr-only" for="ag-date">Ir para a data</label><input id="ag-date" type="date" name="date" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()"></form>
+      {% if can_create_appointment %}<a class="ag-btn is-primary" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">+ Novo agendamento</a>{% endif %}</div>
+  </div>
+  {% if services %}<ul class="ag-legend" aria-label="Cores por serviço">{% for s in services %}<li><span style="--c:{{ s.colour }}"></span>{{ s.name }}</li>{% endfor %}<li class="ag-legend-status"><span class="is-pending"></span>Não confirmado</li><li class="ag-legend-status"><span class="is-done"></span>Confirmado</li></ul>{% endif %}
+  <form id="calendar-csrf" hidden>{% csrf_token %}</form><p id="agenda-live-status" class="sr-only" role="status" aria-live="polite"></p>
+  {% if can_move and grid %}<p class="ag-hint">Arraste um agendamento para outro horário ou dia; conflitos são verificados antes de salvar. Clique num horário livre para agendar.</p>{% endif %}
+
+  {% if grid %}
+  <div class="ag-scroll" role="region" aria-label="Agenda {{ columns.0.day|date:'d/m' }}" tabindex="0">
+  <div class="ag-grid calendar-board calendar-board--{{ mode }}" style="--days:{{ columns|length }};--slots:{{ grid.slots }};grid-template-columns:{{ grid.template }}">
+    <div class="ag-corner"></div>
+    {% for column in columns %}<div class="ag-dayhead{% if column.today %} is-today{% endif %}"><a href="?mode=day&date={{ column.day|date:'Y-m-d' }}&unit={{ unit.pk|default:'' }}&resource={{ resource }}"{% if column.today %} aria-current="date"{% endif %}><span>{{ column.day|date:'D' }}</span> {{ column.day|date:'d/m' }}</a></div>{% endfor %}
+    <div class="ag-times" aria-hidden="true">{% for label in grid.labels %}<span class="{% if label.full %}is-hour{% endif %}">{{ label.text }}</span>{% endfor %}</div>
+    {% for column in columns %}<div class="ag-col{% if column.today %} is-today{% endif %}" data-calendar-date="{{ column.day|date:'Y-m-d' }}" data-first-hour="{{ grid.first_hour }}" data-slots="{{ grid.slots }}">
+      <div class="ag-col-inner" data-live-agenda="day-{{ column.day|date:'Y-m-d' }}">
+      {% for free in column.free %}<a class="ag-free" style="--top:{{ free.top|stringformat:'.3f' }};--h:{{ free.height|stringformat:'.3f' }}" href="{% if can_create_appointment %}{% url 'portal-resource-create' 'agenda' 'agendamentos' %}?professional={{ free.resource }}&starts_at={{ column.day|date:'Y-m-d' }}T{{ free.start|date:'H:i' }}{% else %}#{% endif %}" title="Livre {{ free.start|date:'H:i' }}–{{ free.end|date:'H:i' }} · {{ free.name }}"><span>Livre · {{ free.name }}</span></a>{% endfor %}
+      {% for off in column.off %}<div class="ag-off" style="--top:{{ off.top|stringformat:'.3f' }};--h:{{ off.height|stringformat:'.3f' }}" title="Bloqueio"><span>Bloqueio · {% if arena %}{{ off.row.court.name }}{% else %}{{ off.row.professional.name }}{% endif %}</span></div>{% endfor %}
+      {% for ev in column.events %}{% with row=ev.row %}<a class="ag-ev is-{{ row.status }}" style="--top:{{ ev.top|stringformat:'.3f' }};--h:{{ ev.height|stringformat:'.3f' }};--left:{{ ev.left|stringformat:'.3f' }}%;--w:{{ ev.width|stringformat:'.3f' }}%;--c:{{ ev.colour }}"
+        href="{% if arena %}{% url 'portal-resource-edit' 'arena' 'reservas' row.pk %}{% elif professional_mode %}{% url 'professional-appointment' row.pk %}{% else %}{% url 'portal-resource-edit' 'agenda' 'agendamentos' row.pk %}{% endif %}"
+        {% if can_move and row.status == 'confirmed' or can_move and row.status == 'pending' %}draggable="true" data-appointment="{{ row.pk }}" data-time="{{ row.starts_at|date:'H:i' }}"{% endif %}
+        title="{{ row.starts_at|date:'H:i' }}–{{ row.ends_at|date:'H:i' }} · {% if arena %}{{ row.customer_name }}{% else %}{{ row.customer_display_name }} · {{ row.service.name }} · {{ row.professional.name|default:'Sem profissional' }}{% endif %} · {{ row.get_status_display }}">
+        <strong>{% if row.status == 'confirmed' or row.status == 'completed' %}<span aria-hidden="true">✓ </span>{% endif %}{% if arena %}{{ row.court.name }}{% else %}{{ row.service.name }}{% endif %} · {{ row.starts_at|date:'H:i' }}–{{ row.ends_at|date:'H:i' }}</strong>
+        <span>{% if arena %}{{ row.customer_name }}{% else %}{{ row.customer_display_name }}{% endif %}</span>
+        {% if not arena and not selected_resource %}<small>{{ row.professional.name|default:'Sem profissional' }}</small>{% endif %}
+        <small class="ag-ev-status">{{ row.get_status_display }}</small></a>{% endwith %}{% endfor %}
+      </div>
+      {% if column.today and grid.now is not None %}<div class="ag-now" style="--top:{{ grid.now|stringformat:'.3f' }}" aria-hidden="true"></div>{% endif %}
+    </div>{% endfor %}
+  </div></div>
+  {% else %}
+  <div class="ag-month calendar-board calendar-board--month" role="region" aria-label="Mês {{ day|date:'F Y' }}">
+    {% for name in weekday_names %}<div class="ag-month-head">{{ name }}</div>{% endfor %}
+    {% for column in columns %}<section class="ag-month-day{% if column.today %} is-today{% endif %}{% if column.outside %} is-outside{% endif %}" data-calendar-date="{{ column.day|date:'Y-m-d' }}">
+      <a class="ag-month-num" href="?mode=day&date={{ column.day|date:'Y-m-d' }}&unit={{ unit.pk|default:'' }}&resource={{ resource }}"{% if column.today %} aria-current="date"{% endif %}>{{ column.day|date:'j' }}</a>
+      <div data-live-agenda="day-{{ column.day|date:'Y-m-d' }}">{% for row in column.rows|slice:':4' %}<a class="ag-month-ev is-{{ row.status }}" href="{% if arena %}{% url 'portal-resource-edit' 'arena' 'reservas' row.pk %}{% elif professional_mode %}{% url 'professional-appointment' row.pk %}{% else %}{% url 'portal-resource-edit' 'agenda' 'agendamentos' row.pk %}{% endif %}">{{ row.starts_at|date:'H:i' }} {% if arena %}{{ row.customer_name }}{% else %}{{ row.customer_display_name }}{% endif %}</a>{% endfor %}
+      {% if column.rows|length > 4 %}<a class="ag-month-more" href="?mode=day&date={{ column.day|date:'Y-m-d' }}&unit={{ unit.pk|default:'' }}&resource={{ resource }}">+{{ column.rows|length|add:'-4' }} agendamento(s)</a>{% endif %}
+      {% if column.blocks %}<small class="ag-month-off">Bloqueio</small>{% endif %}</div>
+    </section>{% endfor %}
+  </div>
+  {% endif %}
+</section>
+</div>
+<div class="ag-toast" data-reminder-toast role="alert" hidden></div>
+</main>
+<script src="{% static 'js/calendar.js' %}?v=20261124" defer></script><script src="{% static 'js/live-agenda.js' %}" defer></script><script src="{% static 'js/agenda-reminders.js' %}?v=20261124" defer></script>
+{% endtimezone %}{% endblock %}

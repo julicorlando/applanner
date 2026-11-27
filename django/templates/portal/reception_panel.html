@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Recepção · {{ tenant.name }}{% endblock %}
+{% block manifest %}<link rel="manifest" href="{% url 'reception-app-manifest' %}">{% endblock %}
+{% block extra_head %}{% if offline_available %}<script src="{% static 'healthcare/offline-vault.js' %}" defer></script><script src="{% static 'js/reception-offline.js' %}" defer></script>{% endif %}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/reception-panel.css' %}">{% endblock %}
+{% block content %}
+<main class="rp">
+  <header class="rp-head">
+    <div><h1>Recepção</h1><p>{{ tenant.name }} · {{ today|date:"l, d \d\e F" }}</p></div>
+    <nav class="rp-actions" aria-label="Ações rápidas">
+      {% if can_schedule %}<a class="rp-btn is-primary" href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">Novo agendamento</a>{% endif %}
+      {% if dental %}<a class="rp-btn" href="{% url 'dental-patient-create' %}?next={{ request.path|urlencode }}">Novo paciente</a>{% elif can_schedule %}<a class="rp-btn" href="{% url 'portal-resource-create' 'agenda' 'clientes' %}">Novo cliente</a>{% endif %}
+      <a class="rp-btn" href="{% url 'operation-calendar' %}">Agenda</a>
+    </nav>
+  </header>
+
+  <form class="rp-search" method="get" action="{% if dental %}{% url 'dental-assessments' %}{% else %}{% url 'portal-resource-list' 'agenda' 'clientes' %}{% endif %}" role="search">
+    <label for="rp-q">Buscar paciente</label>
+    <div><input id="rp-q" type="search" name="q" placeholder="Nome, telefone ou e-mail" autofocus><button class="rp-btn is-primary" type="submit">Buscar</button></div>
+  </form>
+
+  {% if offline_available %}<aside id="rp-offline" class="rp-offline" data-shell="{% url 'clinical-offline-shell' %}" hidden aria-live="polite">
+    <div><strong data-offline-title></strong><p data-offline-text></p></div>
+    <a class="rp-btn is-primary" data-offline-action href="{% url 'clinical-offline-shell' %}">Modo offline</a>
+  </aside>{% endif %}
+
+  <section class="rp-stats" aria-label="Resumo do dia">
+    <div><strong>{{ total }}</strong><span>Agendados hoje</span></div>
+    <div class="is-wait"><strong>{{ counts.waiting }}</strong><span>Aguardando</span></div>
+    <div class="is-care"><strong>{{ counts.in_progress }}</strong><span>Em atendimento</span></div>
+    <div class="is-done"><strong>{{ counts.completed }}</strong><span>Concluídos</span></div>
+    {% if can_cash %}<a class="rp-cash {% if cash_session %}is-open{% endif %}" href="{% url 'clinic-finance-desk' %}"><strong>{% if cash_session %}Caixa aberto{% else %}Caixa fechado{% endif %}</strong><span>{% if cash_session %}Desde {{ cash_session.opened_at|date:"H:i" }} · abrir folha do dia{% else %}Abra o caixa para receber pagamentos{% endif %}</span></a>{% endif %}
+  </section>
+
+  <section class="rp-day" aria-label="Pacientes de hoje"><h2>Pacientes de hoje</h2>
+    {% for visit in visits %}
+    <article class="rp-visit status-{{ visit.status }}">
+      <time>{{ visit.starts_at|date:"H:i" }}</time>
+      <div class="rp-who"><strong>{{ visit.customer_display_name }}</strong><span>{{ visit.service.name }}{% if visit.professional %} · {{ visit.professional.name }}{% endif %}</span></div>
+      <span class="rp-status">{{ visit.get_status_display }}</span>
+      <div class="rp-visit-actions">
+        {% if can_checkin and visit.status == 'pending' or can_checkin and visit.status == 'confirmed' %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="arrived"><input type="hidden" name="appointment" value="{{ visit.pk }}"><button class="rp-btn is-primary" type="submit">Paciente chegou</button></form>{% endif %}
+        {% if dental and visit.customer_id %}<a class="rp-btn" href="{% url 'dental-patient-record' visit.customer_id %}">Prontuário</a>{% if can_cash %}<a class="rp-btn" href="{% url 'dental-patient-record' visit.customer_id %}#receber">Receber</a>{% endif %}{% endif %}
+        {% if can_checkin %}<a class="rp-btn" href="{% url 'reception-appointment' visit.pk %}">Atendimento</a>{% endif %}
+      </div>
+    </article>
+    {% empty %}<p class="rp-empty">Nenhum paciente agendado para hoje. {% if can_schedule %}<a href="{% url 'portal-resource-create' 'agenda' 'agendamentos' %}">Criar um agendamento</a>{% endif %}</p>{% endfor %}
+  </section>
+
+  {% if physio_menu or workspace_groups %}<section class="rp-all" aria-label="Todas as funções"><h2>Todas as funções</h2>
+    <nav class="rp-grid">{% if physio_menu %}{% for item in physio_menu %}{% if item.url %}<a href="{{ item.url }}">{{ item.title }}</a>{% endif %}{% endfor %}{% else %}{% for group in workspace_groups %}{% for item in group.items %}{% if item.url %}<a href="{{ item.url }}">{{ item.title }}</a>{% endif %}{% endfor %}{% endfor %}{% endif %}<a href="{% url 'reception-app-install' %}">Instalar no computador</a></nav></section>{% endif %}
+</main>
+{% endblock %}

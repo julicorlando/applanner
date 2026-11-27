@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Emitir NFe — Master{% endblock %}
+{% block content %}
+<section class="shell portal-page narrow">
+  <div class="portal-heading">
+    <div><a class="back-link" href="{% url 'master-resource-list' 'notas-fiscais' %}">← Solicitações de NFe</a><span class="eyebrow">FISCAL</span><h1>Enviar nota fiscal</h1><p>{{ row.tenant.name }} · referência {{ row.reference_month|date:"m/Y" }} · R$ {{ row.amount }}</p></div>
+  </div>
+  <article class="panel">
+    <h2>Composição da cobrança</h2>
+    {% with breakdown=row.charge_breakdown %}
+      <div class="module-row"><span></span><div><strong>Plano {{ breakdown.plan.name }}</strong><small>R$ {{ breakdown.plan.amount }} no ciclo {{ breakdown.cycle_label }}</small></div></div>
+      {% for item in breakdown.addons %}<div class="module-row"><span></span><div><strong>{{ item.name }}</strong><small>{% if item.quantity > 1 %}{{ item.quantity }} unidades/vagas · {% endif %}R$ {{ item.cycle_total }} no ciclo</small></div></div>{% endfor %}
+      {% if breakdown.adjustment != "0.00" %}<div class="module-row"><span></span><div><strong>Ajuste, crédito ou desconto contratual</strong><small>R$ {{ breakdown.adjustment }}</small></div></div>{% endif %}
+      <div class="module-row"><span></span><div><strong>Total pago</strong><small>R$ {{ row.amount }}</small></div></div>
+    {% endwith %}
+  </article>
+  <article class="panel" style="margin-top:16px">
+    <form method="post" enctype="multipart/form-data" class="portal-form">{% csrf_token %}
+      {{ form.non_field_errors }}
+      {% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+      <p class="payment-hint">O PDF é obrigatório e validado antes do armazenamento. O XML é opcional. Os arquivos só podem ser baixados por usuários da empresa ou pelo Master.</p>
+      <button class="button primary" type="submit">Publicar NFe para a empresa</button>
+    </form>
+  </article>
+</section>
+{% endblock %}

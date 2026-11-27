@@ -1,0 +1,69 @@
+/* Shared public hierarchy; brand colors and booking/authentication behavior stay intact. */
+body.experience-page .shell{max-width:1180px}
+body.experience-page .eyebrow{font-size:.72rem;letter-spacing:.14em}
+body.experience-page .experience-intro{max-width:740px}
+body.experience-page .experience-intro h1{font-size:clamp(2.3rem,4vw,3.8rem);line-height:1.12;letter-spacing:-.045em;margin:20px 0}
+body.experience-page .experience-intro>p{font-size:1.05rem;line-height:1.7;color:var(--muted);max-width:600px}
+body.experience-page .button{min-height:48px;border-radius:13px}
+body.experience-page .experience-text-link{font-size:.9rem;font-weight:750;color:var(--accent);text-underline-offset:4px}
+body.experience-directory .portal-page{padding-block:64px 80px}
+body.experience-directory .experience-location-bar{display:flex;align-items:center;justify-content:space-between;gap:28px;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:24px;margin:32px 0 40px}
+body.experience-directory .experience-location-bar>div{min-width:0;max-width:760px}
+body.experience-directory .experience-location-bar strong{font-size:1rem}
+body.experience-directory .experience-location-bar p{font-size:.85rem;line-height:1.65;color:var(--muted);margin:8px 0 0}
+body.experience-directory #location-status:empty{display:none}
+body.experience-directory #location-status{padding-top:10px;border-top:1px solid var(--line);margin-top:12px;color:var(--ink)}
+body.experience-directory #nearby{flex-shrink:0}
+body.experience-directory .experience-results-heading h2{font-size:clamp(1.5rem,2.5vw,2rem);letter-spacing:-.03em;margin:0 0 8px}
+body.experience-directory .experience-results-heading p{color:var(--muted);font-size:.9rem;margin:0}
+body.experience-directory .experience-results{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:24px}
+body.experience-directory .directory-card{border-radius:18px;box-shadow:none;padding:26px;min-width:0}
+body.experience-directory .directory-card:hover{border-color:var(--accent);box-shadow:0 8px 24px var(--shadow-color)}
+body.experience-directory .directory-card h3{font-size:1.25rem;line-height:1.35;letter-spacing:-.025em;margin:20px 0 12px;overflow-wrap:anywhere}
+body.experience-directory .directory-card p{line-height:1.65;font-size:.88rem}
+body.experience-directory .directory-card__location{padding-top:14px;border-top:1px solid var(--line)}
+body.experience-directory .directory-card__cta{border-radius:12px;min-height:46px;background:var(--action);color:#fff;box-shadow:none}
+body.experience-directory .public-business-identity{margin-bottom:18px}
+body.experience-login .login-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:64px;align-items:center;padding-block:70px;min-height:70vh}
+body.experience-login .login-intro{min-width:0}
+body.experience-login .experience-login-benefits{list-style:none;padding:0;display:grid;gap:12px;margin:28px 0;font-size:.88rem;color:var(--muted)}
+body.experience-login .experience-login-benefits li::before{content:'✓';color:var(--accent);margin-right:10px;font-weight:750}
+body.experience-login .login-card{padding:34px;border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 40px var(--shadow-color);background:var(--paper);min-width:0}
+body.experience-login .login-card h2{font-size:1.8rem;letter-spacing:-.035em;line-height:1.2;margin:16px 0 12px}
+body.experience-login .login-card>p{font-size:.88rem;line-height:1.6;color:var(--muted)}
+body.experience-login .login-card .portal-form{margin-top:26px}
+body.experience-login .login-card input:not([type=checkbox]){min-height:48px;width:100%;border-radius:12px}
+body.experience-login .login-card button[type=submit]{width:100%;margin-top:6px}
+body.experience-login .checkbox-field{align-items:start;font-size:.78rem;line-height:1.5}
+body.experience-login .checkbox-field input{margin-top:3px}
+body.experience-login .experience-login-help{margin:20px 0;text-align:center}
+body.experience-login .experience-login-customer{padding-top:18px;border-top:1px solid var(--line);margin-bottom:0}
+body.experience-business .tenant-hero{padding-block:48px 32px}
+body.experience-business .tenant-hero__content{max-width:1180px}
+body.experience-business .tenant-hero h1{font-size:clamp(2rem,3.4vw,3.2rem);line-height:1.14;letter-spacing:-.035em;max-width:800px;margin:18px 0}
+body.experience-business .tenant-hero p{font-size:1rem;line-height:1.7;max-width:720px}
+body.experience-business .tenant-hero--has-cover{padding-block:24px}
+body.experience-business .tenant-hero--has-cover .tenant-hero__content{min-height:360px;border-radius:22px;overflow:hidden;padding:clamp(24px,4vw,48px)}
+body.experience-business .tenant-hero .actions{margin-top:24px;gap:12px}
+body.experience-business .public-section-tabs{max-width:1180px;margin:auto;gap:10px;padding-block:16px}
+body.experience-business .public-section-tabs a{border-radius:12px}
+body.experience-business .public-location-summary{margin-block:24px 8px;padding:22px;border:1px solid var(--line);border-radius:18px;background:var(--paper)}
+body.experience-business .section{padding-block:44px;scroll-margin-top:100px}
+body.experience-business .section-head{max-width:780px;margin-bottom:24px}
+body.experience-business .section h2{font-size:clamp(1.65rem,2.6vw,2.3rem);line-height:1.2;letter-spacing:-.035em;margin:14px 0}
+body.experience-business .section-head p{font-size:.9rem;line-height:1.7;margin:0;color:var(--muted)}
+body.experience-business #agendar>.panel{border-radius:20px;padding:28px;box-shadow:none}
+body.experience-business .booking-summary{border-radius:16px}
+body.experience-business .public-choice-card,body.experience-business .segment-grid article{border-radius:18px;box-shadow:none;min-width:0}
+body.experience-business .segment-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:24px;gap:20px}
+body.experience-business .segment-grid article h3{margin-top:16px;font-size:1.1rem;line-height:1.4}
+body.experience-business .public-professional-card h3{margin:0}
+body.experience-business .public-unit-card h3{margin:12px 0}
+body.experience-business .public-unit-hours p{font-size:.8rem}
+body.experience-business .public-footer{margin-top:40px}
+@media(max-width:900px){body.experience-directory .experience-results{grid-template-columns:repeat(2,minmax(0,1fr))}body.experience-login .login-layout{gap:32px}body.experience-login .login-card{padding:28px}}
+@media(max-width:760px){body.experience-page .experience-intro h1{font-size:clamp(2.1rem,6vw,2.7rem)}body.experience-directory .portal-page{padding-block:36px 50px}body.experience-directory .experience-location-bar{flex-direction:column;align-items:stretch;padding:20px;margin-block:24px 32px;gap:18px}body.experience-login .login-layout{grid-template-columns:1fr;gap:28px;padding-block:36px}body.experience-login .experience-login-benefits{display:none}body.experience-login .login-intro>p{margin-bottom:16px}body.experience-business .tenant-hero{padding-block:30px 20px}body.experience-business .tenant-hero--has-cover{padding-block:16px}body.experience-business .tenant-hero--has-cover .tenant-hero__content{min-height:300px;border-radius:18px;padding:24px 20px}body.experience-business .tenant-hero h1{font-size:clamp(1.8rem,6.5vw,2.3rem)}body.experience-business .section{padding-block:30px}body.experience-business #agendar>.panel{padding:18px}body.experience-business .public-location-summary{padding:18px;margin-top:18px}body.experience-business .public-section-tabs{padding-block:12px}body.experience-business .segment-grid{gap:12px}}
+@media(max-width:560px){body.experience-directory .experience-results{grid-template-columns:1fr}body.experience-directory .directory-card{padding:22px}body.experience-login .login-card{padding:24px 20px}body.experience-login .login-card h2{font-size:1.6rem}body.experience-business .tenant-hero .actions{display:grid;grid-template-columns:1fr}body.experience-business .tenant-hero .actions .button{text-align:center;width:100%}body.experience-business .public-location-summary .button{min-height:44px;font-size:.75rem}}
+
+@media(max-width:900px){body.experience-business .segment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){body.experience-business .segment-grid{grid-template-columns:minmax(0,1fr)}}

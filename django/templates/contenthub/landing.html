@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container">
+  <h1>{{ page.headline }}</h1>
+  {% if page.subheadline %}<p>{{ page.subheadline }}</p>{% endif %}
+  <div>{{ page.body|safe }}</div>
+  {% if page.cta_url %}<p><a href="{{ page.cta_url }}">{{ page.cta_label|default:"Começar" }}</a></p>{% endif %}
+</main>
+{% endblock %}

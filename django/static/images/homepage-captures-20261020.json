@@ -1,0 +1,29 @@
+{
+  "source_branch": "feat/home-push-import-20261020",
+  "source_commit": "351b1033ef0c04dc951f4c8d21cf90279849bcc9",
+  "captured_on": "2026-10-20",
+  "environment": "Disposable SQLite database and local Chromium, no production access",
+  "synthetic_data": true,
+  "assets": [
+    {
+      "file": "homepage-agenda-20261020-640.webp",
+      "sha256": "d222a17722478118bb174c0bad0176cbf4a4993f14592071cc24f481facd176b"
+    },
+    {
+      "file": "homepage-agenda-20261020-960.webp",
+      "sha256": "79f01a63424df4115fcbea80c111e52be2d18bb6561a1f9721f439e275599260"
+    },
+    {
+      "file": "homepage-agenda-20261020-1440.webp",
+      "sha256": "543d61ad754ea2149471b093b26c2f8751e6cb0e801e7edafbd6c02fed308235"
+    },
+    {
+      "file": "homepage-booking-20261020-390.webp",
+      "sha256": "491a478895bff7a5562611a21549bb6897c56513a10174eef562391013cf8dcd"
+    },
+    {
+      "file": "homepage-booking-20261020-780.webp",
+      "sha256": "a53d38534281f36d91bf998f5ed8e257c33fb16e071e5e8f422b0ca46e52522e"
+    }
+  ]
+}
