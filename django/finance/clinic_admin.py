@@ -12,7 +12,7 @@ from django.views.decorators.cache import never_cache
 from core.unit_scope import selected_unit
 
 from . import reception_permissions as perms
-from .clinic_cash import decide_removal, delete_sheet
+from .clinic_cash import decide_removal, delete_sheet, merge_all, merge_day
 from .clinic_models import ClinicCashEntryRemoval
 from .clinic_services import access, business_today
 from .models import CashSession
@@ -31,6 +31,22 @@ def cash_days(request):
             if action == "delete-sheet" and request.POST.get("session", "").isdigit():
                 delete_sheet(user=request.user, session_id=int(request.POST["session"]), reason=request.POST.get("reason", ""))
                 messages.success(request, "Caixa apagado. Os lançamentos foram cancelados e ficou registrado na auditoria.")
+            elif action == "merge-day" and request.POST.get("day"):
+                from datetime import date
+                try:
+                    day = date.fromisoformat(request.POST["day"])
+                except ValueError:
+                    raise ValidationError("Data inválida.") from None
+                merge_day(user=request.user, unit=unit, day=day)
+                messages.success(request, f"Caixas de {day:%d/%m/%Y} unificados no caixa da clínica. Os totais do dia não mudaram.")
+            elif action == "merge-all":
+                done, failed = merge_all(user=request.user, unit=unit)
+                if done:
+                    messages.success(request, f"{len(done)} dia(s) unificados no caixa da clínica. Os totais de cada dia não mudaram.")
+                for day, error in failed:
+                    messages.error(request, f"{day:%d/%m/%Y}: {error}")
+                if not done and not failed:
+                    messages.info(request, "Nenhum dia com caixas separados por profissional.")
             elif action in {"approve-removal", "reject-removal"} and request.POST.get("removal", "").isdigit():
                 decide_removal(user=request.user, removal_id=int(request.POST["removal"]),
                                approve=action == "approve-removal", note=request.POST.get("note", ""))
@@ -59,7 +75,12 @@ def cash_days(request):
         day["open"] += sheet.status == "open"
     removals = ClinicCashEntryRemoval.objects.filter(entry__session__tenant=tenant, status="requested").select_related(
         "entry__session__professional", "entry__customer", "requested_by")
+    for group in grouped.values():
+        group["split"] = len(group["sheets"]) > 1 or any(s.professional_id for s in group["sheets"])
+    split_days = (CashSession.objects.filter(tenant=tenant, unit=unit, deleted_at__isnull=True, professional__isnull=False)
+                  .values("business_date").distinct().count())
     return render(request, "finance/clinic_cash_days.html", {
+        "split_days": split_days,
         "groups": list(grouped.values()), "days": days, "gestor": gestor, "removals": removals, "today": today,
         "periods": [(7, "Últimos 7 dias"), (30, "Últimos 30 dias"), (90, "Últimos 90 dias"), (365, "Últimos 12 meses")]})
 

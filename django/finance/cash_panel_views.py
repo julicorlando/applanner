@@ -43,7 +43,7 @@ def _open(request, tenant, unit, day):
         professional = get_object_or_404(Professional, pk=post["professional"], tenant=tenant, active=True)
     row = services.open_clinic_cash(request.user, unit, post.get("opening") or "0", (post.get("notes") or "").strip(),
                                     professional=professional, day=day)
-    messages.success(request, f"Caixa de {row.label} aberto para {day:%d/%m/%Y}.")
+    messages.success(request, f"{row.label} aberto para {day:%d/%m/%Y}.")
 
 
 def _close(request, tenant, unit):
@@ -54,10 +54,10 @@ def _close(request, tenant, unit):
                                      notes=(post.get("notes") or "").strip(), session_id=session.pk, counted=counted)
     divergent = (row.clinical_closing.summary or {}).get("divergent")
     if divergent:
-        messages.warning(request, f"Caixa de {row.label} fechado com divergência em "
+        messages.warning(request, f"{row.label} fechado com divergência em "
                                   f"{', '.join(KIND_LABEL[k] for k in divergent)}. A observação ficou registrada.")
     else:
-        messages.success(request, f"Caixa de {row.label} fechado e conferido.")
+        messages.success(request, f"{row.label} fechado e conferido.")
 
 
 @login_required

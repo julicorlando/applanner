@@ -649,7 +649,7 @@ def patient_record(request, pk):
                 from finance.clinic_services import day_sheet
                 data = receive_form.cleaned_data
                 try:
-                    # Each professional has their own cash sheet per day, opened on the first receipt.
+                    # One clinic cash sheet per day, opened on the first receipt; the line keeps the professional.
                     # Sheet and line in one step: a refused line never leaves an empty extra sheet behind.
                     with transaction.atomic():
                         session = day_sheet(tenant, selected_unit(request, tenant), data["professional"], request.user,
@@ -664,7 +664,7 @@ def patient_record(request, pk):
                 else:
                     total = f"{sum(r.total for r in rows):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                     how = " + ".join(r.method_name for r in rows)
-                    messages.success(request, f"Pagamento de R$ {total} ({how}) recebido e lançado no caixa de {data['paid_on']:%d/%m/%Y} de {session.label}.")
+                    messages.success(request, f"Pagamento de R$ {total} ({how}) recebido e lançado no caixa da clínica de {data['paid_on']:%d/%m/%Y}, para {rows[0].professional_name}.")
                     return redirect(self_url)
         elif action in {"deactivate", "reactivate"}:
             if not (request.user.role in {"owner", "tenant-admin", "manager"} or allowed(request.user, "cadastro")):
@@ -722,7 +722,7 @@ def patient_record(request, pk):
             except ValidationError as exc:
                 messages.error(request, " ".join(exc.messages))
             else:
-                messages.success(request, f"Recebimento lançado na folha do caixa de {entry.session.label}.")
+                messages.success(request, f"Recebimento lançado na folha do caixa da clínica, para {entry.professional_name}.")
             return redirect(self_url)
         else:
             raise PermissionDenied

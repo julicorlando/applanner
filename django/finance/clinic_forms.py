@@ -34,10 +34,13 @@ class ReceiptForm(forms.Form):
 
 
 class ExpenseForm(ReceiptForm):
-    professional=forms.ModelChoiceField(label='Lançar no caixa de',queryset=Professional.objects.none(),required=False,
-        empty_label='Caixa da clínica (despesa geral)',
-        help_text='Escolha o dentista quando a despesa for dele: ela sai do caixa do dia desse profissional.')
+    day=forms.DateField(label='Data da despesa',required=False,widget=forms.DateInput(attrs={'type':'date'},format='%Y-%m-%d'),
+        help_text='Hoje ou um dia anterior. Ela entra no caixa da clínica desse dia.')
+    professional=forms.ModelChoiceField(label='Despesa de qual profissional (opcional)',queryset=Professional.objects.none(),required=False,
+        empty_label='Despesa geral da clínica',
+        help_text='Escolha o dentista quando a despesa for dele: ela sai do caixa da clínica e fica marcada para ele no fechamento.')
     description=forms.CharField(label='Descrição da despesa',max_length=190)
+    field_order=['request_id','day','description','amount','method','professional','invoice','items','photo','confirmed']
     invoice=forms.CharField(label='Número da nota/cupom fiscal (opcional)',max_length=80,required=False)
     items=forms.CharField(label='Itens comprados (opcional)',max_length=3000,required=False,widget=forms.Textarea(attrs={'rows':3}))
     photo=forms.FileField(label='Foto do comprovante (opcional, JPEG/PNG até 10 MB)',required=False)
@@ -47,6 +50,15 @@ class ExpenseForm(ReceiptForm):
         self.fields['amount'].label='Valor pago da despesa (R$)'
         self.fields['professional'].queryset=Professional.objects.filter(tenant=tenant,active=True).order_by('name')
         self.fields['confirmed'].label='Confirmo que esta despesa foi efetivamente paga'
+        from .clinic_services import business_today
+        self.today=business_today(tenant) if tenant else None
+        if self.today:
+            self.fields['day'].widget.attrs['max']=self.today.isoformat()
+            self.fields['day'].initial=self.initial.get('day') or self.today
+    def clean_day(self):
+        day=self.cleaned_data.get('day') or self.today
+        if self.today and day>self.today:raise ValidationError('A data da despesa não pode ser futura.')
+        return day
     def clean_photo(self):
         file=self.cleaned_data.get('photo')
         if not file:return None
@@ -63,8 +75,8 @@ class ExpenseForm(ReceiptForm):
 
 class WithdrawalForm(forms.Form):
     request_id=forms.UUIDField(widget=forms.HiddenInput)
-    professional=forms.ModelChoiceField(label='Retirar do caixa de',queryset=Professional.objects.none(),required=False,
-        empty_label='Caixa da clínica')
+    professional=forms.ModelChoiceField(label='Retirada de qual profissional (opcional)',queryset=Professional.objects.none(),required=False,
+        empty_label='Não é de um profissional',help_text='Sai do caixa da clínica; o profissional fica registrado na retirada.')
     amount=forms.DecimalField(label='Valor retirado (R$)',max_digits=12,decimal_places=2,min_value=Decimal('.01'))
     method=forms.ModelChoiceField(label='Forma',queryset=ClinicPaymentMethod.objects.none())
     withdrawn_by=forms.CharField(label='Retirado por',max_length=120,help_text='Quem levou o dinheiro (ex.: Dr. Jairo, sócio, banco).')

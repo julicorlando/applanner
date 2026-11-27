@@ -14,7 +14,7 @@
 <form method="get" class="cp-filters" aria-label="Filtros do relatório">
   <label>De<input type="date" name="de" value="{{ start|date:'Y-m-d' }}" max="{{ end|date:'Y-m-d' }}"></label>
   <label>Até<input type="date" name="ate" value="{{ end|date:'Y-m-d' }}"></label>
-  <label>Profissional<select name="profissional"><option value="">Todos</option><option value="clinica"{% if filters.professional == 'clinica' %} selected{% endif %}>Caixa da clínica</option>{% for p in professionals %}<option value="{{ p.pk }}"{% if filters.professional == p.pk|stringformat:'s' %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label>
+  <label>Profissional<select name="profissional"><option value="">Todos</option><option value="clinica"{% if filters.professional == 'clinica' %} selected{% endif %}>Sem profissional (clínica)</option>{% for p in professionals %}<option value="{{ p.pk }}"{% if filters.professional == p.pk|stringformat:'s' %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label>
   <label>Situação<select name="status">{% for value, label in status_filters %}<option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
   <label>Forma de pagamento<select name="forma"><option value="">Todas</option>{% for value, label in kinds %}<option value="{{ value }}"{% if filters.kind == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
   <div><button class="cp-btn is-primary" style="width:100%;justify-content:center">Aplicar filtros</button></div>
@@ -37,8 +37,8 @@
 
 <div class="cp-two">
 <section class="cp-panel" aria-labelledby="cr-prof"><header><h2 id="cr-prof">Por profissional</h2><span class="cp-hint" style="margin:0">Divisão do que foi recebido</span></header>
-<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Profissional</th><th>Caixas</th><th>Dentista</th><th>Consultório</th><th>Outros</th><th>Recebido</th></tr></thead><tbody>
-{% for p in by_professional %}<tr><td>{{ p.label }}{% if p.divergent %} <span class="cp-badge s-divergent">{{ p.divergent }}</span>{% endif %}<span class="cp-meter" aria-hidden="true"><span style="width:{{ p.share }}%"></span></span></td><td>{{ p.sheets }}</td><td>R$ {{ p.dentist|money_pt }}</td><td>R$ {{ p.clinic|money_pt }}</td><td>R$ {{ p.other|money_pt }}</td><td><strong>R$ {{ p.received|money_pt }}</strong>{% if p.open_total %}<br><small class="cp-hint" style="margin:0">+ R$ {{ p.open_total|money_pt }} em aberto</small>{% endif %}</td></tr>{% endfor %}
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Profissional</th><th>Dias</th><th>Dentista</th><th>Consultório</th><th>Outros</th><th>Recebido</th><th>Despesas dele</th><th>Líquido do dentista</th></tr></thead><tbody>
+{% for p in by_professional %}<tr><td>{{ p.label }}{% if p.divergent %} <span class="cp-badge s-divergent">{{ p.divergent }}</span>{% endif %}<span class="cp-meter" aria-hidden="true"><span style="width:{{ p.share }}%"></span></span></td><td>{{ p.sheets }}</td><td>R$ {{ p.dentist|money_pt }}</td><td>R$ {{ p.clinic|money_pt }}</td><td>R$ {{ p.other|money_pt }}</td><td><strong>R$ {{ p.received|money_pt }}</strong>{% if p.open_total %}<br><small class="cp-hint" style="margin:0">+ R$ {{ p.open_total|money_pt }} em aberto</small>{% endif %}</td><td>{% if p.expenses %}R$ {{ p.expenses|money_pt }}{% else %}—{% endif %}</td><td>R$ {{ p.dentist_net|money_pt }}</td></tr>{% endfor %}
 </tbody></table></div></section>
 
 <section class="cp-panel" aria-labelledby="cr-day"><header><h2 id="cr-day">Por dia</h2></header>

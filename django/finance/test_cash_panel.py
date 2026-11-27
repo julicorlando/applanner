@@ -35,7 +35,7 @@ class CashPanelTests(TestCase):
 
     def line(self, session, total="100", method="cash", professional=None):
         return cash.add_entry(user=self.reception, session_id=session.pk, customer=self.patient,
-                              professional=professional or session.professional, professional_name="",
+                              professional=professional or self.ana, professional_name="",
                               dentist_amount=total, clinic_amount="0", other_amount="0",
                               method=getattr(self, method) if method else None, notes="", request_id=uuid.uuid4())
 
@@ -53,26 +53,32 @@ class CashPanelTests(TestCase):
         self.assertContains(page, "Nenhum caixa aberto hoje")
         self.assertContains(page, "data-open-cash")
         self.assertEqual(page.context["kpis"]["sheets"], 0)
-        self.assertEqual({p.name for p in page.context["without_sheet"]}, {"Dra. Ana Exemplo", "Dr. Bruno Exemplo"})
+        self.assertTrue(page.context["clinic_sheet_missing"])
 
-    def test_day_groups_cards_by_professional_with_kpis_and_methods(self):
-        ana, bruno = self.sheet(self.ana, "20"), self.sheet(self.bruno)
-        self.line(ana, "100", "cash")
-        self.line(ana, "50", "pix")
-        self.line(bruno, "80", "card")
-        self.line(bruno, "40", None)  # em aberto
+    def test_one_clinic_card_with_the_split_per_professional(self):
+        sheet = self.sheet(self.ana, "20")
+        self.assertIsNone(sheet.professional_id)
+        self.line(sheet, "100", "cash", self.ana)
+        self.line(sheet, "50", "pix", self.ana)
+        self.line(sheet, "80", "card", self.bruno)
+        self.line(sheet, "40", None, self.bruno)  # em aberto
         page = self.client.get(self.url)
-        cards = {c["label"]: c for c in page.context["cards"]}
-        self.assertEqual(cards["Dra. Ana Exemplo"]["received"], Decimal("150"))
-        self.assertEqual(cards["Dra. Ana Exemplo"]["drawer_expected"], Decimal("120"))
-        self.assertEqual(cards["Dr. Bruno Exemplo"]["open_total"], Decimal("40"))
+        cards = page.context["cards"]
+        self.assertEqual([c["label"] for c in cards], ["Caixa da clínica"])
+        self.assertEqual(cards[0]["received"], Decimal("230"))
+        self.assertEqual(cards[0]["drawer_expected"], Decimal("120"))
+        self.assertEqual(cards[0]["open_total"], Decimal("40"))
+        people = {p["professional"]: p for p in page.context["day_professionals"]}
+        self.assertEqual(people["Dra. Ana Exemplo"]["total"], Decimal("150"))
+        self.assertEqual(people["Dr. Bruno Exemplo"]["total"], Decimal("80"))
+        self.assertEqual(people["Dr. Bruno Exemplo"]["open"], Decimal("40"))
         kpis = page.context["kpis"]
         self.assertEqual((kpis["received"], kpis["open_total"], kpis["open"], kpis["sheets"]),
-                         (Decimal("230"), Decimal("40"), 2, 2))
+                         (Decimal("230"), Decimal("40"), 1, 1))
         self.assertEqual({m["kind"]: m["amount"] for m in page.context["methods"]},
                          {"cash": Decimal("100"), "pix": Decimal("50"), "card": Decimal("80")})
         self.assertContains(page, "Conferir e fechar")
-        self.assertEqual([p.name for p in page.context["without_sheet"]], [])
+        self.assertContains(page, "Quanto foi para cada profissional")
 
     def test_day_navigation_never_goes_to_the_future(self):
         yesterday = self.today - timedelta(days=1)
@@ -86,13 +92,13 @@ class CashPanelTests(TestCase):
 
     # ------------------------------------------------------------ abertura
 
-    def test_open_from_panel_per_professional_and_no_duplicate(self):
+    def test_open_from_panel_opens_the_clinic_cash_once(self):
         response = self.client.post(self.url, {"action": "open", "professional": self.ana.pk, "opening": "30", "notes": "Troco"})
         self.assertEqual(response.status_code, 302)
-        row = CashSession.objects.get(professional=self.ana)
-        self.assertEqual((row.opening_amount, row.business_date, row.status), (Decimal("30"), self.today, "open"))
-        self.client.post(self.url, {"action": "open", "professional": self.ana.pk, "opening": "0"})
-        self.assertEqual(CashSession.objects.filter(professional=self.ana).count(), 1)
+        row = CashSession.objects.get()
+        self.assertEqual((row.professional_id, row.opening_amount, row.business_date, row.status), (None, Decimal("30"), self.today, "open"))
+        self.client.post(self.url, {"action": "open", "professional": self.bruno.pk, "opening": "0"})
+        self.assertEqual(CashSession.objects.count(), 1)
         with self.assertRaises(ValidationError):
             s.open_clinic_cash(self.owner, self.unit, "0", day=self.today + timedelta(days=1))
 
@@ -104,8 +110,8 @@ class CashPanelTests(TestCase):
         refused = self.client.post(self.url, {"action": "open", "dia": yesterday.isoformat(), "professional": self.ana.pk, "opening": "0"})
         self.assertEqual(refused.status_code, 403)
         self.set_perms(dias_anteriores=True)
-        self.client.post(self.url, {"action": "open", "dia": yesterday.isoformat(), "professional": self.ana.pk, "opening": "0"})
-        self.assertTrue(CashSession.objects.filter(professional=self.ana, business_date=yesterday).exists())
+        self.client.post(self.url, {"action": "open", "dia": yesterday.isoformat(), "opening": "0"})
+        self.assertTrue(CashSession.objects.filter(professional__isnull=True, business_date=yesterday).exists())
 
     def test_without_open_close_permission_the_panel_is_read_only(self):
         self.sheet(self.ana)
@@ -177,27 +183,30 @@ class CashPanelTests(TestCase):
     # ------------------------------------------------------------ relatório
 
     def test_report_filters_kpis_and_groupings(self):
-        ana, bruno = self.sheet(self.ana), self.sheet(self.bruno)
-        self.line(ana, "100", "cash")
-        self.line(ana, "60", "pix")
-        self.line(bruno, "90", "card")
-        s.close_clinic_cash(user=self.owner, unit=self.unit, amount="10", session_id=ana.pk, notes="Faltou troco")
+        today = self.sheet(None)
+        self.line(today, "100", "cash", self.ana)
+        self.line(today, "60", "pix", self.ana)
+        s.close_clinic_cash(user=self.owner, unit=self.unit, amount="10", session_id=today.pk, notes="Faltou troco")
+        earlier = self.sheet(None, day=self.today - timedelta(days=1))
+        self.line(earlier, "90", "card", self.bruno)
         report_url = reverse("clinic-cash-report")
-        page = self.client.get(report_url)
+        week = {"periodo": "7d"}
+        page = self.client.get(report_url, week)
         self.assertEqual(page.status_code, 200)
         self.assertEqual(page.context["kpis"]["received"], Decimal("250"))
         self.assertEqual({p["label"]: p["received"] for p in page.context["by_professional"]},
                          {"Dra. Ana Exemplo": Decimal("160"), "Dr. Bruno Exemplo": Decimal("90")})
-        self.assertEqual(len(page.context["by_day"]), 1)
-        only_ana = self.client.get(report_url, {"profissional": self.ana.pk})
-        self.assertEqual([r["label"] for r in only_ana.context["sheets"]], ["Dra. Ana Exemplo"])
-        divergent = self.client.get(report_url, {"status": "divergent"})
-        self.assertEqual([r["session"].pk for r in divergent.context["sheets"]], [ana.pk])
-        opened = self.client.get(report_url, {"status": "open"})
-        self.assertEqual([r["session"].pk for r in opened.context["sheets"]], [bruno.pk])
-        pix = self.client.get(report_url, {"forma": "pix"})
+        self.assertEqual(len(page.context["by_day"]), 2)
+        only_ana = self.client.get(report_url, {**week, "profissional": self.ana.pk})
+        self.assertEqual([r["session"].pk for r in only_ana.context["sheets"]], [today.pk])
+        self.assertEqual(only_ana.context["kpis"]["received"], Decimal("160"))
+        divergent = self.client.get(report_url, {**week, "status": "divergent"})
+        self.assertEqual([r["session"].pk for r in divergent.context["sheets"]], [today.pk])
+        opened = self.client.get(report_url, {**week, "status": "open"})
+        self.assertEqual([r["session"].pk for r in opened.context["sheets"]], [earlier.pk])
+        pix = self.client.get(report_url, {**week, "forma": "pix"})
         self.assertEqual(pix.context["kpis"]["received"], Decimal("60"))
-        empty = self.client.get(report_url, {"periodo": "mes-passado", "profissional": self.bruno.pk})
+        empty = self.client.get(report_url, {"periodo": "mes-passado", "profissional": self.ana.pk})
         self.assertContains(empty, "Nenhum caixa encontrado")
         self.assertTrue(AuditLog.objects.filter(action="clinic.cash_report.viewed").exists())
 
@@ -209,7 +218,7 @@ class CashPanelTests(TestCase):
         self.assertIn("attachment;", response["Content-Disposition"])
         body = response.content.decode("utf-8-sig")
         self.assertIn("Data;Caixa;Situação", body)
-        self.assertIn("Dra. Ana Exemplo;Aberto;1;123,45", body)
+        self.assertIn("Caixa da clínica;Aberto;1;123,45", body)
 
     def test_report_period_is_capped_and_custom_range_is_read(self):
         page = self.client.get(reverse("clinic-cash-report"), {"de": "2020-01-01", "ate": self.today.isoformat()})

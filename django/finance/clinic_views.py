@@ -29,7 +29,7 @@ class PaymentForm(forms.ModelForm):
 
 
 class CashForm(forms.Form):
-    professional=forms.ModelChoiceField(queryset=None,required=False,label='Caixa de',empty_label='Caixa da clínica (despesas e sem profissional)')
+    professional=forms.ModelChoiceField(queryset=None,required=False,label='Caixa de',empty_label='Caixa da clínica')
     session=forms.IntegerField(required=False,widget=forms.HiddenInput)
     amount=forms.DecimalField(label='Valor em dinheiro (R$)',max_digits=12,decimal_places=2,min_value=0,initial=0)
     notes=forms.CharField(label='Observações',max_length=500,required=False,widget=forms.Textarea(attrs={'rows':2}))
@@ -54,8 +54,10 @@ def desk(request):
     initial={'request_id':uuid.uuid4()}
     charge_form=ChargeForm(request.POST if action=='charge' else None,tenant=tenant,initial=initial,auto_id='charge_%s')
     chosen=request.GET.get('profissional') or ''
+    try:expense_day=forms.DateField(required=False).clean(request.GET.get('day'))
+    except ValidationError:expense_day=None
     expense_form=ExpenseForm(request.POST if action=='expense' else None,request.FILES if action=='expense' else None,tenant=tenant,
-        initial={'request_id':uuid.uuid4(),'professional':int(chosen) if chosen.isdigit() else None},auto_id='expense_%s')
+        initial={'request_id':uuid.uuid4(),'professional':int(chosen) if chosen.isdigit() else None,'day':expense_day},auto_id='expense_%s')
     withdrawal_form=WithdrawalForm(request.POST if action=='withdrawal' else None,tenant=tenant,
         initial={'request_id':uuid.uuid4(),'professional':int(chosen) if chosen.isdigit() else None},auto_id='withdrawal_%s')
     payment_form=PaymentForm(request.POST if action=='method' else None,auto_id='method_%s')
@@ -83,13 +85,16 @@ def desk(request):
                 services.create_charge(user=request.user,unit=unit,**charge_form.cleaned_data)
             elif action=='expense' and expense_form.is_valid():
                 data=expense_form.cleaned_data;data.pop('confirmed');data['image']=data.pop('photo')
-                services.expense(user=request.user,unit=unit,**data)
+                row=services.expense(user=request.user,unit=unit,**data)
+                if data['day']!=services.business_today(tenant):
+                    messages.success(request,f"Despesa lançada no caixa de {data['day']:%d/%m/%Y}.")
+                    return redirect('clinic-cash-sheet-detail',pk=row.session_id)
             elif action=='withdrawal' and withdrawal_form.is_valid():
                 data=withdrawal_form.cleaned_data;data.pop('confirmed')
                 services.withdraw(user=request.user,unit=unit,**data)
             elif action in {'open','close'} and cash_form.is_valid():
                 data=cash_form.cleaned_data
-                if action=='open':services.open_clinic_cash(request.user,unit,data['amount'],data['notes'],professional=data['professional'])
+                if action=='open':services.open_clinic_cash(request.user,unit,data['amount'],data['notes'])
                 else:services.close_clinic_cash(user=request.user,unit=unit,amount=data['amount'],notes=data['notes'],session_id=data['session'])
             elif action=='method' and payment_form.is_valid():
                 if ClinicPaymentMethod.objects.filter(tenant=tenant,name=payment_form.cleaned_data['name']).exists():
@@ -135,8 +140,8 @@ def desk(request):
         'charge_form':charge_form,'expense_form':expense_form,'withdrawal_form':withdrawal_form,'payment_form':payment_form,'pending':pending,
         'methods':ClinicPaymentMethod.objects.filter(tenant=tenant).order_by('kind','name'),
         'transactions':FinancialTransaction.objects.filter(tenant=tenant,unit=unit,status='paid',paid_at__gte=start,paid_at__lte=end).order_by('paid_at')[:300],
-        'expenses':ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,created_at__gte=start,created_at__lte=end).exclude(transaction__status='cancelled').select_related('transaction','session__professional')[:200],
-        'closings':ClinicCashClosing.objects.filter(session__tenant=tenant,session__unit=unit).select_related('session').order_by('-session__closed_at')[:30]})
+        'expenses':ClinicExpense.objects.filter(session__tenant=tenant,session__unit=unit,session__business_date=day,session__deleted_at__isnull=True).exclude(transaction__status='cancelled').select_related('transaction','session__professional','professional')[:200],
+        'closings':ClinicCashClosing.objects.filter(session__tenant=tenant,session__unit=unit,session__deleted_at__isnull=True).select_related('session').order_by('-session__closed_at')[:30]})
 
 
 @login_required

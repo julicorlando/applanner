@@ -9,8 +9,6 @@ from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
 
-from scheduling.models import Professional
-
 from .clinic_cash import KIND_LABEL, active_correction, report
 from .clinic_models import ClinicCashEntry, ClinicCashEntryRemoval, ClinicCashWithdrawal, ClinicExpense, ClinicReceipt
 from .models import CashSession
@@ -63,7 +61,21 @@ def sheet_card(session, today):
         "conference_rows": [(KIND_LABEL[kind], conference(session)[kind]) for kind in KINDS if kind in conference(session)],
         # Values the closing modal pre-fills as "esperado" per payment method.
         "expected": {"cash": data["drawer_expected"], "pix": kinds["pix"], "card": kinds["card"]},
+        "professionals": data["professionals"],
     }
+
+
+def _merge_professionals(cards):
+    """Soma o "por profissional" de todos os caixas do dia (normalmente um só, o da clínica)."""
+    rows = OrderedDict()
+    for card in cards:
+        for item in card["professionals"]:
+            row = rows.setdefault(item["professional"], {k: (ZERO if isinstance(v, Decimal) else 0) for k, v in item.items()
+                                                          if k != "professional"} | {"professional": item["professional"]})
+            for key, value in item.items():
+                if key != "professional":
+                    row[key] += value
+    return sorted(rows.values(), key=lambda r: (-r["total"], r["professional"]))
 
 
 def _sum_kinds(cards):
@@ -84,6 +96,7 @@ def day_overview(*, tenant, unit, day, today):
     # The clinic's own sheet (expenses, unassigned lines) goes last.
     cards.sort(key=lambda c: (c["session"].professional_id is None, c["label"].casefold()))
     with_sheet = {c["session"].professional_id for c in cards}
+    day_professionals = _merge_professionals(cards)
     received = sum((c["received"] for c in cards), ZERO)
     expenses = sum((c["expenses"] for c in cards), ZERO)
     removals = (ClinicCashEntryRemoval.objects.filter(entry__session__tenant=tenant, entry__session__unit=unit,
@@ -104,8 +117,7 @@ def day_overview(*, tenant, unit, day, today):
             "divergent": sum(c["status"] == "divergent" for c in cards),
         },
         "methods": _sum_kinds(cards),
-        "without_sheet": [p for p in Professional.objects.filter(tenant=tenant, active=True).order_by("name")
-                          if p.pk not in with_sheet],
+        "day_professionals": day_professionals,
         "clinic_sheet_missing": None not in with_sheet,
         "removals": list(removals), "overdue": list(overdue),
         "yesterday": today - timedelta(days=1), "prev_day": day - timedelta(days=1), "next_day": day + timedelta(days=1) if day < today else None,
@@ -133,14 +145,11 @@ def preset_range(key, today):
 
 
 def period_report(*, tenant, unit, start, end, today, professional="", status="", kind=""):
-    """professional: "" (all), "clinica" (the clinic's own sheet) or a professional id."""
+    """professional: "" (todos), "clinica" (lançamentos sem profissional) ou o id de um profissional.
+    O caixa é um só por dia: o filtro e o "por profissional" vêm de cada linha, despesa e retirada."""
     sessions = (CashSession.objects.filter(tenant=tenant, unit=unit, deleted_at__isnull=True,
                                            business_date__gte=start, business_date__lte=end)
                 .select_related("professional", "closed_by", "clinical_closing").order_by("-business_date", "professional__name"))
-    if professional == "clinica":
-        sessions = sessions.filter(professional__isnull=True)
-    elif str(professional).isdigit():
-        sessions = sessions.filter(professional_id=int(professional))
     rows = OrderedDict()
     for session in sessions:
         state = sheet_status(session, today)
@@ -156,56 +165,84 @@ def period_report(*, tenant, unit, start, end, today, professional="", status=""
     entries = ClinicCashEntry.objects.filter(session_id__in=ids).exclude(status=ClinicCashEntry.Status.CANCELLED)
     receipts = ClinicReceipt.objects.filter(session_id__in=ids)
     expenses = ClinicExpense.objects.filter(session_id__in=ids).exclude(transaction__status="cancelled")
+    withdrawals = ClinicCashWithdrawal.objects.filter(session_id__in=ids, cancelled_at__isnull=True)
+    if professional == "clinica":
+        entries = entries.filter(professional__isnull=True)
+        receipts = receipts.filter(installment__charge__professional__isnull=True)
+        expenses = expenses.filter(professional__isnull=True)
+        withdrawals = withdrawals.filter(professional__isnull=True)
+    elif str(professional).isdigit():
+        pid = int(professional)
+        entries = entries.filter(professional_id=pid)
+        receipts = receipts.filter(installment__charge__professional_id=pid)
+        expenses = expenses.filter(professional_id=pid)
+        withdrawals = withdrawals.filter(professional_id=pid)
     if kind in KINDS:
         entries = entries.filter(Q(method__kind=kind) | Q(status="open"))
         receipts = receipts.filter(method__kind=kind)
         expenses = expenses.filter(method__kind=kind)
-    for item in entries.values("session_id", "status", "method__kind").annotate(
+    people = OrderedDict()
+
+    def person(name):
+        return people.setdefault(name, {"label": name, "days": set(), "received": ZERO, "dentist": ZERO, "clinic": ZERO,
+                                        "other": ZERO, "open_total": ZERO, "expenses": ZERO, "lines": 0, "divergent": 0})
+    for item in entries.values("session_id", "session__business_date", "professional_name", "status", "method__kind").annotate(
             n=Count("pk"), total=Sum("total"), dentist=Sum("dentist_amount"), clinic=Sum("clinic_amount"), other=Sum("other_amount")):
         row = rows[item["session_id"]]
+        who = person(item["professional_name"] or "Sem profissional informado")
         row["lines"] += item["n"]
+        who["lines"] += item["n"]
+        who["days"].add(item["session__business_date"])
         if item["status"] == "open":
             if not kind:
                 row["open_total"] += item["total"] or ZERO
+                who["open_total"] += item["total"] or ZERO
             continue
         row["received"] += item["total"] or ZERO
+        who["received"] += item["total"] or ZERO
         row["kinds"][item["method__kind"]] = row["kinds"].get(item["method__kind"], ZERO) + (item["total"] or ZERO)
         for key in ("dentist", "clinic", "other"):
             row[key] += item[key] or ZERO
-    for item in receipts.values("session_id", "method__kind").annotate(n=Count("pk"), total=Sum("amount")):
+            who[key] += item[key] or ZERO
+    for item in receipts.values("session_id", "session__business_date", "installment__charge__professional__name",
+                                "method__kind").annotate(n=Count("pk"), total=Sum("amount")):
         row = rows[item["session_id"]]
+        who = person(item["installment__charge__professional__name"] or "Sem profissional informado")
         row["lines"] += item["n"]
         row["received"] += item["total"] or ZERO
         row["kinds"][item["method__kind"]] = row["kinds"].get(item["method__kind"], ZERO) + (item["total"] or ZERO)
-    for item in expenses.values("session_id").annotate(total=Sum("transaction__amount")):
+        who["lines"] += item["n"]
+        who["received"] += item["total"] or ZERO
+        who["days"].add(item["session__business_date"])
+    for item in expenses.values("session_id", "professional__name").annotate(total=Sum("transaction__amount")):
         rows[item["session_id"]]["expenses"] += item["total"] or ZERO
+        if item["professional__name"]:
+            person(item["professional__name"])["expenses"] += item["total"] or ZERO
     if kind in ("", None, "cash") or kind not in KINDS:
-        for item in (ClinicCashWithdrawal.objects.filter(session_id__in=ids, cancelled_at__isnull=True)
-                     .values("session_id").annotate(total=Sum("amount"))):
+        for item in withdrawals.values("session_id").annotate(total=Sum("amount")):
             rows[item["session_id"]]["withdrawals"] += item["total"] or ZERO
     sheets = list(rows.values())
+    if professional:
+        sheets = [r for r in sheets if r["lines"] or r["expenses"] or r["withdrawals"]]
     for row in sheets:
         row["net"] = row["received"] - row["expenses"]
         row["difference"] = row["session"].difference_amount if row["session"].status == "closed" else None
-    by_professional, by_day = OrderedDict(), OrderedDict()
+    by_day = OrderedDict()
     for row in sheets:
-        p = by_professional.setdefault(row["label"], {"label": row["label"], "sheets": 0, "received": ZERO, "dentist": ZERO,
-                                                       "clinic": ZERO, "other": ZERO, "open_total": ZERO, "expenses": ZERO,
-                                                       "lines": 0, "divergent": 0})
         d = by_day.setdefault(row["day"], {"day": row["day"], "sheets": 0, "open": 0, "received": ZERO, "expenses": ZERO,
                                            "open_total": ZERO, "divergent": 0})
-        for target in (p, d):
-            target["sheets"] += 1
-            target["received"] += row["received"]
-            target["expenses"] += row["expenses"]
-            target["open_total"] += row["open_total"]
-            target["divergent"] += row["status"] == "divergent"
-        for key in ("dentist", "clinic", "other", "lines"):
-            p[key] += row[key]
+        d["sheets"] += 1
+        d["received"] += row["received"]
+        d["expenses"] += row["expenses"]
+        d["open_total"] += row["open_total"]
+        d["divergent"] += row["status"] == "divergent"
         d["open"] += row["session"].status == "open"
     for d in by_day.values():
         d["net"] = d["received"] - d["expenses"]
-    professionals = sorted(by_professional.values(), key=lambda r: (-r["received"], r["label"]))
+    for p in people.values():
+        p["sheets"] = len(p.pop("days"))
+        p["dentist_net"] = p["dentist"] - p["expenses"]
+    professionals = sorted(people.values(), key=lambda r: (-r["received"], r["label"]))
     top = professionals[0]["received"] if professionals else ZERO
     for p in professionals:
         p["share"] = int(round(p["received"] * 100 / top)) if top else 0

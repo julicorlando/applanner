@@ -127,7 +127,7 @@ class DailyCashByProfessionalTests(TestCase):
         summary = {r["professional"]: r for r in closed.clinical_closing.summary["professionals"]}
         self.assertEqual(summary["Dr. Listado"]["total"], "100.00")
 
-    def test_one_sheet_per_professional_per_day_and_earlier_days_stay_editable(self):
+    def test_one_clinic_sheet_per_day_and_earlier_days_stay_editable(self):
         from datetime import timedelta
         from django.db import transaction
         from django.utils import timezone
@@ -135,9 +135,8 @@ class DailyCashByProfessionalTests(TestCase):
             mine = s.day_sheet(self.tenant, self.unit, self.dentist, self.reception)
             again = s.day_sheet(self.tenant, self.unit, self.dentist, self.reception)
             theirs = s.day_sheet(self.tenant, self.unit, None, self.reception)
-        self.assertEqual(mine.pk, again.pk)
-        self.assertNotEqual(mine.pk, theirs.pk)
-        self.assertEqual(mine.label, "Dr. Listado")
+        self.assertEqual({mine.pk, again.pk, theirs.pk}, {self.session.pk})
+        self.assertEqual(mine.label, "Caixa da clínica")
         yesterday = timezone.localdate() - timedelta(days=1)
         type(self.session).objects.filter(pk=self.session.pk).update(business_date=yesterday,
                                                                      opened_at=timezone.now() - timedelta(days=1))
@@ -251,3 +250,129 @@ class CashWithdrawalTests(TestCase):
             "action": "withdrawal", "request_id": str(uuid.uuid4()), "professional": "", "amount": "10", "method": self.cash.pk,
             "withdrawn_by": "Banco", "destination": "bank", "notes": "", "confirmed": "on"})
         self.assertEqual(response.status_code, 302)
+
+
+class UnifiedClinicCashTests(TestCase):
+    """Um caixa da clínica por dia: despesa com data escolhida e unificação dos caixas antigos por profissional."""
+    setUp = ClinicCashSheetTests.setUp
+    entry = ClinicCashSheetTests.entry
+
+    def second_dentist(self):
+        from billing.models import Module, TenantModuleAddon
+        extra, _ = Module.objects.get_or_create(slug="dental-professional-extra", defaults={"name": "Dentista extra", "active": True})
+        TenantModuleAddon.objects.create(tenant=self.tenant, module=extra, monthly_price=0, quantity=2,
+                                         status=TenantModuleAddon.Status.ACTIVE)
+        return Professional.objects.create(tenant=self.tenant, name="Dra. Segunda")
+
+    def legacy_sheet(self, professional, day=None, opening="0"):
+        from django.utils import timezone
+        from .models import CashSession
+        return CashSession.objects.create(tenant=self.tenant, unit=self.unit, professional=professional,
+                                          business_date=day or s.business_today(self.tenant), opened_by=self.reception,
+                                          opened_at=timezone.now(), opening_amount=Decimal(opening))
+
+    def test_expense_on_an_earlier_day_goes_to_that_day_clinic_sheet(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        yesterday = s.business_today(self.tenant) - timedelta(days=1)
+        row = s.expense(user=self.owner, unit=self.unit, description="Conta de luz", amount="80", method=self.pix,
+                        invoice="", items="", image=None, request_id=uuid.uuid4(), day=yesterday)
+        self.assertEqual(row.session.business_date, yesterday)
+        self.assertIsNone(row.session.professional_id)
+        self.assertEqual(row.transaction.competence_at, yesterday)
+        self.assertEqual(timezone.localtime(row.transaction.paid_at).date(), yesterday)
+        with self.assertRaises(ValidationError):
+            s.expense(user=self.owner, unit=self.unit, description="Futuro", amount="1", method=self.pix, invoice="",
+                      items="", image=None, request_id=uuid.uuid4(), day=yesterday + timedelta(days=5))
+        from . import reception_permissions as perms
+        values = perms.current(self.tenant)
+        values.update(dias_anteriores=False)
+        perms.save(self.tenant, self.owner, values)
+        self.reception.refresh_from_db()
+        with self.assertRaises(PermissionDenied):
+            s.expense(user=self.reception, unit=self.unit, description="Atrasada", amount="1", method=self.pix, invoice="",
+                      items="", image=None, request_id=uuid.uuid4(), day=yesterday)
+
+    def test_desk_expense_with_a_chosen_date_opens_that_day_sheet(self):
+        from datetime import timedelta
+        from .clinic_models import ClinicExpense
+        self.client.force_login(self.owner)
+        yesterday = s.business_today(self.tenant) - timedelta(days=1)
+        response = self.client.post(reverse("clinic-finance-desk"), {
+            "action": "expense", "request_id": str(uuid.uuid4()), "day": yesterday.isoformat(), "description": "Gás",
+            "amount": "35", "method": self.cash.pk, "professional": "", "confirmed": "on"})
+        row = ClinicExpense.objects.get(transaction__description="Gás")
+        self.assertRedirects(response, reverse("clinic-cash-sheet-detail", args=[row.session_id]), fetch_redirect_response=False)
+        self.assertEqual(row.session.business_date, yesterday)
+        page = self.client.get(reverse("clinic-finance-desk"), {"day": yesterday.isoformat()})
+        self.assertContains(page, "Gás")
+        self.assertContains(page, "Data da despesa")
+
+    def test_merge_day_joins_professional_sheets_without_changing_totals(self):
+        from django.utils import timezone
+        from .clinic_models import ClinicCashMerge, ClinicCashWithdrawal, ClinicExpense
+        from .models import CashSession
+        other = self.second_dentist()
+        self.entry(method="pix")  # clinic sheet: Dr. Listado R$ 100
+        legacy = self.legacy_sheet(other, opening="20")
+        cash.add_entry(user=self.reception, session_id=legacy.pk, customer=self.patient, professional=other,
+                       professional_name="", dentist_amount="70", clinic_amount="30", other_amount="0", method=self.cash,
+                       notes="", request_id=uuid.uuid4())
+        expense = s.expense(user=self.reception, unit=self.unit, description="Broca", amount="10", method=self.cash,
+                            invoice="", items="", image=None, request_id=uuid.uuid4())
+        ClinicExpense.objects.filter(pk=expense.pk).update(session=legacy, professional=None)
+        ClinicCashWithdrawal.objects.create(session=legacy, amount=Decimal("5"), method=self.cash, method_name="Dinheiro",
+                                            withdrawn_by="Dra. Segunda", destination="partner", recorded_by=self.reception,
+                                            occurred_at=timezone.now(), request_id=uuid.uuid4())
+        drawer = cash.expected_cash(self.session) + cash.expected_cash(legacy)
+        with self.assertRaises(PermissionDenied):
+            cash.merge_day(user=self.reception, unit=self.unit, day=self.session.business_date)
+        target = cash.merge_day(user=self.owner, unit=self.unit, day=self.session.business_date)
+        self.assertEqual(target.pk, self.session.pk)
+        self.assertEqual(list(CashSession.objects.filter(tenant=self.tenant, deleted_at__isnull=True)), [target])
+        legacy.refresh_from_db()
+        self.assertIsNotNone(legacy.deleted_at)
+        self.assertEqual(sorted(target.clinical_entries.values_list("number", flat=True)), [1, 2])
+        self.assertEqual(target.opening_amount, Decimal("70"))
+        self.assertEqual(cash.expected_cash(target), drawer)
+        expense.refresh_from_db()
+        self.assertEqual((expense.session_id, expense.professional_id), (target.pk, other.pk))
+        rows = {r["professional"]: r for r in cash.by_professional(target)}
+        self.assertEqual(rows["Dra. Segunda"]["total"], Decimal("100"))
+        self.assertEqual(rows["Dra. Segunda"]["expenses"], Decimal("10"))
+        self.assertEqual(rows["Dr. Listado"]["total"], Decimal("100"))
+        merge = ClinicCashMerge.objects.get(source=legacy)
+        self.assertEqual(len(merge.moved["entries"]), 1)
+        self.assertIsNone(cash.merge_day(user=self.owner, unit=self.unit, day=self.session.business_date))
+
+    def test_merge_of_a_closed_day_sums_the_counted_cash(self):
+        from datetime import timedelta
+        from .models import CashSession
+        yesterday = s.business_today(self.tenant) - timedelta(days=1)
+        other = self.second_dentist()
+        first, second = self.legacy_sheet(self.dentist, yesterday, "10"), self.legacy_sheet(other, yesterday, "0")
+        for sheet, value in ((first, "40"), (second, "25")):
+            cash.add_entry(user=self.owner, session_id=sheet.pk, customer=self.patient, professional=sheet.professional,
+                           professional_name="", dentist_amount=value, clinic_amount="0", other_amount="0",
+                           method=self.cash, notes="", request_id=uuid.uuid4())
+        s.close_clinic_cash(user=self.owner, unit=self.unit, amount="50", session_id=first.pk)   # exato
+        s.close_clinic_cash(user=self.owner, unit=self.unit, amount="20", session_id=second.pk)  # faltam 5
+        target = cash.merge_day(user=self.owner, unit=self.unit, day=yesterday)
+        self.assertEqual(target.status, "closed")
+        self.assertIsNone(target.professional_id)
+        self.assertEqual((target.closing_amount, target.expected_amount, target.difference_amount),
+                         (Decimal("70"), Decimal("75"), Decimal("-5")))
+        summary = target.clinical_closing.summary
+        self.assertEqual(summary["unified_from"], 2)
+        self.assertEqual({p["professional"] for p in summary["professionals"]}, {"Dr. Listado", "Dra. Segunda"})
+        self.assertEqual(CashSession.objects.filter(business_date=yesterday, deleted_at__isnull=True).count(), 1)
+
+    def test_cash_days_page_offers_and_runs_the_unification(self):
+        other = self.second_dentist()
+        self.legacy_sheet(other)
+        self.client.force_login(self.owner)
+        url = reverse("clinic-cash-days")
+        self.assertContains(self.client.get(url), "Unificar todos os dias")
+        response = self.client.post(url, {"action": "merge-all"}, follow=True)
+        self.assertContains(response, "unificados no caixa da clínica")
+        self.assertNotContains(self.client.get(url), "Unificar todos os dias")

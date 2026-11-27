@@ -159,7 +159,7 @@ def add_entry(*, user, session_id, customer, professional, professional_name, de
         tenant=tenant, unit=session.unit, type="income", source_type="clinic-cash-entry",
         status="paid" if method else "pending", paid_at=now if method else None,
         payment_method=method.kind if method else "", amount=total,
-        description=f"Caixa {day:%d/%m/%Y} · {session.label} · {customer.name}"[:190],
+        description=f"Caixa {day:%d/%m/%Y} · {label} · {customer.name}"[:190],
         competence_at=day,
         due_at=None if method else day,
         idempotency_key=f"clinic-cash-entry:{request_id}",
@@ -214,7 +214,8 @@ def update_entry(*, user, entry_id, customer, professional, professional_name, d
     tx.payment_method = method.kind if method else ""
     tx.status = "paid" if method else "pending"
     tx.paid_at = (tx.paid_at or _entry_time(session)) if method else None
-    tx.due_at = None if method else timezone.localtime(session.opened_at).date()
+    from .clinic_services import session_day
+    tx.due_at = None if method else session_day(session)
     tx.save(update_fields=["amount", "payment_method", "status", "paid_at", "due_at", "updated_at"])
     append_audit(tenant=tenant, user=user, action="clinic.cash_entry.updated", entity_type="ClinicCashEntry", entity_id=row.pk,
                  before=before, after=_snapshot(row))
@@ -345,13 +346,15 @@ def finish_correction(*, user, correction_id):
 
 
 def by_professional(session):
-    """Day's closing split per professional: what each dentist produced on this sheet."""
+    """Fechamento do dia por profissional: o que cada dentista recebeu neste caixa (parte dele e da clínica)
+    e as despesas marcadas para ele."""
     rows = {}
 
     def line(name):
         return rows.setdefault(name or "Sem profissional informado", {
             "professional": name or "Sem profissional informado", "patients": 0, "dentist": Decimal(0),
-            "clinic": Decimal(0), "other": Decimal(0), "total": Decimal(0), "open": Decimal(0)})
+            "clinic": Decimal(0), "other": Decimal(0), "total": Decimal(0), "open": Decimal(0),
+            "expenses": Decimal(0)})
 
     for row in session.clinical_entries.exclude(status="cancelled"):
         item = line(row.professional_name)
@@ -368,6 +371,11 @@ def by_professional(session):
         item = line(professional.name if professional else "")
         item["patients"] += 1
         item["total"] += receipt.amount
+    for expense in (ClinicExpense.objects.filter(session=session, professional__isnull=False)
+                    .exclude(transaction__status="cancelled").select_related("professional", "transaction")):
+        line(expense.professional.name)["expenses"] += expense.transaction.amount
+    for item in rows.values():
+        item["dentist_net"] = item["dentist"] - item["expenses"]
     return sorted(rows.values(), key=lambda r: (-r["total"], r["professional"]))
 
 
@@ -394,7 +402,7 @@ def report(session):
         columns["total"] += receipt.amount
         by_kind[receipt.method.kind] = by_kind.get(receipt.method.kind, Decimal(0)) + receipt.amount
     expenses = list(ClinicExpense.objects.filter(session=session).exclude(transaction__status="cancelled")
-                    .select_related("transaction", "recorded_by", "method").order_by("created_at", "pk"))
+                    .select_related("transaction", "recorded_by", "method", "professional").order_by("created_at", "pk"))
     withdrawals = list(ClinicCashWithdrawal.objects.filter(session=session, cancelled_at__isnull=True)
                        .select_related("recorded_by", "converted_from__transaction").order_by("occurred_at", "pk"))
     opened = timezone.localtime(session.opened_at)
@@ -563,14 +571,8 @@ def cash_sheet(request, pk=None):
     if request.method == "POST":
         try:
             if action == "add" and form.is_valid():
+                # Um caixa só por dia: a linha fica nesta folha, ligada ao profissional escolhido.
                 target = session
-                chosen = form.cleaned_data.get("professional")
-                if session.professional_id and chosen and chosen.pk != session.professional_id:
-                    # Each professional has their own sheet for the day: send the line to it.
-                    from .clinic_services import day_sheet, session_day
-                    with transaction.atomic():
-                        target = day_sheet(tenant, session.unit, chosen, request.user, day=session_day(session))
-                    messages.info(request, f"Lançado no caixa de {target.label} do mesmo dia.")
                 _require_closed_confirmation(request, target)
                 add_split_entry(user=request.user, session_id=target.pk, **_payload(form))
             elif action == "update" and form.is_valid() and form.cleaned_data.get("entry_id"):
@@ -632,8 +634,10 @@ def cash_sheet(request, pk=None):
         "manager": is_manager(request.user), "gestor": gestor(request.user),
         "can_delete_line": allowed(request.user, "apagar_lancamento"), "pending_removals": list(pending.values()),
         "history": sessions.filter(unit=session.unit).order_by("-opened_at")[:15],
-        # Expenses are always recorded on today's sheet, so the shortcut only shows on an open sheet of today.
-        "can_expense": _is_today_open(session, tenant) and allowed(request.user, "despesas"),
+        # A despesa pode ser lançada no dia desta folha (hoje ou anterior, conforme a permissão da recepção).
+        "can_expense": can_edit(session, request.user) and allowed(request.user, "despesas")
+        and (_is_today_open(session, tenant) or allowed(request.user, "dias_anteriores")),
+        "sheet_day": session_day(session),
         "can_cancel_withdrawal": (gestor(request.user) and bool(context.get("correction"))) if session.status == CashSession.Status.CLOSED
         else True,
         "me": request.user.pk,
@@ -783,3 +787,144 @@ def convert_expense(*, user, expense_id, reason):
                  after={"withdrawal": row.pk, "reason": reason, "session": session.pk})
     refresh_closed(session, user)
     return row
+
+
+def _day_totals(sessions):
+    """Recebido, despesas, retiradas e fundo de um grupo de caixas (para conferir a unificação)."""
+    received = expenses = withdrawals = opening = Decimal(0)
+    for session in sessions:
+        data = report(session)
+        received += data["columns"]["total"]
+        expenses += data["expenses_total"]
+        withdrawals += data["withdrawals_total"]
+        opening += session.opening_amount
+    return {"received": received, "expenses": expenses, "withdrawals": withdrawals, "opening": opening}
+
+
+def _merged_conference(closings):
+    """Soma a conferência por forma de pagamento dos fechamentos que existiam."""
+    merged = {}
+    for summary in closings:
+        for kind, row in (summary.get("conference") or {}).items():
+            item = merged.setdefault(kind, {"expected": Decimal(0), "informed": Decimal(0), "difference": Decimal(0)})
+            for key in item:
+                item[key] += Decimal(str(row.get(key) or 0))
+    return {kind: {k: format(v, ".2f") for k, v in row.items()} for kind, row in merged.items()}
+
+
+@transaction.atomic
+def merge_day(*, user, unit, day):
+    """Junta os caixas por profissional de um dia no caixa da clínica. Nada é apagado de verdade: cada caixa
+    antigo fica guardado (oculto das listas) e o ClinicCashMerge registra o que saiu dele. Os totais do dia
+    (recebido, despesas, retiradas, fundo e dinheiro contado) precisam ficar iguais, senão nada muda."""
+    from .clinic_models import ClinicCashCorrection, ClinicCashMerge
+    from .clinic_services import period_summary
+    from .reception_permissions import is_manager as gestor
+    if not gestor(user):
+        raise PermissionDenied("Somente o gestor unifica os caixas de um dia.")
+    tenant = lock_company(user)
+    sessions = list(CashSession.objects.select_for_update().filter(
+        tenant=tenant, unit=unit, business_date=day, deleted_at__isnull=True).order_by("pk"))
+    if not sessions or (len(sessions) == 1 and not sessions[0].professional_id):
+        return None
+    before = _day_totals(sessions)
+    counted_before = sum((s.closing_amount or Decimal(0) for s in sessions if s.status == CashSession.Status.CLOSED), Decimal(0))
+    closings = [c.summary or {} for c in ClinicCashClosing.objects.filter(session__in=sessions)]
+    target = next((s for s in sessions if not s.professional_id), sessions[0])
+    sources = [s for s in sessions if s.pk != target.pk]
+    any_open = any(s.status == CashSession.Status.OPEN for s in sessions)
+    target_was = {"professional": target.label, "status": target.status, "opening": str(target.opening_amount),
+                  "closing": str(target.closing_amount) if target.closing_amount is not None else None}
+    number = target.clinical_entries.aggregate(v=Max("number"))["v"] or 0
+    # Linhas do caixa que fica: guardam o profissional dele, que deixa de ser o dono do caixa.
+    if target.professional_id:
+        ClinicExpense.objects.filter(session=target, professional__isnull=True).update(professional=target.professional)
+        ClinicCashWithdrawal.objects.filter(session=target, professional__isnull=True).update(professional=target.professional)
+    now = timezone.now()
+    for source in sources:
+        moved = {"professional": source.label, "status": source.status, "opening": str(source.opening_amount),
+                 "closing": str(source.closing_amount) if source.closing_amount is not None else None,
+                 "entries": [], "receipts": [], "expenses": [], "withdrawals": [], "corrections": []}
+        for row in source.clinical_entries.select_for_update().order_by("number", "pk"):
+            number += 1
+            moved["entries"].append({"id": row.pk, "number": row.number})
+            ClinicCashEntry.objects.filter(pk=row.pk).update(session=target, number=number)
+        moved["receipts"] = list(ClinicReceipt.objects.filter(session=source).values_list("pk", flat=True))
+        ClinicReceipt.objects.filter(session=source).update(session=target)
+        moved["expenses"] = list(ClinicExpense.objects.filter(session=source).values_list("pk", flat=True))
+        if source.professional_id:
+            ClinicExpense.objects.filter(session=source, professional__isnull=True).update(professional=source.professional)
+            ClinicCashWithdrawal.objects.filter(session=source, professional__isnull=True).update(professional=source.professional)
+        ClinicExpense.objects.filter(session=source).update(session=target)
+        moved["withdrawals"] = list(ClinicCashWithdrawal.objects.filter(session=source).values_list("pk", flat=True))
+        ClinicCashWithdrawal.objects.filter(session=source).update(session=target)
+        moved["corrections"] = list(ClinicCashCorrection.objects.filter(session=source).values_list("pk", flat=True))
+        ClinicCashCorrection.objects.filter(session=source).update(session=target)
+        target.opening_amount += source.opening_amount
+        target.opened_at = min(target.opened_at, source.opened_at)
+        if source.notes:
+            target.notes = f"{target.notes}\n{source.label}: {source.notes}".strip()[:500]
+        ClinicCashMerge.objects.create(target=target, source=source, moved=moved, merged_by=user)
+        source.deleted_at, source.deleted_by = now, user
+        source.deleted_reason = f"Unificado no caixa da clínica #{target.pk}"
+        if source.status == CashSession.Status.OPEN:
+            source.status, source.closed_at, source.closed_by = CashSession.Status.CLOSED, now, user
+        source.save()
+    target.professional = None
+    if any_open:
+        target.status, target.closed_at, target.closed_by = CashSession.Status.OPEN, None, None
+        target.closing_amount = target.expected_amount = target.difference_amount = None
+    else:
+        last = max(sessions, key=lambda s: s.closed_at or s.opened_at)
+        target.status = CashSession.Status.CLOSED
+        target.closed_at, target.closed_by = last.closed_at, last.closed_by
+        target.closing_amount = counted_before
+    target.save()
+    if not any_open:
+        target.expected_amount = expected_cash(target)
+        target.difference_amount = target.closing_amount - target.expected_amount
+        target.save(update_fields=["expected_amount", "difference_amount"])
+        data = report(target)
+        window = period_summary(tenant, target.unit, target.opened_at, target.closed_at)
+        conference = _merged_conference(closings)
+        summary = {"professional": target.label, "day": day.isoformat(), "charged": window["charged"],
+                   "received": format(data["columns"]["total"], ".2f"), "expenses": format(data["expenses_total"], ".2f"),
+                   "withdrawals": format(data["withdrawals_total"], ".2f"),
+                   "net": format(data["columns"]["total"] - data["expenses_total"], ".2f"),
+                   "pending": format(data["open_total"], ".2f"),
+                   "methods": [{"method": label, "type": "income", "amount": format(value, ".2f")} for label, value in data["kinds"]],
+                   "opening": str(target.opening_amount), "cash_expected": str(target.expected_amount),
+                   "cash_counted": str(target.closing_amount), "difference": str(target.difference_amount),
+                   "from": target.opened_at.isoformat(), "to": target.closed_at.isoformat(),
+                   "professionals": [{k: (format(v, ".2f") if isinstance(v, Decimal) else v) for k, v in r.items()}
+                                     for r in by_professional(target)],
+                   "conference": conference, "divergent": [k for k, r in conference.items() if Decimal(r["difference"])],
+                   "unified_from": len(sessions)}
+        ClinicCashClosing.objects.update_or_create(session=target, defaults={"summary": summary})
+    else:
+        ClinicCashClosing.objects.filter(session=target).delete()
+    after = _day_totals([target])
+    if after != before:
+        raise ValidationError(f"A unificação de {day:%d/%m/%Y} mudaria os totais do dia. Nada foi alterado.")
+    append_audit(tenant=tenant, user=user, action="clinic.cash.unified", entity_type="CashSession", entity_id=target.pk,
+                 before={"target": target_was, "sources": [s.pk for s in sources]},
+                 after={"day": day.isoformat(), **{k: str(v) for k, v in after.items()}, "status": target.status,
+                        "cash_counted": str(target.closing_amount) if target.closing_amount is not None else None})
+    return target
+
+
+def merge_all(*, user, unit):
+    """Unifica todos os dias que ainda têm caixas por profissional. Cada dia é independente: um dia com problema
+    não impede os outros e é devolvido para conferência."""
+    from django.db.models import Count, Q
+    days = (CashSession.objects.filter(tenant=user.tenant, unit=unit, deleted_at__isnull=True, business_date__isnull=False)
+            .values("business_date").annotate(n=Count("pk"), pros=Count("pk", filter=Q(professional__isnull=False)))
+            .filter(Q(n__gt=1) | Q(pros__gt=0)).order_by("business_date"))
+    done, failed = [], []
+    for item in days:
+        try:
+            if merge_day(user=user, unit=unit, day=item["business_date"]):
+                done.append(item["business_date"])
+        except ValidationError as exc:
+            failed.append((item["business_date"], " ".join(exc.messages)))
+    return done, failed
