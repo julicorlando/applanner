@@ -257,6 +257,13 @@ class UnifiedClinicCashTests(TestCase):
     setUp = ClinicCashSheetTests.setUp
     entry = ClinicCashSheetTests.entry
 
+    def second_dentist(self):
+        from billing.models import Module, TenantModuleAddon
+        extra, _ = Module.objects.get_or_create(slug="dental-professional-extra", defaults={"name": "Dentista extra", "active": True})
+        TenantModuleAddon.objects.create(tenant=self.tenant, module=extra, monthly_price=0, quantity=2,
+                                         status=TenantModuleAddon.Status.ACTIVE)
+        return Professional.objects.create(tenant=self.tenant, name="Dra. Segunda")
+
     def legacy_sheet(self, professional, day=None, opening="0"):
         from django.utils import timezone
         from .models import CashSession
@@ -305,7 +312,7 @@ class UnifiedClinicCashTests(TestCase):
         from django.utils import timezone
         from .clinic_models import ClinicCashMerge, ClinicCashWithdrawal, ClinicExpense
         from .models import CashSession
-        other = Professional.objects.create(tenant=self.tenant, name="Dra. Segunda")
+        other = self.second_dentist()
         self.entry(method="pix")  # clinic sheet: Dr. Listado R$ 100
         legacy = self.legacy_sheet(other, opening="20")
         cash.add_entry(user=self.reception, session_id=legacy.pk, customer=self.patient, professional=other,
@@ -342,7 +349,7 @@ class UnifiedClinicCashTests(TestCase):
         from datetime import timedelta
         from .models import CashSession
         yesterday = s.business_today(self.tenant) - timedelta(days=1)
-        other = Professional.objects.create(tenant=self.tenant, name="Dra. Segunda")
+        other = self.second_dentist()
         first, second = self.legacy_sheet(self.dentist, yesterday, "10"), self.legacy_sheet(other, yesterday, "0")
         for sheet, value in ((first, "40"), (second, "25")):
             cash.add_entry(user=self.owner, session_id=sheet.pk, customer=self.patient, professional=sheet.professional,
@@ -361,7 +368,7 @@ class UnifiedClinicCashTests(TestCase):
         self.assertEqual(CashSession.objects.filter(business_date=yesterday, deleted_at__isnull=True).count(), 1)
 
     def test_cash_days_page_offers_and_runs_the_unification(self):
-        other = Professional.objects.create(tenant=self.tenant, name="Dra. Segunda")
+        other = self.second_dentist()
         self.legacy_sheet(other)
         self.client.force_login(self.owner)
         url = reverse("clinic-cash-days")

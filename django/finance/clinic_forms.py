@@ -34,7 +34,7 @@ class ReceiptForm(forms.Form):
 
 
 class ExpenseForm(ReceiptForm):
-    day=forms.DateField(label='Data da despesa',widget=forms.DateInput(attrs={'type':'date'},format='%Y-%m-%d'),
+    day=forms.DateField(label='Data da despesa',required=False,widget=forms.DateInput(attrs={'type':'date'},format='%Y-%m-%d'),
         help_text='Hoje ou um dia anterior. Ela entra no caixa da clínica desse dia.')
     professional=forms.ModelChoiceField(label='Despesa de qual profissional (opcional)',queryset=Professional.objects.none(),required=False,
         empty_label='Despesa geral da clínica',
@@ -56,7 +56,7 @@ class ExpenseForm(ReceiptForm):
             self.fields['day'].widget.attrs['max']=self.today.isoformat()
             self.fields['day'].initial=self.initial.get('day') or self.today
     def clean_day(self):
-        day=self.cleaned_data['day']
+        day=self.cleaned_data.get('day') or self.today
         if self.today and day>self.today:raise ValidationError('A data da despesa não pode ser futura.')
         return day
     def clean_photo(self):

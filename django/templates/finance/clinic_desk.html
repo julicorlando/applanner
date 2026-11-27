@@ -49,7 +49,7 @@
   <div class="cp-card-body"><p class="cp-total">R$ {{ sheet.expected_now|money_pt }}<small>dinheiro na gaveta</small></p></div>
   <div class="cp-card-foot"><a class="cp-btn" href="{% url 'clinic-cash-sheet-detail' sheet.pk %}">{% if sheet.status == 'open' %}Abrir folha e lançar{% else %}Ver folha{% endif %}</a></div>
 </article>{% endfor %}</div>
-{% else %}<div class="cp-empty"><strong>Nenhum caixa aberto neste dia</strong>O caixa da clínica é criado sozinho no primeiro recebimento do dia, ou abra com fundo de troco no caixa do dia.
+{% else %}<div class="cp-empty"><strong>{% if is_today %}Nenhum caixa aberto hoje{% else %}Nenhum caixa aberto neste dia{% endif %}</strong>O caixa da clínica é criado sozinho no primeiro recebimento do dia, ou abra com fundo de troco no caixa do dia.
 <p style="margin-top:14px"><a class="cp-btn is-primary" href="{% url 'clinic-cash-panel' %}?dia={{ day|date:'Y-m-d' }}">Ir para o caixa do dia</a></p></div>{% endif %}
 
 <div class="cp-section-title"><h2>Atendimentos do dia</h2><span>Aguardando: <strong>{{ waiting_count }}</strong> · Em atendimento: <strong>{{ attending_count }}</strong> · Atendidos: <strong>{{ completed_count }}</strong></span></div>
