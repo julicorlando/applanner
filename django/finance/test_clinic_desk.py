@@ -251,7 +251,7 @@ class ClinicDeskTests(TestCase):
         self.charge()
         response=self.client.get(reverse('clinic-finance-desk'))
         self.assertContains(response,'Nenhum caixa aberto hoje')
-        self.assertContains(response,'Cada profissional tem o seu caixa por dia')
+        self.assertContains(response,'Um caixa só, da clínica')
         self.assertNotContains(response,'Cadastrar modalidade')
 
     def test_expense_review_requires_management_and_preserves_paid_movement(self):
