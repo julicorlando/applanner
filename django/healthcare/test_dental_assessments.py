@@ -353,7 +353,7 @@ class DentalAssessmentTests(TestCase):
         self.assertTrue(response.context['form'].errors)
         self.assertEqual(response.context['totals']['amount'],0)
 
-    def test_treatment_receipt_goes_to_the_plan_dentist_day_sheet_once(self):
+    def test_treatment_receipt_goes_to_the_clinic_day_sheet_once_linked_to_the_dentist(self):
         from tenants.models import Unit
         from .clinical import change_treatment_status
         from finance.models import FinancialTransaction,CashSession
@@ -380,15 +380,15 @@ class DentalAssessmentTests(TestCase):
         self.assertEqual(self.client.post(url,post).status_code,302)
         tx.refresh_from_db();self.assertEqual(tx.status,'paid')
         entry=ClinicCashEntry.objects.get(transaction=tx)
-        self.assertEqual(entry.session.professional_id,self.professional.pk)
+        self.assertEqual(entry.session_id,clinic_sheet.pk)
+        self.assertEqual(entry.professional_id,self.professional.pk)
         self.assertEqual(entry.total,tx.amount)
-        self.assertEqual(CashSession.objects.filter(tenant=self.tenant,professional=self.professional).count(),1)
-        self.assertEqual(expected_cash(clinic_sheet),0)
-        self.assertEqual(expected_cash(entry.session),180)
+        self.assertFalse(CashSession.objects.filter(tenant=self.tenant,professional=self.professional).exists())
+        self.assertEqual(expected_cash(clinic_sheet),180)
         self.assertEqual(FinancialTransaction.objects.filter(tenant=self.tenant,type='income',status='paid').count(),1)
         cancel_entry(user=self.owner,entry_id=entry.pk,reason='Lançado no paciente errado')
         reopened=FinancialTransaction.objects.get(tenant=self.tenant,source_type='clinical-plan',status='pending')
         self.assertEqual(reopened.amount,tx.amount)
         self.client.post(url,{**post,'transaction':reopened.pk})
         reopened.refresh_from_db();self.assertEqual(reopened.status,'paid')
-        self.assertEqual(CashSession.objects.filter(tenant=self.tenant,professional=self.professional).count(),1)
+        self.assertEqual(CashSession.objects.filter(tenant=self.tenant,deleted_at__isnull=True).count(),1)

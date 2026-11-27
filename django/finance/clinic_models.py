@@ -73,6 +73,8 @@ class ClinicExpense(TimeStampedModel):
     receipt_encrypted=models.BinaryField(blank=True,default=bytes)
     receipt_mime=models.CharField(max_length=30,blank=True)
     request_id=models.UUIDField(unique=True)
+    # Despesa de um profissional: fica no caixa da clínica, marcada para ele no fechamento.
+    professional=models.ForeignKey('scheduling.Professional',on_delete=models.PROTECT,null=True,blank=True,related_name='clinic_expenses')
 
 
 class ClinicCashClosing(models.Model):
@@ -171,6 +173,17 @@ class ClinicCashWithdrawal(models.Model):
     cancelled_at=models.DateTimeField(null=True,blank=True)
     cancelled_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.PROTECT,related_name='+')
     cancel_reason=models.CharField(max_length=300,blank=True)
+    professional=models.ForeignKey('scheduling.Professional',on_delete=models.PROTECT,null=True,blank=True,related_name='clinic_withdrawals')
 
     class Meta:
         indexes=[models.Index(fields=['session','cancelled_at'],name='finance_withdraw_session_idx')]
+
+
+class ClinicCashMerge(models.Model):
+    """Caixas por profissional de um dia unificados no caixa da clínica. Guarda o que saiu de cada caixa
+    (ids das linhas, despesas, retiradas e recebimentos), para conferência e para desfazer se preciso."""
+    target=models.ForeignKey('finance.CashSession',on_delete=models.PROTECT,related_name='merges_in')
+    source=models.OneToOneField('finance.CashSession',on_delete=models.PROTECT,related_name='merged_out')
+    moved=models.JSONField()
+    merged_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='+')
+    created_at=models.DateTimeField(auto_now_add=True)

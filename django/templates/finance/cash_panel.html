@@ -7,7 +7,7 @@
     <h1 id="cp-title">Caixa do dia</h1>
     <p>{{ day|date:'l, d \d\e F \d\e Y' }}{% if is_today %} · hoje{% endif %}{% if unit %} · {{ unit.name }}{% endif %}</p></div>
   <div class="cp-actions">
-    {% if can_open_here %}<button type="button" class="cp-btn is-primary" data-open-cash>+ Abrir caixa</button>{% endif %}
+    {% if can_open_here and clinic_sheet_missing %}<button type="button" class="cp-btn is-primary" data-open-cash>+ Abrir caixa</button>{% endif %}
     <a class="cp-btn" href="{% url 'clinic-cash-report' %}">Relatório do caixa</a>
     <a class="cp-btn is-quiet" href="{% url 'clinic-cash-days' %}">Caixas por data</a>
   </div>
@@ -40,7 +40,12 @@
   <ul class="cp-legend">{% for m in methods %}<li><span class="cp-dot k-{{ m.kind }}"></span>{{ m.label }} <strong>R$ {{ m.amount|money_pt }}</strong> <span class="cp-hint" style="margin:0">{{ m.share }}%</span></li>{% endfor %}</ul>
 </section>
 
-<div class="cp-section-title"><h2>Caixas por profissional</h2><span>Cada profissional tem o seu caixa no dia; despesas gerais e lançamentos sem profissional ficam no caixa da clínica.</span></div>
+{% if day_professionals %}<section class="cp-panel" aria-labelledby="cp-pros"><header><h2 id="cp-pros">Quanto foi para cada profissional</h2><span class="cp-hint" style="margin:0">Tudo no caixa da clínica; cada recebimento fica ligado a quem atendeu</span></header>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Profissional</th><th>Pacientes</th><th>Dentista</th><th>Clínica</th><th>Outros</th><th>Recebido</th><th>Despesas dele</th><th>Líquido do dentista</th><th>Em aberto</th></tr></thead><tbody>
+{% for p in day_professionals %}<tr><td>{{ p.professional }}</td><td>{{ p.patients }}</td><td>R$ {{ p.dentist|money_pt }}</td><td>R$ {{ p.clinic|money_pt }}</td><td>R$ {{ p.other|money_pt }}</td><td><strong>R$ {{ p.total|money_pt }}</strong></td><td>{% if p.expenses %}R$ {{ p.expenses|money_pt }}{% else %}—{% endif %}</td><td>R$ {{ p.dentist_net|money_pt }}</td><td>{% if p.open %}R$ {{ p.open|money_pt }}{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></section>{% endif %}
+
+<div class="cp-section-title"><h2>{% if cards|length > 1 %}Caixas do dia{% else %}Caixa da clínica{% endif %}</h2><span>{% if cards|length > 1 %}Este dia ainda tem caixas separados por profissional{% if gestor %}: unifique em <a href="{% url 'clinic-cash-days' %}">Caixas por data</a>{% endif %}.{% else %}Um caixa só por dia: abra, lance e feche aqui.{% endif %}</span></div>
 {% if cards %}<div class="cp-grid">{% for c in cards %}
 <article class="cp-card is-{{ c.status }}" aria-labelledby="card-{{ c.session.pk }}">
   <div class="cp-card-head"><span class="cp-avatar" aria-hidden="true">{{ c.initials }}</span>
@@ -60,21 +65,18 @@
     </tbody></table>{% endif %}
   </div>
   <div class="cp-card-foot"><a class="cp-btn" href="{% url 'clinic-cash-sheet-detail' c.session.pk %}">{% if c.session.status == 'open' %}Abrir folha e lançar{% else %}Ver folha{% endif %}</a>
-    {% if is_today and c.session.status == 'open' and can_expense %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}?profissional={{ c.session.professional_id|default:'' }}#gastos">Lançar despesa</a>{% endif %}
-    {% if is_today and c.session.status == 'open' and can_expense %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}?profissional={{ c.session.professional_id|default:'' }}#retirada">Retirada (sangria)</a>{% endif %}
+    {% if can_expense and c.session.status == 'open' or can_expense and can_past %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}?day={{ day|date:'Y-m-d' }}#gastos">Lançar despesa</a>{% endif %}
+    {% if is_today and c.session.status == 'open' and can_expense %}<a class="cp-btn is-quiet" href="{% url 'clinic-finance-desk' %}#retirada">Retirada (sangria)</a>{% endif %}
     {% if c.session.status == 'open' and can_open_close %}<button type="button" class="cp-btn is-primary" data-close-cash data-session="{{ c.session.pk }}" data-label="{{ c.label }}"
       data-cash="{{ c.expected.cash|stringformat:'.2f' }}" data-pix="{{ c.expected.pix|stringformat:'.2f' }}" data-card="{{ c.expected.card|stringformat:'.2f' }}" data-open="{{ c.open_count }}">Conferir e fechar</button>{% endif %}</div>
 </article>{% endfor %}</div>
-{% else %}<div class="cp-empty"><strong>{% if is_today %}Nenhum caixa aberto hoje{% else %}Nenhum caixa neste dia{% endif %}</strong>O caixa de cada profissional é criado sozinho no primeiro recebimento do dia{% if can_open_close %}, ou abra agora com fundo de troco{% endif %}.
+{% else %}<div class="cp-empty"><strong>{% if is_today %}Nenhum caixa aberto hoje{% else %}Nenhum caixa neste dia{% endif %}</strong>O caixa da clínica é criado sozinho no primeiro recebimento do dia{% if can_open_close %}, ou abra agora com fundo de troco{% endif %}.
 {% if can_open_here %}<p style="margin-top:14px"><button type="button" class="cp-btn is-primary" data-open-cash>+ Abrir caixa</button></p>{% endif %}</div>{% endif %}
 
-{% if without_sheet and can_open_here %}<div class="cp-section-title"><h2>Sem caixa neste dia</h2><span>Abra para lançar com fundo de troco</span></div>
-<ul class="cp-missing">{% for p in without_sheet %}<li>{{ p.name }} <button type="button" class="cp-btn is-quiet" data-open-cash data-professional="{{ p.pk }}">Abrir</button></li>{% endfor %}{% if clinic_sheet_missing %}<li>Caixa da clínica <button type="button" class="cp-btn is-quiet" data-open-cash data-professional="">Abrir</button></li>{% endif %}</ul>{% endif %}
 
 {% if can_open_close %}{% if can_open_here %}
 <dialog class="cp-dialog" id="cp-open" aria-labelledby="cp-open-title"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="open"><input type="hidden" name="dia" value="{{ day|date:'Y-m-d' }}">
-  <header><div><h2 id="cp-open-title">Abrir caixa</h2><p>Dia {{ day|date:'d/m/Y' }}{% if not is_today %} · dia anterior (fica registrado na auditoria){% endif %}</p></div><button type="button" class="cp-x" data-close aria-label="Fechar">×</button></header>
-  <label>Caixa de<select name="professional"><option value="">Caixa da clínica (despesas e sem profissional)</option>{% for p in professionals %}<option value="{{ p.pk }}">{{ p.name }}</option>{% endfor %}</select></label>
+  <header><div><h2 id="cp-open-title">Abrir o caixa da clínica</h2><p>Dia {{ day|date:'d/m/Y' }}{% if not is_today %} · dia anterior (fica registrado na auditoria){% endif %}</p></div><button type="button" class="cp-x" data-close aria-label="Fechar">×</button></header>
   <label>Fundo de troco em dinheiro (R$)<input name="opening" type="number" min="0" step="0.01" value="0" inputmode="decimal" required></label>
   <label>Observação (opcional)<textarea name="notes" rows="2" maxlength="500"></textarea></label>
   <footer><button type="button" class="cp-btn" data-close>Cancelar</button><button class="cp-btn is-primary">Abrir caixa</button></footer>
@@ -100,7 +102,7 @@ const brl=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const open=document.getElementById('cp-open'),close=document.getElementById('cp-close');
 document.addEventListener('click',e=>{
   const o=e.target.closest('[data-open-cash]');
-  if(o&&open){const sel=open.querySelector('[name=professional]');if('professional' in o.dataset)sel.value=o.dataset.professional;open.showModal();sel.focus();return}
+  if(o&&open){open.showModal();open.querySelector('[name=opening]').focus();return}
   const c=e.target.closest('[data-close-cash]');
   if(c&&close){const f=close.querySelector('form');f.elements.session.value=c.dataset.session;close.querySelector('[data-close-label]').textContent=c.dataset.label;
     ['cash','pix','card'].forEach(k=>{const row=close.querySelector(`[data-row=${k}]`),exp=parseFloat(c.dataset[k])||0;row.dataset.value=exp;row.querySelector('[data-expected]').textContent=brl(exp);

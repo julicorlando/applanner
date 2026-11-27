@@ -19,8 +19,8 @@ def allowed(user):
 
 
 def receive_plan(request,transaction_id,method_id,paid_on=""):
-    """Pays a treatment-plan receivable as a line on the plan dentist's cash sheet of that day (one sheet per
-    professional per day). The receivable's own transaction becomes the line's transaction, so nothing is counted twice."""
+    """Pays a treatment-plan receivable as a line on the clinic's cash sheet of that day, linked to the plan's dentist.
+    The receivable's own transaction becomes the line's transaction, so nothing is counted twice."""
     from datetime import date
     from core.unit_scope import selected_unit
     from finance.clinic_cash import add_entry

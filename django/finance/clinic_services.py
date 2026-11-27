@@ -59,7 +59,7 @@ def session_day(session):
 
 
 def opened_before_today(session):
-    """Informative only: each professional has one sheet per day; earlier days stay editable (audited)."""
+    """Informative only: the clinic has one sheet per day; earlier days stay editable (audited)."""
     return session.status=='open' and session_day(session)<business_today(session.tenant)
 
 
@@ -69,10 +69,11 @@ def require_today(session):
 
 
 def day_sheet(tenant,unit,professional,user,day=None,opening=None):
-    """Cash sheet of one professional (None = the clinic's own) for one day, created on first use."""
+    """O caixa da clínica do dia (um só por dia), criado no primeiro uso. `professional` não escolhe outro
+    caixa: cada linha, despesa ou retirada guarda o seu profissional, e o fechamento mostra quanto foi de cada um."""
     day=day or business_today(tenant)
     if professional and professional.tenant_id!=tenant.pk: raise PermissionDenied
-    rows=CashSession.objects.select_for_update().filter(tenant=tenant,unit=unit,business_date=day,professional=professional,deleted_at__isnull=True)
+    rows=CashSession.objects.select_for_update().filter(tenant=tenant,unit=unit,business_date=day,professional__isnull=True,deleted_at__isnull=True)
     row=rows.filter(status='open').order_by('-pk').first()
     if row: return row
     if day<business_today(tenant):
@@ -80,7 +81,7 @@ def day_sheet(tenant,unit,professional,user,day=None,opening=None):
         row=rows.order_by('-pk').first()
         if row: return row
     opened=timezone.now() if day==business_today(tenant) else timezone.make_aware(datetime.combine(day,time(8,0)),_zone(tenant))
-    row=CashSession.objects.create(tenant=tenant,unit=unit,professional=professional,business_date=day,opened_by=user,
+    row=CashSession.objects.create(tenant=tenant,unit=unit,professional=None,business_date=day,opened_by=user,
         opening_amount=money(opening,True) if opening not in (None,'') else Decimal(0),opened_at=opened)
     append_audit(tenant=tenant,user=user,action='clinic.cash.opened',entity_type='CashSession',entity_id=row.pk,
         after={'professional':row.label,'day':day.isoformat(),'opening':str(row.opening_amount)})
@@ -96,7 +97,7 @@ def require_open_sheet(tenant,unit):
 
 
 def active_cash(tenant,unit,*,recording=True,professional=None,user=None):
-    """Today's sheet for receipts/expenses (professional's own, or the clinic's), opened automatically."""
+    """Today's clinic sheet for receipts/expenses, opened automatically."""
     if recording:
         if user is None: raise ValidationError('Identifique quem está lançando no caixa.')
         return day_sheet(tenant,unit,professional,user)
@@ -107,24 +108,23 @@ def active_cash(tenant,unit,*,recording=True,professional=None,user=None):
 
 @transaction.atomic
 def open_clinic_cash(user,unit,amount,notes="",professional=None,day=None):
-    """Abre o caixa de um profissional (ou da clínica) em um dia. Dias anteriores seguem a permissão
-    "dias_anteriores" da recepção; dia futuro não é aceito."""
+    """Abre o caixa da clínica em um dia (um só por dia; `professional` é ignorado). Dias anteriores seguem a
+    permissão "dias_anteriores" da recepção; dia futuro não é aceito."""
     from .reception_permissions import require
     require(user,'abrir_fechar')
     tenant=lock_company(user)
     if unit and (unit.tenant_id!=tenant.pk or not unit.active): raise PermissionDenied
-    if professional and (professional.tenant_id!=tenant.pk or not professional.active): raise PermissionDenied
     today=business_today(tenant)
     day=day or today
     if day>today: raise ValidationError('Não é possível abrir caixa para uma data futura.')
     if day<today: require(user,'dias_anteriores')
-    existing=CashSession.objects.filter(tenant=tenant,unit=unit,business_date=day,professional=professional,deleted_at__isnull=True).order_by('-pk').first()
+    existing=CashSession.objects.filter(tenant=tenant,unit=unit,business_date=day,professional__isnull=True,deleted_at__isnull=True).order_by('-pk').first()
     if existing and existing.status=='open':
-        raise ValidationError(f'O caixa de {existing.label} deste dia já está aberto. Abra a folha dele para lançar.')
+        raise ValidationError(f'O {existing.label.lower()} deste dia já está aberto. Abra a folha para lançar.')
     if existing and day<today:
         # Earlier days keep one sheet: adjust the closed one instead of opening another.
-        raise ValidationError(f'O caixa de {existing.label} deste dia já foi fechado. Para ajustar, abra a folha e peça a correção.')
-    row=day_sheet(tenant,unit,professional,user,day=day,opening=amount)
+        raise ValidationError(f'O {existing.label.lower()} deste dia já foi fechado. Para ajustar, abra a folha e peça a correção.')
+    row=day_sheet(tenant,unit,None,user,day=day,opening=amount)
     if notes: CashSession.objects.filter(pk=row.pk).update(notes=notes[:500])
     return row
 
@@ -193,11 +193,16 @@ def receive(*,user,unit,installment,amount,method,request_id):
 
 
 @transaction.atomic
-def expense(*,user,unit,description,amount,method,invoice,items,image,request_id,professional=None):
-    """A paid expense. With a professional it goes out of that professional's sheet of the day; without, the clinic's."""
+def expense(*,user,unit,description,amount,method,invoice,items,image,request_id,professional=None,day=None):
+    """Despesa paga, no caixa da clínica do dia escolhido (hoje ou um dia anterior). Com profissional, fica marcada
+    para ele no fechamento. Dia anterior segue a permissão "dias_anteriores" da recepção."""
     from .reception_permissions import require
     require(user,'despesas')
     tenant=lock_company(user);amount=money(amount)
+    today=business_today(tenant)
+    day=day or today
+    if day>today: raise ValidationError('A data da despesa não pode ser futura.')
+    if day<today: require(user,'dias_anteriores')
     if professional is not None and (professional.tenant_id!=tenant.pk or not professional.active):
         raise PermissionDenied('Profissional inválido para esta empresa.')
     existing=ClinicExpense.objects.filter(request_id=request_id).select_related('transaction','session').first()
@@ -206,7 +211,7 @@ def expense(*,user,unit,description,amount,method,invoice,items,image,request_id
         if (existing.session.tenant_id!=tenant.pk or existing.recorded_by_id!=user.pk or existing.session.unit_id!=(unit.pk if unit else None)
             or tx.amount!=amount or tx.description!=description.strip() or existing.method_id!=method.pk
             or existing.invoice_number!=invoice or existing.items!=items
-            or existing.session.professional_id!=(professional.pk if professional else None)):
+            or existing.professional_id!=(professional.pk if professional else None)):
             raise ValidationError('Esta despesa já foi registrada com outros dados.')
         from cryptography.fernet import Fernet
         from django.conf import settings
@@ -215,19 +220,22 @@ def expense(*,user,unit,description,amount,method,invoice,items,image,request_id
         supplied=cipher.decrypt(image[0]) if image else b''
         if previous!=supplied:raise ValidationError('O comprovante desta operação é diferente do original.')
         return existing
-    session=day_sheet(tenant,unit,professional,user)
+    session=day_sheet(tenant,unit,professional,user,day=day)
     method=ClinicPaymentMethod.objects.select_for_update().filter(pk=method.pk,tenant=tenant,active=True).first()
     if method is None:raise PermissionDenied
-    tx=FinancialTransaction.objects.create(tenant=tenant,unit=unit,type='expense',status='paid',paid_at=timezone.now(),
+    from .clinic_cash import _entry_time,refresh_closed
+    tx=FinancialTransaction.objects.create(tenant=tenant,unit=unit,type='expense',status='paid',paid_at=_entry_time(session),
         source_type='clinic-expense',description=description.strip(),amount=amount,payment_method=method.kind,
-        competence_at=timezone.localdate(),idempotency_key=f'clinic-expense:{request_id}')
+        competence_at=day,idempotency_key=f'clinic-expense:{request_id}')
     encrypted,mime=image or (b'','')
     row=ClinicExpense.objects.create(session=session,transaction=tx,recorded_by=user,invoice_number=invoice,items=items,method=method,method_name=method.name,
-        receipt_encrypted=encrypted,receipt_mime=mime,request_id=request_id)
-    append_audit(tenant=tenant,user=user,action='clinic.expense.recorded',entity_type='ClinicExpense',entity_id=row.pk,after={'transaction_id':tx.pk,'amount':str(amount),'sheet':session.pk,'professional':professional.pk if professional else None})
+        receipt_encrypted=encrypted,receipt_mime=mime,request_id=request_id,professional=professional)
+    append_audit(tenant=tenant,user=user,action='clinic.expense.recorded',entity_type='ClinicExpense',entity_id=row.pk,after={'transaction_id':tx.pk,'amount':str(amount),'sheet':session.pk,'day':day.isoformat(),'late':session.status!='open','professional':professional.pk if professional else None})
+    refresh_closed(session,user)
     return row
 
 
+@transaction.atomic
 def withdraw(*,user,unit,amount,method,withdrawn_by,destination,notes,request_id,professional=None):
     """Retirada de caixa (sangria): dinheiro que só sai da gaveta. Não gera lançamento financeiro."""
     from .reception_permissions import require
@@ -252,7 +260,7 @@ def withdraw(*,user,unit,amount,method,withdrawn_by,destination,notes,request_id
         raise ValidationError('A retirada é maior que o dinheiro esperado na gaveta deste caixa. Confira o valor.')
     row=ClinicCashWithdrawal.objects.create(session=session,amount=amount,method=method,method_name=method.name,
         withdrawn_by=withdrawn_by,destination=destination,notes=(notes or '').strip()[:500],recorded_by=user,
-        occurred_at=timezone.now(),request_id=request_id)
+        occurred_at=timezone.now(),request_id=request_id,professional=professional)
     append_audit(tenant=tenant,user=user,action='clinic.cash_withdrawal.recorded',entity_type='ClinicCashWithdrawal',entity_id=row.pk,
         after={'amount':str(amount),'sheet':session.pk,'destination':destination,'withdrawn_by':withdrawn_by})
     return row

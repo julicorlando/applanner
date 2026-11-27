@@ -3,13 +3,17 @@
 <header class="cp-head">
   <div><p class="cp-eyebrow"><a href="{% url 'clinic-finance-desk' %}">Financeiro</a> · Caixa</p>
     <h1 id="cd-title">Caixas por data</h1>
-    <p>Cada dia mostra o caixa de cada profissional e o caixa da clínica.{% if gestor %} Como gestor, você aprova pedidos da recepção e pode apagar um caixa.{% endif %}</p></div>
+    <p>Um caixa da clínica por dia; cada recebimento fica ligado ao profissional que atendeu.{% if gestor %} Como gestor, você aprova pedidos da recepção e pode apagar um caixa.{% endif %}</p></div>
   <div class="cp-actions">
     <a class="cp-btn is-primary" href="{% url 'clinic-cash-panel' %}">Caixa do dia</a>
     <a class="cp-btn" href="{% url 'clinic-cash-report' %}">Relatório do caixa</a>
     {% if gestor %}<a class="cp-btn is-quiet" href="{% url 'clinic-reception-permissions' %}">Permissões da recepção</a>{% endif %}
   </div>
 </header>
+
+{% if gestor and split_days %}<section class="cp-panel cd-unify" aria-labelledby="cd-unify"><header><h2 id="cd-unify">Unificar caixas por profissional</h2><span class="cp-badge s-overdue">{{ split_days }} dia(s)</span></header>
+<p class="cp-hint" style="margin-top:0">Antes, cada dentista tinha o seu caixa do dia. Unificar junta os caixas de cada dia no caixa da clínica: as linhas continuam ligadas ao dentista, e o fundo, o recebido, as despesas, as retiradas e o dinheiro contado são somados. Se algum total do dia mudasse, aquele dia não é alterado. Os caixas antigos ficam guardados na auditoria.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="merge-all"><button class="cp-btn is-primary">Unificar todos os dias</button></form></section>{% endif %}
 
 <nav class="cp-presets" aria-label="Período">{% for value, label in periods %}<a href="?dias={{ value }}" class="{% if days == value %}is-on{% endif %}"{% if days == value %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}</nav>
 
@@ -19,7 +23,8 @@
 
 {% for group in groups %}<section class="cp-panel cd-day" aria-labelledby="cd-{{ group.day|date:'Ymd' }}">
 <header><h2 id="cd-{{ group.day|date:'Ymd' }}"><a href="{% url 'clinic-cash-panel' %}?dia={{ group.day|date:'Y-m-d' }}">{{ group.day|date:'d/m/Y' }}</a> <small>{{ group.day|date:'l' }}{% if group.day == today %} · hoje{% endif %}</small></h2>
-<span class="cd-sum">Recebido <strong>R$ {{ group.total|money_pt }}</strong>{% if group.open %} <span class="cp-badge s-overdue">{{ group.open }} aberto(s)</span>{% endif %}</span></header>
+<span class="cd-sum">Recebido <strong>R$ {{ group.total|money_pt }}</strong>{% if group.open %} <span class="cp-badge s-overdue">{{ group.open }} aberto(s)</span>{% endif %}
+{% if gestor and group.split %}<form method="post" class="cd-inline">{% csrf_token %}<input type="hidden" name="action" value="merge-day"><input type="hidden" name="day" value="{{ group.day|date:'Y-m-d' }}"><button class="cp-btn">Unificar este dia</button></form>{% endif %}</span></header>
 <div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>Caixa</th><th class="is-left">Situação</th><th>Lançamentos</th><th>Recebido</th><th></th></tr></thead><tbody>{% for sheet in group.sheets %}
 <tr><td><a href="{% url 'clinic-cash-sheet-detail' sheet.pk %}"><strong>{{ sheet.label }}</strong></a></td>
 <td class="is-left">{% if sheet.status == 'open' %}<span class="cp-badge s-open">Aberto</span>{% elif sheet.difference_amount %}<span class="cp-badge s-divergent">Fechado · diferença R$ {{ sheet.difference_amount|money_pt }}</span>{% else %}<span class="cp-badge s-closed">Fechado</span>{% endif %}</td>
@@ -34,7 +39,7 @@
 .cd-sum{font-size:14px;color:var(--cp-muted)}.cd-sum strong{color:var(--cp-ink)}
 .cd-requests{border-color:#fcd34d}
 .cd-request{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--cp-line);font-size:14px}
-.cd-actions{display:flex;gap:8px}
+.cd-actions{display:flex;gap:8px}.cd-inline{display:inline-block;margin-left:10px}.cd-unify{border-color:#93c5fd}
 .cd-del summary{cursor:pointer;color:var(--cp-err);font-size:13px;font-weight:600}
 .cd-del form{display:flex;flex-direction:column;gap:6px;margin-top:6px;text-align:left;white-space:normal;min-width:220px}
 .cd-del label{font-size:12px;font-weight:600}.cd-del input{display:block;width:100%;margin-top:4px;min-height:38px;padding:6px 10px;border:1px solid var(--cp-line);border-radius:9px;background:var(--cp-surface);color:inherit;font:inherit}

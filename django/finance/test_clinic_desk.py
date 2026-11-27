@@ -168,23 +168,29 @@ class ClinicDeskTests(TestCase):
         with self.assertRaises(ValidationError):s.expense(**{**data,'amount':'6'})
         self.assertEqual(FinancialTransaction.objects.filter(source_type='clinic-expense').count(),1)
 
-    def test_expense_can_go_out_of_a_professional_sheet(self):
+    def test_expense_of_a_professional_stays_in_the_clinic_sheet_marked_for_them(self):
         from scheduling.models import Professional
-        from finance.clinic_cash import expected_cash
+        from finance.clinic_cash import by_professional, expected_cash
         dentist=Professional.objects.create(tenant=self.tenant,name='Dra. Despesa',unit=self.unit)
         url=reverse('clinic-finance-desk')
         page=self.client.get(url,{'profissional':dentist.pk})
-        self.assertContains(page,'Lançar no caixa de')
+        self.assertContains(page,'Despesa de qual profissional')
         self.assertEqual(page.context['expense_form'].initial['professional'],dentist.pk)
         response=self.client.post(url,{'action':'expense','request_id':str(uuid.uuid4()),'professional':dentist.pk,
+            'day':s.business_today(self.tenant).isoformat(),
             'description':'Material do dentista','amount':'12.50','method':self.cash.pk,'confirmed':'on'})
         self.assertEqual(response.status_code,302)
         row=ClinicExpense.objects.get(transaction__description='Material do dentista')
-        self.assertEqual(row.session.professional_id,dentist.pk)
+        self.assertIsNone(row.session.professional_id)
+        self.assertEqual(row.professional_id,dentist.pk)
         self.assertEqual(expected_cash(row.session),Decimal('-12.50'))
         general=s.expense(user=self.reception,unit=self.unit,description='Água',amount='3',method=self.cash,invoice='',items='',
                           image=None,request_id=uuid.uuid4())
-        self.assertIsNone(general.session.professional_id)
+        self.assertEqual(general.session_id,row.session_id)
+        self.assertIsNone(general.professional_id)
+        rows={r['professional']:r for r in by_professional(row.session)}
+        self.assertEqual(rows['Dra. Despesa']['expenses'],Decimal('12.50'))
+        self.assertEqual(rows['Dra. Despesa']['dentist_net'],Decimal('-12.50'))
         other=Professional.objects.create(tenant=Tenant.objects.create(name='Outra',slug='outra-despesa'),name='Fora')
         with self.assertRaises(PermissionDenied):
             s.expense(user=self.reception,unit=self.unit,description='X',amount='1',method=self.cash,invoice='',items='',
